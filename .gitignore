@@ -1,0 +1,46 @@
+# ── Dependencias ─────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Builds ───────────────────────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# ── Variables de entorno ─────────────────────────────────────────────────
+# Nunca versionar: en el VPS viven fuera de control de versiones con permisos
+# restringidos, y en CI vienen de GitHub Actions Secrets (CLAUDE.md §5.7).
+.env
+.env.*
+!.env.example
+
+# ── Configuración local de Claude Code ───────────────────────────────────
+# Excluidos a propósito: ambos archivos contienen listas de permisos con
+# CONTRASEÑAS EN TEXTO PLANO heredadas de otro proyecto. Este repositorio es
+# público. Antes de versionarlos hay que sanearlos.
+settings.json
+settings.local.json
+.claude/settings.local.json
+
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── Herramientas y temporales ────────────────────────────────────────────
+.playwright-mcp/
+*.preview-tmp.html
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+
+# ── Editor / SO ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

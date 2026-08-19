@@ -1,0 +1,607 @@
+/* ==========================================================================
+   Portal de acceso — Sistema de Gestión de Calidad y Mejora Continua
+   Universidad Continental
+
+   Paleta institucional (no inventar valores fuera de esta lista):
+     #6802C1  primario        #7C19E0  variante 1
+     #8E41D0  variante 2      #57019F  variante 3 (oscuro)
+     #C3B9F5  lila            #E9E1FB  lila claro
+
+   El color primario se inyecta desde el componente como `--uc-primary`, así que
+   tematizar es cambiar una prop, no editar esta hoja.
+
+   ── Escalado proporcional ────────────────────────────────────────────────
+   El diseño está especificado a 1360×820. En vez de fijarlo a ese tamaño, toda
+   medida se expresa en `--u`: la unidad que equivale a UN píxel del diseño
+   original. `--u` crece o se encoge con el viewport, así que la tarjeta ocupa
+   siempre la pantalla disponible manteniendo la proporción 1360:820 exacta, y
+   tipografía, campos e íconos escalan junto con ella.
+
+   Por eso las medidas se leen `calc(56 * var(--u))` y no `56px`: el número
+   sigue siendo el del diseño, solo cambia la unidad. No mezclar px aquí dentro
+   — un valor en px se quedaría del tamaño original mientras el resto escala.
+
+   Debajo de 1180px el diseño se apila en columna y `--u` vuelve a valer 1px,
+   porque ahí manda el ancho disponible, no la proporción.
+   ========================================================================== */
+
+/* En producción, mover a un <link rel="preconnect"> + <link> en index.html:
+   el @import bloquea el render del CSS que lo sigue. */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+.uc-login {
+  /* Tematizable: el componente sobrescribe estas dos con las props. */
+  --uc-primary: #6802c1;
+  --uc-gradient-end: #57019f;
+
+  /* Fijas del sistema. */
+  --uc-orb-1: #7c19e0;
+  --uc-orb-2: #8e41d0;
+  --uc-lilac: #c3b9f5;
+  --uc-lilac-soft: #e9e1fb;
+  --uc-page: #ededf2;
+  --uc-border: #e2e1ea;
+  --uc-surface-muted: #f7f5fb;
+  --uc-ink: #1a1526;
+  --uc-ink-soft: #6b6779;
+
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+  background: var(--uc-page);
+  font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--uc-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* `.uc-login` va incluido a propósito: sin él, su `min-height: 100vh` se suma a
+   su propio padding y la página arrastra 64px de scroll vertical de más. */
+.uc-login,
+.uc-login *,
+.uc-login *::before,
+.uc-login *::after {
+  box-sizing: border-box;
+}
+
+.uc-card {
+  /* Un píxel de diseño. El lado que primero se agote (ancho o alto) manda, de
+     modo que la tarjeta nunca se desborda ni deja de ser proporcional.
+     Los 48px y 64px descuentan el padding de `.uc-login`; 1.6585 es 1360/820.
+     Para poner un techo al crecimiento, envolver el min() en un max():
+       min(<lo de ahora>, 1700px)  */
+  --u: calc(min(100vw - 48px, (100vh - 64px) * 1.6585) / 1360);
+
+  display: flex;
+  width: calc(1360 * var(--u));
+  height: calc(820 * var(--u));
+  overflow: hidden;
+  background: #fff;
+  border-radius: calc(28 * var(--u));
+  box-shadow: 0 calc(30 * var(--u)) calc(80 * var(--u)) calc(-20 * var(--u))
+    rgba(20, 0, 50, 0.25);
+}
+
+/* ── Panel de marca (58%) ───────────────────────────────────────────────── */
+
+.uc-brand {
+  position: relative;
+  display: flex;
+  flex: 0 0 58%;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: calc(56 * var(--u)) calc(64 * var(--u));
+  background: linear-gradient(160deg, var(--uc-primary) 0%, var(--uc-gradient-end) 100%);
+}
+
+.uc-brand__orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.uc-brand__orb--tr {
+  top: calc(-170 * var(--u));
+  right: calc(-140 * var(--u));
+  width: calc(460 * var(--u));
+  height: calc(460 * var(--u));
+  background: var(--uc-orb-1);
+  opacity: 0.35;
+}
+
+.uc-brand__orb--bl {
+  bottom: calc(-200 * var(--u));
+  left: calc(-160 * var(--u));
+  width: calc(520 * var(--u));
+  height: calc(520 * var(--u));
+  background: var(--uc-orb-2);
+  opacity: 0.25;
+}
+
+.uc-brand > *:not(.uc-brand__orb) {
+  position: relative;
+  z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Logo institucional
+
+   Son DOS marcas distintas, no la misma imagen escalada:
+     .uc-logo-img    lockup horizontal, panel morado, 34 de alto
+     .uc-isotipo     cuadro morado 44×44 con el símbolo, panel blanco
+
+   Los archivos están en `assets/marca/`. Ver el README de esa carpeta.
+   -------------------------------------------------------------------------- */
+
+/* El archivo es 890×187 (4.76:1), así que a 34 de alto ocupa ~162 de ancho. */
+.uc-logo-img {
+  display: block;
+  width: auto;
+  height: calc(34 * var(--u));
+  /* `.uc-brand` es flex column: sin esto el `align-items: stretch` implícito
+     estira la imagen a todo el ancho del panel y deforma el logo. */
+  align-self: flex-start;
+}
+
+/* El único archivo con transparencia es negro. Este filtro lo pasa a blanco
+   puro sin tocar el alfa, que es exactamente lo que necesita el panel morado.
+   Funciona porque el logo es monocromático; con un logo multicolor habría que
+   pedir la versión blanca oficial en lugar de forzarla. */
+.uc-logo-img--blanco {
+  filter: brightness(0) invert(1);
+}
+
+/* El símbolo dentro del cuadro morado del panel derecho. */
+.uc-isotipo__img {
+  display: block;
+  width: calc(26 * var(--u));
+  height: auto;
+  filter: brightness(0) invert(1);
+}
+
+/* Bloque central */
+.uc-brand__eyebrow {
+  margin: 0 0 calc(18 * var(--u));
+  color: var(--uc-lilac);
+  font-size: calc(11.5 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+}
+
+.uc-brand__title {
+  margin: 0;
+  max-width: calc(480 * var(--u));
+  color: #fff;
+  font-size: calc(36 * var(--u));
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: -0.018em;
+}
+
+.uc-brand__rule {
+  width: calc(44 * var(--u));
+  height: calc(3 * var(--u));
+  margin: calc(24 * var(--u)) 0 calc(16 * var(--u));
+  border: 0;
+  border-radius: calc(2 * var(--u));
+  background: var(--uc-lilac);
+}
+
+.uc-brand__tagline {
+  margin: 0;
+  color: var(--uc-lilac-soft);
+  font-size: calc(16 * var(--u));
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* Tarjeta del ciclo — elemento firma del panel */
+.uc-cycle {
+  padding: calc(24 * var(--u)) calc(28 * var(--u)) calc(26 * var(--u));
+  border: calc(1 * var(--u)) solid rgba(255, 255, 255, 0.16);
+  border-radius: calc(20 * var(--u));
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(calc(12 * var(--u)));
+  -webkit-backdrop-filter: blur(calc(12 * var(--u)));
+}
+
+.uc-cycle__title {
+  margin: 0 0 calc(22 * var(--u));
+  color: var(--uc-lilac-soft);
+  font-size: calc(11 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.uc-cycle__steps {
+  display: flex;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uc-cycle__item {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: calc(10 * var(--u));
+}
+
+/* La última etapa no lleva conector, pero sí conserva su hueco: ocultarlo con
+   `visibility` en vez de recortarlo mantiene las cuatro columnas idénticas.
+   (Con `padding-right` no funciona: sobre `flex: 1` el padding se suma al
+   reparto y ensancha la última columna.) */
+.uc-cycle__item:last-child .uc-cycle__arrow {
+  visibility: hidden;
+}
+
+.uc-cycle__step {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(11 * var(--u));
+  text-align: center;
+}
+
+.uc-cycle__icon {
+  display: grid;
+  place-items: center;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  border-radius: calc(14 * var(--u));
+}
+
+/* Los SVG traen medidas como atributos HTML, que no escalan solos.
+   El CSS gana sobre el atributo de presentación, así que aquí se reponen. */
+.uc-cycle__icon > svg {
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+}
+
+/* Alternancia blanco / morado por etapa */
+.uc-cycle__icon--light {
+  background: #fff;
+  color: var(--uc-primary);
+}
+
+.uc-cycle__icon--dark {
+  background: var(--uc-orb-2);
+  color: #fff;
+}
+
+.uc-cycle__label {
+  color: #fff;
+  font-size: calc(12.5 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.uc-cycle__arrow {
+  flex: 0 0 auto;
+  /* Centrado óptico contra el cuadro de 44, no contra el bloque completo. */
+  margin-top: calc(16 * var(--u));
+  color: var(--uc-lilac);
+  opacity: 0.65;
+}
+
+.uc-cycle__arrow > svg {
+  width: calc(18 * var(--u));
+  height: calc(12 * var(--u));
+}
+
+/* Pie */
+.uc-brand__foot {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  color: var(--uc-lilac);
+  font-size: calc(12.5 * var(--u));
+  font-weight: 500;
+}
+
+/* `flex-shrink` evita que el escudo se aplaste cuando el texto envuelve. */
+.uc-brand__foot > svg {
+  flex-shrink: 0;
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+}
+
+/* ── Panel de acceso (42%) ──────────────────────────────────────────────── */
+
+.uc-access {
+  display: flex;
+  flex: 0 0 42%;
+  align-items: center;
+  justify-content: center;
+  padding: calc(56 * var(--u)) calc(48 * var(--u));
+  background: #fff;
+}
+
+.uc-access__inner {
+  width: 100%;
+  max-width: calc(360 * var(--u));
+}
+
+.uc-isotipo {
+  display: grid;
+  place-items: center;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  margin: 0 auto calc(26 * var(--u));
+  border-radius: calc(13 * var(--u));
+  background: linear-gradient(160deg, var(--uc-primary) 0%, var(--uc-gradient-end) 100%);
+}
+
+.uc-access__eyebrow {
+  margin: 0 0 calc(10 * var(--u));
+  color: var(--uc-primary);
+  font-size: calc(10.5 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.uc-access__title {
+  margin: 0 0 calc(8 * var(--u));
+  font-size: calc(27 * var(--u));
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.uc-access__sub {
+  margin: 0 0 calc(30 * var(--u));
+  color: var(--uc-ink-soft);
+  font-size: calc(14 * var(--u));
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Formulario */
+.uc-field {
+  margin-bottom: calc(18 * var(--u));
+}
+
+.uc-field__label {
+  display: block;
+  margin-bottom: calc(8 * var(--u));
+  font-size: calc(13 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+.uc-field__control {
+  position: relative;
+}
+
+.uc-input {
+  width: 100%;
+  height: calc(50 * var(--u));
+  padding: 0 calc(16 * var(--u));
+  border: calc(1 * var(--u)) solid var(--uc-border);
+  border-radius: calc(12 * var(--u));
+  background: #fff;
+  color: var(--uc-ink);
+  font-family: inherit;
+  font-size: calc(14.5 * var(--u));
+  font-weight: 500;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.uc-input::placeholder {
+  color: #a8a4b5;
+  font-weight: 400;
+}
+
+.uc-input:hover {
+  border-color: #cfccdb;
+}
+
+.uc-input:focus {
+  outline: none;
+  border-color: var(--uc-primary);
+  box-shadow: 0 0 0 calc(3 * var(--u)) color-mix(in srgb, var(--uc-primary) 15%, transparent);
+}
+
+.uc-input--password {
+  padding-right: calc(48 * var(--u));
+}
+
+.uc-eye {
+  position: absolute;
+  top: 50%;
+  right: calc(6 * var(--u));
+  display: grid;
+  place-items: center;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: calc(9 * var(--u));
+  background: transparent;
+  color: #8b8799;
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.uc-eye > svg {
+  width: calc(19 * var(--u));
+  height: calc(19 * var(--u));
+}
+
+.uc-eye:hover {
+  background: var(--uc-surface-muted);
+  color: var(--uc-primary);
+}
+
+.uc-eye:focus-visible {
+  outline: calc(2 * var(--u)) solid var(--uc-primary);
+  outline-offset: calc(2 * var(--u));
+}
+
+.uc-forgot {
+  display: block;
+  margin: calc(-4 * var(--u)) 0 calc(24 * var(--u));
+  color: var(--uc-primary);
+  font-size: calc(13 * var(--u));
+  font-weight: 600;
+  text-align: right;
+  text-decoration: none;
+  border-radius: calc(4 * var(--u));
+}
+
+.uc-forgot:hover {
+  text-decoration: underline;
+  text-underline-offset: calc(3 * var(--u));
+}
+
+.uc-forgot:focus-visible {
+  outline: calc(2 * var(--u)) solid var(--uc-primary);
+  outline-offset: calc(3 * var(--u));
+}
+
+.uc-submit {
+  width: 100%;
+  height: calc(50 * var(--u));
+  border: 0;
+  border-radius: calc(12 * var(--u));
+  background: var(--uc-primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 calc(10 * var(--u)) calc(24 * var(--u)) calc(-8 * var(--u))
+    color-mix(in srgb, var(--uc-primary) 55%, transparent);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.uc-submit:hover {
+  transform: translateY(calc(-1 * var(--u)));
+  filter: brightness(1.06);
+  box-shadow: 0 calc(14 * var(--u)) calc(30 * var(--u)) calc(-8 * var(--u))
+    color-mix(in srgb, var(--uc-primary) 62%, transparent);
+}
+
+.uc-submit:active {
+  transform: translateY(0);
+  box-shadow: 0 calc(6 * var(--u)) calc(16 * var(--u)) calc(-8 * var(--u))
+    color-mix(in srgb, var(--uc-primary) 55%, transparent);
+}
+
+.uc-submit:focus-visible {
+  outline: calc(2 * var(--u)) solid var(--uc-primary);
+  outline-offset: calc(3 * var(--u));
+}
+
+/* Separador y nota de seguridad */
+.uc-sep {
+  height: calc(1 * var(--u));
+  margin: calc(28 * var(--u)) 0 calc(20 * var(--u));
+  border: 0;
+  background: var(--uc-border);
+}
+
+.uc-note {
+  margin: 0;
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: var(--uc-surface-muted);
+  color: var(--uc-ink-soft);
+  font-size: calc(12 * var(--u));
+  font-weight: 500;
+  line-height: 1.55;
+  text-align: center;
+}
+
+/* ── Adaptación a pantallas menores ─────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .uc-card {
+    /* Apilado en columna la proporción 1360:820 deja de aplicar: manda el ancho
+       disponible. `--u` vuelve a 1px y todo recupera su tamaño de diseño. */
+    --u: 1px;
+
+    flex-direction: column;
+    width: min(1360px, 100%);
+    height: auto;
+  }
+
+  .uc-brand,
+  .uc-access {
+    flex: 1 1 auto;
+  }
+
+  .uc-brand {
+    gap: 40px;
+    padding: 44px 40px;
+  }
+
+  .uc-brand__title {
+    font-size: 30px;
+  }
+
+  .uc-access {
+    padding: 48px 40px 56px;
+  }
+}
+
+@media (max-width: 640px) {
+  .uc-login {
+    padding: 16px 12px;
+  }
+
+  .uc-card {
+    border-radius: 20px;
+  }
+
+  .uc-brand {
+    padding: 32px 24px;
+  }
+
+  .uc-brand__title {
+    font-size: 26px;
+  }
+
+  .uc-cycle {
+    padding: 20px 18px;
+  }
+
+  .uc-cycle__steps {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px 12px;
+  }
+
+  /* En 2×2 el conector deja de describir la secuencia y solo estorba. */
+  .uc-cycle__arrow {
+    display: none;
+  }
+
+  .uc-access {
+    padding: 36px 24px 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uc-login *,
+  .uc-login *::before,
+  .uc-login *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  .uc-submit:hover,
+  .uc-submit:active {
+    transform: none;
+  }
+}

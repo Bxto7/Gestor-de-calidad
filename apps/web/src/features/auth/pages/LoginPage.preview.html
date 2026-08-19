@@ -1,0 +1,228 @@
+<!doctype html>
+<!--
+  Preview estático del portal de acceso.
+
+  Enlaza ./LoginPage.css — la MISMA hoja que consume LoginPage.tsx, así que los
+  estilos tienen una sola fuente de verdad y este archivo no puede desincronizarse
+  visualmente del componente.
+
+  Solo duplica el markup, para poder revisar el diseño antes de que exista el
+  andamiaje de Vite. Se puede borrar en cuanto `npm run dev` funcione.
+  Ábrelo con doble clic.
+-->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bienvenido — Gestión de Calidad y Mejora Continua</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="./LoginPage.css" />
+    <style>
+      /* Reset mínimo. En la app real esto vive en el CSS global (index.css) que
+         crea el andamiaje de Vite — un componente no debe estilar <body>.
+         Sin esto, el margen por defecto de 8px del navegador provoca 16px de
+         scroll vertical de más. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Para probar otro morado institucional, cambia las dos variables:
+         #6802C1 · #7C19E0 · #8E41D0 · #57019F -->
+    <div class="uc-login" style="--uc-primary: #6802c1; --uc-gradient-end: #57019f">
+      <div class="uc-card">
+        <!-- ── Panel de marca ─────────────────────────────────────────── -->
+        <section class="uc-brand">
+          <div class="uc-brand__orb uc-brand__orb--tr"></div>
+          <div class="uc-brand__orb uc-brand__orb--bl"></div>
+
+          <img
+            class="uc-logo-img uc-logo-img--blanco"
+            src="../../../assets/marca/logo-uc-negro.png"
+            alt="Universidad Continental"
+          />
+
+          <div>
+            <p class="uc-brand__eyebrow">Sistema de Gestión de Calidad</p>
+            <h1 class="uc-brand__title">Gestión de Calidad y Mejora Continua</h1>
+            <hr class="uc-brand__rule" />
+            <p class="uc-brand__tagline">Excelencia que transforma</p>
+          </div>
+
+          <div class="uc-cycle">
+            <h2 class="uc-cycle__title">Ciclo de mejora continua</h2>
+            <ol class="uc-cycle__steps">
+              <li class="uc-cycle__item">
+                <div class="uc-cycle__step">
+                  <span class="uc-cycle__icon uc-cycle__icon--light">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z" />
+                      <path d="M16 6h1.5A1.5 1.5 0 0 1 19 7.5v11A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5v-11A1.5 1.5 0 0 1 6.5 6H8" />
+                      <path d="M8.75 11.5l1.25 1.25 2.25-2.25" />
+                      <path d="M14.75 16h-6" />
+                    </svg>
+                  </span>
+                  <span class="uc-cycle__label">Planificar</span>
+                </div>
+                <span class="uc-cycle__arrow">
+                  <svg width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 6h14" /><path d="M12 2.5L15.5 6 12 9.5" />
+                  </svg>
+                </span>
+              </li>
+
+              <li class="uc-cycle__item">
+                <div class="uc-cycle__step">
+                  <span class="uc-cycle__icon uc-cycle__icon--dark">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="8.25" />
+                      <path d="M10.5 9.4l4.4 2.6-4.4 2.6V9.4Z" />
+                    </svg>
+                  </span>
+                  <span class="uc-cycle__label">Ejecutar</span>
+                </div>
+                <span class="uc-cycle__arrow">
+                  <svg width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 6h14" /><path d="M12 2.5L15.5 6 12 9.5" />
+                  </svg>
+                </span>
+              </li>
+
+              <li class="uc-cycle__item">
+                <div class="uc-cycle__step">
+                  <span class="uc-cycle__icon uc-cycle__icon--light">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="10.8" cy="10.8" r="6.3" />
+                      <path d="M8.6 10.9l1.6 1.6 3-3.2" />
+                      <path d="M15.4 15.4L20 20" />
+                    </svg>
+                  </span>
+                  <span class="uc-cycle__label">Verificar</span>
+                </div>
+                <span class="uc-cycle__arrow">
+                  <svg width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 6h14" /><path d="M12 2.5L15.5 6 12 9.5" />
+                  </svg>
+                </span>
+              </li>
+
+              <li class="uc-cycle__item">
+                <div class="uc-cycle__step">
+                  <span class="uc-cycle__icon uc-cycle__icon--dark">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M4 16.5l4.75-4.75 3 3L20 6.5" />
+                      <path d="M15 6.5h5v5" />
+                    </svg>
+                  </span>
+                  <span class="uc-cycle__label">Mejorar</span>
+                </div>
+                <!-- Oculto por CSS, pero conserva el hueco: las cuatro columnas miden igual. -->
+                <span class="uc-cycle__arrow">
+                  <svg width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 6h14" /><path d="M12 2.5L15.5 6 12 9.5" />
+                  </svg>
+                </span>
+              </li>
+            </ol>
+          </div>
+
+          <p class="uc-brand__foot">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3.25l6.5 2.4v5.1c0 4-2.7 7.4-6.5 8.75-3.8-1.35-6.5-4.75-6.5-8.75v-5.1L12 3.25Z" />
+            </svg>
+            Universidad Continental — Dirección de Calidad Académica
+          </p>
+        </section>
+
+        <!-- ── Panel de acceso ────────────────────────────────────────── -->
+        <section class="uc-access">
+          <div class="uc-access__inner">
+            <div class="uc-isotipo">
+              <img class="uc-isotipo__img" src="../../../assets/marca/isotipo-uc-negro.png" alt="" />
+            </div>
+
+            <p class="uc-access__eyebrow">Portal de acceso institucional</p>
+            <h2 class="uc-access__title">Bienvenido</h2>
+            <p class="uc-access__sub">Ingresa tus credenciales para continuar</p>
+
+            <form novalidate>
+              <div class="uc-field">
+                <label class="uc-field__label" for="correo">Correo institucional</label>
+                <div class="uc-field__control">
+                  <input
+                    id="correo"
+                    class="uc-input"
+                    type="email"
+                    name="correo"
+                    autocomplete="username"
+                    placeholder="nombre@continental.edu.pe"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="uc-field">
+                <label class="uc-field__label" for="password">Contraseña</label>
+                <div class="uc-field__control">
+                  <input
+                    id="password"
+                    class="uc-input uc-input--password"
+                    type="password"
+                    name="password"
+                    autocomplete="current-password"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    class="uc-eye"
+                    id="toggle-password"
+                    aria-label="Mostrar contraseña"
+                    aria-pressed="false"
+                    aria-controls="password"
+                  >
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+                      <circle cx="12" cy="12" r="2.75" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <a class="uc-forgot" href="#recuperar">¿Olvidaste tu contraseña?</a>
+
+              <button type="submit" class="uc-submit">Iniciar sesión</button>
+            </form>
+
+            <hr class="uc-sep" />
+
+            <p class="uc-note">
+              Acceso exclusivo para personal autorizado de la Universidad Continental. Toda
+              actividad es registrada.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const OJO = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>`;
+      const OJO_TACHADO = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 5.8A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.9 3.8"/><path d="M6.4 7.6A17.3 17.3 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 3.9-.85"/><path d="M10.1 10.1a2.75 2.75 0 0 0 3.8 3.8"/><path d="M3.5 3.5l17 17"/></svg>`;
+
+      const boton = document.getElementById('toggle-password');
+      const campo = document.getElementById('password');
+
+      boton.addEventListener('click', () => {
+        const visible = campo.type === 'text';
+        campo.type = visible ? 'password' : 'text';
+        boton.innerHTML = visible ? OJO : OJO_TACHADO;
+        boton.setAttribute('aria-pressed', String(!visible));
+        boton.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+      });
+    </script>
+  </body>
+</html>
