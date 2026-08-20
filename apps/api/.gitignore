@@ -2,3 +2,7 @@
 src/platform/database/generated/
 node_modules/
 .env
+dist/
+coverage/
+*.tmp.ts
+*.log.tmp
