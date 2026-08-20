@@ -53,18 +53,26 @@ function correlativo(prefijo: string, codigosExistentes: readonly string[]): str
   return `${prefijo}-${String(siguiente).padStart(2, '0')}`;
 }
 
+function sinDiacriticos(fragmento: string): string {
+  return fragmento.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
 /**
  * RF006/RF015 — comparación de unicidad que no distingue mayúsculas ni espacios
  * adicionales. Se normaliza también el acento para que "Ingeniería" e
  * "Ingenieria" no convivan como facultades distintas.
+ *
+ * La eñe queda fuera de esa normalización porque en español **es una letra
+ * propia**, no una "n" con tilde: "campaña" y "campana", o "año" y "ano", son
+ * palabras distintas. Despojarla convertiría nombres legítimamente diferentes
+ * en duplicados. Por eso el texto se parte por la eñe, se limpia cada trozo y
+ * se vuelve a unir.
+ *
+ * La diéresis sí se despoja, y es correcto: en "pingüino" no marca otra letra,
+ * solo indica que la u suena.
  */
 export function normalizarParaUnicidad(texto: string): string {
-  return texto
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/\s+/g, ' ');
+  return texto.trim().toLowerCase().split('ñ').map(sinDiacriticos).join('ñ').replace(/\s+/g, ' ');
 }
 
 export function existeNombreDuplicado(

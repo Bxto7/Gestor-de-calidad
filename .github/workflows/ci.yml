@@ -6,9 +6,9 @@
 # en verde saltándose las pruebas es peor que no tener pipeline.
 #
 #   §5.4-1  Lint + typecheck ............. implementado (job `calidad`)
-#   §5.4-2  Pruebas unit/integración ..... PENDIENTE: no hay tests todavía
+#   §5.4-2  Pruebas unitarias ............ implementado (dominio del frontend)
 #   §5.4-3  SAST + auditoría de deps ..... implementado (job `seguridad`)
-#   §5.4-4  Cobertura ≥80% en dominio .... PENDIENTE: depende de §5.4-2
+#   §5.4-4  Cobertura ≥80% en dominio .... implementado (umbral en vitest.config)
 #   §5.4-5  Build ........................ parcial: solo el estático del frontend
 #   §5.4-6  Push a ghcr.io ............... PENDIENTE: no hay imágenes que publicar
 #   §5.4-7  Deploy al VPS ................ PENDIENTE: no hay VPS aprovisionado
@@ -64,6 +64,11 @@ jobs:
 
       - name: Formato
         run: npm run format:check
+
+      # CLAUDE.md §5.4-2 y §5.4-4. El umbral del 80% en `domain/` vive en
+      # vitest.config.ts, así que el mismo comando falla igual en local.
+      - name: Pruebas y cobertura
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
@@ -122,11 +127,10 @@ jobs:
 # No están escritas como pasos comentados porque envejecerían mal. Lo que hace
 # falta antes de poder añadirlas:
 #
-# §5.4-2 y §5.4-4 — Pruebas y cobertura
-#   Requiere Vitest (o Jest) en apps/web y, cuando exista el backend, Jest +
-#   Testcontainers en apps/api. El dominio del frontend (motor-validaciones,
-#   estado-plan, codigos) ya es puro y testeable sin montar React: es el punto
-#   natural por donde empezar, y donde el umbral del 80% aplica.
+# §5.4-2 — Pruebas de integración
+#   El dominio del frontend ya está cubierto. Falta el nivel de integración,
+#   que depende del backend: Jest + Testcontainers contra Postgres y Redis
+#   efímeros (CLAUDE.md §6.4), nunca contra staging.
 #
 # §5.4-5 y §5.4-6 — Imágenes Docker y ghcr.io
 #   Requiere apps/api con su Dockerfile. El frontend no lleva imagen propia:

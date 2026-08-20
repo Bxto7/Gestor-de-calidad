@@ -32,7 +32,15 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'src/features/auth/pages/*.preview.html'],
+    // Artefactos generados: `dist` del build y `coverage` del informe de
+    // pruebas. Sin excluir `coverage`, ESLint intenta analizar su HTML+JS con
+    // reglas que exigen tipos y aborta la ejecución entera.
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      'src/features/auth/pages/*.preview.html',
+    ],
   },
 
   js.configs.recommended,

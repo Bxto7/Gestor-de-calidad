@@ -16,7 +16,12 @@ import {
   siguienteCodigoCompetencia,
   siguienteCodigoObjetivo,
 } from '../domain/codigos';
-import { intentarTransicion, permiteEdicion, type AccionTransicion } from '../domain/estado-plan';
+import {
+  intentarTransicion,
+  permiteEdicion,
+  permiteFechaVigencia,
+  type AccionTransicion,
+} from '../domain/estado-plan';
 import type {
   Asignatura,
   Carrera,
@@ -259,27 +264,50 @@ export async function crearPlan(carreraId: string): Promise<PlanEstudios> {
   return demora(clonar(plan));
 }
 
-/** RF021 / RF023 / RF024: edición de datos generales, solo en estados editables. */
+/**
+ * RF021 / RF023 / RF024 — edición del plan.
+ *
+ * Cada campo lleva su propia precondición, y no una única puerta de entrada,
+ * porque RF023 y RF027 se contradicen sobre la fecha de vigencia:
+ *
+ *   RF027    bloquea la edición fuera de Borrador / En revisión.
+ *   RF023 RN1 exige que la vigencia solo se active con el plan **Aprobado**.
+ *
+ * Con un solo guard, uno de los dos quedaría sin aplicar. Se resuelve leyendo
+ * RF027 por lo que enumera —"datos generales, asignaturas y malla curricular"—
+ * y tratando la fecha de vigencia como un dato del flujo de aprobación, no como
+ * dato general. Así cada regla rige donde le corresponde.
+ */
 export async function editarPlan(
   id: string,
   cambios: { duracionAnios?: number; fechaVigencia?: string | null },
 ): Promise<PlanEstudios> {
   const plan = db.planes.find((p) => p.id === id);
   if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-  // RF027: bloqueo de edición fuera de Borrador / En revisión.
-  if (!permiteEdicion(plan.estado)) {
-    throw new ErrorDeNegocio(
-      `Un plan en estado ${plan.estado} no admite edición. Genera una nueva versión para modificarlo.`,
-    );
-  }
 
   if (cambios.duracionAnios !== undefined) {
+    // RF027: dato general, solo editable en Borrador / En revisión.
+    if (!permiteEdicion(plan.estado)) {
+      throw new ErrorDeNegocio(
+        `Un plan en estado ${plan.estado} no admite edición. Genera una nueva versión para modificarlo.`,
+      );
+    }
     if (!Number.isInteger(cambios.duracionAnios) || cambios.duracionAnios < 1) {
       throw new ErrorDeNegocio('La duración debe ser un número entero de años mayor a cero.');
     }
     plan.duracionAnios = cambios.duracionAnios;
   }
-  if (cambios.fechaVigencia !== undefined) plan.fechaVigencia = cambios.fechaVigencia;
+
+  if (cambios.fechaVigencia !== undefined) {
+    // RF023 RN1: fijarla antes de la aprobación daría un plan "vigente desde"
+    // una fecha que nadie aprobó. Limpiarla (null) sí se permite siempre.
+    if (cambios.fechaVigencia !== null && !permiteFechaVigencia(plan.estado)) {
+      throw new ErrorDeNegocio(
+        `La fecha de vigencia solo puede fijarse con el plan Aprobado; ahora está en ${plan.estado}.`,
+      );
+    }
+    plan.fechaVigencia = cambios.fechaVigencia;
+  }
 
   registrarAuditoria('Plan', id, 'Edición', 'Datos generales del plan actualizados.');
   return demora(clonar(plan));
