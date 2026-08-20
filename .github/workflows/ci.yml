@@ -160,6 +160,12 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # Antes del typecheck: `prisma/seed.ts` importa el cliente generado y sin
+      # él no compila. El cliente no se versiona (se regenera), así que en un
+      # checkout limpio no existe.
+      - name: Generar cliente Prisma
+        run: npx prisma generate
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -191,8 +197,6 @@ jobs:
         run: |
           npx prisma migrate diff             --from-config-datasource             --to-schema prisma/schema.prisma             --exit-code
 
-      - name: Generar cliente
-        run: npx prisma generate
 
       # El seed carga el catálogo de roles y permisos. Que corra aquí garantiza
       # que sigue siendo idempotente y que no referencia permisos inexistentes.
