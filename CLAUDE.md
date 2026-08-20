@@ -229,7 +229,8 @@ Módulo propio dentro del monolito (no un IAM externo tipo Keycloak/Auth0 en est
 
 ### 4.6 Versionado de dependencias — convención
 
-- Node.js 20 LTS fijado en `.nvmrc` y en la imagen Docker.
+- **Node.js 22 LTS ("Jod")** fijado en `.nvmrc` con versión exacta y en la imagen Docker, más `engines` en `package.json` para que la incompatibilidad falle de forma visible y no como un aviso perdido en el log.
+  > Antes decía Node 20 LTS. Se cambió porque **Node 20 llegó a fin de vida en abril de 2026**: ya no recibe parches de seguridad, lo que es incompatible con el objetivo de ASVS L2 de la sección 6.2. Node 22 tiene soporte hasta abril de 2027. Además, Vite 8 exige `^20.19.0 || >=22.12.0`, así que la versión mínima queda alineada con la herramienta de build.
 - Lockfiles (`package-lock.json`) siempre commiteados; CI falla si el lockfile no coincide con `package.json`.
 - Actualizaciones de dependencias mayores: PR dedicado, no mezclado con features.
 
