@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto del proyecto para Claude Code
 
-> Este archivo es el punto de entrada de contexto para Claude Code y contiene **todo** lo necesario: visión del proyecto, arquitectura, stack, despliegue y costos.
+> Este archivo es el punto de entrada de contexto para Claude Code y contiene **todo** lo necesario: visión del proyecto, arquitectura, stack, calidad/pruebas, despliegue y costos.
 
 ---
 
@@ -22,6 +22,12 @@ Se están construyendo **en paralelo**:
 - `RF-PEND-01`: recomendación de asignaturas comparando mallas de otras universidades
 - Automatización/recomendación en otros módulos futuros
 
+### Calidad como requisito no negociable
+
+Este sistema existe para ayudar a la universidad a sostener procesos de acreditación bajo distintos marcos (ICACIT hoy; a futuro, potencialmente SINEACE-CONEAU, licenciamiento SUNEDU u otros marcos internacionales). Por eso el propio software debe poder demostrar el mismo rigor de calidad que exige evaluar en los programas académicos — no basta con que funcione. La **sección 6** define el marco de estándares de referencia (ISO/IEC 25000, ISO/IEC/IEEE 29119, OWASP ASVS, WCAG), la estrategia de pruebas y dónde se ejecuta cada nivel de prueba, y cómo encajan ahí los agentes y skills ya configurados en `agents/` y `skills/`.
+
+Auth/Roles es desarrollado en paralelo con Plan de Estudios como MVP 1.
+
 ---
 
 ## 2. Convenciones de código
@@ -29,7 +35,7 @@ Se están construyendo **en paralelo**:
 - **TypeScript estricto** (`strict: true`) en frontend y backend. Nada de `any` sin justificar con comentario.
 - **Arquitectura por módulo:** cada módulo de NestJS sigue `domain/ application/ infrastructure/`. La capa de dominio no importa nada de NestJS, Prisma ni Express — debe ser testeable de forma aislada.
 - **Nomenclatura:** entidades y casos de uso en español (coherente con el dominio del negocio: `PlanDeEstudios`, `Asignatura`, `MotorDeValidaciones`), nombres técnicos de infraestructura (repos, DTOs, controllers) en inglés cuando sea el patrón del framework.
-- **Testing:** cobertura ≥80% en lógica de dominio (RNF del proyecto). Unit tests con Jest para dominio/aplicación; tests de integración para adaptadores (Prisma, colas, PDF).
+- **Testing:** cobertura ≥80% en lógica de dominio (RNF del proyecto). Unit tests con Jest para dominio/aplicación; tests de integración para adaptadores (Prisma, colas, PDF). El diseño y la documentación de pruebas siguen el vocabulario y la estructura de **ISO/IEC/IEEE 29119** (niveles de prueba, técnicas basadas en riesgo, trazabilidad requisito↔caso de prueba) — ver sección 6.4 para el detalle de niveles y dónde corre cada uno.
 - **Migraciones de base de datos:** siempre vía Prisma Migrate, nunca cambios manuales al esquema en producción.
 - **Auditoría:** cualquier caso de uso que modifique una entidad relevante (Plan de Estudios, Asignatura, aprobaciones) debe registrar el evento en la bitácora de auditoría (append-only, usuario + fecha + detalle). No es opcional.
 - **Validaciones de consistencia** (prerrequisitos circulares, coherencia de ciclos, créditos, competencias mínimas) viven en un servicio de dominio desacoplado (`MotorDeValidaciones`), no dispersas en controllers.
@@ -189,7 +195,7 @@ export interface RecommendationPort {
 | Autenticación | `@nestjs/jwt` + `passport-jwt`, `argon2` para hashing | Argon2 sobre bcrypt: mejor resistencia a ataques con hardware dedicado |
 | Colas | BullMQ sobre Redis | Generación de documentos, notificaciones, futura comunicación async con IA |
 | Documentos | `puppeteer` (PDF vía HTML→PDF) o `pdfkit` (PDF programático), `exceljs` (Excel) | Puppeteer da más control visual; PDFKit es más liviano en recursos |
-| Testing | Jest (unit + integración), Supertest (e2e HTTP) | Cobertura ≥80% en `domain/` y `application/` |
+| Testing | Jest (unit + integración), Supertest (e2e HTTP) | Cobertura ≥80% en `domain/` y `application/`; ver sección 4.7 para el resto del stack de calidad |
 | Linting/formato | ESLint + Prettier, `strict` TypeScript | No negociable en CI |
 
 ### 4.3 Base de datos
@@ -227,6 +233,21 @@ Módulo propio dentro del monolito (no un IAM externo tipo Keycloak/Auth0 en est
 - Lockfiles (`package-lock.json`) siempre commiteados; CI falla si el lockfile no coincide con `package.json`.
 - Actualizaciones de dependencias mayores: PR dedicado, no mezclado con features.
 
+### 4.7 Calidad, pruebas y seguridad
+
+| Elemento | Elección | Notas |
+|---|---|---|
+| Unit / integración (Node) | Jest + Supertest | Ya definidos en 4.2; cobertura ≥80% en `domain/`/`application/` |
+| Infraestructura de pruebas de integración | Testcontainers (Postgres y Redis efímeros) | Evita mocks frágiles de Prisma: cada test de repositorio corre contra una BD real y desechable, no contra staging/producción |
+| E2E de frontend | Playwright | Flujos críticos: login, crear/editar plan, drag-and-drop de malla, transición de estados, aprobación |
+| Accesibilidad | `jest-axe` / `axe-core` (integrado a Playwright) | Chequeo automatizado alineado a WCAG 2.1 AA en componentes clave — ver 6.4 |
+| Pruebas de carga | k6 | Solo contra Staging; valida el RNF de generación de documentos < 5s y tiempos de respuesta bajo concurrencia |
+| SAST (análisis estático de seguridad) | Semgrep (reglas OWASP) | Corre en cada PR; bloquea el merge ante hallazgos críticos/altos |
+| Análisis de dependencias | `npm audit` + GitHub Dependabot | Alertas automáticas de CVEs en dependencias directas y transitivas |
+| Datos de prueba | Factories con datos sintéticos/anonimizados, nunca datos reales de estudiantes o docentes fuera de producción | Ver 6.5 |
+
+Todas estas herramientas tienen una capa gratuita suficiente para el volumen del proyecto — no agregan costo de infraestructura más allá de minutos de CI (ver sección 7.1).
+
 ---
 
 ## 5. Despliegue e infraestructura
@@ -253,19 +274,23 @@ El servicio de IA (futuro) **no** vive en este `docker-compose.yml` del VPS — 
 
 | Entorno | Dónde | Propósito |
 |---|---|---|
-| **Desarrollo local** | Docker Compose en la máquina de cada dev | Réplica fiel de producción a nivel de servicios |
-| **Staging** | Mismo VPS que producción (contenedores separados, distinto puerto/subdominio) o un segundo VPS pequeño si el presupuesto lo permite | Validar releases antes de producción; correr migraciones aquí primero |
-| **Producción** | VPS principal | — |
+| **Desarrollo local** | Docker Compose en la máquina de cada dev | Réplica fiel de producción a nivel de servicios; pruebas unitarias corren aquí en cada guardado |
+| **CI (efímero)** | GitHub Actions, contenedores de servicio (Postgres/Redis) levantados por job | Pruebas de integración, API/contract, subconjunto rápido de E2E, SAST, auditoría de dependencias — se destruye al terminar el job |
+| **Staging** | Mismo VPS que producción (contenedores separados, distinto puerto/subdominio) o un segundo VPS pequeño si el presupuesto lo permite | Validar releases antes de producción; correr migraciones aquí primero; suite completa de E2E, pruebas de carga, accesibilidad manual, aceptación con usuarios piloto |
+| **Producción** | VPS principal | Solo monitoreo sintético (health checks) — nunca pruebas destructivas ni de carga |
 
 ### 5.4 CI/CD (GitHub Actions)
 
 Pipeline por push/PR:
 
 1. **Lint + typecheck** (`eslint`, `tsc --noEmit`)
-2. **Tests** (Jest unit + integración; Supertest para e2e de endpoints críticos)
-3. **Build** de imágenes Docker (api, worker) y build estático del frontend
-4. **Push** de imágenes a GitHub Container Registry (ghcr.io) — gratuito para repos del mismo dueño
-5. **Deploy** (en push a `main` o tag de release): SSH al VPS, `docker compose pull && docker compose up -d`, ejecutar `prisma migrate deploy` antes de levantar `api`
+2. **Pruebas unitarias e integración** (Jest + Testcontainers para Postgres/Redis efímeros; Supertest para e2e de endpoints críticos) — niveles definidos en la sección 6.4
+3. **Quality gates de seguridad:** SAST (Semgrep) + auditoría de dependencias (`npm audit`/Dependabot) — bloquean el merge ante hallazgos críticos o altos sin justificar
+4. **Verificación de cobertura:** falla el build si `domain/`/`application/` cae por debajo del 80%
+5. **Build** de imágenes Docker (api, worker) y build estático del frontend
+6. **Push** de imágenes a GitHub Container Registry (ghcr.io) — gratuito para repos del mismo dueño
+7. **Deploy** (en push a `main` o tag de release): SSH al VPS, `docker compose pull && docker compose up -d`, ejecutar `prisma migrate deploy` antes de levantar `api`
+8. **Smoke tests post-deploy** en Staging (subconjunto de Playwright sobre los flujos críticos) antes de promover a producción
 
 Migraciones de base de datos siempre corren como paso explícito del pipeline, nunca automáticamente al arrancar el contenedor.
 
@@ -301,11 +326,98 @@ Con presupuesto de un VPS único, el objetivo realista es **alta disponibilidad 
 
 ---
 
-## 6. Costos estimados
+## 6. Calidad de software: estándares, pruebas y agentes
+
+### 6.1 Por qué un marco formal de calidad
+
+Este sistema reemplaza la gestión manual de un proceso de acreditación — el estándar de rigor que se le exige no puede ser menor al que el propio sistema evalúa en los programas académicos. Adoptar modelos de referencia reconocidos (en vez de un criterio de calidad ad-hoc) da trazabilidad y un vocabulario común, en la misma línea que ya se buscaba con la arquitectura hexagonal y los invariantes de dominio explícitos de la sección 3.
+
+**Precisión importante:** salvo que la universidad lo pida explícitamente, nada de esto implica perseguir una *certificación* formal. ISO/IEC 25000 (SQuaRE) e ISO/IEC/IEEE 29119 son **modelos de referencia y de proceso** — se aplican por decisión de ingeniería, no se "obtienen" mediante una auditoría externa como sí ocurre con ISO 9001 o ISO/IEC 27001 (sistemas de gestión certificables). Lo que este documento adopta es su vocabulario y su estructura, aplicados de forma pragmática para un equipo de 3-5 personas — no la plantilla completa de documentación de los estándares.
+
+### 6.2 Estándares de referencia adoptados
+
+| Estándar | Qué cubre | Cómo se usa en este proyecto |
+|---|---|---|
+| **ISO/IEC 25010:2023** (parte de la familia SQuaRE, ISO/IEC 25000) | Modelo de calidad de producto: 9 características — adecuación funcional, eficiencia de desempeño, compatibilidad, capacidad de interacción, fiabilidad, seguridad, mantenibilidad, flexibilidad y *safety* (esta última, en 2023, se agregó como característica nueva) | Checklist de diseño: cada RNF y cada decisión arquitectónica relevante se puede trazar a una característica — ver la tabla de trazabilidad en 6.3 |
+| **ISO/IEC 25012** (SQuaRE) | Modelo de calidad de datos: exactitud, completitud, consistencia, trazabilidad, credibilidad, entre otras | Referencia para el diseño del `MotorDeValidaciones` y del esquema (invariantes de Plan de Estudios, sección 3.3) |
+| **ISO/IEC 25040 / 25041** (SQuaRE) | Proceso de evaluación de calidad de producto | Marco para revisiones de calidad periódicas del equipo, no un proceso de certificación |
+| **ISO/IEC/IEEE 29119** (partes 1 – conceptos, 2 – procesos, 3 – documentación, 4 – técnicas) | Vocabulario, proceso, documentación y técnicas de diseño de pruebas de software | Estructura de la estrategia de pruebas de la sección 6.4: niveles, técnicas basadas en riesgo, documentación mínima de pruebas |
+| **OWASP ASVS 5.0** | ~350 requisitos verificables de seguridad de aplicaciones (autenticación, control de acceso, manejo de datos, criptografía, etc.), en niveles L1–L3 | Objetivo: **Nivel 2** (aplicaciones que manejan datos institucionales sensibles) como checklist de referencia para el agente `security-auditor` |
+| **WCAG 2.1, nivel AA** | Accesibilidad web | Checklist para el frontend, reforzado por el skill `ui-ux-pro-max` y pruebas automatizadas con `axe-core` (sección 4.7) |
+| **ISO/IEC 12207** | Procesos del ciclo de vida del software (requisitos, diseño, construcción, pruebas, despliegue, mantenimiento) | Referencia general de estructura — ya reflejada de facto en las secciones 2 a 5 de este documento |
+
+Si a futuro la universidad requiere una certificación formal (por ejemplo ISO/IEC 27001 para su SGSI institucional), este documento es el punto de partida de la brecha a cubrir, no el estado final: hoy no se declara conformidad con ningún estándar, se declara la *intención de diseño* alineada a ellos.
+
+### 6.3 Trazabilidad: características de ISO/IEC 25010 ↔ decisiones de este documento
+
+| Característica (ISO 25010:2023) | Cómo se cumple hoy en la arquitectura | Estado |
+|---|---|---|
+| Adecuación funcional | 131 RF + 24 RNF documentados y trazables por módulo (sección 1) | ✅ ya definido |
+| Eficiencia de desempeño | Generación de documentos como jobs en cola, RNF < 5s (3.4); pruebas de carga con k6 en Staging (4.7/6.4) | 🔲 arquitectura lista, tooling de pruebas pendiente de implementar |
+| Compatibilidad | API REST + OpenAPI autogenerado (4.2), evita acoplar frontend/backend a un formato propietario | ✅ ya definido |
+| Capacidad de interacción (antes "usabilidad") | Tailwind + `@dnd-kit` accesible (4.1); objetivo WCAG 2.1 AA + `axe-core` (4.7/6.2) | 🔲 objetivo definido, pruebas automatizadas pendientes |
+| Fiabilidad | Máquina de estados explícita (3.4), auditoría append-only (3.4/5.3), backups diarios + RTO ≤4h (5.6) | ✅ ya definido |
+| Seguridad | JWT + refresh, `argon2id`, rate limiting (4.4), RBAC vía `AuthorizationPort` (3.5), TLS + firewall (5.7); SAST + dependency scanning (4.7); objetivo ASVS L2 (6.2) | ✅ controles base definidos / 🔲 gap analysis contra ASVS L2 pendiente |
+| Mantenibilidad | Arquitectura hexagonal + aislamiento de módulos (3.1-3.2), dominio sin dependencias de framework, cobertura ≥80% (2) | ✅ ya definido |
+| Flexibilidad (antes "portabilidad") | Docker Compose reproducible en local/CI/staging/prod (5.2-5.3); servicio de IA desacoplado vía `RecommendationPort` (3.6) | ✅ ya definido |
+| *Safety* (integridad operacional de los datos de acreditación) | Versiones `Histórico` inmutables, invariante de única versión `Vigente` protegida a nivel de dominio (3.3) | ✅ ya definido |
+
+La columna "Estado" es intencionalmente honesta: varias filas describen un objetivo que esta actualización de `CLAUDE.md` fija, no algo que ya esté implementado y probado.
+
+### 6.4 Estrategia y niveles de prueba — dónde se ejecuta cada uno
+
+| Nivel (vocabulario ISO 29119) | Qué prueba | Herramienta | Dónde corre |
+|---|---|---|---|
+| Pruebas unitarias | Entidades, value objects, `MotorDeValidaciones` (prerrequisitos circulares, créditos, competencias mínimas) | Jest | Local (cada guardado) + CI (cada push/PR) — sin dependencias externas, el dominio no importa Prisma/NestJS |
+| Pruebas de integración | Adaptadores: repos Prisma, colas BullMQ, generación de PDF/Excel | Jest + Testcontainers (Postgres/Redis efímeros) | Solo CI — cada PR levanta contenedores desechables; nunca contra la BD de staging/producción |
+| Pruebas de API / contrato | Controllers HTTP, DTOs, guards, `AuthorizationPort` | Supertest | CI, contra una instancia de la app con BD efímera |
+| Pruebas E2E de frontend | Login, crear/editar plan, drag-and-drop de malla, transición de estados, aprobación | Playwright | CI (subconjunto rápido en cada PR) + Staging (suite completa antes de cada release) |
+| Pruebas de regresión de validaciones | Casos derivados de la auditoría del Excel actual (p. ej. el comportamiento de "Insumo de entrada" según bloque) | Jest, tabla de casos con datos anonimizados del Excel auditado | CI — se congelan como regresión porque ya se encontró comportamiento no trivial una vez |
+| Pruebas de seguridad | Autenticación, RBAC, inyección, exposición de datos | Semgrep (SAST automático) en cada PR; revisión del agente `security-auditor` en PRs sobre `auth`/endpoints sensibles; pentest puntual antes de manejar datos reales en producción | CI (SAST) + Staging (revisión manual/pentest) — nunca en producción |
+| Pruebas de accesibilidad | Componentes de frontend contra WCAG 2.1 AA | `jest-axe` / Playwright + `axe-core` | CI (automatizado) + revisión manual puntual en Staging antes de un release mayor |
+| Pruebas de carga/desempeño | RNF de generación de documentos < 5s, tiempos de respuesta bajo concurrencia | k6 | Solo Staging — nunca en producción, nunca en cada PR de CI (demasiado costoso/ruidoso) |
+| Pruebas de aceptación | Validación funcional contra los 131 RF documentados | Manual, con Director de carrera/Coordinador académico como usuarios piloto | Staging, antes de cada release a producción |
+| Monitoreo sintético | Health checks, disponibilidad | Uptime Kuma (5.8) | Producción — nunca pruebas destructivas o de carga aquí |
+
+**Regla general:** cualquier prueba que pueda modificar o corromper datos corre contra datos sintéticos/anonimizados (local, CI o Staging); nunca contra la base de datos de producción.
+
+### 6.5 Datos de prueba y protección de datos personales
+
+Los seeds/factories usados en local, CI y Staging generan datos sintéticos o anonimizados — nunca datos reales de estudiantes, docentes o egresados fuera de producción. Esto es tanto una buena práctica de ingeniería (evita fugas de datos vía logs de CI, capturas de pantalla de bugs, etc.) como una precaución razonable frente a la normativa peruana de protección de datos personales (Ley N.º 29733 y su reglamento) — vale la pena que el equipo confirme con el área legal/de cumplimiento de la universidad qué categorías de datos del Plan de Estudios y de Auth califican como datos personales antes de decidir qué se puede anonimizar vs. qué requiere consentimiento explícito.
+
+### 6.6 Definición de "Terminado" (Definition of Done) por PR
+
+- Lint + typecheck sin errores.
+- Tests unitarios y de integración en verde; cobertura de `domain/`/`application/` ≥80%.
+- SAST y auditoría de dependencias sin hallazgos críticos/altos sin resolver o justificar explícitamente.
+- Si la PR toca una entidad auditable (Plan de Estudios, Asignatura, aprobaciones): evento de auditoría emitido y cubierto por una prueba.
+- Si la PR toca UI: chequeo de accesibilidad automatizado (`axe-core`) en verde.
+- Documentación OpenAPI/Swagger actualizada si cambia un endpoint.
+
+### 6.7 Agentes y skills de Claude Code en el proceso de calidad
+
+Ya existen agentes en `agents/` y skills en `skills/`. La tabla siguiente propone un rol para cada uno dentro de este marco de calidad, **basada solo en sus nombres de archivo** — no he leído su contenido. Si ya tienen instrucciones definidas, compártelas y ajusto esta tabla a lo que ya escribiste en vez de proponerlo desde cero.
+
+| Agente / skill | Rol propuesto |
+|---|---|
+| `security-auditor` (agent) | Dueño del checklist OWASP ASVS L2 (6.2); revisa PRs que tocan `auth`, `AuthorizationPort` o endpoints con datos sensibles; interpreta hallazgos de Semgrep |
+| `devops-engineer` (agent) | Dueño del pipeline CI/CD y sus quality gates (5.4); mantiene los contenedores efímeros de Testcontainers |
+| `deployment-engineer` (agent) | Dueño de la promoción a producción, smoke tests post-deploy (5.4) y rollback |
+| `api-documenter` (agent) | Mantiene el OpenAPI/Swagger sincronizado con el código — parte de "adecuación funcional" (6.3) y del Definition of Done (6.6) |
+| `python-pro` / `ml-engineer` (agents) | Cuando arranque RF-PEND-01, dueños del servicio FastAPI y de su propia suite `pytest`, desacoplada de la suite de Node |
+| `database-architect` (skill) | Revisión de esquema/migraciones Prisma contra los invariantes de dominio (única versión `Vigente`, grafo sin ciclos) — alineado a ISO/IEC 25012 |
+| `senior-backend` / `senior-frontend` (skills) | Revisión de código contra las convenciones de la sección 2 (aislamiento de módulos, dominio sin imports de framework) |
+| `ui-ux-pro-max` (skill) | Revisión de accesibilidad e interacción (WCAG 2.1 AA) en los flujos de la sección 6.4 |
+| `python-fastapi` / `nlp-embeddings` (skills) | Soporte específico para el futuro servicio de IA (3.6/4.5) — no aplican a MVP 1 |
+| `seo-optimizer` (skill) | Sin encaje claro hoy: el sistema es interno y vive detrás de autenticación, no hay una superficie pública que posicionar. Confirmar si hay un sitio institucional público planeado antes de asignarle un rol aquí |
+
+---
+
+## 7. Costos estimados
 
 > Cifras en USD, verificadas en agosto de 2026. Hetzner ajustó precios dos veces durante 2026 (abril y 15 de junio) — verificar el precio vigente antes de contratar. No incluye IGV/impuestos locales ni conversión a soles.
 
-### 6.1 Costo mensual — MVP 1 (Auth + Plan de Estudios, sin IA)
+### 7.1 Costo mensual — MVP 1 (Auth + Plan de Estudios, sin IA)
 
 | Ítem | Proveedor | Costo estimado/mes | Notas |
 |---|---|---|---|
@@ -313,23 +425,24 @@ Con presupuesto de un VPS único, el objetivo realista es **alta disponibilidad 
 | Almacenamiento de objetos (PDFs, evidencias, dumps de BD) | Backblaze B2 | **~$1–5** | $6–7/TB/mes; volumen esperado en el primer año es de pocas decenas de GB. Egress gratis hasta 3x el almacenamiento promedio |
 | Dominio | Cualquier registrador | **~$1** | ~$10–15/año prorrateado |
 | TLS/certificados | Let's Encrypt vía Caddy | **$0** | Automático |
-| CI/CD | GitHub Actions | **$0** | Plan gratuito suele alcanzar para este volumen; monitorear consumo |
+| CI/CD | GitHub Actions | **$0** | Plan gratuito suele alcanzar para este volumen; monitorear consumo (los quality gates de la sección 6 añaden minutos de CI, no costo de infraestructura) |
 | Registro de imágenes Docker | GitHub Container Registry (ghcr.io) | **$0** | Gratuito hasta cuotas razonables para este tamaño de proyecto |
 | Email transaccional | Resend (u otro con capa gratuita similar) | **$0** | Capa gratuita cubre miles de correos/mes; volumen esperado es bajo |
 | Monitoreo/uptime | Uptime Kuma self-hosted | **$0** | Alternativa: servicio gestionado con capa gratuita |
+| Herramientas de calidad y seguridad (SAST, dependencias, accesibilidad, carga) | Semgrep OSS, `npm audit` + Dependabot, `axe-core`, k6, Testcontainers, Playwright | **$0** | Todas con capa open-source/gratuita suficiente para este volumen (sección 4.7/6.4); consumen minutos de CI, ya contemplados arriba |
 | **Total MVP 1** | | **≈ $16–24/mes** | Equivalente a **$190–290/año** |
 
-### 6.2 Refuerzos recomendados
+### 7.2 Refuerzos recomendados
 
 | Ítem | Costo estimado/mes | Cuándo contratarlo |
 |---|---|---|
 | Snapshots automáticos de Hetzner | ~20% del costo del VPS (~$3–4) | Recomendado desde el día 1 |
-| VPS de staging separado (CX23, 2 vCPU/4 GB) | ~$6–7 | Cuando staging en el mismo VPS interfiera con producción |
+| VPS de staging separado (CX23, 2 vCPU/4 GB) | ~$6–7 | Cuando staging en el mismo VPS interfiera con producción, o cuando la suite completa de pruebas de la sección 6.4 necesite correr sin afectar producción |
 | Plan Team de GitHub | ~$4/usuario | Solo si el consumo real de minutos de CI supera el free tier |
 
 **Total MVP 1 con refuerzos recomendados: ≈ $25–35/mes.**
 
-### 6.3 Escenario de crecimiento — al incorporar IA/recomendación (RF-PEND-01)
+### 7.3 Escenario de crecimiento — al incorporar IA/recomendación (RF-PEND-01)
 
 | Ítem | Costo estimado/mes | Notas |
 |---|---|---|
@@ -338,14 +451,14 @@ Con presupuesto de un VPS único, el objetivo realista es **alta disponibilidad 
 | Almacenamiento de objetos (crece con más históricos/versiones) | **~$3–8** | Sigue siendo marginal a esta escala |
 | **Total con IA activa** | | **≈ $35–65/mes** |
 
-### 6.4 Escenario de crecimiento — al sumar módulos adicionales
+### 7.4 Escenario de crecimiento — al sumar módulos adicionales
 
 El costo de infraestructura **no crece linealmente por módulo**, porque los módulos nuevos viven dentro del mismo monolito y comparten el mismo VPS core. Solo se prevé gasto incremental si:
 
 - El histórico de versiones/auditoría crece a un punto que requiere más almacenamiento en disco del VPS (mitigable subiendo de tier o moviendo históricos a almacenamiento frío en B2).
 - Un módulo específico necesita escalar de forma independiente al resto (en ese punto se extrae a su propio servicio).
 
-### 6.5 Resumen por horizonte
+### 7.5 Resumen por horizonte
 
 | Horizonte | Costo mensual aproximado |
 |---|---|
@@ -354,7 +467,7 @@ El costo de infraestructura **no crece linealmente por módulo**, porque los mó
 | Con servicio de IA activo | $35–65 |
 | Con múltiples módulos + IA, a mediano plazo | A definir según volumen real de datos/usuarios |
 
-### 6.6 Notas finales
+### 7.6 Notas finales
 
 - No incluye tiempo de desarrollo/operación del equipo, solo infraestructura.
 - El hosting universitario propio (on-premise) sigue siendo alternativa válida si la universidad ya cuenta con servidores — en ese caso estos costos de VPS se reemplazan por el costo de oportunidad de esa infraestructura, manteniendo el almacenamiento de objetos en la nube (recomendado conservar, para separar los backups del mismo hardware que se respalda).
