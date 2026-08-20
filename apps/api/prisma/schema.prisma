@@ -136,7 +136,11 @@ model UsuarioRol {
 /// permiso y que el usuario esté asignado a la carrera del plan. Un usuario sin
 /// filas aquí no tiene alcance sobre ninguna carrera.
 model UsuarioCarrera {
-  usuarioId String @map("usuario_id") @db.Uuid
+  /// `@unique` y no solo parte de la clave compuesta: la universidad confirmó
+  /// que un director dirige **exactamente una** carrera. Se declara aquí y no
+  /// solo en SQL para que el esquema y la base no diverjan; el `map` conserva
+  /// el nombre descriptivo que usa la migración.
+  usuarioId String @unique(map: "usuario_carrera_una_por_usuario") @map("usuario_id") @db.Uuid
   /// Sin relación de Prisma a propósito: `Carrera` vive en otro módulo y §3.2
   /// prohíbe el acceso directo. Se guarda el identificador y la resolución pasa
   /// por el puerto que expone `plan-estudios`.
