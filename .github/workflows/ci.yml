@@ -6,7 +6,7 @@
 # en verde saltándose las pruebas es peor que no tener pipeline.
 #
 #   §5.4-1  Lint + typecheck ............. implementado (job `calidad`)
-#   §5.4-2  Pruebas unitarias ............ implementado (dominio del frontend)
+#   §5.4-2  Pruebas unitarias ............ implementado (dominio de front y back)
 #   §5.4-3  SAST + auditoría de deps ..... implementado (job `seguridad`)
 #   §5.4-4  Cobertura ≥80% en dominio .... implementado (umbral en vitest.config)
 #   §5.4-5  Build ........................ parcial: estático del frontend + esquema
@@ -123,7 +123,7 @@ jobs:
           --error
           --metrics=off
   esquema:
-    name: Esquema de datos
+    name: "Backend: dominio y esquema"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -159,6 +159,14 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # El dominio y los casos de uso son puros: no necesitan la base de datos
+      # para probarse, y por eso corren antes de levantarla.
+      - name: Pruebas de dominio y aplicación
+        run: npm run test:coverage
 
       - name: Validar esquema
         run: npx prisma validate
