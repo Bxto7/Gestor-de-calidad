@@ -171,9 +171,17 @@ jobs:
 
       # Si el esquema se editó sin generar la migración correspondiente, el
       # diff sale no vacío y `--exit-code` devuelve 2.
+      #
+      # `--from-config-datasource` lee la conexión de prisma.config.ts. En
+      # Prisma 7 ya no existe `--from-url`.
+      #
+      # El SQL escrito a mano (índices parciales, CHECK, triggers) no aparece
+      # como diferencia: Prisma ignora lo que su datamodel no puede representar.
+      # Verificado en local en ambos sentidos, con el esquema al día y con una
+      # tabla añadida sin migrar.
       - name: Migraciones al día con el esquema
         run: |
-          npx prisma migrate diff             --from-url "$DATABASE_URL"             --to-schema prisma/schema.prisma             --exit-code
+          npx prisma migrate diff             --from-config-datasource             --to-schema prisma/schema.prisma             --exit-code
 
       - name: Generar cliente
         run: npx prisma generate
