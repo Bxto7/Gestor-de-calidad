@@ -44,6 +44,10 @@ import type { PublicadorDeEventos } from './shared-kernel/domain-events/domain-e
 import { BitacoraListener } from './modules/auditoria/infrastructure/listeners/bitacora.listener.js';
 
 import {
+  REPOSITORIO_ASIGNATURA,
+  type RepositorioAsignaturaPort,
+} from './modules/plan-estudios/application/ports/asignatura.port.js';
+import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
   type RepositorioCarreraPort,
@@ -68,6 +72,7 @@ import {
   GestionarCarreras,
   GestionarFacultades,
 } from './modules/plan-estudios/application/use-cases/gestionar-estructura.use-case.js';
+import { GestionarAsignaturas } from './modules/plan-estudios/application/use-cases/gestionar-asignaturas.use-case.js';
 import { UbicarAsignatura } from './modules/plan-estudios/application/use-cases/ubicar-asignatura.use-case.js';
 import {
   AprobacionesRepositoryPrisma,
@@ -81,10 +86,15 @@ import {
 } from './modules/plan-estudios/infrastructure/http/estructura.controller.js';
 import { MallaController } from './modules/plan-estudios/infrastructure/http/malla.controller.js';
 import {
+  AsignaturasController,
+  AsignaturasDelPlanController,
+} from './modules/plan-estudios/infrastructure/http/asignaturas.controller.js';
+import {
   CarreraRepositoryPrisma,
   FacultadRepositoryPrisma,
 } from './modules/plan-estudios/infrastructure/persistence/estructura.repository.js';
 import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
+import { AsignaturaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/asignatura.repository.js';
 
 const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
 
@@ -115,6 +125,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     CarrerasController,
     PlanesController,
     MallaController,
+    AsignaturasDelPlanController,
+    AsignaturasController,
   ],
 
   providers: [
@@ -136,6 +148,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_FACULTAD, useClass: FacultadRepositoryPrisma },
     { provide: REPOSITORIO_CARRERA, useClass: CarreraRepositoryPrisma },
     { provide: REPOSITORIO_MALLA, useClass: MallaRepositoryPrisma },
+    { provide: REPOSITORIO_ASIGNATURA, useClass: AsignaturaRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
 
     /* ── Casos de uso ──────────────────────────────────────────────────── */
@@ -171,6 +184,23 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos),
+    },
+    {
+      provide: GestionarAsignaturas,
+      inject: [
+        REPOSITORIO_ASIGNATURA,
+        REPOSITORIO_PLAN,
+        REPOSITORIO_CONTENIDO,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        asignaturas: RepositorioAsignaturaPort,
+        planes: RepositorioPlanPort,
+        contenido: RepositorioContenidoPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarAsignaturas(asignaturas, planes, contenido, autorizacion, eventos),
     },
     {
       provide: UbicarAsignatura,
