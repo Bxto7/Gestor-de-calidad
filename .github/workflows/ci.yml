@@ -1,0 +1,138 @@
+# Integración continua — Sistema de Gestión de la Calidad
+#
+# Implementa las etapas de CLAUDE.md §5.4 que HOY pueden ejecutarse de verdad.
+# Las que dependen de piezas que aún no existen están listadas al final de este
+# archivo como pendientes explícitos, no como pasos vacíos: un pipeline que sale
+# en verde saltándose las pruebas es peor que no tener pipeline.
+#
+#   §5.4-1  Lint + typecheck ............. implementado (job `calidad`)
+#   §5.4-2  Pruebas unit/integración ..... PENDIENTE: no hay tests todavía
+#   §5.4-3  SAST + auditoría de deps ..... implementado (job `seguridad`)
+#   §5.4-4  Cobertura ≥80% en dominio .... PENDIENTE: depende de §5.4-2
+#   §5.4-5  Build ........................ parcial: solo el estático del frontend
+#   §5.4-6  Push a ghcr.io ............... PENDIENTE: no hay imágenes que publicar
+#   §5.4-7  Deploy al VPS ................ PENDIENTE: no hay VPS aprovisionado
+#   §5.4-8  Smoke tests en Staging ....... PENDIENTE: depende de §5.4-7
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Un push nuevo sobre la misma rama cancela el anterior. CLAUDE.md §7.1 pide
+# vigilar el consumo de minutos, y revisar commits ya superados no aporta nada.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Mínimo privilegio: ningún job de este workflow escribe en el repositorio.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/web
+
+jobs:
+  calidad:
+    name: Calidad del frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Lee .nvmrc en lugar de fijar la versión aquí: una sola fuente de
+          # verdad entre las máquinas del equipo y CI (CLAUDE.md §4.6).
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # `npm ci` y no `npm install`: falla si el lockfile no coincide con
+      # package.json, que es justamente lo que pide CLAUDE.md §4.6.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Formato
+        run: npm run format:check
+
+      - name: Build
+        run: npm run build
+
+  seguridad:
+    name: Quality gates de seguridad
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # CLAUDE.md §5.4-3: bloquea ante hallazgos críticos o altos.
+      # Los moderados y bajos se reportan pero no detienen el merge.
+      - name: Auditoría de dependencias
+        run: npm audit --audit-level=high
+
+      - name: Informe completo de vulnerabilidades
+        if: always()
+        run: npm audit || true
+
+  sast:
+    name: Análisis estático de seguridad
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    # El contenedor trae su propio working-directory; el `defaults` de arriba
+    # apunta a apps/web, que aquí no aplica porque se analiza todo el repo.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+
+      # `semgrep scan` funciona sin cuenta ni token, a diferencia de `semgrep ci`.
+      # Reglas OWASP según CLAUDE.md §4.7; falla solo en severidad ERROR, que es
+      # lo que el estándar considera crítico/alto.
+      - name: Semgrep
+        run: >
+          semgrep scan
+          --config=p/typescript
+          --config=p/react
+          --config=p/owasp-top-ten
+          --severity=ERROR
+          --error
+          --metrics=off
+# ── Etapas pendientes ────────────────────────────────────────────────────────
+#
+# No están escritas como pasos comentados porque envejecerían mal. Lo que hace
+# falta antes de poder añadirlas:
+#
+# §5.4-2 y §5.4-4 — Pruebas y cobertura
+#   Requiere Vitest (o Jest) en apps/web y, cuando exista el backend, Jest +
+#   Testcontainers en apps/api. El dominio del frontend (motor-validaciones,
+#   estado-plan, codigos) ya es puro y testeable sin montar React: es el punto
+#   natural por donde empezar, y donde el umbral del 80% aplica.
+#
+# §5.4-5 y §5.4-6 — Imágenes Docker y ghcr.io
+#   Requiere apps/api con su Dockerfile. El frontend no lleva imagen propia:
+#   CLAUDE.md §5.2 lo compila a estáticos servidos por Caddy.
+#
+# §5.4-7 y §5.4-8 — Deploy y smoke tests
+#   Requiere el VPS aprovisionado y estos secretos en el repositorio:
+#   SSH_HOST, SSH_USER, SSH_KEY. El deploy debe correr `prisma migrate deploy`
+#   como paso explícito antes de levantar `api`, nunca al arrancar el contenedor.

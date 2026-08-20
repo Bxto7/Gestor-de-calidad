@@ -9,10 +9,10 @@ al archivo y solo sirve sobre ese color exacto.
 
 ## Inventario actual
 
-| Archivo | Tamaño real | Fondo | Estado |
-|---|---|---|---|
-| `logo-uc-negro.png` | 890×187 | Transparente | **En uso** — panel morado del login |
-| `isotipo-uc-negro.png` | 257×187 | Transparente | **En uso** — panel blanco del login |
+| Archivo                | Tamaño real | Fondo        | Estado                              |
+| ---------------------- | ----------- | ------------ | ----------------------------------- |
+| `logo-uc-negro.png`    | 890×187     | Transparente | **En uso** — panel morado del login |
+| `isotipo-uc-negro.png` | 257×187     | Transparente | **En uso** — panel blanco del login |
 
 Se eliminaron tres archivos del kit original por venir con el fondo opaco pegado
 (`logo-uc-negro-sobre-blanco`, `logo-uc-blanco-sobre-negro`,

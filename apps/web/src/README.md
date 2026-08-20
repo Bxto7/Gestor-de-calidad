@@ -3,17 +3,17 @@
 Organización **por feature**, espejando los bounded contexts del backend. Un feature del
 frontend nunca importa desde otro feature; lo compartido sube a `shared/`.
 
-| Carpeta | Contenido |
-|---|---|
-| `app/` | Router, providers (`QueryClient`, auth context), layout raíz |
-| `features/<modulo>/api/` | Llamadas HTTP + hooks de `@tanstack/react-query` |
-| `features/<modulo>/schemas/` | Esquemas `zod`, compartidos con `react-hook-form` |
-| `features/<modulo>/components/` | Componentes propios del feature |
-| `features/<modulo>/hooks/` | Lógica de UI reutilizable dentro del feature |
-| `features/<modulo>/pages/` | Componentes de ruta |
-| `shared/components/ui/` | Primitivas de UI sin dominio (Button, Dialog, Table) |
-| `shared/lib/` | Cliente HTTP, formateo, helpers |
-| `styles/` | Entrada de Tailwind y tokens de tema |
+| Carpeta                         | Contenido                                                    |
+| ------------------------------- | ------------------------------------------------------------ |
+| `app/`                          | Router, providers (`QueryClient`, auth context), layout raíz |
+| `features/<modulo>/api/`        | Llamadas HTTP + hooks de `@tanstack/react-query`             |
+| `features/<modulo>/schemas/`    | Esquemas `zod`, compartidos con `react-hook-form`            |
+| `features/<modulo>/components/` | Componentes propios del feature                              |
+| `features/<modulo>/hooks/`      | Lógica de UI reutilizable dentro del feature                 |
+| `features/<modulo>/pages/`      | Componentes de ruta                                          |
+| `shared/components/ui/`         | Primitivas de UI sin dominio (Button, Dialog, Table)         |
+| `shared/lib/`                   | Cliente HTTP, formateo, helpers                              |
+| `styles/`                       | Entrada de Tailwind y tokens de tema                         |
 
 ## Notas de stack (`CLAUDE.md` §4.1)
 

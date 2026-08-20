@@ -1,0 +1,38 @@
+# Dependabot — CLAUDE.md §4.7 lo nombra junto a `npm audit` como el par que
+# vigila CVEs en dependencias directas y transitivas.
+#
+# CLAUDE.md §4.6 pide que las actualizaciones mayores vayan en PR dedicado y no
+# mezcladas con features. Por eso las menores y de parche se agrupan en un solo
+# PR semanal, y las mayores quedan fuera del grupo: cada una llega sola, con su
+# changelog visible y su propia ejecución de CI.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Lima
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+    groups:
+      menores-y-parches:
+        patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      # Las mayores no se agrupan: se abren de una en una.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+
+  # Las propias acciones del workflow también envejecen y arrastran CVEs.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
