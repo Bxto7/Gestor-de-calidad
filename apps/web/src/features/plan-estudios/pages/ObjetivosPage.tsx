@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   AreaTexto,
   Badge,
@@ -106,8 +106,8 @@ export function ObjetivosPage() {
       {/* RF095: el plan necesita al menos uno. */}
       {plan && asociados.size === 0 && (
         <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg">
-          Este plan no tiene ningún objetivo educacional asociado. Es una validación bloqueante:
-          sin al menos uno no podrá enviarse a revisión.
+          Este plan no tiene ningún objetivo educacional asociado. Es una validación bloqueante: sin
+          al menos uno no podrá enviarse a revisión.
         </p>
       )}
 
@@ -192,11 +192,7 @@ export function ObjetivosPage() {
                       <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(o)}>
                         Editar
                       </Boton>
-                      <Boton
-                        variante="fantasma"
-                        tamano="sm"
-                        onClick={() => inactivar.mutate(o.id)}
-                      >
+                      <Boton variante="fantasma" tamano="sm" onClick={() => inactivar.mutate(o.id)}>
                         {o.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
                       </Boton>
                     </div>
@@ -208,41 +204,37 @@ export function ObjetivosPage() {
         </div>
       )}
 
-      <ModalObjetivo
-        abierto={creando || editando !== null}
-        objetivo={editando}
-        onCerrar={() => {
-          setCreando(false);
-          setEditando(null);
-        }}
-      />
+      {/* Se monta solo al abrir: así el estado del formulario nace ya
+          correcto y no hace falta un efecto que lo sincronice. */}
+      {(creando || editando !== null) && (
+        <ModalObjetivo
+          objetivo={editando}
+          onCerrar={() => {
+            setCreando(false);
+            setEditando(null);
+          }}
+        />
+      )}
     </>
   );
 }
 
 function ModalObjetivo({
-  abierto,
   objetivo,
   onCerrar,
 }: {
-  abierto: boolean;
   objetivo: ObjetivoEducacional | null;
   onCerrar: () => void;
 }) {
-  const [nombre, setNombre] = useState('');
-  const [descripcion, setDescripcion] = useState('');
+  // El componente solo existe mientras el modal esta abierto, asi que el estado
+  // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
+  const [nombre, setNombre] = useState(objetivo?.nombre ?? '');
+  const [descripcion, setDescripcion] = useState(objetivo?.descripcion ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const crear = useCrearObjetivo();
   const editar = useEditarObjetivo();
   const guardando = crear.isPending || editar.isPending;
-
-  useEffect(() => {
-    if (!abierto) return;
-    setNombre(objetivo?.nombre ?? '');
-    setDescripcion(objetivo?.descripcion ?? '');
-    setError(null);
-  }, [abierto, objetivo]);
 
   function guardar() {
     setError(null);
@@ -257,7 +249,7 @@ function ModalObjetivo({
 
   return (
     <Modal
-      abierto={abierto}
+      abierto
       onCerrar={onCerrar}
       titulo={objetivo ? 'Editar objetivo educacional' : 'Nuevo objetivo educacional'}
       pie={
@@ -302,7 +294,6 @@ function ModalObjetivo({
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej. Desempeño profesional en ingeniería de software"
-              autoFocus
             />
           )}
         </Campo>

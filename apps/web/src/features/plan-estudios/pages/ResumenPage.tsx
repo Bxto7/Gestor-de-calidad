@@ -9,7 +9,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import { Badge } from '@/shared/components/ui';
 
 const PROXIMOS = [

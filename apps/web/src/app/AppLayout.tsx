@@ -7,33 +7,11 @@
  * Informática") viven en los datos, no en la URL.
  */
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 
 import isotipoUC from '@/assets/marca/isotipo-uc-negro.png';
-
-export interface Miga {
-  etiqueta: string;
-  a?: string;
-}
-
-interface Encabezado {
-  migas: Miga[];
-  acciones: ReactNode;
-}
-
-interface ContextoEncabezado extends Encabezado {
-  publicar: (e: Partial<Encabezado>) => void;
-}
-
-const Ctx = createContext<ContextoEncabezado | null>(null);
-
-/** Publica el breadcrumb y las acciones contextuales del header. */
-export function useEncabezado(): ContextoEncabezado {
-  const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useEncabezado debe usarse dentro de AppLayout.');
-  return ctx;
-}
+import { CtxEncabezado, type ContextoEncabezado, type Encabezado } from './encabezado';
 
 const ENLACES = [
   { a: '/', etiqueta: 'Resumen', icono: IconoResumen, exacto: true },
@@ -52,7 +30,7 @@ export function AppLayout() {
   );
 
   return (
-    <Ctx.Provider value={valor}>
+    <CtxEncabezado.Provider value={valor}>
       <div className="flex min-h-screen">
         {/* ── Sidebar 264px ─────────────────────────────────────────── */}
         <aside className="fixed inset-y-0 left-0 flex w-[264px] flex-col bg-gradient-to-b from-uc-primary to-uc-dark">
@@ -103,9 +81,7 @@ export function AppLayout() {
               <span className="block truncate text-[13px] font-bold text-white">
                 Coordinador académico
               </span>
-              <span className="block truncate text-[11px] text-uc-lila">
-                Dirección de Calidad
-              </span>
+              <span className="block truncate text-[11px] text-uc-lila">Dirección de Calidad</span>
             </span>
           </div>
         </aside>
@@ -152,7 +128,7 @@ export function AppLayout() {
           </main>
         </div>
       </div>
-    </Ctx.Provider>
+    </CtxEncabezado.Provider>
   );
 }
 

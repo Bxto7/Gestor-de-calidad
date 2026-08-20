@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   Badge,
   Boton,
@@ -192,14 +192,17 @@ export function FacultadesPage() {
         ))}
       </div>
 
-      <ModalFacultad
-        abierto={creando || editando !== null}
-        facultad={editando}
-        onCerrar={() => {
-          setCreando(false);
-          setEditando(null);
-        }}
-      />
+      {/* Se monta solo al abrir: así el estado del formulario nace ya
+          correcto y no hace falta un efecto que lo sincronice. */}
+      {(creando || editando !== null) && (
+        <ModalFacultad
+          facultad={editando}
+          onCerrar={() => {
+            setCreando(false);
+            setEditando(null);
+          }}
+        />
+      )}
 
       {historialDe && (
         <HistorialModal
@@ -255,26 +258,19 @@ export function FacultadesPage() {
 
 /** RF001 / RF002 / RF006: alta y edición con validación de unicidad. */
 function ModalFacultad({
-  abierto,
   facultad,
   onCerrar,
 }: {
-  abierto: boolean;
   facultad: Facultad | null;
   onCerrar: () => void;
 }) {
-  const [nombre, setNombre] = useState('');
+  // El componente solo existe mientras el modal está abierto, así que el estado
+  // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
+  const [nombre, setNombre] = useState(facultad?.nombre ?? '');
   const [error, setError] = useState<string | null>(null);
   const crear = useCrearFacultad();
   const editar = useEditarFacultad();
   const guardando = crear.isPending || editar.isPending;
-
-  useEffect(() => {
-    if (abierto) {
-      setNombre(facultad?.nombre ?? '');
-      setError(null);
-    }
-  }, [abierto, facultad]);
 
   function guardar() {
     setError(null);
@@ -289,7 +285,7 @@ function ModalFacultad({
 
   return (
     <Modal
-      abierto={abierto}
+      abierto
       onCerrar={onCerrar}
       titulo={facultad ? 'Editar facultad' : 'Nueva facultad'}
       descripcion="El nombre debe ser único; no se distinguen mayúsculas ni espacios."
@@ -318,7 +314,6 @@ function ModalFacultad({
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej. Ingeniería"
-              autoFocus
             />
           )}
         </Campo>

@@ -4,7 +4,6 @@
  * a su vez vienen de la paleta institucional del prompt (§2).
  */
 
-import { twMerge } from 'tailwind-merge';
 import {
   useEffect,
   useId,
@@ -16,15 +15,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 
-/**
- * Une clases resolviendo conflictos de Tailwind. Sin `twMerge`, un
- * `className="w-44"` pasado desde fuera NO gana sobre el `w-full` de la clase
- * base: tienen la misma especificidad y decide el orden del CSS generado, no el
- * del string. Esto ya rompió el ancho de los selectores de filtro.
- */
-export function cn(...clases: (string | false | null | undefined)[]): string {
-  return twMerge(clases.filter(Boolean).join(' '));
-}
+import { cn } from '@/shared/lib/cn';
 
 /* ── Badge de estado ──────────────────────────────────────────────────── */
 
@@ -68,11 +59,9 @@ type VarianteBoton = 'primario' | 'secundario' | 'fantasma' | 'peligro';
 const VARIANTES: Record<VarianteBoton, string> = {
   primario:
     'bg-uc-primary text-white hover:brightness-110 shadow-[0_8px_20px_-8px_rgba(104,2,193,0.55)]',
-  secundario:
-    'bg-white text-tinta border border-borde hover:border-uc-lila hover:text-uc-primary',
+  secundario: 'bg-white text-tinta border border-borde hover:border-uc-lila hover:text-uc-primary',
   fantasma: 'bg-transparent text-tinta-suave hover:bg-superficie-tenue',
-  peligro:
-    'bg-white text-alerta-fg border border-alerta-borde hover:bg-alerta-bg',
+  peligro: 'bg-white text-alerta-fg border border-alerta-borde hover:bg-alerta-bg',
 };
 
 export interface BotonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -113,13 +102,7 @@ export function Tarjeta({
   ...props
 }: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      {...props}
-      className={cn(
-        'rounded-2xl border border-borde bg-superficie p-5',
-        className,
-      )}
-    >
+    <div {...props} className={cn('rounded-2xl border border-borde bg-superficie p-5', className)}>
       {children}
     </div>
   );
@@ -138,10 +121,16 @@ export function Campo({
   error?: string | undefined;
   ayuda?: string;
   requerido?: boolean;
-  children: (props: { id: string; 'aria-invalid': boolean; 'aria-describedby': string }) => ReactNode;
+  children: (props: {
+    id: string;
+    'aria-invalid': boolean;
+    'aria-describedby': string;
+  }) => ReactNode;
 }) {
   const id = useId();
   const idAyuda = `${id}-ayuda`;
+  // El error desplaza a la ayuda: nunca se muestran los dos a la vez.
+  const mensaje = error ?? ayuda;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -150,15 +139,12 @@ export function Campo({
         {requerido && <span className="ml-0.5 text-alerta-fg">*</span>}
       </label>
       {children({ id, 'aria-invalid': !!error, 'aria-describedby': idAyuda })}
-      {(error || ayuda) && (
+      {mensaje && (
         <p
           id={idAyuda}
-          className={cn(
-            'text-xs',
-            error ? 'font-medium text-alerta-fg' : 'text-tinta-suave',
-          )}
+          className={cn('text-xs', error ? 'font-medium text-alerta-fg' : 'text-tinta-suave')}
         >
-          {error ?? ayuda}
+          {mensaje}
         </p>
       )}
     </div>
@@ -185,6 +171,20 @@ export function Selector({ className, ...props }: SelectHTMLAttributes<HTMLSelec
 
 /* ── Modal ────────────────────────────────────────────────────────────── */
 
+const FOCALIZABLES =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Diálogo modal con la gestión de foco centralizada aquí y no repartida por las
+ * pantallas. Antes cada formulario ponía `autoFocus` en su primer campo, lo que
+ * `jsx-a11y/no-autofocus` marca con razón: la decisión de dónde cae el foco es
+ * del contenedor, no de cada campo suelto.
+ *
+ * Cubre las tres piezas que WCAG espera de un modal:
+ *   - el foco entra al abrir (al primer control, o al diálogo si no hay ninguno)
+ *   - el foco queda atrapado dentro mientras está abierto
+ *   - el foco vuelve a donde estaba al cerrar
+ */
 export function Modal({
   abierto,
   titulo,
@@ -203,17 +203,54 @@ export function Modal({
   ancho?: 'sm' | 'md' | 'lg';
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const idTitulo = useId();
 
-  // Escape cierra: es lo que el usuario espera y evita dejarlo atrapado si el
-  // botón de cerrar queda fuera de vista.
   useEffect(() => {
     if (!abierto) return;
+
+    // Recordar el foco previo para devolverlo al cerrar.
+    const previo = document.activeElement as HTMLElement | null;
+    const dialogo = ref.current;
+
+    // El primer elemento del DOM es el botón "Cerrar" del encabezado, pero en un
+    // diálogo de formulario lo útil es caer en el primer campo. Se prioriza el
+    // cuerpo; si no tiene controles (un diálogo de confirmación), vale el primer
+    // focalizable, y si no hay ninguno, el diálogo mismo.
+    const campo = dialogo?.querySelector<HTMLElement>(
+      '[data-cuerpo] input:not([disabled]), [data-cuerpo] select:not([disabled]), [data-cuerpo] textarea:not([disabled])',
+    );
+    const primero = dialogo?.querySelector<HTMLElement>(FOCALIZABLES);
+    (campo ?? primero ?? dialogo)?.focus();
+
     const alPulsar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCerrar();
+      if (e.key === 'Escape') {
+        onCerrar();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialogo) return;
+
+      // Trampa de foco: sin esto el tabulador se escapa al contenido de detrás,
+      // que está oculto visualmente pero sigue siendo alcanzable.
+      const focalizables = [...dialogo.querySelectorAll<HTMLElement>(FOCALIZABLES)];
+      if (focalizables.length === 0) return;
+      const inicio = focalizables[0];
+      const fin = focalizables[focalizables.length - 1];
+      if (!inicio || !fin) return;
+
+      if (e.shiftKey && document.activeElement === inicio) {
+        e.preventDefault();
+        fin.focus();
+      } else if (!e.shiftKey && document.activeElement === fin) {
+        e.preventDefault();
+        inicio.focus();
+      }
     };
+
     document.addEventListener('keydown', alPulsar);
-    ref.current?.focus();
-    return () => document.removeEventListener('keydown', alPulsar);
+    return () => {
+      document.removeEventListener('keydown', alPulsar);
+      previo?.focus();
+    };
   }, [abierto, onCerrar]);
 
   if (!abierto) return null;
@@ -221,32 +258,61 @@ export function Modal({
   const anchos = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,0,50,0.35)] p-4"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCerrar();
-      }}
-    >
+    <div className="fixed inset-0 z-50 grid place-items-center p-4">
+      {/*
+        Fondo decorativo. Cerrar al hacer clic fuera es una comodidad de ratón:
+        el teclado y los lectores de pantalla ya tienen Escape y el botón
+        "Cerrar" del encabezado, así que esta interacción no es la única vía.
+      */}
+      <div
+        className="absolute inset-0 bg-[rgba(20,0,50,0.35)]"
+        aria-hidden="true"
+        onMouseDown={onCerrar}
+      />
+
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label={titulo}
+        aria-labelledby={idTitulo}
         tabIndex={-1}
         className={cn(
-          'w-full rounded-2xl bg-white shadow-[0_30px_80px_-20px_rgba(20,0,50,0.35)] focus:outline-none',
+          'relative w-full rounded-2xl bg-white shadow-[0_30px_80px_-20px_rgba(20,0,50,0.35)] focus:outline-none',
           anchos[ancho],
         )}
       >
-        <header className="border-b border-borde px-6 py-4">
-          <h2 className="text-lg font-extrabold tracking-tight">{titulo}</h2>
-          {descripcion && <p className="mt-1 text-sm text-tinta-suave">{descripcion}</p>}
+        <header className="flex items-start gap-4 border-b border-borde px-6 py-4">
+          <div className="min-w-0 flex-1">
+            <h2 id={idTitulo} className="text-lg font-extrabold tracking-tight">
+              {titulo}
+            </h2>
+            {descripcion && <p className="mt-1 text-sm text-tinta-suave">{descripcion}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar"
+            className="-mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-tinta-tenue transition hover:bg-superficie-tenue hover:text-tinta"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </header>
-        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">{children}</div>
+        <div data-cuerpo className="max-h-[60vh] overflow-y-auto px-6 py-5">
+          {children}
+        </div>
         {pie && (
-          <footer className="flex justify-end gap-2 border-t border-borde px-6 py-4">
-            {pie}
-          </footer>
+          <footer className="flex justify-end gap-2 border-t border-borde px-6 py-4">{pie}</footer>
         )}
       </div>
     </div>

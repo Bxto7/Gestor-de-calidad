@@ -39,18 +39,21 @@ export function useFacultades() {
 }
 
 export function useCrearFacultad() {
-  return conInvalidacion((nombre: string) => api.crearFacultad(nombre), [claves.facultades]);
+  return useMutacionConInvalidacion(
+    (nombre: string) => api.crearFacultad(nombre),
+    [claves.facultades],
+  );
 }
 
 export function useEditarFacultad() {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { id: string; nombre: string }) => api.editarFacultad(v.id, v.nombre),
     [claves.facultades],
   );
 }
 
 export function useInactivarFacultad() {
-  return conInvalidacion((id: string) => api.inactivarFacultad(id), [claves.facultades]);
+  return useMutacionConInvalidacion((id: string) => api.inactivarFacultad(id), [claves.facultades]);
 }
 
 /* ── Carreras ─────────────────────────────────────────────────────────── */
@@ -63,21 +66,21 @@ export function useCarreras(facultadId?: string) {
 }
 
 export function useCrearCarrera(facultadId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (datos: api.DatosCarrera) => api.crearCarrera(facultadId, datos),
     [claves.carreras(facultadId), claves.carreras(), claves.facultades],
   );
 }
 
 export function useEditarCarrera(facultadId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { id: string; datos: api.DatosCarrera }) => api.editarCarrera(v.id, v.datos),
     [claves.carreras(facultadId), claves.carreras()],
   );
 }
 
 export function useInactivarCarrera(facultadId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (id: string) => api.inactivarCarrera(id),
     [claves.carreras(facultadId), claves.carreras()],
   );
@@ -102,11 +105,14 @@ export function useVersiones(carreraId: string) {
 }
 
 export function useCrearPlan() {
-  return conInvalidacion((carreraId: string) => api.crearPlan(carreraId), [['planes'], ['versiones']]);
+  return useMutacionConInvalidacion(
+    (carreraId: string) => api.crearPlan(carreraId),
+    [['planes'], ['versiones']],
+  );
 }
 
 export function useEditarPlan(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (cambios: { duracionAnios?: number; fechaVigencia?: string | null }) =>
       api.editarPlan(planId, cambios),
     [claves.plan(planId), ['planes'], claves.auditoria('Plan', planId)],
@@ -114,7 +120,7 @@ export function useEditarPlan(planId: string) {
 }
 
 export function useAsociarAlPlan(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (cambios: { objetivoIds?: string[]; competenciaIds?: string[] }) =>
       api.asociarAlPlan(planId, cambios),
     [claves.plan(planId), claves.auditoria('Plan', planId)],
@@ -122,12 +128,16 @@ export function useAsociarAlPlan(planId: string) {
 }
 
 export function useCambiarEstadoPlan(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: {
       accion: Parameters<typeof api.cambiarEstadoPlan>[1];
       tieneBloqueos: boolean;
       comentario?: string;
-    }) => api.cambiarEstadoPlan(planId, v.accion, { tieneBloqueos: v.tieneBloqueos, comentario: v.comentario }),
+    }) =>
+      api.cambiarEstadoPlan(planId, v.accion, {
+        tieneBloqueos: v.tieneBloqueos,
+        comentario: v.comentario,
+      }),
     [
       claves.plan(planId),
       ['planes'],
@@ -139,14 +149,17 @@ export function useCambiarEstadoPlan(planId: string) {
 }
 
 export function useGenerarNuevaVersion() {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (idOrigen: string) => api.generarNuevaVersion(idOrigen),
     [['planes'], ['versiones']],
   );
 }
 
 export function useEliminarPlan() {
-  return conInvalidacion((id: string) => api.eliminarPlan(id), [['planes'], ['versiones']]);
+  return useMutacionConInvalidacion(
+    (id: string) => api.eliminarPlan(id),
+    [['planes'], ['versiones']],
+  );
 }
 
 /* ── Trazabilidad ─────────────────────────────────────────────────────── */
@@ -176,7 +189,7 @@ export function useJustificaciones(planId: string) {
 }
 
 export function useJustificarRegla(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { codigoRegla: string; motivo: string }) =>
       api.justificarRegla(planId, v.codigoRegla, v.motivo),
     [claves.justificaciones(planId), claves.auditoria('Plan', planId)],
@@ -190,14 +203,14 @@ export function useObjetivos() {
 }
 
 export function useCrearObjetivo() {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { nombre: string; descripcion: string }) => api.crearObjetivo(v.nombre, v.descripcion),
     [claves.objetivos],
   );
 }
 
 export function useEditarObjetivo() {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { id: string; nombre: string; descripcion: string }) =>
       api.editarObjetivo(v.id, v.nombre, v.descripcion),
     [claves.objetivos],
@@ -205,11 +218,11 @@ export function useEditarObjetivo() {
 }
 
 export function useInactivarObjetivo() {
-  return conInvalidacion((id: string) => api.inactivarObjetivo(id), [claves.objetivos]);
+  return useMutacionConInvalidacion((id: string) => api.inactivarObjetivo(id), [claves.objetivos]);
 }
 
 export function useEliminarObjetivo() {
-  return conInvalidacion((id: string) => api.eliminarObjetivo(id), [claves.objetivos]);
+  return useMutacionConInvalidacion((id: string) => api.eliminarObjetivo(id), [claves.objetivos]);
 }
 
 export function useCompetencias() {
@@ -217,22 +230,31 @@ export function useCompetencias() {
 }
 
 export function useCrearCompetencia() {
-  return conInvalidacion((nombre: string) => api.crearCompetencia(nombre), [claves.competencias]);
+  return useMutacionConInvalidacion(
+    (nombre: string) => api.crearCompetencia(nombre),
+    [claves.competencias],
+  );
 }
 
 export function useEditarCompetencia() {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { id: string; nombre: string }) => api.editarCompetencia(v.id, v.nombre),
     [claves.competencias],
   );
 }
 
 export function useInactivarCompetencia() {
-  return conInvalidacion((id: string) => api.inactivarCompetencia(id), [claves.competencias]);
+  return useMutacionConInvalidacion(
+    (id: string) => api.inactivarCompetencia(id),
+    [claves.competencias],
+  );
 }
 
 export function useEliminarCompetencia() {
-  return conInvalidacion((id: string) => api.eliminarCompetencia(id), [claves.competencias]);
+  return useMutacionConInvalidacion(
+    (id: string) => api.eliminarCompetencia(id),
+    [claves.competencias],
+  );
 }
 
 /* ── Asignaturas y malla ──────────────────────────────────────────────── */
@@ -246,21 +268,21 @@ export function useAsignaturas(planId: string) {
 }
 
 export function useCrearAsignatura(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (datos: api.DatosAsignatura) => api.crearAsignatura(planId, datos),
     [claves.asignaturas(planId), claves.auditoria('Plan', planId)],
   );
 }
 
 export function useEditarAsignatura(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { id: string; datos: api.DatosAsignatura }) => api.editarAsignatura(v.id, v.datos),
     [claves.asignaturas(planId)],
   );
 }
 
 export function useInactivarAsignatura(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (id: string) => api.inactivarAsignatura(id),
     [claves.asignaturas(planId)],
   );
@@ -268,7 +290,7 @@ export function useInactivarAsignatura(planId: string) {
 
 /** RF061 / RF062 / RF070 / RF071: toda la malla se mueve por aquí. */
 export function useUbicarAsignatura(planId: string) {
-  return conInvalidacion(
+  return useMutacionConInvalidacion(
     (v: { id: string; ciclo: number | null; ordenDestino?: number }) =>
       api.ubicarAsignatura(v.id, v.ciclo, v.ordenDestino),
     [claves.asignaturas(planId)],
@@ -279,10 +301,14 @@ export function useUbicarAsignatura(planId: string) {
 
 /**
  * Envuelve `useMutation` invalidando las claves indicadas al terminar bien.
+ *
+ * El nombre empieza por `use` porque llama hooks: sin eso, la regla
+ * `react-hooks/rules-of-hooks` no puede verificar ninguna de sus ~25
+ * llamadas y el linter se queda ciego justo donde más importa.
  * Evita repetir el mismo `onSuccess` en veinte hooks y, sobre todo, evita que
  * alguno se olvide de invalidar y deje la pantalla mostrando datos viejos.
  */
-function conInvalidacion<TVars, TData>(
+function useMutacionConInvalidacion<TVars, TData>(
   fn: (vars: TVars) => Promise<TData>,
   clavesAInvalidar: readonly (readonly unknown[])[],
 ): UseMutationResult<TData, Error, TVars> {

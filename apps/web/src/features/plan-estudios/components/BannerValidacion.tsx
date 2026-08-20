@@ -60,10 +60,14 @@ export function BannerValidacion({
             titulo={`${resultado.advertencias.length} advertencia(s)`}
             subtitulo="No impiden avanzar. Pueden corregirse o justificarse."
             hallazgos={resultado.advertencias}
-            onJustificar={soloLectura ? undefined : (h) => {
-              setAJustificar(h);
-              setMotivo('');
-            }}
+            onJustificar={
+              soloLectura
+                ? undefined
+                : (h) => {
+                    setAJustificar(h);
+                    setMotivo('');
+                  }
+            }
           />
         )}
       </div>
@@ -101,7 +105,6 @@ export function BannerValidacion({
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
           placeholder="Ej. Los ciclos 9 y 10 se completarán en la siguiente etapa de diseño curricular."
-          autoFocus
         />
         <p className="mt-2 text-xs text-tinta-suave">
           Queda registrada en el histórico del plan con tu usuario y la fecha.

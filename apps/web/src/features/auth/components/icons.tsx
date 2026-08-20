@@ -12,10 +12,10 @@
 import logoUC from '../../../assets/marca/logo-uc-negro.png';
 import isotipoUC from '../../../assets/marca/isotipo-uc-negro.png';
 
-type IconProps = {
+interface IconProps {
   size?: number;
   className?: string;
-};
+}
 
 const base = (size: number) => ({
   width: size,
@@ -38,11 +38,7 @@ const base = (size: number) => ({
  */
 export function LogotipoUC() {
   return (
-    <img
-      className="uc-logo-img uc-logo-img--blanco"
-      src={logoUC}
-      alt="Universidad Continental"
-    />
+    <img className="uc-logo-img uc-logo-img--blanco" src={logoUC} alt="Universidad Continental" />
   );
 }
 

@@ -33,7 +33,11 @@ export function StepperEstado({ actual }: { actual: EstadoPlan }) {
               <span
                 className={[
                   'grid h-4 w-4 place-items-center rounded-full text-[10px]',
-                  esActual ? 'bg-white text-uc-primary' : recorrido ? 'bg-uc-primary text-white' : 'bg-borde text-tinta-tenue',
+                  esActual
+                    ? 'bg-white text-uc-primary'
+                    : recorrido
+                      ? 'bg-uc-primary text-white'
+                      : 'bg-borde text-tinta-tenue',
                 ].join(' ')}
                 aria-hidden="true"
               >
@@ -53,20 +57,4 @@ export function StepperEstado({ actual }: { actual: EstadoPlan }) {
       })}
     </ol>
   );
-}
-
-/** Mapea el estado del plan al tono de badge del §2 del prompt. */
-export function tonoDeEstado(estado: EstadoPlan) {
-  switch (estado) {
-    case 'Borrador':
-      return 'inactivo' as const;
-    case 'En revisión':
-      return 'progreso' as const;
-    case 'Aprobado':
-      return 'aprobado' as const;
-    case 'Vigente':
-      return 'activo' as const;
-    case 'Histórico':
-      return 'inactivo' as const;
-  }
 }

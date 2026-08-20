@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   Badge,
   Boton,
@@ -209,39 +209,36 @@ export function CompetenciasPage() {
         </div>
       )}
 
-      <ModalCompetencia
-        abierto={creando || editando !== null}
-        competencia={editando}
-        onCerrar={() => {
-          setCreando(false);
-          setEditando(null);
-        }}
-      />
+      {/* Se monta solo al abrir: así el estado del formulario nace ya
+          correcto y no hace falta un efecto que lo sincronice. */}
+      {(creando || editando !== null) && (
+        <ModalCompetencia
+          competencia={editando}
+          onCerrar={() => {
+            setCreando(false);
+            setEditando(null);
+          }}
+        />
+      )}
     </>
   );
 }
 
 function ModalCompetencia({
-  abierto,
   competencia,
   onCerrar,
 }: {
-  abierto: boolean;
   competencia: Competencia | null;
   onCerrar: () => void;
 }) {
-  const [nombre, setNombre] = useState('');
+  // El componente solo existe mientras el modal esta abierto, asi que el estado
+  // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
+  const [nombre, setNombre] = useState(competencia?.nombre ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const crear = useCrearCompetencia();
   const editar = useEditarCompetencia();
   const guardando = crear.isPending || editar.isPending;
-
-  useEffect(() => {
-    if (!abierto) return;
-    setNombre(competencia?.nombre ?? '');
-    setError(null);
-  }, [abierto, competencia]);
 
   function guardar() {
     setError(null);
@@ -256,7 +253,7 @@ function ModalCompetencia({
 
   return (
     <Modal
-      abierto={abierto}
+      abierto
       onCerrar={onCerrar}
       titulo={competencia ? 'Editar competencia' : 'Nueva competencia'}
       ancho="sm"
@@ -298,7 +295,6 @@ function ModalCompetencia({
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej. Análisis y resolución de problemas"
-              autoFocus
             />
           )}
         </Campo>

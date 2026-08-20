@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   Badge,
   Boton,
@@ -20,12 +20,7 @@ import {
   Selector,
   type TonoBadge,
 } from '@/shared/components/ui';
-import {
-  useAsignaturas,
-  useCarreras,
-  usePlan,
-  useUbicarAsignatura,
-} from '../api/queries';
+import { useAsignaturas, useCarreras, usePlan, useUbicarAsignatura } from '../api/queries';
 import { permiteEdicion } from '../domain/estado-plan';
 import { ciclosDeCarrera, creditosPorCiclo } from '../domain/motor-validaciones';
 import { TIPOS_ASIGNATURA, type Asignatura, type TipoAsignatura } from '../domain/tipos';
@@ -123,9 +118,7 @@ export function MallaCurricularPage() {
       ['Ciclo', 'Código', 'Asignatura', 'Tipo', 'Condición', 'Créditos', 'Horas teóricas'],
     ];
     for (const c of ciclos) {
-      const delCiclo = activas
-        .filter((a) => a.cicloNumero === c)
-        .sort((x, y) => x.orden - y.orden);
+      const delCiclo = activas.filter((a) => a.cicloNumero === c).sort((x, y) => x.orden - y.orden);
       if (delCiclo.length === 0) {
         filas.push([c, '', '(sin asignaturas)', '', '', '', '']);
         continue;
@@ -135,7 +128,15 @@ export function MallaCurricularPage() {
       }
     }
     for (const a of sinCiclo) {
-      filas.push(['Sin ciclo', a.codigo, a.nombre, a.tipo, a.condicion, a.creditos, a.horasTeoricas]);
+      filas.push([
+        'Sin ciclo',
+        a.codigo,
+        a.nombre,
+        a.tipo,
+        a.condicion,
+        a.creditos,
+        a.horasTeoricas,
+      ]);
     }
     descargarCsv(`malla-${planActual.codigo}.csv`, filas);
   }
@@ -148,8 +149,8 @@ export function MallaCurricularPage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Malla Curricular</h1>
           <p className="mt-1 text-sm text-tinta-suave">
-            {carrera.nombre} · {ciclos.length} ciclos · {plural(totalCreditos, 'crédito', 'créditos')}{' '}
-            en total
+            {carrera.nombre} · {ciclos.length} ciclos ·{' '}
+            {plural(totalCreditos, 'crédito', 'créditos')} en total
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -183,7 +184,11 @@ export function MallaCurricularPage() {
         </p>
       )}
 
-      <div className="mb-5 flex flex-wrap gap-2 print:hidden" role="tablist" aria-label="Vista de la malla">
+      <div
+        className="mb-5 flex flex-wrap gap-2 print:hidden"
+        role="tablist"
+        aria-label="Vista de la malla"
+      >
         {(
           [
             ['malla', 'Malla por ciclos'],
@@ -472,7 +477,9 @@ function VistaPorCondicion({ asignaturas }: { asignaturas: Asignatura[] }) {
                       <span className="w-16 shrink-0 font-mono text-[11px] font-bold text-uc-primary">
                         {a.codigo}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{a.nombre}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {a.nombre}
+                      </span>
                       <span className="shrink-0 text-xs text-tinta-suave tabular-nums">
                         {a.cicloNumero ? `Ciclo ${a.cicloNumero}` : 'Sin ciclo'} · {a.creditos} cr.
                       </span>

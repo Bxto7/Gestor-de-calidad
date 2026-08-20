@@ -9,11 +9,7 @@
 import type { EstadoPlan } from './tipos';
 
 export type AccionTransicion =
-  | 'enviar-a-revision'
-  | 'aprobar'
-  | 'observar'
-  | 'marcar-vigente'
-  | 'archivar';
+  'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
 
 interface Transicion {
   desde: EstadoPlan;
@@ -74,8 +70,7 @@ export function describirTransicion(accion: AccionTransicion): Transicion {
 }
 
 export type ResultadoTransicion =
-  | { ok: true; nuevoEstado: EstadoPlan }
-  | { ok: false; motivo: string };
+  { ok: true; nuevoEstado: EstadoPlan } | { ok: false; motivo: string };
 
 /**
  * RF026 RN1: no se permiten saltos fuera de la secuencia definida.

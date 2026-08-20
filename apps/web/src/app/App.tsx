@@ -34,7 +34,10 @@ export function App() {
             <Route path="plan-estudios/facultades/:facultadId" element={<CarrerasPage />} />
             <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />
             <Route path="plan-estudios/planes/:planId/objetivos" element={<ObjetivosPage />} />
-            <Route path="plan-estudios/planes/:planId/competencias" element={<CompetenciasPage />} />
+            <Route
+              path="plan-estudios/planes/:planId/competencias"
+              element={<CompetenciasPage />}
+            />
             <Route path="plan-estudios/planes/:planId/asignaturas" element={<AsignaturasPage />} />
             <Route path="plan-estudios/planes/:planId/malla" element={<MallaCurricularPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

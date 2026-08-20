@@ -50,7 +50,12 @@
   place-items: center;
   padding: 32px 24px;
   background: var(--uc-page);
-  font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family:
+    'Manrope',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
   color: var(--uc-ink);
   -webkit-font-smoothing: antialiased;
 }
@@ -78,8 +83,7 @@
   overflow: hidden;
   background: #fff;
   border-radius: calc(28 * var(--u));
-  box-shadow: 0 calc(30 * var(--u)) calc(80 * var(--u)) calc(-20 * var(--u))
-    rgba(20, 0, 50, 0.25);
+  box-shadow: 0 calc(30 * var(--u)) calc(80 * var(--u)) calc(-20 * var(--u)) rgba(20, 0, 50, 0.25);
 }
 
 /* ── Panel de marca (58%) ───────────────────────────────────────────────── */
@@ -391,7 +395,9 @@
   font-family: inherit;
   font-size: calc(14.5 * var(--u));
   font-weight: 500;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .uc-input::placeholder {
@@ -428,7 +434,9 @@
   background: transparent;
   color: #8b8799;
   cursor: pointer;
-  transition: color 0.18s ease, background-color 0.18s ease;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
 }
 
 .uc-eye > svg {
@@ -482,7 +490,10 @@
   cursor: pointer;
   box-shadow: 0 calc(10 * var(--u)) calc(24 * var(--u)) calc(-8 * var(--u))
     color-mix(in srgb, var(--uc-primary) 55%, transparent);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
 }
 
 .uc-submit:hover {

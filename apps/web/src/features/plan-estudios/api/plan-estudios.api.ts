@@ -364,13 +364,16 @@ export async function cambiarEstadoPlan(
   };
 
   const etiqueta = etiquetaAprobacion[accion];
+  const comentarioLimpio = contexto.comentario?.trim() ?? '';
   if (etiqueta) {
     // RF088 / RF089: responsable y fecha, en un historial de solo lectura.
     db.aprobaciones.unshift({
       id: nuevoId(),
       planId: id,
       accion: etiqueta,
-      comentario: contexto.comentario?.trim() || null,
+      // Un comentario en blanco se guarda como null, no como cadena vacia:
+      // por eso no sirve `??`, que conservaria el "".
+      comentario: comentarioLimpio === '' ? null : comentarioLimpio,
       usuario: USUARIO_ACTUAL,
       fecha: ahora(),
     });
@@ -399,7 +402,9 @@ export async function generarNuevaVersion(idOrigen: string): Promise<PlanEstudio
     );
   }
 
-  const version = Math.max(...db.planes.filter((p) => p.carreraId === origen.carreraId).map((p) => p.version)) + 1;
+  const version =
+    Math.max(...db.planes.filter((p) => p.carreraId === origen.carreraId).map((p) => p.version)) +
+    1;
 
   const nuevo: PlanEstudios = {
     id: nuevoId(),
@@ -418,10 +423,20 @@ export async function generarNuevaVersion(idOrigen: string): Promise<PlanEstudio
 
   // La malla se copia: una versión nueva parte del contenido de la anterior.
   for (const a of db.asignaturas.filter((x) => x.planId === origen.id)) {
-    db.asignaturas.push({ ...a, id: nuevoId(), planId: nuevo.id, competenciaIds: [...a.competenciaIds] });
+    db.asignaturas.push({
+      ...a,
+      id: nuevoId(),
+      planId: nuevo.id,
+      competenciaIds: [...a.competenciaIds],
+    });
   }
 
-  registrarAuditoria('Plan', nuevo.id, 'Creación', `Versión ${version} generada desde ${origen.codigo}.`);
+  registrarAuditoria(
+    'Plan',
+    nuevo.id,
+    'Creación',
+    `Versión ${version} generada desde ${origen.codigo}.`,
+  );
   return demora(clonar(nuevo));
 }
 
@@ -480,7 +495,10 @@ export async function listarObjetivos(): Promise<ObjetivoEducacional[]> {
   return demora(clonar([...db.objetivos].sort((x, y) => x.codigo.localeCompare(y.codigo))));
 }
 
-export async function crearObjetivo(nombre: string, descripcion: string): Promise<ObjetivoEducacional> {
+export async function crearObjetivo(
+  nombre: string,
+  descripcion: string,
+): Promise<ObjetivoEducacional> {
   // RF033 RN1: nombre y descripción obligatorios.
   if (!nombre.trim()) throw new ErrorDeNegocio('El nombre del objetivo es obligatorio.');
   if (!descripcion.trim()) throw new ErrorDeNegocio('La descripción del objetivo es obligatoria.');
@@ -553,7 +571,12 @@ export async function crearCompetencia(nombre: string): Promise<Competencia> {
     estado: 'Activo',
   };
   db.competencias.push(competencia);
-  registrarAuditoria('Competencia', competencia.id, 'Creación', `${competencia.codigo} registrada.`);
+  registrarAuditoria(
+    'Competencia',
+    competencia.id,
+    'Creación',
+    `${competencia.codigo} registrada.`,
+  );
   return demora(clonar(competencia));
 }
 
@@ -701,7 +724,9 @@ export async function ubicarAsignatura(
     const carrera = db.carreras.find((c) => c.id === plan.carreraId);
     const totalCiclos = (carrera?.duracionAnios ?? 0) * 2;
     if (ciclo < 1 || ciclo > totalCiclos) {
-      throw new ErrorDeNegocio(`El ciclo ${ciclo} está fuera del rango de la carrera (1 a ${totalCiclos}).`);
+      throw new ErrorDeNegocio(
+        `El ciclo ${ciclo} está fuera del rango de la carrera (1 a ${totalCiclos}).`,
+      );
     }
   }
 
@@ -754,10 +779,7 @@ export interface DiferenciaAsignatura {
  * se renuevan, y lo que el usuario reconoce como "la misma asignatura" es el
  * nombre.
  */
-export async function compararVersiones(
-  idA: string,
-  idB: string,
-): Promise<DiferenciaAsignatura[]> {
+export async function compararVersiones(idA: string, idB: string): Promise<DiferenciaAsignatura[]> {
   const a = db.planes.find((p) => p.id === idA);
   const b = db.planes.find((p) => p.id === idB);
   if (!a || !b) throw new ErrorDeNegocio('Alguna de las versiones no existe.');
@@ -792,7 +814,9 @@ export async function compararVersiones(
       cambios.push(`créditos ${previa.creditos} → ${asig.creditos}`);
     }
     if (previa.cicloNumero !== asig.cicloNumero) {
-      cambios.push(`ciclo ${previa.cicloNumero ?? 'sin asignar'} → ${asig.cicloNumero ?? 'sin asignar'}`);
+      cambios.push(
+        `ciclo ${previa.cicloNumero ?? 'sin asignar'} → ${asig.cicloNumero ?? 'sin asignar'}`,
+      );
     }
     if (previa.tipo !== asig.tipo) cambios.push(`tipo ${previa.tipo} → ${asig.tipo}`);
     if (previa.condicion !== asig.condicion) {

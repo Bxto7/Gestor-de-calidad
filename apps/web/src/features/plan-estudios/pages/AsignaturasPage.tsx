@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   AreaTexto,
   Badge,
@@ -97,7 +97,9 @@ export function AsignaturasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.codigo, planId]);
 
-  const sinCiclo = (asignaturas ?? []).filter((a) => a.cicloNumero === null && a.estado === 'Activo');
+  const sinCiclo = (asignaturas ?? []).filter(
+    (a) => a.cicloNumero === null && a.estado === 'Activo',
+  );
 
   /** RF057 RN1: los filtros son combinables entre sí. */
   const visibles = useMemo(() => {
@@ -122,7 +124,9 @@ export function AsignaturasPage() {
             variante="primario"
             onClick={() => setCreando(true)}
             disabled={!editable}
-            title={editable ? undefined : `El plan está en estado ${plan?.estado} y no admite cambios.`}
+            title={
+              editable ? undefined : `El plan está en estado ${plan?.estado} y no admite cambios.`
+            }
           >
             Nueva asignatura
           </Boton>
@@ -217,7 +221,9 @@ export function AsignaturasPage() {
             key={a.id}
             className={[
               'flex flex-col rounded-2xl border bg-superficie p-5 transition',
-              a.estado === 'Inactivo' ? 'border-borde opacity-60' : 'border-borde hover:border-uc-lila',
+              a.estado === 'Inactivo'
+                ? 'border-borde opacity-60'
+                : 'border-borde hover:border-uc-lila',
             ].join(' ')}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -305,15 +311,18 @@ export function AsignaturasPage() {
         ))}
       </div>
 
-      <ModalAsignatura
-        abierto={creando || editando !== null}
-        planId={planId}
-        asignatura={editando}
-        onCerrar={() => {
-          setCreando(false);
-          setEditando(null);
-        }}
-      />
+      {/* Se monta solo al abrir: así el estado del formulario nace ya
+          correcto y no hace falta un efecto que lo sincronice. */}
+      {(creando || editando !== null) && (
+        <ModalAsignatura
+          planId={planId}
+          asignatura={editando}
+          onCerrar={() => {
+            setCreando(false);
+            setEditando(null);
+          }}
+        />
+      )}
 
       {historialDe && (
         <HistorialModal
@@ -329,41 +338,35 @@ export function AsignaturasPage() {
 }
 
 function ModalAsignatura({
-  abierto,
   planId,
   asignatura,
   onCerrar,
 }: {
-  abierto: boolean;
   planId: string;
   asignatura: Asignatura | null;
   onCerrar: () => void;
 }) {
-  const [datos, setDatos] = useState<DatosAsignatura>(VACIA);
+  // El componente solo existe mientras el modal esta abierto, asi que el estado
+  // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
+  const [datos, setDatos] = useState<DatosAsignatura>(() =>
+    asignatura
+      ? {
+          nombre: asignatura.nombre,
+          descripcion: asignatura.descripcion,
+          tipo: asignatura.tipo,
+          condicion: asignatura.condicion,
+          creditos: asignatura.creditos,
+          horasTeoricas: asignatura.horasTeoricas,
+          competenciaIds: [...asignatura.competenciaIds],
+        }
+      : VACIA,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const { data: competencias } = useCompetencias();
   const crear = useCrearAsignatura(planId);
   const editar = useEditarAsignatura(planId);
   const guardando = crear.isPending || editar.isPending;
-
-  useEffect(() => {
-    if (!abierto) return;
-    setDatos(
-      asignatura
-        ? {
-            nombre: asignatura.nombre,
-            descripcion: asignatura.descripcion,
-            tipo: asignatura.tipo,
-            condicion: asignatura.condicion,
-            creditos: asignatura.creditos,
-            horasTeoricas: asignatura.horasTeoricas,
-            competenciaIds: [...asignatura.competenciaIds],
-          }
-        : VACIA,
-    );
-    setError(null);
-  }, [abierto, asignatura]);
 
   function guardar() {
     setError(null);
@@ -392,7 +395,7 @@ function ModalAsignatura({
 
   return (
     <Modal
-      abierto={abierto}
+      abierto
       onCerrar={onCerrar}
       titulo={asignatura ? 'Editar asignatura' : 'Nueva asignatura'}
       ancho="lg"
@@ -438,7 +441,6 @@ function ModalAsignatura({
               value={datos.nombre}
               onChange={(e) => setDatos({ ...datos, nombre: e.target.value })}
               placeholder="Ej. Estructuras de Datos"
-              autoFocus
             />
           )}
         </Campo>

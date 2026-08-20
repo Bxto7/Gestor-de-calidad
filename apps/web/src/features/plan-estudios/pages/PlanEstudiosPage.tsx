@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   AreaTexto,
   Badge,
@@ -43,7 +43,8 @@ import {
 } from '../api/queries';
 import { BannerValidacion } from '../components/BannerValidacion';
 import { HistorialModal } from '../components/HistorialModal';
-import { StepperEstado, tonoDeEstado } from '../components/StepperEstado';
+import { StepperEstado } from '../components/StepperEstado';
+import { tonoDeEstado } from '../components/tonos';
 import {
   describirTransicion,
   permiteEdicion,
@@ -90,7 +91,9 @@ export function PlanEstudiosPage() {
     publicar({
       migas: [
         { etiqueta: 'Plan de Estudios', a: '/plan-estudios' },
-        ...(facultad ? [{ etiqueta: facultad.nombre, a: `/plan-estudios/facultades/${facultad.id}` }] : []),
+        ...(facultad
+          ? [{ etiqueta: facultad.nombre, a: `/plan-estudios/facultades/${facultad.id}` }]
+          : []),
         { etiqueta: plan?.codigo ?? 'Plan' },
       ],
       acciones: null,
@@ -232,7 +235,11 @@ export function PlanEstudiosPage() {
           valor={String(validacion?.totalCreditos ?? 0)}
           nota="Calculado automáticamente"
         />
-        <Metrica etiqueta="Ciclos de la carrera" valor={String(ciclos.length)} nota={`${carrera.duracionAnios} años`} />
+        <Metrica
+          etiqueta="Ciclos de la carrera"
+          valor={String(ciclos.length)}
+          nota={`${carrera.duracionAnios} años`}
+        />
         <MetricaDuracion
           plan={plan}
           editable={editable}
@@ -299,7 +306,11 @@ export function PlanEstudiosPage() {
 
           {/* RF032: eliminar solo en Borrador. */}
           {permiteEliminacion(plan.estado) && (
-            <Boton variante="peligro" className="ml-auto" onClick={() => setConfirmarEliminar(true)}>
+            <Boton
+              variante="peligro"
+              className="ml-auto"
+              onClick={() => setConfirmarEliminar(true)}
+            >
               Eliminar borrador
             </Boton>
           )}
@@ -309,9 +320,7 @@ export function PlanEstudiosPage() {
           // RF027: explicar el bloqueo en lugar de solo deshabilitar botones.
           <p className="mt-3 rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave">
             Este plan está en estado <strong>{plan.estado}</strong> y no admite edición.
-            {permiteNuevaVersion(plan.estado)
-              ? ' Para modificarlo, genera una nueva versión.'
-              : ''}
+            {permiteNuevaVersion(plan.estado) ? ' Para modificarlo, genera una nueva versión.' : ''}
           </p>
         )}
       </section>
@@ -402,7 +411,9 @@ export function PlanEstudiosPage() {
                     </>
                   )}
                   {v.id === planId && (
-                    <span className="px-3 text-xs font-semibold text-tinta-tenue">Viendo ahora</span>
+                    <span className="px-3 text-xs font-semibold text-tinta-tenue">
+                      Viendo ahora
+                    </span>
                   )}
                 </span>
               </li>
@@ -494,7 +505,6 @@ export function PlanEstudiosPage() {
           value={comentario}
           onChange={(e) => setComentario(e.target.value)}
           placeholder="Describe qué debe corregirse antes de volver a enviar el plan."
-          autoFocus
         />
       </Modal>
 
@@ -579,9 +589,6 @@ function MetricaDuracion({
   onGuardar: (anios: number) => void;
 }) {
   const [editando, setEditando] = useState(false);
-  const [valor, setValor] = useState(String(plan.duracionAnios));
-
-  useEffect(() => setValor(String(plan.duracionAnios)), [plan.duracionAnios]);
 
   return (
     <Tarjeta>
@@ -589,29 +596,16 @@ function MetricaDuracion({
         Duración del plan
       </p>
       {editando ? (
-        <div className="mt-2 flex gap-2">
-          <Entrada
-            type="number"
-            min={1}
-            max={10}
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            className="w-20"
-            aria-label="Duración en años"
-            autoFocus
-          />
-          <Boton
-            variante="primario"
-            tamano="sm"
-            disabled={guardando}
-            onClick={() => {
-              onGuardar(Number.parseInt(valor, 10));
-              setEditando(false);
-            }}
-          >
-            Guardar
-          </Boton>
-        </div>
+        // El formulario se monta al entrar en edición, así que lee el valor
+        // actual una sola vez y no necesita un efecto que lo re-sincronice.
+        <EdicionDuracion
+          inicial={plan.duracionAnios}
+          guardando={guardando}
+          onGuardar={(anios) => {
+            onGuardar(anios);
+            setEditando(false);
+          }}
+        />
       ) : (
         <div className="mt-2 flex items-baseline gap-2">
           <p className="text-xl font-extrabold text-tinta">{plan.duracionAnios} años</p>
@@ -694,5 +688,42 @@ function ModalComparacion({
         </ul>
       )}
     </Modal>
+  );
+}
+
+/** Formulario de duración, aislado para que su estado nazca y muera con la edición. */
+function EdicionDuracion({
+  inicial,
+  guardando,
+  onGuardar,
+}: {
+  inicial: number;
+  guardando: boolean;
+  onGuardar: (anios: number) => void;
+}) {
+  const [valor, setValor] = useState(String(inicial));
+  const numero = Number.parseInt(valor, 10);
+  const valido = Number.isInteger(numero) && numero >= 1 && numero <= 10;
+
+  return (
+    <div className="mt-2 flex gap-2">
+      <Entrada
+        type="number"
+        min={1}
+        max={10}
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        className="w-20"
+        aria-label="Duración en años"
+      />
+      <Boton
+        variante="primario"
+        tamano="sm"
+        disabled={guardando || !valido}
+        onClick={() => onGuardar(numero)}
+      >
+        Guardar
+      </Boton>
+    </div>
   );
 }

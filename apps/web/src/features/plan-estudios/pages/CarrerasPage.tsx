@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/AppLayout';
+import { useEncabezado } from '@/app/encabezado';
 import {
   Badge,
   Boton,
@@ -93,12 +93,12 @@ export function CarrerasPage() {
     setError(null);
     const existente = planPorCarrera.get(carrera.id);
     if (existente) {
-      navegar(`/plan-estudios/planes/${existente.id}`);
+      void navegar(`/plan-estudios/planes/${existente.id}`);
       return;
     }
     try {
       const plan = await crearPlan.mutateAsync(carrera.id);
-      navegar(`/plan-estudios/planes/${plan.id}`);
+      void navegar(`/plan-estudios/planes/${plan.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo crear el plan de estudios.');
     }
@@ -173,7 +173,9 @@ export function CarrerasPage() {
 
       {!isLoading && visibles.length === 0 && (
         <EstadoVacio
-          titulo={busqueda || filtro !== 'todos' ? 'Sin resultados' : 'Esta facultad no tiene carreras'}
+          titulo={
+            busqueda || filtro !== 'todos' ? 'Sin resultados' : 'Esta facultad no tiene carreras'
+          }
           detalle={
             busqueda || filtro !== 'todos'
               ? 'Ninguna carrera coincide con el criterio de búsqueda.'
@@ -240,15 +242,18 @@ export function CarrerasPage() {
         })}
       </div>
 
-      <ModalCarrera
-        abierto={creando || editando !== null}
-        facultadId={facultadId}
-        carrera={editando}
-        onCerrar={() => {
-          setCreando(false);
-          setEditando(null);
-        }}
-      />
+      {/* Se monta solo al abrir: así el estado del formulario nace ya
+          correcto y no hace falta un efecto que lo sincronice. */}
+      {(creando || editando !== null) && (
+        <ModalCarrera
+          facultadId={facultadId}
+          carrera={editando}
+          onCerrar={() => {
+            setCreando(false);
+            setEditando(null);
+          }}
+        />
+      )}
 
       {historialDe && (
         <HistorialModal
@@ -264,32 +269,26 @@ export function CarrerasPage() {
 }
 
 function ModalCarrera({
-  abierto,
   facultadId,
   carrera,
   onCerrar,
 }: {
-  abierto: boolean;
   facultadId: string;
   carrera: Carrera | null;
   onCerrar: () => void;
 }) {
-  const [datos, setDatos] = useState<DatosCarrera>({ nombre: '', codigo: '', duracionAnios: 5 });
+  // El componente solo existe mientras el modal esta abierto, asi que el estado
+  // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
+  const [datos, setDatos] = useState<DatosCarrera>(
+    carrera
+      ? { nombre: carrera.nombre, codigo: carrera.codigo, duracionAnios: carrera.duracionAnios }
+      : { nombre: '', codigo: '', duracionAnios: 5 },
+  );
   const [error, setError] = useState<string | null>(null);
 
   const crear = useCrearCarrera(facultadId);
   const editar = useEditarCarrera(facultadId);
   const guardando = crear.isPending || editar.isPending;
-
-  useEffect(() => {
-    if (!abierto) return;
-    setDatos(
-      carrera
-        ? { nombre: carrera.nombre, codigo: carrera.codigo, duracionAnios: carrera.duracionAnios }
-        : { nombre: '', codigo: '', duracionAnios: 5 },
-    );
-    setError(null);
-  }, [abierto, carrera]);
 
   function guardar() {
     setError(null);
@@ -305,7 +304,7 @@ function ModalCarrera({
 
   return (
     <Modal
-      abierto={abierto}
+      abierto
       onCerrar={onCerrar}
       titulo={carrera ? 'Editar carrera' : 'Nueva carrera'}
       descripcion="El código identifica la carrera en toda la universidad y se usa para generar los códigos del plan y sus asignaturas."
@@ -338,17 +337,12 @@ function ModalCarrera({
               value={datos.nombre}
               onChange={(e) => setDatos({ ...datos, nombre: e.target.value })}
               placeholder="Ej. Ingeniería de Sistemas e Informática"
-              autoFocus
             />
           )}
         </Campo>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Campo
-            etiqueta="Código"
-            requerido
-            ayuda="Único en toda la universidad. Ej. ISI"
-          >
+          <Campo etiqueta="Código" requerido ayuda="Único en toda la universidad. Ej. ISI">
             {(props) => (
               <Entrada
                 {...props}
