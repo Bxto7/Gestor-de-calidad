@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   Sistema de diseño — SGC Universidad Continental
+   Valores tomados de docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md §2.
+   No inventar colores fuera de esta lista.
+   ========================================================================== */
+
+@theme {
+  /* Paleta institucional */
+  --color-uc-primary: #6802c1;
+  --color-uc-v1: #7c19e0;
+  --color-uc-v2: #8e41d0;
+  --color-uc-dark: #57019f;
+  --color-uc-lila: #c3b9f5;
+  --color-uc-lila-claro: #e9e1fb;
+
+  /* Estados: texto sobre fondo (§2 "Estados") */
+  --color-estado-activo-fg: #1a9c5e;
+  --color-estado-activo-bg: #e7f6ee;
+  --color-estado-progreso-fg: #b8860b;
+  --color-estado-progreso-bg: #fbf3e3;
+  --color-estado-inactivo-fg: #9a97a6;
+  --color-estado-inactivo-bg: #f3f2f6;
+  --color-estado-aprobado-fg: #1a7fc0;
+  --color-estado-aprobado-bg: #e7f1fb;
+
+  /* Neutros con sesgo hacia el morado institucional: un gris puro
+     desentona contra la paleta. */
+  --color-tinta: #1a1526;
+  --color-tinta-suave: #6b6779;
+  --color-tinta-tenue: #9a97a6;
+  --color-borde: #e2e1ea;
+  --color-superficie: #ffffff;
+  --color-superficie-tenue: #f7f5fb;
+  --color-fondo: #f4f3f8;
+
+  /* Semánticos para validaciones (independientes del acento) */
+  --color-alerta-fg: #b42318;
+  --color-alerta-bg: #fef3f2;
+  --color-alerta-borde: #fecdc9;
+
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Layout base (§2 "Layout base") */
+  --spacing-sidebar: 264px;
+  --spacing-header: 64px;
+  --spacing-contenido: 1320px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-fondo);
+    color: var(--color-tinta);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Foco visible en todo elemento interactivo: requisito de accesibilidad
+     que no depende de que cada componente se acuerde de ponerlo. */
+  :focus-visible {
+    outline: 2px solid var(--color-uc-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ==========================================================================
+   Impresión (RF072)
+
+   El "PDF" del plan es, por ahora, la impresión del navegador: ocultamos la
+   navegación y los controles para que el papel muestre solo la malla.
+   Sustituir cuando exista el job de generación en el backend (CLAUDE.md §3.4).
+   ========================================================================== */
+
+@media print {
+  aside,
+  header {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  body > div > div {
+    padding-left: 0 !important;
+  }
+
+  /* Evita cortar una tarjeta de ciclo entre dos páginas. */
+  section {
+    break-inside: avoid;
+  }
+}
