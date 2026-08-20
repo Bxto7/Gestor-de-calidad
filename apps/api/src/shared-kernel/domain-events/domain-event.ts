@@ -14,7 +14,8 @@ export abstract class DomainEvent {
   abstract readonly nombre: string;
 
   /** Entidad afectada, en el vocabulario de la bitácora. */
-  abstract readonly entidad: 'Facultad' | 'Carrera' | 'Plan' | 'Asignatura' | 'Objetivo' | 'Competencia';
+  abstract readonly entidad:
+    'Facultad' | 'Carrera' | 'Plan' | 'Asignatura' | 'Objetivo' | 'Competencia';
 
   abstract readonly entidadId: string;
 

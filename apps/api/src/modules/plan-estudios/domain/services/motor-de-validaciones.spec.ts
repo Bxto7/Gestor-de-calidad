@@ -24,10 +24,7 @@ import {
   validarPlan,
   type EntradaValidacion,
 } from './motor-de-validaciones.js';
-import type {
-  AsignaturaDelPlan,
-  DatosCarrera,
-} from '../../application/ports/repositorios.port.js';
+import type { AsignaturaDelPlan, DatosCarrera } from '../../application/ports/repositorios.port.js';
 
 /* ── Constructores de datos de prueba ─────────────────────────────────── */
 
@@ -146,7 +143,7 @@ describe('RF094 — cada asignatura necesita una competencia', () => {
     const h = r.hallazgos.find((x) => x.codigo === 'ASIGNATURA_SIN_COMPETENCIA');
 
     expect(h?.afectados).toHaveLength(1);
-    expect(h?.afectados[0]).toContain(e.asignaturas[1]!.codigo);
+    expect(h?.afectados[0]).toContain(e.asignaturas[1].codigo);
   });
 
   it('ignora las asignaturas inactivas', () => {

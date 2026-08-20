@@ -65,7 +65,7 @@ export class IniciarSesion {
     const tokenHash = this.seguridad.hashearRefreshToken(refreshToken);
     const sesion = await this.usuarios.buscarRefresco(tokenHash);
 
-    if (!sesion || !sesion.usuario.activo) {
+    if (!sesion?.usuario.activo) {
       throw new AccesoDenegado('Sesión inválida.');
     }
 

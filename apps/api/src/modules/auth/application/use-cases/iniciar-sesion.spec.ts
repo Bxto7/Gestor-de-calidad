@@ -36,10 +36,12 @@ function usuario(sobre: Partial<UsuarioAutenticable> = {}): UsuarioAutenticable 
   };
 }
 
-function montar(opciones: {
-  usuario?: UsuarioAutenticable | null;
-  sesion?: SesionRefresco | null;
-} = {}) {
+function montar(
+  opciones: {
+    usuario?: UsuarioAutenticable | null;
+    sesion?: SesionRefresco | null;
+  } = {},
+) {
   const verificados: string[] = [];
   const creados: { usuarioId: string; expiraEn: Date }[] = [];
   const revocados: string[] = [];
@@ -88,7 +90,9 @@ describe('Login', () => {
   it('normaliza el correo antes de buscarlo', async () => {
     // Sin esto, "Director@..." y "director@..." serían cuentas distintas.
     const { caso } = montar({ usuario: usuario() });
-    await expect(caso.ejecutar('  DIRECTOR.ISI@CONTINENTAL.EDU.PE  ', 'correcta')).resolves.toBeDefined();
+    await expect(
+      caso.ejecutar('  DIRECTOR.ISI@CONTINENTAL.EDU.PE  ', 'correcta'),
+    ).resolves.toBeDefined();
   });
 
   it('el refresco caduca a los 7 días', async () => {
@@ -105,8 +109,12 @@ describe('Login — no revela si el correo existe', () => {
     const conUsuario = montar({ usuario: usuario() });
 
     const mensajes = await Promise.all([
-      sinUsuario.caso.ejecutar('nadie@continental.edu.pe', 'loquesea').catch((e: Error) => e.message),
-      conUsuario.caso.ejecutar('director.isi@continental.edu.pe', 'mala').catch((e: Error) => e.message),
+      sinUsuario.caso
+        .ejecutar('nadie@continental.edu.pe', 'loquesea')
+        .catch((e: Error) => e.message),
+      conUsuario.caso
+        .ejecutar('director.isi@continental.edu.pe', 'mala')
+        .catch((e: Error) => e.message),
     ]);
 
     expect(mensajes[0]).toBe(mensajes[1]);

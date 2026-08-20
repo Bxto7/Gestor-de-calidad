@@ -10,7 +10,10 @@
  * versión se marca Vigente, y de eso se encarga `CambiarEstadoPlan`.
  */
 
-import type { Actor, PublicadorDeEventos } from '../../../../shared-kernel/domain-events/domain-event.js';
+import type {
+  Actor,
+  PublicadorDeEventos,
+} from '../../../../shared-kernel/domain-events/domain-event.js';
 import {
   AccesoDenegado,
   NoEncontrado,
@@ -47,7 +50,11 @@ export class GenerarNuevaVersion {
     const origen = await this.planes.porId(planOrigenId);
     if (!origen) throw new NoEncontrado('el plan de estudios', planOrigenId);
 
-    const decision = await this.autorizacion.puede(actor.id, 'plan.nueva_version', origen.carreraId);
+    const decision = await this.autorizacion.puede(
+      actor.id,
+      'plan.nueva_version',
+      origen.carreraId,
+    );
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
 
     // RF075: solo se deriva de un plan consolidado. Con el plan en Borrador se

@@ -12,7 +12,10 @@
 
 import type { EstadoPlan as EstadoDominio } from '../../domain/value-objects/estado-plan.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
-import type { EstadoPlan as EstadoPrisma, PlanEstudios as FilaPlan } from '../../../../platform/database/generated/client.js';
+import type {
+  EstadoPlan as EstadoPrisma,
+  PlanEstudios as FilaPlan,
+} from '../../../../platform/database/generated/client.js';
 
 const A_PRISMA: Readonly<Record<EstadoDominio, EstadoPrisma>> = {
   Borrador: 'BORRADOR',

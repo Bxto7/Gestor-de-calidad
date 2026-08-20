@@ -23,18 +23,18 @@ Ejemplo: `plan-estudios` no consulta la tabla de roles — pide la decisión al
 
 ## Qué va en cada carpeta
 
-| Carpeta | Contenido | Ejemplos |
-|---|---|---|
-| `modules/*/domain/entities` | Entidades con sus invariantes | `PlanDeEstudios`, `Asignatura` |
-| `modules/*/domain/value-objects` | Value objects inmutables | `EstadoPlan`, `Version`, `Creditos` |
-| `modules/*/domain/services` | Servicios de dominio puros | `MotorDeValidaciones` |
-| `modules/*/domain/events` | Eventos de dominio emitidos por las entidades | `PlanAprobado` |
-| `modules/*/application/use-cases` | Un caso de uso por archivo | `AprobarPlan`, `GenerarNuevaVersion` |
-| `modules/*/application/ports` | Interfaces que infraestructura implementa | `RepositorioPlanPort`, `RecommendationPort` |
-| `modules/*/infrastructure/persistence` | Repositorios Prisma | `PlanRepositoryPrisma` |
-| `modules/*/infrastructure/http` | Controllers, DTOs, guards | `PlanController` |
-| `shared-kernel/` | Tipos genuinamente compartidos entre módulos (mínimo) | `DomainEvent`, `Result` |
-| `platform/` | Plomería NestJS transversal, sin dominio | `PrismaModule`, filtros, logging |
+| Carpeta                                | Contenido                                             | Ejemplos                                    |
+| -------------------------------------- | ----------------------------------------------------- | ------------------------------------------- |
+| `modules/*/domain/entities`            | Entidades con sus invariantes                         | `PlanDeEstudios`, `Asignatura`              |
+| `modules/*/domain/value-objects`       | Value objects inmutables                              | `EstadoPlan`, `Version`, `Creditos`         |
+| `modules/*/domain/services`            | Servicios de dominio puros                            | `MotorDeValidaciones`                       |
+| `modules/*/domain/events`              | Eventos de dominio emitidos por las entidades         | `PlanAprobado`                              |
+| `modules/*/application/use-cases`      | Un caso de uso por archivo                            | `AprobarPlan`, `GenerarNuevaVersion`        |
+| `modules/*/application/ports`          | Interfaces que infraestructura implementa             | `RepositorioPlanPort`, `RecommendationPort` |
+| `modules/*/infrastructure/persistence` | Repositorios Prisma                                   | `PlanRepositoryPrisma`                      |
+| `modules/*/infrastructure/http`        | Controllers, DTOs, guards                             | `PlanController`                            |
+| `shared-kernel/`                       | Tipos genuinamente compartidos entre módulos (mínimo) | `DomainEvent`, `Result`                     |
+| `platform/`                            | Plomería NestJS transversal, sin dominio              | `PrismaModule`, filtros, logging            |
 
 ## Nomenclatura
 

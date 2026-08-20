@@ -9,10 +9,7 @@
  * Las dos copias comparten juego de pruebas para que la divergencia se note.
  */
 
-import type {
-  AsignaturaDelPlan,
-  DatosCarrera,
-} from '../../application/ports/repositorios.port.js';
+import type { AsignaturaDelPlan, DatosCarrera } from '../../application/ports/repositorios.port.js';
 
 /** RF097 RN1 / RF098 RN1: bloqueante impide avanzar; advertencia solo informa. */
 export type Severidad = 'bloqueante' | 'advertencia';
@@ -60,7 +57,10 @@ export function calcularTotalCreditos(asignaturas: readonly AsignaturaDelPlan[])
   return asignaturas.filter((a) => a.activa).reduce((suma, a) => suma + a.creditos, 0);
 }
 
-export function creditosPorCiclo(asignaturas: readonly AsignaturaDelPlan[], cicloNumero: number): number {
+export function creditosPorCiclo(
+  asignaturas: readonly AsignaturaDelPlan[],
+  cicloNumero: number,
+): number {
   return asignaturas
     .filter((a) => a.activa && a.cicloNumero === cicloNumero)
     .reduce((suma, a) => suma + a.creditos, 0);

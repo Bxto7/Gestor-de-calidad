@@ -14,7 +14,10 @@ import type { Actor } from '../../../../shared-kernel/domain-events/domain-event
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
-import { validarPlan, type ResultadoValidacion } from '../../domain/services/motor-de-validaciones.js';
+import {
+  validarPlan,
+  type ResultadoValidacion,
+} from '../../domain/services/motor-de-validaciones.js';
 import {
   describirTransicion,
   transicionesDisponibles,

@@ -20,12 +20,12 @@ Implementada como máquina de estados explícita en `domain/` — no un `string`
 
 ## Carpetas propias de este módulo
 
-| Carpeta | Rol |
-|---|---|
-| `domain/services/` | `MotorDeValidaciones`: prerrequisitos circulares, coherencia de ciclos, créditos, competencias mínimas. Corre consolidado antes de `Aprobado` y devuelve una **lista estructurada** de errores/advertencias, no excepciones sueltas |
-| `infrastructure/documents/` | Generación de PDF y Excel. Se **dispara** desde un caso de uso pero se **ejecuta** como job en cola (RNF: < 5s bajo carga) |
-| `infrastructure/queue/` | Processors BullMQ que consumen esos jobs |
-| `infrastructure/recommendation/` | Adaptadores del `RecommendationPort`. En MVP 1 solo `NullRecommendationAdapter` (no-op) |
+| Carpeta                          | Rol                                                                                                                                                                                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain/services/`               | `MotorDeValidaciones`: prerrequisitos circulares, coherencia de ciclos, créditos, competencias mínimas. Corre consolidado antes de `Aprobado` y devuelve una **lista estructurada** de errores/advertencias, no excepciones sueltas |
+| `infrastructure/documents/`      | Generación de PDF y Excel. Se **dispara** desde un caso de uso pero se **ejecuta** como job en cola (RNF: < 5s bajo carga)                                                                                                          |
+| `infrastructure/queue/`          | Processors BullMQ que consumen esos jobs                                                                                                                                                                                            |
+| `infrastructure/recommendation/` | Adaptadores del `RecommendationPort`. En MVP 1 solo `NullRecommendationAdapter` (no-op)                                                                                                                                             |
 
 ## Punto de extensión de IA
 

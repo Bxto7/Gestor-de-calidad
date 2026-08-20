@@ -47,8 +47,7 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
 ]);
 
 export type Decision =
-  | { readonly permitido: true }
-  | { readonly permitido: false; readonly motivo: string };
+  { readonly permitido: true } | { readonly permitido: false; readonly motivo: string };
 
 const PERMITIDO: Decision = { permitido: true };
 

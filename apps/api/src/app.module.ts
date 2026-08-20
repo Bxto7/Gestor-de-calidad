@@ -22,10 +22,15 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from './platform/database/prisma.service.js';
 import { FiltroErroresDominio } from './platform/http/filtro-errores-dominio.js';
 
-import { AUTHORIZATION_PORT } from './modules/auth/application/ports/authorization.port.js';
+import {
+  AUTHORIZATION_PORT,
+  type AuthorizationPort,
+} from './modules/auth/application/ports/authorization.port.js';
 import {
   REPOSITORIO_USUARIO,
   SEGURIDAD_PORT,
+  type RepositorioUsuarioPort,
+  type SeguridadPort,
 } from './modules/auth/application/ports/sesion.port.js';
 import { IniciarSesion } from './modules/auth/application/use-cases/iniciar-sesion.use-case.js';
 import { AuthorizationAdapter } from './modules/auth/infrastructure/authorization.adapter.js';
@@ -34,22 +39,52 @@ import { Seguridad } from './modules/auth/infrastructure/seguridad.js';
 import { JwtGuard } from './modules/auth/infrastructure/http/jwt.guard.js';
 import { SesionController } from './modules/auth/infrastructure/http/sesion.controller.js';
 
+import type { PublicadorDeEventos } from './shared-kernel/domain-events/domain-event.js';
+
 import { BitacoraListener } from './modules/auditoria/infrastructure/listeners/bitacora.listener.js';
 
+import {
+  REPOSITORIO_CARRERA,
+  REPOSITORIO_FACULTAD,
+  type RepositorioCarreraPort,
+  type RepositorioFacultadPort,
+} from './modules/plan-estudios/application/ports/estructura.port.js';
+import {
+  REPOSITORIO_MALLA,
+  type RepositorioMallaPort,
+} from './modules/plan-estudios/application/ports/malla.port.js';
 import {
   REPOSITORIO_APROBACIONES,
   REPOSITORIO_CONTENIDO,
   REPOSITORIO_PLAN,
+  type RepositorioAprobacionesPort,
+  type RepositorioContenidoPort,
+  type RepositorioPlanPort,
 } from './modules/plan-estudios/application/ports/repositorios.port.js';
 import { CambiarEstadoPlan } from './modules/plan-estudios/application/use-cases/cambiar-estado-plan.use-case.js';
 import { ConsultarPlan } from './modules/plan-estudios/application/use-cases/consultar-plan.use-case.js';
 import { GenerarNuevaVersion } from './modules/plan-estudios/application/use-cases/generar-nueva-version.use-case.js';
+import {
+  GestionarCarreras,
+  GestionarFacultades,
+} from './modules/plan-estudios/application/use-cases/gestionar-estructura.use-case.js';
+import { UbicarAsignatura } from './modules/plan-estudios/application/use-cases/ubicar-asignatura.use-case.js';
 import {
   AprobacionesRepositoryPrisma,
   ContenidoRepositoryPrisma,
   PlanRepositoryPrisma,
 } from './modules/plan-estudios/infrastructure/persistence/plan.repository.js';
 import { PlanesController } from './modules/plan-estudios/infrastructure/http/planes.controller.js';
+import {
+  CarrerasController,
+  FacultadesController,
+} from './modules/plan-estudios/infrastructure/http/estructura.controller.js';
+import { MallaController } from './modules/plan-estudios/infrastructure/http/malla.controller.js';
+import {
+  CarreraRepositoryPrisma,
+  FacultadRepositoryPrisma,
+} from './modules/plan-estudios/infrastructure/persistence/estructura.repository.js';
+import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
 
 const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
 
@@ -74,7 +109,13 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
   ],
 
-  controllers: [SesionController, PlanesController],
+  controllers: [
+    SesionController,
+    FacultadesController,
+    CarrerasController,
+    PlanesController,
+    MallaController,
+  ],
 
   providers: [
     PrismaService,
@@ -92,26 +133,70 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_PLAN, useClass: PlanRepositoryPrisma },
     { provide: REPOSITORIO_CONTENIDO, useClass: ContenidoRepositoryPrisma },
     { provide: REPOSITORIO_APROBACIONES, useClass: AprobacionesRepositoryPrisma },
+    { provide: REPOSITORIO_FACULTAD, useClass: FacultadRepositoryPrisma },
+    { provide: REPOSITORIO_CARRERA, useClass: CarreraRepositoryPrisma },
+    { provide: REPOSITORIO_MALLA, useClass: MallaRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
 
     /* ── Casos de uso ──────────────────────────────────────────────────── */
     {
       provide: IniciarSesion,
       inject: [REPOSITORIO_USUARIO, SEGURIDAD_PORT],
-      useFactory: (usuarios, seguridad) => {
+      useFactory: (usuarios: RepositorioUsuarioPort, seguridad: SeguridadPort) => {
         const log = new Logger('Seguridad');
         return new IniciarSesion(usuarios, seguridad, {
           intentoFallido: (email) => log.warn(`Intento de acceso fallido para ${email}.`),
           reusoDeToken: (usuarioId) =>
-            log.error(`Reuso de refresh token revocado (usuario ${usuarioId}). Se revoca la sesión.`),
+            log.error(
+              `Reuso de refresh token revocado (usuario ${usuarioId}). Se revoca la sesión.`,
+            ),
         });
       },
     },
     {
+      provide: GestionarFacultades,
+      inject: [REPOSITORIO_FACULTAD, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        facultades: RepositorioFacultadPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarFacultades(facultades, autorizacion, eventos),
+    },
+    {
+      provide: GestionarCarreras,
+      inject: [REPOSITORIO_CARRERA, REPOSITORIO_FACULTAD, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        carreras: RepositorioCarreraPort,
+        facultades: RepositorioFacultadPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos),
+    },
+    {
+      provide: UbicarAsignatura,
+      inject: [
+        REPOSITORIO_MALLA,
+        REPOSITORIO_PLAN,
+        REPOSITORIO_CONTENIDO,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        malla: RepositorioMallaPort,
+        planes: RepositorioPlanPort,
+        contenido: RepositorioContenidoPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new UbicarAsignatura(malla, planes, contenido, autorizacion, eventos),
+    },
+    {
       provide: ConsultarPlan,
       inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT],
-      useFactory: (planes, contenido, autorizacion) =>
-        new ConsultarPlan(planes, contenido, autorizacion),
+      useFactory: (
+        planes: RepositorioPlanPort,
+        contenido: RepositorioContenidoPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarPlan(planes, contenido, autorizacion),
     },
     {
       provide: CambiarEstadoPlan,
@@ -122,13 +207,23 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
       ],
-      useFactory: (planes, contenido, aprobaciones, autorizacion, eventos) =>
-        new CambiarEstadoPlan(planes, contenido, aprobaciones, autorizacion, eventos),
+      useFactory: (
+        planes: RepositorioPlanPort,
+        contenido: RepositorioContenidoPort,
+        aprobaciones: RepositorioAprobacionesPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new CambiarEstadoPlan(planes, contenido, aprobaciones, autorizacion, eventos),
     },
     {
       provide: GenerarNuevaVersion,
       inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
-      useFactory: (planes, contenido, autorizacion, eventos) =>
+      useFactory: (
+        planes: RepositorioPlanPort,
+        contenido: RepositorioContenidoPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
         new GenerarNuevaVersion(planes, contenido, autorizacion, eventos, {
           nuevo: () => randomUUID(),
         }),

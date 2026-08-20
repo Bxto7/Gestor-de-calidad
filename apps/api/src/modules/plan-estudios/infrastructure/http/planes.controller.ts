@@ -41,10 +41,7 @@ export class PlanesController {
   })
   @ApiResponse({ status: 404, description: 'El plan no existe.' })
   @ApiResponse({ status: 403, description: 'Sin permiso, o el plan es de otra carrera.' })
-  async detalle(
-    @Param('id', ParseUUIDPipe) id: string,
-    @ActorActual() actor: Actor,
-  ) {
+  async detalle(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     const { plan, validacion, accionesDisponibles } = await this.consultar.ejecutar(id, actor);
 
     return {
@@ -99,7 +96,10 @@ export class PlanesController {
       // RF082: se informa qué versión cedió la vigencia, para que la UI pueda
       // reflejarlo sin tener que volver a consultar la lista de versiones.
       versionArchivada: archivado ? { id: archivado.id, codigo: archivado.codigo } : null,
-      validacion: { tieneBloqueos: validacion.tieneBloqueos, totalCreditos: validacion.totalCreditos },
+      validacion: {
+        tieneBloqueos: validacion.tieneBloqueos,
+        totalCreditos: validacion.totalCreditos,
+      },
     };
   }
 

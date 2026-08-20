@@ -62,6 +62,23 @@ function sinDiacriticos(fragmento: string): string {
 }
 
 /**
+ * Deja el nombre como se va a mostrar: sin espacios en los extremos y sin
+ * repeticiones internas.
+ *
+ * Colapsar los espacios de dentro no es cosmética. La unicidad los ignora, así
+ * que "Ciencias   de la Salud" y "Ciencias de la Salud" son el mismo nombre;
+ * si se guardara el primero tal cual, la grafía correcta quedaría bloqueada
+ * para siempre por su propio duplicado. Guardando ya limpio, el problema no
+ * llega a existir.
+ *
+ * A diferencia de `normalizarParaUnicidad`, esto conserva mayúsculas y tildes:
+ * es el nombre que lee una persona, no una clave de comparación.
+ */
+export function limpiarNombre(texto: string): string {
+  return texto.trim().replace(/\s+/g, ' ');
+}
+
+/**
  * RF006/RF015 — comparación de unicidad que no distingue mayúsculas ni espacios
  * adicionales. Se normaliza también el acento para que "Ingeniería" e
  * "Ingenieria" no convivan como facultades distintas.

@@ -78,11 +78,13 @@ export class JwtGuard implements CanActivate {
  * Evita que cada método vuelva a leer la cabecera y decodificar el token, que
  * es donde se cuelan las inconsistencias.
  */
-export const ActorActual = createParamDecorator((_dato: unknown, contexto: ExecutionContext): Actor => {
-  const peticion = contexto.switchToHttp().getRequest<PeticionConActor>();
-  if (!peticion.actor) {
-    // Solo puede pasar si alguien usa el decorador en un endpoint @Publico.
-    throw new UnauthorizedException('La petición no tiene un actor autenticado.');
-  }
-  return peticion.actor;
-});
+export const ActorActual = createParamDecorator(
+  (_dato: unknown, contexto: ExecutionContext): Actor => {
+    const peticion = contexto.switchToHttp().getRequest<PeticionConActor>();
+    if (!peticion.actor) {
+      // Solo puede pasar si alguien usa el decorador en un endpoint @Publico.
+      throw new UnauthorizedException('La petición no tiene un actor autenticado.');
+    }
+    return peticion.actor;
+  },
+);

@@ -16,7 +16,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import type { DomainEvent, PublicadorDeEventos } from '../../../../shared-kernel/domain-events/domain-event.js';
+import type {
+  DomainEvent,
+  PublicadorDeEventos,
+} from '../../../../shared-kernel/domain-events/domain-event.js';
 
 @Injectable()
 export class BitacoraListener implements PublicadorDeEventos {
@@ -48,7 +51,9 @@ export class BitacoraListener implements PublicadorDeEventos {
         `No se pudo escribir en la bitácora ${eventos.length} evento(s): ` +
           `${error instanceof Error ? error.message : String(error)}`,
       );
-      this.log.error(`Eventos perdidos: ${eventos.map((e) => `${e.nombre}#${e.entidadId}`).join(', ')}`);
+      this.log.error(
+        `Eventos perdidos: ${eventos.map((e) => `${e.nombre}#${e.entidadId}`).join(', ')}`,
+      );
     }
   }
 }

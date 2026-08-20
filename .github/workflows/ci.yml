@@ -7,6 +7,7 @@
 #
 #   §5.4-1  Lint + typecheck ............. implementado (job `calidad`)
 #   §5.4-2  Pruebas unitarias ............ implementado (dominio de front y back)
+#   §5.4-2b Pruebas de integración ...... implementado (adaptadores vs. Postgres efímero)
 #   §5.4-3  SAST + auditoría de deps ..... implementado (job `seguridad`)
 #   §5.4-4  Cobertura ≥80% en dominio .... implementado (umbral en vitest.config)
 #   §5.4-5  Build ........................ parcial: estático del frontend + esquema
@@ -169,6 +170,15 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # §4.2 los marca como no negociables. El backend se quedó sin ellos
+      # mientras el frontend sí los tenía; el lint con tipos necesita el cliente
+      # de Prisma ya generado, de ahí que vaya después del paso anterior.
+      - name: Lint
+        run: npm run lint
+
+      - name: Formato
+        run: npm run format:check
+
       # El dominio y los casos de uso son puros: no necesitan la base de datos
       # para probarse, y por eso corren antes de levantarla.
       - name: Pruebas de dominio y aplicación
@@ -206,15 +216,30 @@ jobs:
       - name: Verificar que el seed es idempotente
         run: npx tsx prisma/seed.ts
 
+      # §6.4, nivel de integración: los adaptadores contra el Postgres real de
+      # este job. Es lo único que detecta que la expresión de unicidad de la
+      # aplicación y la del índice hayan dejado de coincidir —ya ocurrió una vez,
+      # por una barra invertida— y que la reordenación de la malla no deje
+      # huecos. Van aparte de las unitarias para que `npm test` siga corriendo
+      # sin base de datos.
+      - name: Pruebas de integración
+        run: npm run test:integration
+
 # ── Etapas pendientes ────────────────────────────────────────────────────────
 #
 # No están escritas como pasos comentados porque envejecerían mal. Lo que hace
 # falta antes de poder añadirlas:
 #
-# §5.4-2 — Pruebas de integración
-#   El dominio del frontend ya está cubierto. Falta el nivel de integración,
-#   que depende del backend: Jest + Testcontainers contra Postgres y Redis
-#   efímeros (CLAUDE.md §6.4), nunca contra staging.
+# §6.4 — Pruebas de API/contrato y E2E
+#   La integración de los adaptadores contra Postgres ya corre. Falta el nivel
+#   de API/contrato con Supertest, que exige arrancar la aplicación de NestJS
+#   dentro del runner de pruebas: Vitest transpila con esbuild y esbuild no
+#   emite metadatos de decoradores, así que el contenedor de inyección arranca
+#   vacío. Se resuelve con `unplugin-swc`, y es el mismo motivo por el que
+#   `start:dev` no funciona hoy. Los flujos E2E de Playwright dependen además
+#   de que el frontend consuma la API real, no la capa simulada.
+#
+#   Falta también Redis efímero, que hoy no hace falta porque no hay colas.
 #
 # §5.4-5 y §5.4-6 — Imágenes Docker y ghcr.io
 #   Requiere apps/api con su Dockerfile. El frontend no lleva imagen propia:

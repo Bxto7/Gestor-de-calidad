@@ -160,7 +160,10 @@ describe('RF026 — transiciones', () => {
     for (const [estado, accion, nombreEvento] of esperados) {
       const p = plan(estado);
       p.transicionar(accion, SIN_BLOQUEOS, ACTOR);
-      expect(p.eventos.map((e) => e.nombre), `${estado} + ${accion}`).toContain(nombreEvento);
+      expect(
+        p.eventos.map((e) => e.nombre),
+        `${estado} + ${accion}`,
+      ).toContain(nombreEvento);
     }
   });
 

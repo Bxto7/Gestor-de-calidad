@@ -107,7 +107,10 @@ describe('Validación incluida en la respuesta', () => {
 
   it('reporta los bloqueos que impiden avanzar', async () => {
     // RF095: sin objetivo educacional la validación es bloqueante.
-    const detalle = await montar({ plan: plan('Borrador'), objetivos: [] }).ejecutar('plan-1', ACTOR);
+    const detalle = await montar({ plan: plan('Borrador'), objetivos: [] }).ejecutar(
+      'plan-1',
+      ACTOR,
+    );
     expect(detalle.validacion.tieneBloqueos).toBe(true);
     expect(detalle.validacion.bloqueantes.map((h) => h.codigo)).toContain('PLAN_SIN_OBJETIVO');
   });
@@ -122,7 +125,10 @@ describe('Acciones disponibles', () => {
 
   it('en revisión ofrece aprobar y observar', async () => {
     const detalle = await montar({ plan: plan('En revisión') }).ejecutar('plan-1', ACTOR);
-    expect(detalle.accionesDisponibles.map((a) => a.accion).sort()).toEqual(['aprobar', 'observar']);
+    expect(detalle.accionesDisponibles.map((a) => a.accion).sort()).toEqual([
+      'aprobar',
+      'observar',
+    ]);
   });
 
   it('un plan Histórico no ofrece ninguna acción', async () => {
@@ -133,7 +139,10 @@ describe('Acciones disponibles', () => {
   it('la deshabilita con su motivo cuando hay bloqueos, en vez de ocultarla', async () => {
     // Ocultarla dejaría al usuario preguntándose por qué no puede enviar; verla
     // gris con el motivo le dice qué corregir.
-    const detalle = await montar({ plan: plan('Borrador'), objetivos: [] }).ejecutar('plan-1', ACTOR);
+    const detalle = await montar({ plan: plan('Borrador'), objetivos: [] }).ejecutar(
+      'plan-1',
+      ACTOR,
+    );
     const enviar = detalle.accionesDisponibles[0];
 
     expect(enviar?.habilitada).toBe(false);
@@ -153,7 +162,10 @@ describe('Acciones disponibles', () => {
 
   it('observar sigue habilitada aunque haya bloqueos', async () => {
     // Devolver el plan con observaciones es la salida cuando algo está mal.
-    const detalle = await montar({ plan: plan('En revisión'), objetivos: [] }).ejecutar('plan-1', ACTOR);
+    const detalle = await montar({ plan: plan('En revisión'), objetivos: [] }).ejecutar(
+      'plan-1',
+      ACTOR,
+    );
     const observar = detalle.accionesDisponibles.find((a) => a.accion === 'observar');
     const aprobar = detalle.accionesDisponibles.find((a) => a.accion === 'aprobar');
 

@@ -7,8 +7,7 @@
  * excepción de `errores.ts` es más directa y se prefiere.
  */
 export type Resultado<T, E = string> =
-  | { readonly ok: true; readonly valor: T }
-  | { readonly ok: false; readonly error: E };
+  { readonly ok: true; readonly valor: T } | { readonly ok: false; readonly error: E };
 
 export function exito<T>(valor: T): Resultado<T, never> {
   return { ok: true, valor };

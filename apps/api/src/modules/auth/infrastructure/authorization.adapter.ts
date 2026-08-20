@@ -27,7 +27,11 @@ export class AuthorizationAdapter implements AuthorizationPort {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async puede(usuarioId: string, permiso: string, carreraId: string | null = null): Promise<Decision> {
+  async puede(
+    usuarioId: string,
+    permiso: string,
+    carreraId: string | null = null,
+  ): Promise<Decision> {
     const contexto = await this.contextoDe(usuarioId);
     const decision = decidir(contexto, permiso, carreraId);
 

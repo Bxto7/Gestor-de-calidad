@@ -17,11 +17,20 @@
  * consultas en peticiones que se van a denegar igual.
  */
 
-import type { Actor, PublicadorDeEventos } from '../../../../shared-kernel/domain-events/domain-event.js';
+import type {
+  Actor,
+  PublicadorDeEventos,
+} from '../../../../shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
-import { validarPlan, type ResultadoValidacion } from '../../domain/services/motor-de-validaciones.js';
-import { describirTransicion, type AccionTransicion } from '../../domain/value-objects/estado-plan.js';
+import {
+  validarPlan,
+  type ResultadoValidacion,
+} from '../../domain/services/motor-de-validaciones.js';
+import {
+  describirTransicion,
+  type AccionTransicion,
+} from '../../domain/value-objects/estado-plan.js';
 import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type {
   RepositorioAprobacionesPort,

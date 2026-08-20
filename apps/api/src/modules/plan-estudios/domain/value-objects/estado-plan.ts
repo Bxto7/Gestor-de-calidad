@@ -20,11 +20,7 @@ export const ESTADOS_PLAN = [
 export type EstadoPlan = (typeof ESTADOS_PLAN)[number];
 
 export type AccionTransicion =
-  | 'enviar-a-revision'
-  | 'aprobar'
-  | 'observar'
-  | 'marcar-vigente'
-  | 'archivar';
+  'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
 
 export interface Transicion {
   readonly desde: EstadoPlan;

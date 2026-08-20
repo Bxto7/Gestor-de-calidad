@@ -10,7 +10,10 @@
  * expone los eventos que hay que publicar. Quien lo guarda es el caso de uso.
  */
 
-import { InvarianteViolado, ReglaDeNegocioViolada } from '../../../../shared-kernel/errors/errores.js';
+import {
+  InvarianteViolado,
+  ReglaDeNegocioViolada,
+} from '../../../../shared-kernel/errors/errores.js';
 import type { Actor, DomainEvent } from '../../../../shared-kernel/domain-events/domain-event.js';
 import {
   PlanAprobado,
@@ -81,10 +84,7 @@ export class PlanDeEstudios {
    * RF020 — alta de un plan. RN1: siempre nace en Borrador, y por eso el estado
    * no es un parámetro: no hay forma de crear un plan ya aprobado.
    */
-  static crear(
-    datos: Omit<DatosPlan, 'estado' | 'fechaVigencia'>,
-    actor: Actor,
-  ): PlanDeEstudios {
+  static crear(datos: Omit<DatosPlan, 'estado' | 'fechaVigencia'>, actor: Actor): PlanDeEstudios {
     if (datos.duracionAnios < 1 || !Number.isInteger(datos.duracionAnios)) {
       throw new ReglaDeNegocioViolada(
         'La duración del plan debe ser un número entero de años mayor a cero.',
@@ -218,9 +218,7 @@ export class PlanDeEstudios {
   private exigirEditable(que: string): void {
     if (this.esEditable) return;
 
-    const sugerencia = this.admiteNuevaVersion
-      ? ' Genera una nueva versión para modificarlo.'
-      : '';
+    const sugerencia = this.admiteNuevaVersion ? ' Genera una nueva versión para modificarlo.' : '';
     throw new ReglaDeNegocioViolada(
       `No se puede cambiar ${que}: el plan está en estado ${this._estado}.${sugerencia}`,
     );

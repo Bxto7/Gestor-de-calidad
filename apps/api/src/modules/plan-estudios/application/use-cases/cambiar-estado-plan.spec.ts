@@ -13,7 +13,11 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { Actor, DomainEvent, PublicadorDeEventos } from '../../../../shared-kernel/domain-events/domain-event.js';
+import type {
+  Actor,
+  DomainEvent,
+  PublicadorDeEventos,
+} from '../../../../shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { Decision } from '../../../auth/domain/services/politica-de-autorizacion.js';

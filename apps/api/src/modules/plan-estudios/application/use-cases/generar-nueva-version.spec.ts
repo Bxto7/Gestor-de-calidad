@@ -15,10 +15,7 @@ import type {
   DomainEvent,
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
-import {
-  AccesoDenegado,
-  NoEncontrado,
-} from '../../../../shared-kernel/errors/errores.js';
+import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { Decision } from '../../../auth/domain/services/politica-de-autorizacion.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
@@ -123,10 +120,9 @@ describe('Precondiciones', () => {
     // crearía dos borradores compitiendo para la misma carrera.
     for (const estado of ['Borrador', 'En revisión'] as const) {
       const { caso } = montar({ origen: plan(estado) });
-      await expect(
-        caso.ejecutar({ planOrigenId: 'plan-1', actor: ACTOR }),
-        estado,
-      ).rejects.toThrow(/se edita directamente/);
+      await expect(caso.ejecutar({ planOrigenId: 'plan-1', actor: ACTOR }), estado).rejects.toThrow(
+        /se edita directamente/,
+      );
     }
   });
 
