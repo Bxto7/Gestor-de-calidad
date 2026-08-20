@@ -1,0 +1,512 @@
+// ============================================================================
+// Esquema de datos — Sistema de Gestión de la Calidad Universitaria
+//
+// Modelo de dominio de CLAUDE.md §3.3, más el módulo de Auth de §3.5.
+//
+// ── Aislamiento entre módulos ───────────────────────────────────────────────
+// §3.2 prohíbe que un módulo acceda a las tablas de otro. Con un único cliente
+// Prisma esa regla solo puede vivir en la disciplina del equipo, así que aquí
+// se le da respaldo real: cada módulo tiene su propio **schema de PostgreSQL**
+// (`auth`, `plan_estudios`, `auditoria`). Eso permite, más adelante, conceder
+// permisos distintos por schema a nivel de rol de base de datos, y hace que un
+// cruce indebido se vea a simple vista en el SQL.
+//
+// ── Invariantes que NO se pueden expresar aquí ──────────────────────────────
+// Prisma no cubre índices parciales ni triggers. Los tres invariantes críticos
+// de §3.3 se añaden como SQL explícito en `prisma/migrations/`:
+//   1. una sola versión Vigente por carrera  → índice único parcial
+//   2. bitácora append-only                  → REVOKE UPDATE/DELETE (§4.3)
+//   3. versiones Histórico inmutables        → trigger
+// El grafo de prerrequisitos sin ciclos no es expresable en SQL declarativo y
+// se valida en el dominio (`MotorDeValidaciones`, RF097).
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/platform/database/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["auth", "plan_estudios", "auditoria"]
+}
+
+// ============================================================================
+// Módulo AUTH — §3.5, §4.4
+// ============================================================================
+
+/// Estado de activación compartido por las entidades que se inactivan en vez
+/// de borrarse (RF005, RF018, RF037, RF044, RF052).
+enum EstadoActivacion {
+  ACTIVO
+  INACTIVO
+
+  @@schema("auth")
+}
+
+model Usuario {
+  id             String           @id @default(uuid()) @db.Uuid
+  email          String           @unique @db.VarChar(255)
+  /// argon2id — §4.4 lo elige sobre bcrypt por su resistencia a ataques con
+  /// hardware dedicado. Nunca se guarda la contraseña en claro.
+  passwordHash   String           @map("password_hash") @db.Text
+  nombreCompleto String           @map("nombre_completo") @db.VarChar(200)
+  estado         EstadoActivacion @default(ACTIVO)
+  creadoEn       DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn  DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  roles          UsuarioRol[]
+  carreras       UsuarioCarrera[]
+  refreshTokens  RefreshToken[]
+
+  @@map("usuarios")
+  @@schema("auth")
+}
+
+/// Rol del sistema. §3.5: los roles y sus permisos se configuran **como datos**,
+/// no como código, para que agregar uno nuevo no exija un despliegue. Por eso
+/// no existe un enum de roles: viven en esta tabla y se cargan por seed.
+model Rol {
+  id          String  @id @default(uuid()) @db.Uuid
+  /// Identificador estable para el código (p. ej. `DIRECTOR_CARRERA`). El
+  /// nombre visible puede cambiar sin romper nada; este no.
+  codigo      String  @unique @db.VarChar(64)
+  nombre      String  @db.VarChar(120)
+  descripcion String  @db.Text
+  /// Marca los roles que instala el sistema. Impide que un administrador borre
+  /// por accidente un rol del que dependen los permisos base.
+  esDelSistema Boolean @default(false) @map("es_del_sistema")
+
+  usuarios    UsuarioRol[]
+  permisos    RolPermiso[]
+
+  @@map("roles")
+  @@schema("auth")
+}
+
+/// Permiso atómico sobre una operación. El código sigue el patrón
+/// `recurso.accion` para que la comprobación en el `AuthorizationPort` sea una
+/// comparación de cadena y no una jerarquía que haya que recorrer.
+model Permiso {
+  id          String @id @default(uuid()) @db.Uuid
+  codigo      String @unique @db.VarChar(64)
+  descripcion String @db.Text
+  /// Módulo al que pertenece, para poder listarlos agrupados en la UI de
+  /// administración de roles.
+  modulo      String @db.VarChar(64)
+
+  roles       RolPermiso[]
+
+  @@map("permisos")
+  @@schema("auth")
+}
+
+model RolPermiso {
+  rolId     String @map("rol_id") @db.Uuid
+  permisoId String @map("permiso_id") @db.Uuid
+
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([rolId, permisoId])
+  @@map("rol_permiso")
+  @@schema("auth")
+}
+
+model UsuarioRol {
+  usuarioId  String   @map("usuario_id") @db.Uuid
+  rolId      String   @map("rol_id") @db.Uuid
+  asignadoEn DateTime @default(now()) @map("asignado_en") @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Restrict)
+
+  @@id([usuarioId, rolId])
+  @@map("usuario_rol")
+  @@schema("auth")
+}
+
+/// Alcance del rol de Director de carrera.
+///
+/// La definición del rol dice "aprobación del plan de estudios **de su
+/// carrera**", y eso no lo expresa un modelo rol→permiso plano: `plan.aprobar`
+/// dice *qué* puede hacer, no *sobre cuál*. Esta tabla aporta el *sobre cuál*.
+///
+/// El `AuthorizationPort` debe comprobar ambas cosas: que el rol tenga el
+/// permiso y que el usuario esté asignado a la carrera del plan. Un usuario sin
+/// filas aquí no tiene alcance sobre ninguna carrera.
+model UsuarioCarrera {
+  usuarioId String @map("usuario_id") @db.Uuid
+  /// Sin relación de Prisma a propósito: `Carrera` vive en otro módulo y §3.2
+  /// prohíbe el acceso directo. Se guarda el identificador y la resolución pasa
+  /// por el puerto que expone `plan-estudios`.
+  carreraId String @map("carrera_id") @db.Uuid
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, carreraId])
+  @@map("usuario_carrera")
+  @@schema("auth")
+}
+
+/// §4.4: refresh token de vida larga con **rotación en cada uso**. Se guarda el
+/// hash y no el token, por la misma razón que con las contraseñas: una fuga de
+/// la tabla no debe permitir suplantar sesiones.
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.Text
+  expiraEn   DateTime  @map("expira_en") @db.Timestamptz(6)
+  /// Al rotar, el token anterior se marca aquí en vez de borrarse: permite
+  /// detectar el reuso de un token ya consumido, que es señal de robo.
+  revocadoEn DateTime? @map("revocado_en") @db.Timestamptz(6)
+  creadoEn   DateTime  @default(now()) @map("creado_en") @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEn])
+  @@map("refresh_tokens")
+  @@schema("auth")
+}
+
+// ============================================================================
+// Módulo PLAN DE ESTUDIOS — §3.3
+// ============================================================================
+
+/// RF025: lista cerrada de estados del ciclo de vida del plan.
+enum EstadoPlan {
+  BORRADOR
+  EN_REVISION
+  APROBADO
+  VIGENTE
+  HISTORICO
+
+  @@schema("plan_estudios")
+}
+
+/// RF048: lista cerrada.
+enum TipoAsignatura {
+  GENERAL
+  TRANSVERSAL
+  ESPECIALIDAD
+
+  @@schema("plan_estudios")
+}
+
+/// RF056: lista cerrada.
+enum CondicionAsignatura {
+  OBLIGATORIA
+  ELECTIVA
+
+  @@schema("plan_estudios")
+}
+
+/// RF061: la relación entre asignaturas distingue el orden temporal.
+enum TipoDependencia {
+  PRERREQUISITO
+  CORREQUISITO
+
+  @@schema("plan_estudios")
+}
+
+model Facultad {
+  id            String           @id @default(uuid()) @db.Uuid
+  /// RF006: la unicidad ignora mayúsculas, espacios y acentos, cosa que un
+  /// `UNIQUE` normal no hace. El índice se crea sobre una expresión
+  /// normalizada en la migración; este `@unique` cubre solo el caso exacto.
+  nombre        String           @unique @db.VarChar(200)
+  estado        EstadoActivacion @default(ACTIVO)
+  creadoEn      DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  carreras Carrera[]
+
+  @@map("facultades")
+  @@schema("plan_estudios")
+}
+
+model Carrera {
+  id          String @id @default(uuid()) @db.Uuid
+  facultadId  String @map("facultad_id") @db.Uuid
+  nombre      String @db.VarChar(200)
+  /// RF017 RN1: único en toda la universidad, no solo dentro de la facultad.
+  codigo      String @unique @db.VarChar(16)
+  /// RF011 RN2: por convención, cada año son dos ciclos.
+  duracionAnios Int   @map("duracion_anios") @db.SmallInt
+
+  estado        EstadoActivacion @default(ACTIVO)
+  creadoEn      DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  facultad Facultad       @relation(fields: [facultadId], references: [id], onDelete: Restrict)
+  ciclos   Ciclo[]
+  planes   PlanEstudios[]
+
+  /// RF015 RN1: el mismo nombre puede repetirse entre facultades, pero no
+  /// dentro de una.
+  @@unique([facultadId, nombre])
+  @@index([facultadId])
+  @@map("carreras")
+  @@schema("plan_estudios")
+}
+
+/// Ciclo académico. §3.3 lo lista como entidad propia y no como un simple
+/// número derivado de `duracionAnios`, porque RF064 exige un rango de créditos
+/// "configurable" por ciclo: esa configuración necesita dónde vivir.
+model Ciclo {
+  id        String @id @default(uuid()) @db.Uuid
+  carreraId String @map("carrera_id") @db.Uuid
+  /// RF096: correlativo del 1 al total definido para la carrera.
+  numero    Int    @db.SmallInt
+
+  /// RF064: rango configurable. Nulo significa "sin configurar", y en ese caso
+  /// la validación se omite en vez de inventar un umbral.
+  creditosMin Int? @map("creditos_min") @db.SmallInt
+  creditosMax Int? @map("creditos_max") @db.SmallInt
+
+  carrera     Carrera      @relation(fields: [carreraId], references: [id], onDelete: Cascade)
+  asignaturas Asignatura[]
+
+  @@unique([carreraId, numero])
+  @@map("ciclos")
+  @@schema("plan_estudios")
+}
+
+model PlanEstudios {
+  id        String @id @default(uuid()) @db.Uuid
+  carreraId String @map("carrera_id") @db.Uuid
+  /// RF022 RN1: autogenerado y no editable manualmente.
+  codigo    String @unique @db.VarChar(64)
+  /// RF076 RN1: correlativo por carrera, no editable.
+  version   Int    @db.SmallInt
+
+  estado        EstadoPlan @default(BORRADOR)
+  duracionAnios Int        @map("duracion_anios") @db.SmallInt
+  /// RF023 RN1: solo se fija cuando el plan está Aprobado.
+  fechaVigencia DateTime?  @map("fecha_vigencia") @db.Timestamptz(6)
+
+  /// RF075: enlaza con la versión de la que se derivó, para reconstruir la
+  /// cadena completa de versiones.
+  derivadoDeId String? @map("derivado_de_id") @db.Uuid
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  carrera      Carrera            @relation(fields: [carreraId], references: [id], onDelete: Restrict)
+  derivadoDe   PlanEstudios?      @relation("Versiones", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados    PlanEstudios[]     @relation("Versiones")
+  objetivos    PlanObjetivo[]
+  competencias PlanCompetencia[]
+  asignaturas  Asignatura[]
+  aprobaciones EventoAprobacion[]
+  justificaciones Justificacion[]
+
+  @@unique([carreraId, version])
+  @@index([carreraId, estado])
+  @@map("planes_estudio")
+  @@schema("plan_estudios")
+}
+
+model ObjetivoEducacional {
+  id          String           @id @default(uuid()) @db.Uuid
+  /// RF034 RN1: correlativo OE-01, OE-02…, no editable.
+  codigo      String           @unique @db.VarChar(16)
+  nombre      String           @db.VarChar(300)
+  descripcion String           @db.Text
+  estado      EstadoActivacion @default(ACTIVO)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  planes PlanObjetivo[]
+
+  @@map("objetivos_educacionales")
+  @@schema("plan_estudios")
+}
+
+model Competencia {
+  id     String           @id @default(uuid()) @db.Uuid
+  /// RF041 RN1: correlativo CPE-01, CPE-02…, no editable.
+  codigo String           @unique @db.VarChar(16)
+  nombre String           @db.VarChar(300)
+  estado EstadoActivacion @default(ACTIVO)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  planes      PlanCompetencia[]
+  asignaturas AsignaturaCompetencia[]
+
+  @@map("competencias")
+  @@schema("plan_estudios")
+}
+
+/// RF028: objetivos asociados a un plan.
+model PlanObjetivo {
+  planId     String @map("plan_id") @db.Uuid
+  objetivoId String @map("objetivo_id") @db.Uuid
+
+  plan     PlanEstudios        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  objetivo ObjetivoEducacional @relation(fields: [objetivoId], references: [id], onDelete: Restrict)
+
+  @@id([planId, objetivoId])
+  @@map("plan_objetivo")
+  @@schema("plan_estudios")
+}
+
+/// RF029: competencias a nivel de plan, distintas de las de cada asignatura.
+model PlanCompetencia {
+  planId        String @map("plan_id") @db.Uuid
+  competenciaId String @map("competencia_id") @db.Uuid
+
+  plan        PlanEstudios @relation(fields: [planId], references: [id], onDelete: Cascade)
+  competencia Competencia  @relation(fields: [competenciaId], references: [id], onDelete: Restrict)
+
+  @@id([planId, competenciaId])
+  @@map("plan_competencia")
+  @@schema("plan_estudios")
+}
+
+model Asignatura {
+  id     String @id @default(uuid()) @db.Uuid
+  planId String @map("plan_id") @db.Uuid
+  /// RF053 RN1: autogenerado a partir del código de la carrera.
+  codigo String @db.VarChar(32)
+
+  nombre      String              @db.VarChar(300)
+  descripcion String              @db.Text
+  tipo        TipoAsignatura
+  condicion   CondicionAsignatura
+
+  /// RF054 RN1: mayor a cero. El CHECK se añade en la migración.
+  creditos      Int @db.SmallInt
+  /// RF055 RN1: numérico y no negativo.
+  horasTeoricas Int @map("horas_teoricas") @db.SmallInt
+
+  /// RF061/RF065: una asignatura ocupa un único ciclo, o ninguno. Que sea una
+  /// sola columna hace estructuralmente imposible el duplicado que RF065
+  /// prohíbe. Nulo dispara la alerta bloqueante de RF068.
+  cicloId String? @map("ciclo_id") @db.Uuid
+  /// RF070: orden de presentación dentro del ciclo, sin efecto en la lógica.
+  orden   Int     @default(0) @db.SmallInt
+
+  estado        EstadoActivacion @default(ACTIVO)
+  creadoEn      DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  plan         PlanEstudios            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  ciclo        Ciclo?                  @relation(fields: [cicloId], references: [id], onDelete: SetNull)
+  competencias AsignaturaCompetencia[]
+  dependeDe    Dependencia[]           @relation("Dependiente")
+  requeridaPor Dependencia[]           @relation("Requerida")
+
+  @@unique([planId, codigo])
+  @@index([planId, cicloId])
+  @@map("asignaturas")
+  @@schema("plan_estudios")
+}
+
+/// RF049: competencias vinculadas a una asignatura. RF094 exige al menos una
+/// antes de aprobar el plan; esa cardinalidad mínima no es expresable en SQL y
+/// la comprueba el `MotorDeValidaciones`.
+model AsignaturaCompetencia {
+  asignaturaId  String @map("asignatura_id") @db.Uuid
+  competenciaId String @map("competencia_id") @db.Uuid
+
+  asignatura  Asignatura  @relation(fields: [asignaturaId], references: [id], onDelete: Cascade)
+  competencia Competencia @relation(fields: [competenciaId], references: [id], onDelete: Restrict)
+
+  @@id([asignaturaId, competenciaId])
+  @@map("asignatura_competencia")
+  @@schema("plan_estudios")
+}
+
+/// Grafo dirigido de prerrequisitos y correquisitos (§3.3).
+///
+/// La ausencia de ciclos **no** es expresable en SQL declarativo: exige un
+/// recorrido del grafo. La valida el `MotorDeValidaciones` (RF097). Aquí solo
+/// se impide el caso trivial de la autorreferencia, con un CHECK en la
+/// migración.
+model Dependencia {
+  asignaturaId String          @map("asignatura_id") @db.Uuid
+  requiereId   String          @map("requiere_id") @db.Uuid
+  tipo         TipoDependencia @default(PRERREQUISITO)
+
+  asignatura Asignatura @relation("Dependiente", fields: [asignaturaId], references: [id], onDelete: Cascade)
+  requiere   Asignatura @relation("Requerida", fields: [requiereId], references: [id], onDelete: Cascade)
+
+  @@id([asignaturaId, requiereId])
+  @@index([requiereId])
+  @@map("dependencias")
+  @@schema("plan_estudios")
+}
+
+/// RF089: historial del flujo de aprobación, de solo lectura.
+model EventoAprobacion {
+  id         String   @id @default(uuid()) @db.Uuid
+  planId     String   @map("plan_id") @db.Uuid
+  accion     String   @db.VarChar(64)
+  comentario String?  @db.Text
+  /// RF088 RN1: el responsable no puede modificarse después. Se guarda el id y
+  /// también el nombre, porque el histórico debe seguir siendo legible aunque
+  /// el usuario se elimine del sistema.
+  usuarioId     String   @map("usuario_id") @db.Uuid
+  usuarioNombre String   @map("usuario_nombre") @db.VarChar(200)
+  fecha         DateTime @default(now()) @db.Timestamptz(6)
+
+  plan PlanEstudios @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, fecha])
+  @@map("eventos_aprobacion")
+  @@schema("plan_estudios")
+}
+
+/// RF099: justificación de una observación **no bloqueante**. Las bloqueantes
+/// no admiten justificación y por eso no hay forma de registrarlas aquí.
+model Justificacion {
+  id          String   @id @default(uuid()) @db.Uuid
+  planId      String   @map("plan_id") @db.Uuid
+  codigoRegla String   @map("codigo_regla") @db.VarChar(64)
+  motivo      String   @db.Text
+  usuarioId   String   @map("usuario_id") @db.Uuid
+  fecha       DateTime @default(now()) @db.Timestamptz(6)
+
+  plan PlanEstudios @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("justificaciones")
+  @@schema("plan_estudios")
+}
+
+// ============================================================================
+// Módulo AUDITORÍA — §3.4, §4.3
+// ============================================================================
+
+/// Bitácora append-only (RF008, RF019, RF059, RF078, RF080).
+///
+/// No tiene relaciones de Prisma hacia los otros módulos a propósito: la
+/// bitácora sobrevive a lo que audita. Si se borrara una facultad, su rastro
+/// debe permanecer, y un FK con `Cascade` lo destruiría.
+///
+/// §4.3 exige que la inmutabilidad se refuerce **también en infraestructura**:
+/// la migración revoca UPDATE y DELETE sobre esta tabla al rol de la
+/// aplicación, de modo que ni un bug ni una consulta manual puedan reescribir
+/// la historia.
+model EventoAuditoria {
+  id        String   @id @default(uuid()) @db.Uuid
+  entidad   String   @db.VarChar(64)
+  entidadId String   @map("entidad_id") @db.Uuid
+  accion    String   @db.VarChar(64)
+  detalle   String   @db.Text
+
+  /// RF080 RN1: no se permiten modificaciones anónimas.
+  usuarioId     String   @map("usuario_id") @db.Uuid
+  usuarioNombre String   @map("usuario_nombre") @db.VarChar(200)
+  fecha         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([entidad, entidadId, fecha])
+  @@index([fecha])
+  @@map("audit_log")
+  @@schema("auditoria")
+}

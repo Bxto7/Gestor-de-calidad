@@ -1,0 +1,4 @@
+# Cliente generado: se regenera con `prisma generate`, no se versiona.
+src/platform/database/generated/
+node_modules/
+.env

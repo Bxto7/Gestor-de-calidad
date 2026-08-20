@@ -9,7 +9,7 @@
 #   §5.4-2  Pruebas unitarias ............ implementado (dominio del frontend)
 #   §5.4-3  SAST + auditoría de deps ..... implementado (job `seguridad`)
 #   §5.4-4  Cobertura ≥80% en dominio .... implementado (umbral en vitest.config)
-#   §5.4-5  Build ........................ parcial: solo el estático del frontend
+#   §5.4-5  Build ........................ parcial: estático del frontend + esquema
 #   §5.4-6  Push a ghcr.io ............... PENDIENTE: no hay imágenes que publicar
 #   §5.4-7  Deploy al VPS ................ PENDIENTE: no hay VPS aprovisionado
 #   §5.4-8  Smoke tests en Staging ....... PENDIENTE: depende de §5.4-7
@@ -122,6 +122,70 @@ jobs:
           --severity=ERROR
           --error
           --metrics=off
+  esquema:
+    name: Esquema de datos
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    # Postgres efímero, como pide CLAUDE.md §6.4 para las pruebas que tocan
+    # base de datos: nunca contra staging ni producción. Se destruye con el job.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sgc
+          POSTGRES_PASSWORD: sgc
+          POSTGRES_DB: sgc
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sgc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://sgc:sgc@localhost:5432/sgc
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Validar esquema
+        run: npx prisma validate
+
+      # Aplica la migración de verdad. Es lo único que detecta el SQL escrito a
+      # mano que Prisma no valida: los índices parciales, los CHECK y los
+      # triggers de inmutabilidad.
+      - name: Aplicar migraciones
+        run: npx prisma migrate deploy
+
+      # Si el esquema se editó sin generar la migración correspondiente, el
+      # diff sale no vacío y `--exit-code` devuelve 2.
+      - name: Migraciones al día con el esquema
+        run: |
+          npx prisma migrate diff             --from-url "$DATABASE_URL"             --to-schema prisma/schema.prisma             --exit-code
+
+      - name: Generar cliente
+        run: npx prisma generate
+
+      # El seed carga el catálogo de roles y permisos. Que corra aquí garantiza
+      # que sigue siendo idempotente y que no referencia permisos inexistentes.
+      - name: Sembrar roles y permisos
+        run: npx tsx prisma/seed.ts
+
+      - name: Verificar que el seed es idempotente
+        run: npx tsx prisma/seed.ts
+
 # ── Etapas pendientes ────────────────────────────────────────────────────────
 #
 # No están escritas como pasos comentados porque envejecerían mal. Lo que hace
