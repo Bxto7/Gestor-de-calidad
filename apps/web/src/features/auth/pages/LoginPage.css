@@ -475,6 +475,24 @@
   outline-offset: calc(3 * var(--u));
 }
 
+/*
+ * Aviso de credenciales rechazadas.
+ *
+ * El color no es la única señal: lleva un borde a la izquierda y el texto lo
+ * dice explícitamente, porque quien no distingue el rojo tiene que enterarse
+ * igual (WCAG 2.1 AA, criterio 1.4.1).
+ */
+.uc-error {
+  margin: 0 0 calc(18 * var(--u));
+  padding: calc(12 * var(--u)) calc(14 * var(--u));
+  border-left: calc(3 * var(--u)) solid #b4232c;
+  border-radius: calc(8 * var(--u));
+  background: #fdf2f2;
+  color: #8c1a22;
+  font-size: calc(13 * var(--u));
+  line-height: 1.45;
+}
+
 .uc-submit {
   width: 100%;
   height: calc(50 * var(--u));
@@ -494,6 +512,13 @@
     transform 0.18s ease,
     box-shadow 0.18s ease,
     filter 0.18s ease;
+}
+
+.uc-submit:disabled {
+  cursor: progress;
+  filter: grayscale(0.35);
+  opacity: 0.75;
+  transform: none;
 }
 
 .uc-submit:hover {

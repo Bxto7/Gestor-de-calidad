@@ -10,6 +10,8 @@
 import { useMemo, useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+
 import isotipoUC from '@/assets/marca/isotipo-uc-negro.png';
 import { CtxEncabezado, type ContextoEncabezado, type Encabezado } from './encabezado';
 
@@ -18,8 +20,38 @@ const ENLACES = [
   { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
 ];
 
+/** Puerta de salida. Trazo simple para que pese lo mismo que los del menú. */
+function IconoSalir() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2" />
+      <path d="M10 12h10M17 9l3 3-3 3" />
+    </svg>
+  );
+}
+
 export function AppLayout() {
   const [encabezado, setEncabezado] = useState<Encabezado>({ migas: [], acciones: null });
+  const { identidad, salir } = useSesion();
+
+  // Iniciales del nombre real, no unas fijas: "Ana María Quispe" → "AQ".
+  const iniciales = useMemo(() => {
+    const partes = (identidad?.nombre ?? '').trim().split(/\s+/).filter(Boolean);
+    if (partes.length === 0) return '··';
+    const primera = partes[0]?.[0] ?? '';
+    const ultima = partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? '') : '';
+    return (primera + ultima).toUpperCase();
+  }, [identidad]);
 
   const valor = useMemo<ContextoEncabezado>(
     () => ({
@@ -75,14 +107,25 @@ export function AppLayout() {
 
           <div className="m-3 flex items-center gap-3 rounded-xl bg-white/10 px-3 py-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-xs font-extrabold text-uc-primary">
-              CA
+              {iniciales}
             </span>
-            <span className="min-w-0 leading-tight">
+            <span className="min-w-0 flex-1 leading-tight">
               <span className="block truncate text-[13px] font-bold text-white">
-                Coordinador académico
+                {identidad?.nombre ?? 'Sesión'}
               </span>
-              <span className="block truncate text-[11px] text-uc-lila">Dirección de Calidad</span>
+              <span className="block truncate text-[11px] text-uc-lila">
+                Universidad Continental
+              </span>
             </span>
+            <button
+              type="button"
+              onClick={() => void salir()}
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+              className="shrink-0 rounded-lg p-1.5 text-uc-lila transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <IconoSalir />
+            </button>
           </div>
         </aside>
 

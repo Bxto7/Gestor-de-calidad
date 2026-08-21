@@ -32,6 +32,7 @@ import {
   type RepositorioUsuarioPort,
   type SeguridadPort,
 } from './modules/auth/application/ports/sesion.port.js';
+import { ConsultarSesion } from './modules/auth/application/use-cases/consultar-sesion.use-case.js';
 import { IniciarSesion } from './modules/auth/application/use-cases/iniciar-sesion.use-case.js';
 import { AuthorizationAdapter } from './modules/auth/infrastructure/authorization.adapter.js';
 import { UsuarioRepositoryPrisma } from './modules/auth/infrastructure/usuario.repository.js';
@@ -206,6 +207,11 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos),
+    },
+    {
+      provide: ConsultarSesion,
+      inject: [AUTHORIZATION_PORT],
+      useFactory: (autorizacion: AuthorizationPort) => new ConsultarSesion(autorizacion),
     },
     {
       provide: GestionarObjetivos,

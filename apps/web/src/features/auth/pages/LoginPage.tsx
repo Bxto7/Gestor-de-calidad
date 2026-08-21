@@ -32,6 +32,10 @@ export interface LoginPageProps {
   colorDegradado?: MoradoInstitucional;
   onSubmit?: (credenciales: Credenciales) => void;
   onOlvidoPassword?: () => void;
+  /** Motivo del último intento fallido. Se muestra sobre el formulario. */
+  error?: string | null;
+  /** Cierto mientras se comprueban las credenciales. */
+  enviando?: boolean;
 }
 
 /** Etapas del ciclo PDCA. El orden es información, no decoración. */
@@ -47,6 +51,8 @@ export function LoginPage({
   colorDegradado = '#57019F',
   onSubmit,
   onOlvidoPassword,
+  error = null,
+  enviando = false,
 }: LoginPageProps) {
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
@@ -126,6 +132,14 @@ export function LoginPage({
             <p className="uc-access__sub">Ingresa tus credenciales para continuar</p>
 
             <form onSubmit={manejarEnvio} noValidate>
+              {error !== null && (
+                // `role="alert"` para que un lector de pantalla lo anuncie sin
+                // que el usuario tenga que ir a buscarlo (WCAG 2.1 AA, §6.2).
+                <p className="uc-error" role="alert">
+                  {error}
+                </p>
+              )}
+
               <div className="uc-field">
                 <label className="uc-field__label" htmlFor={idCorreo}>
                   Correo institucional
@@ -187,8 +201,8 @@ export function LoginPage({
                 ¿Olvidaste tu contraseña?
               </a>
 
-              <button type="submit" className="uc-submit">
-                Iniciar sesión
+              <button type="submit" className="uc-submit" disabled={enviando}>
+                {enviando ? 'Comprobando…' : 'Iniciar sesión'}
               </button>
             </form>
 

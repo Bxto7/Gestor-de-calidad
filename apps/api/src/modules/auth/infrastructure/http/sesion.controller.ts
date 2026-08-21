@@ -7,11 +7,12 @@
  * sentido para un atacante.
  */
 
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
+import { ConsultarSesion } from '../../application/use-cases/consultar-sesion.use-case.js';
 import { IniciarSesion } from '../../application/use-cases/iniciar-sesion.use-case.js';
 import { ActorActual, Publico } from './jwt.guard.js';
 import { IniciarSesionDto, RefrescarDto } from './dto/sesion.dto.js';
@@ -19,7 +20,10 @@ import { IniciarSesionDto, RefrescarDto } from './dto/sesion.dto.js';
 @ApiTags('Sesión')
 @Controller('auth')
 export class SesionController {
-  constructor(private readonly sesion: IniciarSesion) {}
+  constructor(
+    private readonly sesion: IniciarSesion,
+    private readonly consulta: ConsultarSesion,
+  ) {}
 
   @Publico()
   @Post('login')
@@ -57,6 +61,18 @@ export class SesionController {
       expiraEn: r.expiraEn,
       usuario: { nombre: r.nombre },
     };
+  }
+
+  @Get('yo')
+  @ApiOperation({
+    summary: 'Identidad y permisos del usuario autenticado',
+    description:
+      'RF111 a RF119. La interfaz lo usa para no ofrecer acciones que el rol no ' +
+      'puede ejecutar. La lista de permisos es una copia para pintar la pantalla: ' +
+      'quien autoriza sigue siendo el backend en cada petición.',
+  })
+  async yo(@ActorActual() actor: Actor) {
+    return this.consulta.ejecutar(actor.id, actor.nombre);
   }
 
   @Post('logout')
