@@ -51,6 +51,16 @@ const CARRERA = { nombre: 'Ingeniería de Sistemas e Informática', codigo: 'ISI
 const CODIGO_PLAN = 'PE-ISI-2018-v1';
 
 /**
+ * Identificador nulo para lo que no ejecuta una persona.
+ *
+ * Las tablas de evidencia guardan el identificador y también el nombre, y no
+ * tienen clave foránea a usuarios: el histórico debe seguir siendo legible
+ * aunque la cuenta desaparezca. Aquí no hay cuenta que apuntar, y poner la de
+ * quien lanza el comando haría parecer que esa persona aprobó el plan.
+ */
+const USUARIO_DE_CARGA = '00000000-0000-0000-0000-000000000000';
+
+/**
  * El plan no trae horas teóricas ni sumillas, y el esquema las exige.
  *
  * Se cargan en cero y con un texto que dice que faltan, en vez de inventar
@@ -247,7 +257,53 @@ async function main(): Promise<void> {
   await prisma.asignaturaCompetencia.createMany({ data: vinculos });
   resumen.push(`${vinculos.length} vínculos asignatura-competencia`);
 
-  /* ── Archivar ──────────────────────────────────────────────────────── */
+  /* ── Procedencia y archivado ───────────────────────────────────────── */
+
+  // Un plan en Histórico sin un solo evento de aprobación es un registro que se
+  // contradice: dice haber recorrido el flujo y no tiene rastro de haberlo
+  // hecho. En un sistema de acreditación eso es peor que no tener el plan.
+  //
+  // Pero este plan se aprobó en la universidad, hace años, en un proceso que
+  // este sistema no presenció. No se sabe quién lo aprobó ni cuándo, y
+  // rellenarlo con un nombre y una fecha plausibles sería fabricar evidencia de
+  // acreditación, que es justo lo que este software existe para evitar.
+  //
+  // Así que se registra lo único que sí ocurrió aquí: que entró como plan ya
+  // cerrado, y de dónde salió. Quien lea el historial verá que la aprobación es
+  // anterior al sistema, en vez de creerse una que nadie firmó.
+  await prisma.eventoAprobacion.deleteMany({ where: { planId: plan.id } });
+  await prisma.eventoAprobacion.create({
+    data: {
+      planId: plan.id,
+      accion: 'Cargado como histórico',
+      comentario:
+        'Plan aprobado y cerrado por la universidad antes de existir este sistema. Se carga ' +
+        'desde el plan de estudios 201910 publicado, como registro histórico. El sistema no ' +
+        'presenció su aprobación y por eso no consta quién la firmó ni en qué fecha.',
+      // Sin usuario real: la carga no la ejecuta una persona del flujo de
+      // aprobación. El nombre queda descriptivo porque es lo que se muestra, y
+      // la tabla no tiene clave foránea a usuarios justamente para esto.
+      usuarioId: USUARIO_DE_CARGA,
+      usuarioNombre: 'Carga de datos institucionales',
+    },
+  });
+
+  // La misma constancia en la bitácora general (§3.4): una carga de 74
+  // asignaturas que no deja rastro convierte en mentira el "toda mutación
+  // relevante queda registrada".
+  await prisma.eventoAuditoria.create({
+    data: {
+      entidad: 'Plan',
+      entidadId: plan.id,
+      accion: 'plan.cargado',
+      detalle:
+        `Plan ${CODIGO_PLAN} cargado como histórico desde el plan oficial 201910: ` +
+        `${ASIGNATURAS.length} asignaturas, ${COMPETENCIAS.length} competencias y ` +
+        `${OBJETIVOS.length} objetivos educacionales.`,
+      usuarioId: USUARIO_DE_CARGA,
+      usuarioNombre: 'Carga de datos institucionales',
+    },
+  });
 
   // El 2018 es un plan cerrado: su sitio es Histórico. Se hace al final porque
   // a partir de aquí la base rechaza cualquier escritura sobre él.
