@@ -203,6 +203,7 @@ export class ContenidoRepositoryPrisma implements RepositorioContenidoPort {
       include: {
         ciclo: { select: { numero: true } },
         competencias: { select: { competenciaId: true } },
+        grupo: { select: { codigo: true, cantidadAElegir: true } },
       },
       orderBy: { codigo: 'asc' },
     });
@@ -215,6 +216,7 @@ export class ContenidoRepositoryPrisma implements RepositorioContenidoPort {
       competenciaIds: a.competencias.map((c) => c.competenciaId),
       cicloNumero: a.ciclo?.numero ?? null,
       activa: a.estado === 'ACTIVO',
+      grupoElectivo: a.grupo,
     }));
   }
 

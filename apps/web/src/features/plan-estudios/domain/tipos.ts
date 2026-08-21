@@ -106,6 +106,13 @@ export interface Asignatura {
   cicloNumero: number | null;
   /** RF070: orden de presentación dentro del ciclo. */
   orden: number;
+  /**
+   * RF056: grupo de electivos del que es una opción, si lo es.
+   *
+   * De un grupo se lleva la cantidad que el grupo declara, no todas sus
+   * opciones. Sin este dato, el total de créditos del plan sale inflado.
+   */
+  grupoElectivo: { codigo: string; nombre: string; cantidadAElegir: number } | null;
   estado: EstadoActivacion;
 }
 

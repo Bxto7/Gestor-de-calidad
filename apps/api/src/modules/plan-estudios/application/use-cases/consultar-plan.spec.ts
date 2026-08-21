@@ -47,6 +47,7 @@ function asignatura(ciclo: number, competencias: string[] = ['cpe-1']): Asignatu
     competenciaIds: competencias,
     cicloNumero: ciclo,
     activa: true,
+    grupoElectivo: null,
   };
 }
 

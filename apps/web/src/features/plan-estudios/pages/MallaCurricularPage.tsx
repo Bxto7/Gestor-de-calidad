@@ -23,7 +23,11 @@ import {
 } from '@/shared/components/ui';
 import { useAsignaturas, useCarreras, usePlan, useUbicarAsignatura } from '../api/queries';
 import { permiteEdicion } from '../domain/estado-plan';
-import { ciclosDeCarrera, creditosPorCiclo } from '../domain/motor-validaciones';
+import {
+  calcularTotalCreditos,
+  ciclosDeCarrera,
+  creditosPorCiclo,
+} from '../domain/motor-validaciones';
 import { TIPOS_ASIGNATURA, type Asignatura, type TipoAsignatura } from '../domain/tipos';
 import { descargarCsv, imprimirVista } from '../utilidades/exportar';
 import { plural } from '../utilidades/formato';
@@ -155,7 +159,9 @@ export function MallaCurricularPage() {
     descargarCsv(`malla-${planActual.codigo}.csv`, filas);
   }
 
-  const totalCreditos = activas.reduce((s, a) => s + a.creditos, 0);
+  // Del motor y no con un `reduce` propio: las opciones de un grupo de electivos
+  // no se suman todas, y una copia suelta del cálculo se olvidaría de eso.
+  const totalCreditos = calcularTotalCreditos(activas);
 
   return (
     <>
@@ -479,7 +485,7 @@ function VistaPorCondicion({ asignaturas }: { asignaturas: Asignatura[] }) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       {grupos.map((g) => {
-        const creditos = g.lista.reduce((s, a) => s + a.creditos, 0);
+        const creditos = calcularTotalCreditos(g.lista);
         return (
           <section key={g.titulo} className="rounded-2xl border border-borde bg-superficie p-5">
             <div className="flex items-baseline justify-between">

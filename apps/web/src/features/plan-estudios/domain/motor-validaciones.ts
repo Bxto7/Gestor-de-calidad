@@ -53,15 +53,43 @@ export interface EntradaValidacion {
   rangoTotal?: RangoCreditos | undefined;
 }
 
-/** RF067: el total de créditos nunca se edita a mano, siempre se recalcula. */
+/**
+ * RF067 — el total de créditos nunca se edita a mano, siempre se recalcula.
+ *
+ * Las opciones de un grupo de electivos no se suman todas: de un grupo se lleva
+ * lo que el grupo declara. Sumarlas todas hacía que el plan 2018 de ISI
+ * declarase 249 créditos en vez de los 210 que tiene.
+ */
 export function calcularTotalCreditos(asignaturas: readonly Asignatura[]): number {
-  return asignaturas.filter((a) => a.estado === 'Activo').reduce((suma, a) => suma + a.creditos, 0);
+  const activas = asignaturas.filter((a) => a.estado === 'Activo');
+  const sueltas = activas
+    .filter((a) => a.grupoElectivo === null)
+    .reduce((suma, a) => suma + a.creditos, 0);
+
+  return sueltas + creditosDeGrupos(activas);
+}
+
+/** Lo que aportan los grupos: una vez cada uno, no una por opción. */
+function creditosDeGrupos(activas: readonly Asignatura[]): number {
+  const grupos = new Map<string, number>();
+
+  for (const a of activas) {
+    if (a.grupoElectivo === null || grupos.has(a.grupoElectivo.codigo)) continue;
+    grupos.set(a.grupoElectivo.codigo, a.creditos * a.grupoElectivo.cantidadAElegir);
+  }
+
+  return [...grupos.values()].reduce((suma, c) => suma + c, 0);
 }
 
 export function creditosPorCiclo(asignaturas: readonly Asignatura[], cicloNumero: number): number {
-  return asignaturas
-    .filter((a) => a.estado === 'Activo' && a.cicloNumero === cicloNumero)
+  const delCiclo = asignaturas.filter(
+    (a) => a.estado === 'Activo' && a.cicloNumero === cicloNumero,
+  );
+  const sueltas = delCiclo
+    .filter((a) => a.grupoElectivo === null)
     .reduce((suma, a) => suma + a.creditos, 0);
+
+  return sueltas + creditosDeGrupos(delCiclo);
 }
 
 /** RF011 RN2 / RF060: cada año son 2 ciclos. */

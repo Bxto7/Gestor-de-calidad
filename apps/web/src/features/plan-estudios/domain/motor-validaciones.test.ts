@@ -68,6 +68,7 @@ function asignatura(sobrescribir: Partial<Asignatura> = {}): Asignatura {
     competenciaIds: ['cpe-1'],
     cicloNumero: 1,
     orden: 0,
+    grupoElectivo: null,
     estado: 'Activo',
     ...sobrescribir,
   };

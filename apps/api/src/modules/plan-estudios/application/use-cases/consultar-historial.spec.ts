@@ -60,6 +60,7 @@ function asignatura(sobre: Partial<DatosAsignatura> = {}): DatosAsignatura {
     orden: 0,
     activa: true,
     competencias: [],
+    grupoElectivo: null,
     creadoEn: new Date('2026-01-01'),
     ...sobre,
   };

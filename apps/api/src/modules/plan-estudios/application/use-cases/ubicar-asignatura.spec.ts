@@ -79,6 +79,7 @@ function montar(opciones: {
           competenciaIds: ['c'],
           cicloNumero: 2,
           activa: true,
+          grupoElectivo: null,
         },
         {
           id: 'a-2',
@@ -88,6 +89,7 @@ function montar(opciones: {
           competenciaIds: ['c'],
           cicloNumero: null,
           activa: true,
+          grupoElectivo: null,
         },
       ],
   } as unknown as RepositorioContenidoPort;
@@ -278,6 +280,7 @@ describe('Respuesta para la UI', () => {
           competenciaIds: ['c'],
           cicloNumero: 2,
           activa: true,
+          grupoElectivo: null,
         },
         {
           id: 'a-9',
@@ -287,6 +290,7 @@ describe('Respuesta para la UI', () => {
           competenciaIds: [],
           cicloNumero: null,
           activa: false,
+          grupoElectivo: null,
         },
       ],
     });

@@ -64,6 +64,7 @@ const SELECCION = {
   competencias: {
     select: { competencia: { select: { id: true, codigo: true, nombre: true } } },
   },
+  grupo: { select: { codigo: true, nombre: true, cantidadAElegir: true } },
 } satisfies Prisma.AsignaturaSelect;
 
 type FilaAsignatura = Prisma.AsignaturaGetPayload<{ select: typeof SELECCION }>;
@@ -247,6 +248,7 @@ function aDominio(fila: FilaAsignatura): DatosAsignatura {
     orden: fila.orden,
     activa: fila.estado === 'ACTIVO',
     competencias: fila.competencias.map((c) => c.competencia),
+    grupoElectivo: fila.grupo,
     creadoEn: fila.creadoEn,
   };
 }

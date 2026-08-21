@@ -30,6 +30,18 @@ export interface DatosAsignatura {
   readonly orden: number;
   readonly activa: boolean;
   readonly competencias: readonly { id: string; codigo: string; nombre: string }[];
+  /**
+   * RF056: grupo de electivos del que es una opción, si lo es.
+   *
+   * La pantalla lo necesita para decir "elige 1 de 5" en vez de listar cinco
+   * cursos como si hubiera que llevarlos todos, y el cálculo de créditos para
+   * no sumarlos todos.
+   */
+  readonly grupoElectivo: {
+    readonly codigo: string;
+    readonly nombre: string;
+    readonly cantidadAElegir: number;
+  } | null;
   readonly creadoEn: Date;
 }
 

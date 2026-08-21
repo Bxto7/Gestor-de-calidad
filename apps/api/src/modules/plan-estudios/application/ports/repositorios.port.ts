@@ -21,6 +21,13 @@ export interface AsignaturaDelPlan {
   readonly competenciaIds: readonly string[];
   readonly cicloNumero: number | null;
   readonly activa: boolean;
+  /**
+   * Grupo de electivos al que pertenece, si es una opción de uno.
+   *
+   * Lo necesita el cálculo de créditos: de un grupo se lleva lo que el grupo
+   * declara, no todas sus opciones. `null` en las obligatorias.
+   */
+  readonly grupoElectivo: { readonly codigo: string; readonly cantidadAElegir: number } | null;
 }
 
 export interface DatosCarrera {

@@ -85,6 +85,7 @@ export interface AsignaturaApi {
   orden: number;
   activa: boolean;
   competencias: { id: string; codigo: string; nombre: string }[];
+  grupoElectivo: { codigo: string; nombre: string; cantidadAElegir: number } | null;
   creadoEn: string;
 }
 
@@ -200,6 +201,7 @@ export function aAsignatura(a: AsignaturaApi): Asignatura {
     competenciaIds: a.competencias.map((c) => c.id),
     cicloNumero: a.cicloNumero,
     orden: a.orden,
+    grupoElectivo: a.grupoElectivo,
     estado: aEstado(a.activa),
   };
 }

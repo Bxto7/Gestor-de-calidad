@@ -52,18 +52,82 @@ export interface EntradaValidacion {
   rangoTotal?: RangoCreditos | undefined;
 }
 
-/** RF067: el total de créditos nunca se edita a mano, siempre se recalcula. */
+/**
+ * RF067 — el total de créditos nunca se edita a mano, siempre se recalcula.
+ *
+ * Las opciones de un grupo de electivos **no** se suman todas: de un grupo se
+ * lleva la cantidad que el grupo declara, no sus cinco opciones. Sumarlas
+ * todas es el error que hacía que el plan 2018 de ISI declarase 249 créditos
+ * en vez de los 210 que tiene: un plan aparentemente un 19 % más largo del que
+ * cursa nadie.
+ *
+ * Dentro de un grupo todas las opciones valen lo mismo —lo comprueba la regla
+ * GRUPO_ELECTIVO_DESIGUAL de este mismo motor—, así que el aporte del grupo es
+ * esa cantidad multiplicada por los créditos de cualquiera de sus opciones.
+ */
 export function calcularTotalCreditos(asignaturas: readonly AsignaturaDelPlan[]): number {
-  return asignaturas.filter((a) => a.activa).reduce((suma, a) => suma + a.creditos, 0);
+  const activas = asignaturas.filter((a) => a.activa);
+
+  const sueltas = activas
+    .filter((a) => a.grupoElectivo === null)
+    .reduce((suma, a) => suma + a.creditos, 0);
+
+  return sueltas + creditosDeGrupos(activas);
+}
+
+/**
+ * Lo que aportan los grupos de electivos: una vez cada uno, no una por opción.
+ */
+function creditosDeGrupos(activas: readonly AsignaturaDelPlan[]): number {
+  const grupos = new Map<string, { creditos: number; cantidad: number }>();
+
+  for (const a of activas) {
+    if (a.grupoElectivo === null || grupos.has(a.grupoElectivo.codigo)) continue;
+    grupos.set(a.grupoElectivo.codigo, {
+      creditos: a.creditos,
+      cantidad: a.grupoElectivo.cantidadAElegir,
+    });
+  }
+
+  return [...grupos.values()].reduce((suma, g) => suma + g.creditos * g.cantidad, 0);
+}
+
+/**
+ * Grupos cuyas opciones no valen todas lo mismo.
+ *
+ * Devuelve una descripción por grupo con los valores que conviven, para que el
+ * reporte diga qué corregir y no solo que algo está mal.
+ */
+function detectarGruposDesiguales(activas: readonly AsignaturaDelPlan[]): string[] {
+  const porGrupo = new Map<string, Set<number>>();
+
+  for (const a of activas) {
+    if (a.grupoElectivo === null) continue;
+    const valores = porGrupo.get(a.grupoElectivo.codigo) ?? new Set<number>();
+    valores.add(a.creditos);
+    porGrupo.set(a.grupoElectivo.codigo, valores);
+  }
+
+  return [...porGrupo.entries()]
+    .filter(([, valores]) => valores.size > 1)
+    .map(
+      ([codigo, valores]) => codigo + ': créditos ' + [...valores].sort((x, y) => x - y).join(', '),
+    );
 }
 
 export function creditosPorCiclo(
   asignaturas: readonly AsignaturaDelPlan[],
   cicloNumero: number,
 ): number {
-  return asignaturas
-    .filter((a) => a.activa && a.cicloNumero === cicloNumero)
+  const delCiclo = asignaturas.filter((a) => a.activa && a.cicloNumero === cicloNumero);
+
+  const sueltas = delCiclo
+    .filter((a) => a.grupoElectivo === null)
     .reduce((suma, a) => suma + a.creditos, 0);
+
+  // Mismo criterio dentro del ciclo: el ciclo 5 son 18 créditos obligatorios
+  // más los 3 del electivo que se elija, no más los 15 de las cinco opciones.
+  return sueltas + creditosDeGrupos(delCiclo);
 }
 
 /** RF011 RN2 / RF060: cada año son 2 ciclos. */
@@ -98,6 +162,26 @@ export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
         sinCompetencia.length +
         ' asignatura(s) no tienen ninguna competencia vinculada. Cada asignatura necesita al menos una para poder aprobar el plan.',
       afectados: sinCompetencia.map((a) => a.codigo + ' · ' + a.nombre),
+    });
+  }
+
+  // RF056 - las opciones de un grupo de electivos valen lo mismo. Bloqueante.
+  //
+  // Si no valieran lo mismo, el total de créditos del plan dependería de cuál
+  // elija cada estudiante y dejaría de ser un número: sería un rango. Es la
+  // invariante de la que depende `calcularTotalCreditos`, y por eso se
+  // comprueba en vez de asumirse.
+  const gruposDesiguales = detectarGruposDesiguales(activas);
+  if (gruposDesiguales.length > 0) {
+    hallazgos.push({
+      codigo: 'GRUPO_ELECTIVO_DESIGUAL',
+      rf: 'RF056',
+      severidad: 'bloqueante',
+      titulo: 'Grupos de electivos con créditos distintos entre sus opciones',
+      detalle:
+        'Las opciones de un grupo deben valer los mismos créditos: si no, el total del plan ' +
+        'depende de cuál elija cada estudiante y deja de ser un número fijo.',
+      afectados: gruposDesiguales,
     });
   }
 

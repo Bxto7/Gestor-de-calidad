@@ -59,6 +59,7 @@ function asignatura(sobre: Partial<AsignaturaDelPlan> = {}): AsignaturaDelPlan {
     competenciaIds: ['cpe-1'],
     cicloNumero: 1,
     activa: true,
+    grupoElectivo: null,
     ...sobre,
   };
 }

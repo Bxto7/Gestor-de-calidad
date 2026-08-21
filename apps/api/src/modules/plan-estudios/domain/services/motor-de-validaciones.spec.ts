@@ -47,6 +47,7 @@ function asignatura(sobrescribir: Partial<AsignaturaDelPlan> = {}): AsignaturaDe
     competenciaIds: ['cpe-1'],
     cicloNumero: 1,
     activa: true,
+    grupoElectivo: null,
     ...sobrescribir,
   };
 }
@@ -397,5 +398,99 @@ describe('RF097 / RF098 — reporte consolidado', () => {
     expect(r.totalCreditos).toBe(0);
     expect(codigos(r)).toContain('PLAN_SIN_OBJETIVO');
     expect(codigos(r)).toContain('CICLO_VACIO');
+  });
+});
+
+describe('RF056 / RF067 — los grupos de electivos cuentan una vez', () => {
+  /** Una opción de electivo: pertenece a un grupo del que se elige `cantidad`. */
+  function opcion(codigo: string, grupo: string, cantidad = 1) {
+    return asignatura({
+      id: `op-${codigo}`,
+      codigo,
+      creditos: 3,
+      cicloNumero: 5,
+      grupoElectivo: { codigo: grupo, cantidadAElegir: cantidad },
+    });
+  }
+
+  it('cinco opciones de un grupo aportan los créditos de una', () => {
+    // El error que esto corrige: el plan 2018 de ISI declaraba 249 créditos en
+    // vez de 210 porque sumaba las cinco opciones de cada grupo.
+    const r = validarPlan({
+      ...entradaValida(),
+      asignaturas: [
+        asignatura({ id: 'obl', codigo: 'ISI-101', creditos: 4, cicloNumero: 5 }),
+        opcion('E1', 'ELEC GENER'),
+        opcion('E2', 'ELEC GENER'),
+        opcion('E3', 'ELEC GENER'),
+        opcion('E4', 'ELEC GENER'),
+        opcion('E5', 'ELEC GENER'),
+      ],
+    });
+
+    expect(r.totalCreditos).toBe(7); // 4 obligatorios + 3 del electivo elegido
+  });
+
+  it('dos grupos distintos aportan cada uno lo suyo', () => {
+    const r = validarPlan({
+      ...entradaValida(),
+      asignaturas: [
+        opcion('A1', 'ELEC GENER'),
+        opcion('A2', 'ELEC GENER'),
+        opcion('B1', 'ELECT ESP1'),
+        opcion('B2', 'ELECT ESP1'),
+      ],
+    });
+
+    expect(r.totalCreditos).toBe(6);
+  });
+
+  it('un grupo del que se eligen dos aporta el doble', () => {
+    const r = validarPlan({
+      ...entradaValida(),
+      asignaturas: [
+        opcion('C1', 'ELECT ESP2', 2),
+        opcion('C2', 'ELECT ESP2', 2),
+        opcion('C3', 'ELECT ESP2', 2),
+      ],
+    });
+
+    expect(r.totalCreditos).toBe(6);
+  });
+
+  it('los créditos del ciclo siguen el mismo criterio', () => {
+    // El ciclo 5 del plan real: 18 obligatorios más el electivo, no más los 15
+    // de las cinco opciones.
+    const asignaturas = [
+      asignatura({ id: 'o1', codigo: 'ISI-101', creditos: 18, cicloNumero: 5 }),
+      opcion('E1', 'ELEC GENER'),
+      opcion('E2', 'ELEC GENER'),
+      opcion('E3', 'ELEC GENER'),
+    ];
+
+    expect(creditosPorCiclo(asignaturas, 5)).toBe(21);
+  });
+
+  it('una opción inactiva no cambia el aporte del grupo', () => {
+    const r = validarPlan({
+      ...entradaValida(),
+      asignaturas: [opcion('E1', 'ELEC GENER'), { ...opcion('E2', 'ELEC GENER'), activa: false }],
+    });
+
+    expect(r.totalCreditos).toBe(3);
+  });
+
+  it('las electivas sueltas, sin grupo, sí se suman todas', () => {
+    // No toda electiva pertenece a un grupo; las que no, son cursos del plan
+    // como cualquier otro.
+    const r = validarPlan({
+      ...entradaValida(),
+      asignaturas: [
+        asignatura({ id: 's1', codigo: 'S1', creditos: 3, cicloNumero: 5 }),
+        asignatura({ id: 's2', codigo: 'S2', creditos: 3, cicloNumero: 5 }),
+      ],
+    });
+
+    expect(r.totalCreditos).toBe(6);
   });
 });

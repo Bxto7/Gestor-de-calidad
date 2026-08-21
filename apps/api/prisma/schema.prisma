@@ -55,9 +55,9 @@ model Usuario {
   creadoEn       DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn  DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  roles          UsuarioRol[]
-  carreras       UsuarioCarrera[]
-  refreshTokens  RefreshToken[]
+  roles         UsuarioRol[]
+  carreras      UsuarioCarrera[]
+  refreshTokens RefreshToken[]
 
   @@map("usuarios")
   @@schema("auth")
@@ -67,18 +67,18 @@ model Usuario {
 /// no como código, para que agregar uno nuevo no exija un despliegue. Por eso
 /// no existe un enum de roles: viven en esta tabla y se cargan por seed.
 model Rol {
-  id          String  @id @default(uuid()) @db.Uuid
+  id           String  @id @default(uuid()) @db.Uuid
   /// Identificador estable para el código (p. ej. `DIRECTOR_CARRERA`). El
   /// nombre visible puede cambiar sin romper nada; este no.
-  codigo      String  @unique @db.VarChar(64)
-  nombre      String  @db.VarChar(120)
-  descripcion String  @db.Text
+  codigo       String  @unique @db.VarChar(64)
+  nombre       String  @db.VarChar(120)
+  descripcion  String  @db.Text
   /// Marca los roles que instala el sistema. Impide que un administrador borre
   /// por accidente un rol del que dependen los permisos base.
   esDelSistema Boolean @default(false) @map("es_del_sistema")
 
-  usuarios    UsuarioRol[]
-  permisos    RolPermiso[]
+  usuarios UsuarioRol[]
+  permisos RolPermiso[]
 
   @@map("roles")
   @@schema("auth")
@@ -95,7 +95,7 @@ model Permiso {
   /// administración de roles.
   modulo      String @db.VarChar(64)
 
-  roles       RolPermiso[]
+  roles RolPermiso[]
 
   @@map("permisos")
   @@schema("auth")
@@ -231,13 +231,13 @@ model Facultad {
 }
 
 model Carrera {
-  id          String @id @default(uuid()) @db.Uuid
-  facultadId  String @map("facultad_id") @db.Uuid
-  nombre      String @db.VarChar(200)
+  id            String @id @default(uuid()) @db.Uuid
+  facultadId    String @map("facultad_id") @db.Uuid
+  nombre        String @db.VarChar(200)
   /// RF017 RN1: único en toda la universidad, no solo dentro de la facultad.
-  codigo      String @unique @db.VarChar(16)
+  codigo        String @unique @db.VarChar(16)
   /// RF011 RN2: por convención, cada año son dos ciclos.
-  duracionAnios Int   @map("duracion_anios") @db.SmallInt
+  duracionAnios Int    @map("duracion_anios") @db.SmallInt
 
   estado        EstadoActivacion @default(ACTIVO)
   creadoEn      DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
@@ -269,8 +269,9 @@ model Ciclo {
   creditosMin Int? @map("creditos_min") @db.SmallInt
   creditosMax Int? @map("creditos_max") @db.SmallInt
 
-  carrera     Carrera      @relation(fields: [carreraId], references: [id], onDelete: Cascade)
-  asignaturas Asignatura[]
+  carrera         Carrera         @relation(fields: [carreraId], references: [id], onDelete: Cascade)
+  asignaturas     Asignatura[]
+  gruposElectivos GrupoElectivo[]
 
   @@unique([carreraId, numero])
   @@map("ciclos")
@@ -297,13 +298,14 @@ model PlanEstudios {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  carrera      Carrera            @relation(fields: [carreraId], references: [id], onDelete: Restrict)
-  derivadoDe   PlanEstudios?      @relation("Versiones", fields: [derivadoDeId], references: [id], onDelete: SetNull)
-  derivados    PlanEstudios[]     @relation("Versiones")
-  objetivos    PlanObjetivo[]
-  competencias PlanCompetencia[]
-  asignaturas  Asignatura[]
-  aprobaciones EventoAprobacion[]
+  carrera         Carrera            @relation(fields: [carreraId], references: [id], onDelete: Restrict)
+  derivadoDe      PlanEstudios?      @relation("Versiones", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados       PlanEstudios[]     @relation("Versiones")
+  objetivos       PlanObjetivo[]
+  competencias    PlanCompetencia[]
+  asignaturas     Asignatura[]
+  gruposElectivos GrupoElectivo[]
+  aprobaciones    EventoAprobacion[]
   justificaciones Justificacion[]
 
   @@unique([carreraId, version])
@@ -372,6 +374,40 @@ model PlanCompetencia {
   @@schema("plan_estudios")
 }
 
+/// Grupo de asignaturas electivas entre las que se elige (RF056).
+///
+/// Un plan no ofrece electivas sueltas: ofrece paquetes —"Electivos generales",
+/// "Electivos de especialidad 1"— de los que el estudiante toma un número fijo.
+/// Sin este modelo, las cinco opciones de un grupo se cuentan como cinco
+/// asignaturas del plan y el total de créditos sale inflado: el plan 2018 de
+/// ISI daría 249 créditos en vez de los 210 que declara.
+model GrupoElectivo {
+  id     String @id @default(uuid()) @db.Uuid
+  planId String @map("plan_id") @db.Uuid
+  /// Identificador del plan oficial: "ELEC GENER", "ELECT ESP1"…
+  codigo String @db.VarChar(32)
+  nombre String @db.VarChar(200)
+
+  /// El ciclo en el que se ofrece. Los grupos pertenecen a un ciclo concreto:
+  /// "elige uno de estos cinco, en el ciclo 5".
+  cicloId String @map("ciclo_id") @db.Uuid
+
+  /// Cuántas asignaturas del grupo hay que llevar. Casi siempre una.
+  cantidadAElegir Int @default(1) @map("cantidad_a_elegir") @db.SmallInt
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  plan        PlanEstudios @relation(fields: [planId], references: [id], onDelete: Cascade)
+  ciclo       Ciclo        @relation(fields: [cicloId], references: [id], onDelete: Restrict)
+  asignaturas Asignatura[]
+
+  @@unique([planId, codigo])
+  @@index([cicloId])
+  @@map("grupos_electivos")
+  @@schema("plan_estudios")
+}
+
 model Asignatura {
   id     String @id @default(uuid()) @db.Uuid
   planId String @map("plan_id") @db.Uuid
@@ -395,12 +431,17 @@ model Asignatura {
   /// RF070: orden de presentación dentro del ciclo, sin efecto en la lógica.
   orden   Int     @default(0) @db.SmallInt
 
+  /// Grupo de electivos al que pertenece, si es una opción de uno. Nulo en las
+  /// obligatorias y en las electivas sueltas.
+  grupoElectivoId String? @map("grupo_electivo_id") @db.Uuid
+
   estado        EstadoActivacion @default(ACTIVO)
   creadoEn      DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
   plan         PlanEstudios            @relation(fields: [planId], references: [id], onDelete: Cascade)
   ciclo        Ciclo?                  @relation(fields: [cicloId], references: [id], onDelete: SetNull)
+  grupo        GrupoElectivo?          @relation(fields: [grupoElectivoId], references: [id], onDelete: SetNull)
   competencias AsignaturaCompetencia[]
   dependeDe    Dependencia[]           @relation("Dependiente")
   requeridaPor Dependencia[]           @relation("Requerida")
@@ -448,10 +489,10 @@ model Dependencia {
 
 /// RF089: historial del flujo de aprobación, de solo lectura.
 model EventoAprobacion {
-  id         String   @id @default(uuid()) @db.Uuid
-  planId     String   @map("plan_id") @db.Uuid
-  accion     String   @db.VarChar(64)
-  comentario String?  @db.Text
+  id            String   @id @default(uuid()) @db.Uuid
+  planId        String   @map("plan_id") @db.Uuid
+  accion        String   @db.VarChar(64)
+  comentario    String?  @db.Text
   /// RF088 RN1: el responsable no puede modificarse después. Se guarda el id y
   /// también el nombre, porque el histórico debe seguir siendo legible aunque
   /// el usuario se elimine del sistema.
@@ -498,11 +539,11 @@ model Justificacion {
 /// aplicación, de modo que ni un bug ni una consulta manual puedan reescribir
 /// la historia.
 model EventoAuditoria {
-  id        String   @id @default(uuid()) @db.Uuid
-  entidad   String   @db.VarChar(64)
-  entidadId String   @map("entidad_id") @db.Uuid
-  accion    String   @db.VarChar(64)
-  detalle   String   @db.Text
+  id        String @id @default(uuid()) @db.Uuid
+  entidad   String @db.VarChar(64)
+  entidadId String @map("entidad_id") @db.Uuid
+  accion    String @db.VarChar(64)
+  detalle   String @db.Text
 
   /// RF080 RN1: no se permiten modificaciones anónimas.
   usuarioId     String   @map("usuario_id") @db.Uuid
