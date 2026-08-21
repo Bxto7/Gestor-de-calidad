@@ -423,29 +423,26 @@ describe('RF097 / RF098 — reporte consolidado', () => {
   });
 });
 
-describe('RF027 — un plan cerrado no se valida', () => {
-  it('en Borrador reporta lo que está mal', () => {
-    const e = entradaValida();
-    e.plan = { ...e.plan, estado: 'Borrador', objetivoIds: [] };
-    expect(validarPlan(e).tieneBloqueos).toBe(true);
+describe('RF027 — un plan cerrado también se valida', () => {
+  it('reporta lo mismo esté abierto o cerrado', () => {
+    // Se probó a callar en los planes cerrados y el remedio fue peor: la
+    // pantalla dejaba de saber que un plan histórico no tiene la matriz de
+    // competencias, que es justo lo que una acreditación consulta de sus
+    // planes anteriores. El motor reporta; la pantalla enmarca.
+    const abierto = entradaValida();
+    abierto.plan = { ...abierto.plan, estado: 'Borrador', objetivoIds: [] };
+
+    const cerrado = entradaValida();
+    cerrado.plan = { ...cerrado.plan, estado: 'Histórico', objetivoIds: [] };
+
+    expect(validarPlan(cerrado).hallazgos.map((h) => h.codigo)).toEqual(
+      validarPlan(abierto).hallazgos.map((h) => h.codigo),
+    );
   });
 
-  it('en Histórico no reporta nada', () => {
-    // Las reglas son un control previo a la aprobación: sobre un plan cerrado
-    // no queda transición que las exija y el contenido es inmutable. El plan
-    // 2018 de ISI llegaba con 69 asignaturas sin competencia y mostraba una
-    // alerta roja que nadie podía atender.
+  it('sigue señalando el plan sin objetivos aunque esté en Histórico', () => {
     const e = entradaValida();
     e.plan = { ...e.plan, estado: 'Histórico', objetivoIds: [] };
-    const r = validarPlan(e);
-
-    expect(r.hallazgos).toEqual([]);
-    expect(r.tieneBloqueos).toBe(false);
-  });
-
-  it('pero sigue calculando los créditos: es un hecho, no un control', () => {
-    const e = entradaValida();
-    e.plan = { ...e.plan, estado: 'Histórico' };
-    expect(validarPlan(e).totalCreditos).toBeGreaterThan(0);
+    expect(validarPlan(e).hallazgos.map((h) => h.codigo)).toContain('PLAN_SIN_OBJETIVO');
   });
 });

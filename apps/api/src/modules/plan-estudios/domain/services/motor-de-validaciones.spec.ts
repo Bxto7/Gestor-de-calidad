@@ -497,7 +497,7 @@ describe('RF056 / RF067 — los grupos de electivos cuentan una vez', () => {
   });
 });
 
-describe('RF027 — un plan cerrado no se valida', () => {
+describe('RF027 — un plan cerrado también se valida', () => {
   /** Un plan con todo mal: sin objetivos, sin competencias y sin ubicar. */
   function planRoto(estado: EstadoPlan): EntradaValidacion {
     return {
@@ -510,35 +510,28 @@ describe('RF027 — un plan cerrado no se valida', () => {
     };
   }
 
-  it('en Borrador y En revisión sí reporta, que es donde se puede corregir', () => {
-    for (const estado of ['Borrador', 'En revisión'] as const) {
-      const r = validarPlan(planRoto(estado));
-      expect(r.bloqueantes.length, estado).toBeGreaterThan(0);
-      expect(r.tieneBloqueos, estado).toBe(true);
+  it('reporta lo mismo en cualquier estado', () => {
+    // Se probó a callar en los planes cerrados y el remedio fue peor: la
+    // pantalla dejaba de saber que un plan histórico no tiene la matriz de
+    // competencias, que es justo lo que una acreditación quiere consultar de
+    // sus planes anteriores. El motor reporta; la interfaz enmarca.
+    const enBorrador = validarPlan(planRoto('Borrador')).hallazgos.map((h) => h.codigo);
+
+    for (const estado of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+      expect(
+        validarPlan(planRoto(estado)).hallazgos.map((h) => h.codigo),
+        estado,
+      ).toEqual(enBorrador);
     }
   });
 
-  it('en Aprobado, Vigente e Histórico no reporta nada', () => {
-    // Las reglas son un control previo a la aprobación. Ahí no queda transición
-    // que las exija y el contenido es inmutable: pedir que se corrijan sería
-    // pedir un imposible para un fin que ya no existe.
-    for (const estado of ['Aprobado', 'Vigente', 'Histórico'] as const) {
-      const r = validarPlan(planRoto(estado));
-      expect(r.hallazgos, estado).toEqual([]);
-      expect(r.tieneBloqueos, estado).toBe(false);
-    }
-  });
-
-  it('pero el total de créditos se calcula igual: es un hecho, no un control', () => {
+  it('sigue señalando las asignaturas sin competencia en un plan histórico', () => {
     const r = validarPlan(planRoto('Histórico'));
-    expect(r.totalCreditos).toBe(8);
+    expect(r.hallazgos.map((h) => h.codigo)).toContain('ASIGNATURA_SIN_COMPETENCIA');
   });
 
   it('la puerta de aprobación sigue cerrada donde importa', () => {
-    // Aprobar sale de "En revisión", que es editable: el control se aplica y
-    // sigue bloqueando. Este es el caso que no puede romperse al silenciar el
-    // resto.
-    const r = validarPlan(planRoto('En revisión'));
-    expect(r.tieneBloqueos).toBe(true);
+    // Aprobar sale de "En revisión": ahí el control se aplica y bloquea.
+    expect(validarPlan(planRoto('En revisión')).tieneBloqueos).toBe(true);
   });
 });

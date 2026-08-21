@@ -10,7 +10,7 @@
  */
 
 import type { AsignaturaDelPlan, DatosCarrera } from '../../application/ports/repositorios.port.js';
-import { permiteEdicion, type EstadoPlan } from '../value-objects/estado-plan.js';
+import type { EstadoPlan } from '../value-objects/estado-plan.js';
 
 /** RF097 RN1 / RF098 RN1: bloqueante impide avanzar; advertencia solo informa. */
 export type Severidad = 'bloqueante' | 'advertencia';
@@ -146,38 +146,24 @@ function esNumero(v: number | null): v is number {
  * transiciones (RF085 / RF091).
  */
 /**
- * RF097 — revisa la consistencia del plan antes de dejarlo avanzar.
+ * RF097 — revisa la consistencia del plan.
  *
- * **En un plan cerrado no se ejecuta**, y conviene entender por qué. Todas estas
- * reglas son un control *previo a la aprobación*: existen para decir "corrige
- * esto antes de enviar a revisión o aprobar". Las dos únicas transiciones que
- * exigen un plan limpio —`enviar-a-revision` y `aprobar`— salen de Borrador y de
- * En revisión, que son justo los estados editables.
+ * Se ejecuta también sobre planes cerrados, y es deliberado. Se probó a no
+ * hacerlo —un plan Histórico no puede corregirse, así que la comprobación no
+ * gobierna nada— y el resultado fue peor: la pantalla dejaba de saber que el
+ * plan 2018 de ISI tiene 69 asignaturas sin competencia, que es exactamente el
+ * tipo de dato que una acreditación necesita conocer de sus planes anteriores.
  *
- * Sobre un plan Aprobado, Vigente o Histórico no gobiernan nada: no queda
- * transición que las exija, y su contenido es inmutable por RF027 y por los
- * triggers de la base. Reportarlas ahí es pedir que se corrija lo que no se
- * puede tocar, para una aprobación que ya ocurrió. El plan 2018 de ISI llegaba
- * cargado con 69 asignaturas sin competencia y mostraba una alerta bloqueante
- * roja que nadie podía atender ni necesitaba atender.
+ * El motor reporta lo que encuentra; **quién decide cómo enmarcarlo es la
+ * interfaz**, que sí sabe si el plan admite correcciones. Sobre un plan cerrado
+ * los hallazgos son un registro, no una lista de tareas.
  *
- * El total de créditos sí se devuelve siempre: es un hecho del plan, no un
- * control.
+ * La severidad "bloqueante" no bloquea nada fuera de Borrador y En revisión: las
+ * dos únicas transiciones que exigen un plan limpio salen de ahí.
  */
 export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
   const { plan, carrera, asignaturas, reglasJustificadas } = entrada;
   const activas = asignaturas.filter((a) => a.activa);
-
-  if (!permiteEdicion(plan.estado)) {
-    return {
-      hallazgos: [],
-      bloqueantes: [],
-      advertencias: [],
-      tieneBloqueos: false,
-      totalCreditos: calcularTotalCreditos(activas),
-    };
-  }
-
   const ciclos = ciclosDeCarrera(carrera);
   const hallazgos: Hallazgo[] = [];
 

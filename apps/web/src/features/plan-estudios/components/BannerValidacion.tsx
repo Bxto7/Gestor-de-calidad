@@ -27,27 +27,6 @@ export function BannerValidacion({
   const [aJustificar, setAJustificar] = useState<Hallazgo | null>(null);
   const [motivo, setMotivo] = useState('');
 
-  /*
-   * Un plan cerrado no se valida, y decirlo importa.
-   *
-   * Estas comprobaciones son previas a la aprobación; sobre un plan que ya no
-   * admite cambios no gobiernan nada y por eso no se ejecutan. Pintar aquí el
-   * mensaje verde de conformidad afirmaría que el plan las cumple, que es
-   * distinto de no haberlas comprobado y puede ser sencillamente falso: el plan
-   * 2018 de ISI tiene 69 asignaturas sin competencia y saldría como impecable.
-   */
-  if (soloLectura) {
-    return (
-      <div className="rounded-xl border border-borde bg-superficie-tenue px-4 py-3.5">
-        <p className="text-sm font-bold text-tinta">Sin validación de consistencia</p>
-        <p className="mt-0.5 text-sm text-tinta-suave">
-          Las comprobaciones se aplican antes de aprobar un plan. Este ya está cerrado y su
-          contenido no admite cambios, así que no se ejecutan.
-        </p>
-      </div>
-    );
-  }
-
   // RF098: mensaje de conformidad cuando no hay nada que reportar.
   if (resultado.hallazgos.length === 0) {
     return (
@@ -68,9 +47,26 @@ export function BannerValidacion({
       <div className="flex flex-col gap-3">
         {resultado.bloqueantes.length > 0 && (
           <Grupo
-            tono="bloqueante"
-            titulo={`${resultado.bloqueantes.length} inconsistencia(s) bloqueante(s)`}
-            subtitulo="Deben corregirse antes de enviar el plan a revisión o aprobarlo."
+            /*
+             * En un plan cerrado esto es un registro, no una lista de tareas.
+             *
+             * Los hallazgos se siguen mostrando —saber que un plan histórico no
+             * tiene la matriz de competencias es justo lo que una acreditación
+             * consulta de sus planes anteriores—, pero llamarlos "bloqueantes"
+             * y pedir que se corrijan sería pedir un imposible: el contenido es
+             * inmutable y la aprobación ya ocurrió.
+             */
+            tono={soloLectura ? 'advertencia' : 'bloqueante'}
+            titulo={
+              soloLectura
+                ? `${resultado.bloqueantes.length} observación(es) sobre este plan`
+                : `${resultado.bloqueantes.length} inconsistencia(s) bloqueante(s)`
+            }
+            subtitulo={
+              soloLectura
+                ? 'El plan quedó cerrado con estas observaciones. No pueden corregirse aquí: para cambiarlo, genera una nueva versión.'
+                : 'Deben corregirse antes de enviar el plan a revisión o aprobarlo.'
+            }
             hallazgos={resultado.bloqueantes}
           />
         )}
@@ -79,7 +75,11 @@ export function BannerValidacion({
           <Grupo
             tono="advertencia"
             titulo={`${resultado.advertencias.length} advertencia(s)`}
-            subtitulo="No impiden avanzar. Pueden corregirse o justificarse."
+            subtitulo={
+              soloLectura
+                ? 'Quedaron registradas al cerrarse el plan.'
+                : 'No impiden avanzar. Pueden corregirse o justificarse.'
+            }
             hallazgos={resultado.advertencias}
             onJustificar={
               soloLectura
