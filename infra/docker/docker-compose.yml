@@ -1,0 +1,44 @@
+# Servicios de apoyo para desarrollo local.
+#
+# Levanta solo lo que la aplicación necesita tener detrás —PostgreSQL— y no la
+# API ni el frontend: en desarrollo esos dos corren en la máquina, con recarga
+# en caliente y depurador enganchado. Meterlos en un contenedor aquí obligaría a
+# reconstruir la imagen en cada cambio.
+#
+# El compose de producción (CLAUDE.md §5.2) sí incluirá `api`, `worker`, `redis`
+# y `caddy`. Este archivo no es ese; son dos ficheros distintos a propósito.
+#
+#   Arrancar:  docker compose -f infra/docker/docker-compose.yml up -d
+#   Parar:     docker compose -f infra/docker/docker-compose.yml down
+#   Borrar los datos también:  ... down -v
+
+name: sgc
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sgc_postgres
+    environment:
+      POSTGRES_USER: sgc
+      POSTGRES_PASSWORD: sgc
+      POSTGRES_DB: sgc
+    # 5433 y no 5432 a propósito: es habitual tener ya otro PostgreSQL ocupando
+    # el puerto estándar. Si el tuyo está libre y prefieres el de siempre,
+    # cambia el lado izquierdo y ajusta DATABASE_URL en apps/api/.env.
+    ports:
+      - '5433:5432'
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+    # Sin esto, `up -d` devuelve el control antes de que la base acepte
+    # conexiones y la primera migración falla por un motivo que no es el suyo.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sgc -d sgc']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  # Con nombre, no anónimo: sobrevive a `down` y solo desaparece con `down -v`.
+  # Perder la base cada vez que se para el entorno haría inservible el trabajo
+  # de sembrar datos de prueba.
+  datos_postgres:

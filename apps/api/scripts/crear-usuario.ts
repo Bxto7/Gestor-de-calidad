@@ -20,6 +20,7 @@
  * contraseña y sus asignaciones en vez de fallar.
  */
 
+import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 
 import * as argon2 from 'argon2';
@@ -75,8 +76,19 @@ async function main(): Promise<void> {
     );
   }
 
+  // Mismo cargador nativo que `prisma.config.ts` y el seed, y solo si el
+  // archivo existe: en el VPS las variables llegan del entorno, no de un .env
+  // dentro del repositorio. Sin esto, el comando exigía exportar DATABASE_URL a
+  // mano aunque el proyecto ya la tuviera configurada.
+  if (existsSync('.env')) process.loadEnvFile('.env');
+
   const connectionString = process.env['DATABASE_URL'];
-  if (!connectionString) throw new Error('Falta DATABASE_URL.');
+  if (!connectionString) {
+    throw new Error(
+      'Falta DATABASE_URL. Créala en apps/api/.env copiando .env.example, ' +
+        'o expórtala en el entorno.',
+    );
+  }
 
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
