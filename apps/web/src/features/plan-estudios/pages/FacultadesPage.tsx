@@ -21,6 +21,7 @@ import {
   Modal,
   Selector,
 } from '@/shared/components/ui';
+import { SiPuede } from '@/features/auth/components/SiPuede';
 import { impactoInactivarFacultad } from '../api/plan-estudios.api';
 import {
   useCarreras,
@@ -95,9 +96,11 @@ export function FacultadesPage() {
         titulo="Facultades"
         descripcion="Agrupadores de las carreras profesionales de la universidad."
         acciones={
-          <Boton variante="primario" onClick={() => setCreando(true)}>
-            Nueva facultad
-          </Boton>
+          <SiPuede permiso="facultad.crear">
+            <Boton variante="primario" onClick={() => setCreando(true)}>
+              Nueva facultad
+            </Boton>
+          </SiPuede>
         }
       />
 
@@ -135,9 +138,11 @@ export function FacultadesPage() {
           }
           accion={
             !busqueda && filtro === 'todos' ? (
-              <Boton variante="primario" onClick={() => setCreando(true)}>
-                Nueva facultad
-              </Boton>
+              <SiPuede permiso="facultad.crear">
+                <Boton variante="primario" onClick={() => setCreando(true)}>
+                  Nueva facultad
+                </Boton>
+              </SiPuede>
             ) : undefined
           }
         />
@@ -173,20 +178,26 @@ export function FacultadesPage() {
               >
                 Ver carreras
               </Link>
-              <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(f)}>
-                Editar
-              </Boton>
-              <Boton variante="fantasma" tamano="sm" onClick={() => setHistorialDe(f)}>
-                Histórico
-              </Boton>
-              <Boton
-                variante="fantasma"
-                tamano="sm"
-                onClick={() => void pedirInactivacion(f)}
-                className="ml-auto"
-              >
-                {f.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
-              </Boton>
+              <SiPuede permiso="facultad.editar">
+                <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(f)}>
+                  Editar
+                </Boton>
+              </SiPuede>
+              <SiPuede permiso="auditoria.leer">
+                <Boton variante="fantasma" tamano="sm" onClick={() => setHistorialDe(f)}>
+                  Histórico
+                </Boton>
+              </SiPuede>
+              <SiPuede permiso="facultad.inactivar">
+                <Boton
+                  variante="fantasma"
+                  tamano="sm"
+                  onClick={() => void pedirInactivacion(f)}
+                  className="ml-auto"
+                >
+                  {f.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
+                </Boton>
+              </SiPuede>
             </div>
           </article>
         ))}

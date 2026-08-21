@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import {
   Badge,
   Boton,
@@ -52,8 +53,21 @@ export function MallaCurricularPage() {
   const [vista, setVista] = useState<Vista>('malla');
   const [error, setError] = useState<string | null>(null);
 
+  const { puedeEn } = useSesion();
+
   const carrera = carreras?.find((c) => c.id === plan?.carreraId);
-  const editable = plan ? permiteEdicion(plan.estado) : false;
+
+  /**
+   * Dos condiciones para poder arrastrar, y las dos hacen falta.
+   *
+   * RF027 congela la malla fuera de Borrador y En revisión; RF111-RF119 la
+   * reservan a quien tiene `malla.editar` sobre **esta** carrera. Se combinan
+   * en una sola bandera porque de ella cuelga todo el arrastre de la pantalla:
+   * separarlas obligaría a comprobar las dos en cada tarjeta y cada ciclo, y
+   * bastaría olvidarse en uno para dejar un hueco por donde soltar.
+   */
+  const editable =
+    plan !== undefined && permiteEdicion(plan.estado) && puedeEn('malla.editar', plan.carreraId);
   const activas = useMemo(
     () => (asignaturas ?? []).filter((a) => a.estado === 'Activo'),
     [asignaturas],
@@ -171,12 +185,22 @@ export function MallaCurricularPage() {
         </p>
       )}
 
-      {!editable && (
-        <p className="mb-5 rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave print:hidden">
-          El plan está en estado <strong>{plan.estado}</strong>: la malla se muestra en solo
-          lectura.
-        </p>
-      )}
+      {/*
+        El aviso dice cuál de las dos razones aplica. Culpar siempre al estado
+        del plan sería mentir a quien lo tiene en Borrador y solo carece del
+        permiso: se quedaría buscando una transición que no arregla nada.
+      */}
+      {!editable &&
+        (permiteEdicion(plan.estado) ? (
+          <p className="mb-5 rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave print:hidden">
+            No tienes permiso para editar la malla de esta carrera: se muestra en solo lectura.
+          </p>
+        ) : (
+          <p className="mb-5 rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave print:hidden">
+            El plan está en estado <strong>{plan.estado}</strong>: la malla se muestra en solo
+            lectura.
+          </p>
+        ))}
 
       {error && (
         <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm font-medium text-alerta-fg print:hidden">

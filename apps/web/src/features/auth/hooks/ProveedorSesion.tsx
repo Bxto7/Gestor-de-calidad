@@ -71,6 +71,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     [identidad],
   );
 
+  const puedeEn = useCallback(
+    (permiso: string, carreraId: string | null | undefined) => {
+      if (!permisos.has(permiso)) return false;
+      // Sin carrera en juego —la estructura académica es institucional— no hay
+      // nada que acotar.
+      if (carreraId == null) return true;
+      // Un rol sin carrera asignada no está acotado a ninguna: el administrador
+      // gestiona facultades de toda la universidad.
+      if (identidad?.carreraACargo == null) return true;
+      return identidad.carreraACargo === carreraId;
+    },
+    [permisos, identidad],
+  );
+
   const entrar = useCallback((nueva: Identidad) => setIdentidad(nueva), []);
 
   const salir = useCallback(async () => {
@@ -79,8 +93,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   const valor = useMemo<ValorSesion>(
-    () => ({ identidad, cargando, puede, dirigeCarrera, entrar, salir }),
-    [identidad, cargando, puede, dirigeCarrera, entrar, salir],
+    () => ({ identidad, cargando, puede, dirigeCarrera, puedeEn, entrar, salir }),
+    [identidad, cargando, puede, dirigeCarrera, puedeEn, entrar, salir],
   );
 
   return <ContextoSesion.Provider value={valor}>{children}</ContextoSesion.Provider>;

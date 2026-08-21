@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import {
   Badge,
   Boton,
@@ -48,6 +50,7 @@ export function CarrerasPage() {
   const { data: planes } = usePlanes();
   const crearPlan = useCrearPlan();
   const inactivar = useInactivarCarrera(facultadId);
+  const { puede, puedeEn } = useSesion();
 
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState<FiltroEstado>('todos');
@@ -117,19 +120,26 @@ export function CarrerasPage() {
             >
               Volver a facultades
             </Link>
-            <Boton
-              variante="primario"
-              onClick={() => setCreando(true)}
-              // RF004: una facultad inactiva no admite nuevas carreras.
-              disabled={facultad?.estado === 'Inactivo'}
-              title={
-                facultad?.estado === 'Inactivo'
-                  ? 'La facultad está inactiva y no admite nuevas carreras.'
-                  : undefined
-              }
-            >
-              Nueva carrera
-            </Boton>
+            {/*
+              Las dos formas de bloquear, juntas y a propósito: si el rol no
+              puede crear carreras el botón no está —no lo podrá nunca—; si
+              puede pero la facultad está inactiva, está y explica por qué.
+            */}
+            <SiPuede permiso="carrera.crear">
+              <Boton
+                variante="primario"
+                onClick={() => setCreando(true)}
+                // RF004: una facultad inactiva no admite nuevas carreras.
+                disabled={facultad?.estado === 'Inactivo'}
+                title={
+                  facultad?.estado === 'Inactivo'
+                    ? 'La facultad está inactiva y no admite nuevas carreras.'
+                    : undefined
+                }
+              >
+                Nueva carrera
+              </Boton>
+            </SiPuede>
           </>
         }
       />
@@ -213,29 +223,42 @@ export function CarrerasPage() {
               )}
 
               <div className="mt-4 flex flex-wrap gap-2 border-t border-borde pt-4">
-                {/* RF014: acceder a la carrera para gestionar su plan. */}
-                <Boton
-                  variante="secundario"
-                  tamano="sm"
-                  onClick={() => void abrirOCrearPlan(c)}
-                  disabled={crearPlan.isPending}
-                >
-                  {plan ? 'Abrir plan' : 'Crear plan'}
-                </Boton>
-                <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(c)}>
-                  Editar
-                </Boton>
-                <Boton variante="fantasma" tamano="sm" onClick={() => setHistorialDe(c)}>
-                  Histórico
-                </Boton>
-                <Boton
-                  variante="fantasma"
-                  tamano="sm"
-                  className="ml-auto"
-                  onClick={() => inactivar.mutate(c.id)}
-                >
-                  {c.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
-                </Boton>
+                {/*
+                  RF014 — el botón es dos cosas según haya plan o no, y cada una
+                  pide un permiso distinto: abrirlo solo exige leer; crearlo, el
+                  permiso de alta sobre ESTA carrera. Un director ve "Crear
+                  plan" en la suya y nada en las ajenas.
+                */}
+                {(plan ? puede('plan.leer') : puedeEn('plan.crear', c.id)) && (
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => void abrirOCrearPlan(c)}
+                    disabled={crearPlan.isPending}
+                  >
+                    {plan ? 'Abrir plan' : 'Crear plan'}
+                  </Boton>
+                )}
+                <SiPuede permiso="carrera.editar">
+                  <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(c)}>
+                    Editar
+                  </Boton>
+                </SiPuede>
+                <SiPuede permiso="auditoria.leer">
+                  <Boton variante="fantasma" tamano="sm" onClick={() => setHistorialDe(c)}>
+                    Histórico
+                  </Boton>
+                </SiPuede>
+                <SiPuede permiso="carrera.inactivar">
+                  <Boton
+                    variante="fantasma"
+                    tamano="sm"
+                    className="ml-auto"
+                    onClick={() => inactivar.mutate(c.id)}
+                  >
+                    {c.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
+                  </Boton>
+                </SiPuede>
               </div>
             </article>
           );

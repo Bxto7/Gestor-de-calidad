@@ -23,6 +23,13 @@ export const claves = {
   planes: (filtros?: { carreraId?: string; estado?: string }) =>
     ['planes', filtros?.carreraId ?? 'todas', filtros?.estado ?? 'todos'] as const,
   plan: (id: string) => ['plan', id] as const,
+  /**
+   * Hija de `plan` a propósito: react-query invalida por prefijo, así que todo
+   * lo que ya invalidaba `['plan', id]` alcanza también al detalle. Con una
+   * clave hermana habría que acordarse de invalidar las dos, y bastaría un
+   * olvido para dejar la pantalla mostrando validaciones viejas.
+   */
+  planDetalle: (id: string) => ['plan', id, 'detalle'] as const,
   versiones: (carreraId: string) => ['versiones', carreraId] as const,
   objetivos: ['objetivos'] as const,
   competencias: ['competencias'] as const,
@@ -94,6 +101,26 @@ export function usePlanes(filtros?: { carreraId?: string; estado?: string }) {
 
 export function usePlan(id: string) {
   return useQuery({ queryKey: claves.plan(id), queryFn: () => api.obtenerPlan(id), enabled: !!id });
+}
+
+/**
+ * El plan con lo que solo el servidor puede calcular.
+ *
+ * Además del plan trae el resultado del motor de validaciones (RF097) y qué
+ * transiciones puede ejecutar **este** usuario sobre él, cada una con su motivo
+ * si está deshabilitada. Es lo que evita reimplementar la máquina de estados y
+ * el RBAC en el navegador para decidir qué botón mostrar.
+ *
+ * Lleva clave propia porque su forma no es la de `usePlan`: compartirla haría
+ * que la primera consulta en montarse sirviera datos con la estructura
+ * equivocada a la otra.
+ */
+export function useDetallePlan(id: string) {
+  return useQuery({
+    queryKey: claves.planDetalle(id),
+    queryFn: () => api.obtenerDetallePlan(id),
+    enabled: !!id,
+  });
 }
 
 export function useVersiones(carreraId: string) {

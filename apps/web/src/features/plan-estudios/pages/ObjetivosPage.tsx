@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useEncabezado } from '@/app/encabezado';
+import { SiPuede } from '@/features/auth/components/SiPuede';
 import {
   AreaTexto,
   Badge,
@@ -97,9 +98,11 @@ export function ObjetivosPage() {
             : 'Catálogo institucional de objetivos educacionales.'
         }
         acciones={
-          <Boton variante="primario" onClick={() => setCreando(true)}>
-            Nuevo objetivo
-          </Boton>
+          <SiPuede permiso="objetivo.gestionar">
+            <Boton variante="primario" onClick={() => setCreando(true)}>
+              Nuevo objetivo
+            </Boton>
+          </SiPuede>
         }
       />
 
@@ -189,12 +192,18 @@ export function ObjetivosPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex justify-end gap-1">
-                      <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(o)}>
-                        Editar
-                      </Boton>
-                      <Boton variante="fantasma" tamano="sm" onClick={() => inactivar.mutate(o.id)}>
-                        {o.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
-                      </Boton>
+                      <SiPuede permiso="objetivo.gestionar">
+                        <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(o)}>
+                          Editar
+                        </Boton>
+                        <Boton
+                          variante="fantasma"
+                          tamano="sm"
+                          onClick={() => inactivar.mutate(o.id)}
+                        >
+                          {o.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
+                        </Boton>
+                      </SiPuede>
                     </div>
                   </td>
                 </tr>

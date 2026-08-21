@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { SiPuede } from '@/features/auth/components/SiPuede';
 import {
   Badge,
   Boton,
@@ -100,9 +101,11 @@ export function CompetenciasPage() {
         titulo="Competencias"
         descripcion="Catálogo institucional. Se vinculan al plan y, por separado, a cada asignatura."
         acciones={
-          <Boton variante="primario" onClick={() => setCreando(true)}>
-            Nueva competencia
-          </Boton>
+          <SiPuede permiso="competencia.gestionar">
+            <Boton variante="primario" onClick={() => setCreando(true)}>
+              Nueva competencia
+            </Boton>
+          </SiPuede>
         }
       />
 
@@ -189,16 +192,18 @@ export function CompetenciasPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
-                        <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(c)}>
-                          Editar
-                        </Boton>
-                        <Boton
-                          variante="fantasma"
-                          tamano="sm"
-                          onClick={() => inactivar.mutate(c.id)}
-                        >
-                          {c.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
-                        </Boton>
+                        <SiPuede permiso="competencia.gestionar">
+                          <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(c)}>
+                            Editar
+                          </Boton>
+                          <Boton
+                            variante="fantasma"
+                            tamano="sm"
+                            onClick={() => inactivar.mutate(c.id)}
+                          >
+                            {c.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
+                          </Boton>
+                        </SiPuede>
                       </div>
                     </td>
                   </tr>

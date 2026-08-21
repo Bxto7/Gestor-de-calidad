@@ -32,6 +32,7 @@ import {
   useCambiarEstadoPlan,
   useCarreras,
   useComparacion,
+  useDetallePlan,
   useEditarPlan,
   useEliminarPlan,
   useFacultades,
@@ -50,7 +51,6 @@ import {
   permiteEdicion,
   permiteEliminacion,
   permiteNuevaVersion,
-  transicionesDisponibles,
   type AccionTransicion,
 } from '../domain/estado-plan';
 import { ciclosDeCarrera, validarPlan } from '../domain/motor-validaciones';
@@ -71,6 +71,7 @@ export function PlanEstudiosPage() {
   const { data: versiones } = useVersiones(plan?.carreraId ?? '');
 
   const cambiarEstado = useCambiarEstadoPlan(planId);
+  const { data: detalle } = useDetallePlan(planId);
   const editarPlan = useEditarPlan(planId);
   const justificar = useJustificarRegla(planId);
   const nuevaVersion = useGenerarNuevaVersion();
@@ -123,7 +124,20 @@ export function PlanEstudiosPage() {
 
   const editable = permiteEdicion(plan.estado);
   const ciclos = ciclosDeCarrera(carrera);
-  const disponibles = transicionesDisponibles(plan.estado);
+  /**
+   * Las transiciones las decide el servidor, no esta pantalla.
+   *
+   * Cada una llega con `habilitada` y, si no lo está, el motivo: puede ser el
+   * estado del plan, una inconsistencia bloqueante o que el rol no tenga ese
+   * permiso sobre esta carrera. Calcularlo aquí obligaría a reimplementar la
+   * máquina de estados, el motor de validaciones y el RBAC en el navegador, y
+   * las cuatro copias se separarían con el tiempo.
+   *
+   * Mientras el detalle carga se muestra la lista vacía en vez de las
+   * transiciones locales: enseñar un botón y quitarlo medio segundo después es
+   * peor que enseñarlo un poco más tarde.
+   */
+  const disponibles = detalle?.accionesDisponibles ?? [];
 
   function ejecutarTransicion(accion: AccionTransicion) {
     const t = describirTransicion(accion);
@@ -269,21 +283,20 @@ export function PlanEstudiosPage() {
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {disponibles.map((accion) => {
-            const t = describirTransicion(accion);
-            const bloqueado = t.exigeSinBloqueos && (validacion?.tieneBloqueos ?? true);
-            return (
-              <Boton
-                key={accion}
-                variante={accion === 'observar' ? 'secundario' : 'primario'}
-                onClick={() => ejecutarTransicion(accion)}
-                disabled={bloqueado || cambiarEstado.isPending}
-                title={bloqueado ? 'Hay inconsistencias bloqueantes sin resolver.' : undefined}
-              >
-                {t.etiqueta}
-              </Boton>
-            );
-          })}
+          {disponibles.map((a) => (
+            <Boton
+              key={a.accion}
+              variante={a.accion === 'observar' ? 'secundario' : 'primario'}
+              onClick={() => ejecutarTransicion(a.accion as AccionTransicion)}
+              disabled={!a.habilitada || cambiarEstado.isPending}
+              // El motivo viene del servidor: "hay inconsistencias
+              // bloqueantes", "no diriges esta carrera"… La pantalla no lo
+              // inventa, lo muestra.
+              title={a.motivo ?? undefined}
+            >
+              {a.etiqueta}
+            </Boton>
+          ))}
 
           {/* RF075: la vía para modificar un plan ya consolidado. */}
           {permiteNuevaVersion(plan.estado) && (

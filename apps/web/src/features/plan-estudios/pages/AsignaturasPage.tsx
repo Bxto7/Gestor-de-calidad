@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { SiPuede } from '@/features/auth/components/SiPuede';
 import {
   AreaTexto,
   Badge,
@@ -120,16 +121,18 @@ export function AsignaturasPage() {
         titulo="Asignaturas"
         descripcion="Cursos registrados en este plan de estudios."
         acciones={
-          <Boton
-            variante="primario"
-            onClick={() => setCreando(true)}
-            disabled={!editable}
-            title={
-              editable ? undefined : `El plan está en estado ${plan?.estado} y no admite cambios.`
-            }
-          >
-            Nueva asignatura
-          </Boton>
+          <SiPuede permiso="asignatura.gestionar" carreraId={plan?.carreraId}>
+            <Boton
+              variante="primario"
+              onClick={() => setCreando(true)}
+              disabled={!editable}
+              title={
+                editable ? undefined : `El plan está en estado ${plan?.estado} y no admite cambios.`
+              }
+            >
+              Nueva asignatura
+            </Boton>
+          </SiPuede>
         }
       />
 
@@ -281,31 +284,42 @@ export function AsignaturasPage() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2 border-t border-borde pt-4">
-              <Boton
-                variante="secundario"
-                tamano="sm"
-                onClick={() => setEditando(a)}
-                disabled={!editable}
-              >
-                Editar
-              </Boton>
-              <Boton variante="fantasma" tamano="sm" onClick={() => setHistorialDe(a)}>
-                Histórico
-              </Boton>
-              <Boton
-                variante="fantasma"
-                tamano="sm"
-                className="ml-auto"
-                disabled={!editable}
-                onClick={() => {
-                  setError(null);
-                  inactivar.mutateAsync(a.id).catch((e: unknown) => {
-                    setError(e instanceof Error ? e.message : 'No se pudo cambiar el estado.');
-                  });
-                }}
-              >
-                {a.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
-              </Boton>
+              {/*
+                `carreraId` no es opcional aquí: gestionar asignaturas está
+                acotado a la carrera (§3.5), y sin él un director vería los
+                botones también en los planes ajenos.
+              */}
+              <SiPuede permiso="asignatura.gestionar" carreraId={plan?.carreraId}>
+                <Boton
+                  variante="secundario"
+                  tamano="sm"
+                  onClick={() => setEditando(a)}
+                  disabled={!editable}
+                >
+                  Editar
+                </Boton>
+              </SiPuede>
+              <SiPuede permiso="auditoria.leer">
+                <Boton variante="fantasma" tamano="sm" onClick={() => setHistorialDe(a)}>
+                  Histórico
+                </Boton>
+              </SiPuede>
+              <SiPuede permiso="asignatura.gestionar" carreraId={plan?.carreraId}>
+                <Boton
+                  variante="fantasma"
+                  tamano="sm"
+                  className="ml-auto"
+                  disabled={!editable}
+                  onClick={() => {
+                    setError(null);
+                    inactivar.mutateAsync(a.id).catch((e: unknown) => {
+                      setError(e instanceof Error ? e.message : 'No se pudo cambiar el estado.');
+                    });
+                  }}
+                >
+                  {a.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
+                </Boton>
+              </SiPuede>
             </div>
           </article>
         ))}
