@@ -22,9 +22,14 @@ services:
       POSTGRES_USER: sgc
       POSTGRES_PASSWORD: sgc
       POSTGRES_DB: sgc
-    # 5433 y no 5432 a propósito: es habitual tener ya otro PostgreSQL ocupando
-    # el puerto estándar. Si el tuyo está libre y prefieres el de siempre,
-    # cambia el lado izquierdo y ajusta DATABASE_URL en apps/api/.env.
+    # 5433 y no el 5432 de siempre. Esta máquina tiene además un PostgreSQL 18
+    # instalado como servicio de Windows que ya escucha en el estándar: publicar
+    # ahí el contenedor no da error, pero las conexiones desde el host van al
+    # nativo y fallan con "authentication failed" porque no conoce al usuario
+    # `sgc`. Se comprobó midiendo la versión desde dentro (16.15) y desde fuera.
+    #
+    # Si tu máquina tiene el 5432 libre y lo prefieres, cambia el lado izquierdo
+    # y ajusta DATABASE_URL en apps/api/.env.
     ports:
       - '5433:5432'
     volumes:
