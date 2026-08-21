@@ -37,6 +37,15 @@ export interface DetallePlan {
   readonly plan: PlanDeEstudios;
   readonly validacion: ResultadoValidacion;
   readonly accionesDisponibles: readonly AccionDisponible[];
+  /**
+   * RF028 y RF029: qué elementos del catálogo tiene asociados.
+   *
+   * Van en el detalle y no en una petición aparte porque la pantalla del plan
+   * los necesita siempre —para marcar las casillas ya seleccionadas— y ya se
+   * consultan aquí para validar. Pedirlos dos veces sería trabajo repetido.
+   */
+  readonly objetivoIds: readonly string[];
+  readonly competenciaIds: readonly string[];
 }
 
 export class ConsultarPlan {
@@ -59,9 +68,10 @@ export class ConsultarPlan {
     const carrera = await this.contenido.carreraDe(plan.id);
     if (!carrera) throw new NoEncontrado('la carrera del plan', plan.carreraId);
 
-    const [asignaturas, objetivoIds, reglasJustificadas] = await Promise.all([
+    const [asignaturas, objetivoIds, competenciaIds, reglasJustificadas] = await Promise.all([
       this.contenido.asignaturasDe(plan.id),
       this.contenido.objetivoIdsDe(plan.id),
+      this.contenido.competenciaIdsDe(plan.id),
       this.contenido.reglasJustificadasDe(plan.id),
     ]);
 
@@ -78,6 +88,8 @@ export class ConsultarPlan {
       plan,
       validacion,
       accionesDisponibles: await this.accionesPara(plan, validacion, actor),
+      objetivoIds,
+      competenciaIds,
     };
   }
 

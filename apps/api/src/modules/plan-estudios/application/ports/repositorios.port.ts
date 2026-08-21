@@ -81,6 +81,16 @@ export interface RepositorioContenidoPort {
   reglasJustificadasDe(planId: string): Promise<string[]>;
 }
 
+/** Un paso del flujo de aprobación, tal como se muestra en el histórico. */
+export interface EventoDeAprobacion {
+  readonly id: string;
+  readonly planId: string;
+  readonly accion: string;
+  readonly comentario: string | null;
+  readonly usuarioNombre: string;
+  readonly fecha: Date;
+}
+
 /** RF089: historial del flujo de aprobación, separado de la bitácora general. */
 export interface RepositorioAprobacionesPort {
   registrar(evento: {
@@ -89,6 +99,23 @@ export interface RepositorioAprobacionesPort {
     comentario: string | null;
     usuarioId: string;
     usuarioNombre: string;
+  }): Promise<void>;
+
+  /** RF089: los pasos de un plan, del más reciente al más antiguo. */
+  listar(planId: string): Promise<EventoDeAprobacion[]>;
+
+  /**
+   * RF099: deja constancia de por qué se acepta una advertencia no bloqueante.
+   *
+   * Vive en este puerto y no en el del plan porque pertenece al mismo flujo:
+   * una justificación solo tiene sentido dentro de una aprobación, y quien la
+   * lee es quien revisa esa aprobación.
+   */
+  justificar(datos: {
+    planId: string;
+    codigoRegla: string;
+    motivo: string;
+    usuarioId: string;
   }): Promise<void>;
 }
 

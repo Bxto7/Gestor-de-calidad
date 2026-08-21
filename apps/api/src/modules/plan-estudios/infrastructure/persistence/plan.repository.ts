@@ -13,6 +13,7 @@ import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type {
   AsignaturaDelPlan,
   DatosCarrera,
+  EventoDeAprobacion,
   FiltroPlanes,
   RepositorioAprobacionesPort,
   RepositorioContenidoPort,
@@ -278,5 +279,34 @@ export class AprobacionesRepositoryPrisma implements RepositorioAprobacionesPort
     usuarioNombre: string;
   }): Promise<void> {
     await this.prisma.eventoAprobacion.create({ data: evento });
+  }
+
+  async listar(planId: string): Promise<EventoDeAprobacion[]> {
+    return this.prisma.eventoAprobacion.findMany({
+      where: { planId },
+      // Del último paso al primero: al revisar una aprobación se mira en qué
+      // punto está, no cómo empezó.
+      orderBy: { fecha: 'desc' },
+      select: {
+        id: true,
+        planId: true,
+        accion: true,
+        comentario: true,
+        usuarioNombre: true,
+        fecha: true,
+      },
+    });
+  }
+
+  async justificar(datos: {
+    planId: string;
+    codigoRegla: string;
+    motivo: string;
+    usuarioId: string;
+  }): Promise<void> {
+    // Una regla puede justificarse más de una vez si el plan vuelve a
+    // revisarse: se acumulan en vez de sobrescribirse, porque cada intento es
+    // una decisión distinta y el histórico debe conservar ambas.
+    await this.prisma.justificacion.create({ data: datos });
   }
 }

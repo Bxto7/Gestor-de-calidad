@@ -1,27 +1,25 @@
 /**
- * Cliente de datos del módulo. Hoy resuelve contra el almacén en memoria; cada
- * función tiene la firma que tendría contra la API REST de NestJS, así que
- * migrar es cambiar el cuerpo por un `fetch` sin tocar hooks ni componentes.
+ * Cliente de datos del módulo Plan de Estudios.
  *
- * Las reglas de negocio que el backend deberá reimponer (unicidad, integridad
- * referencial, transiciones de estado) se validan también aquí: la UI no debe
- * dejar guardar algo que el servidor rechazaría.
+ * Cada función habla con la API REST de NestJS y devuelve el modelo de dominio
+ * del frontend. Las firmas son exactamente las que tenía la versión contra el
+ * almacén en memoria: por eso los hooks, los componentes y sus pruebas no
+ * cambiaron al hacer la conexión. Esa era la promesa de esta frontera y se
+ * cumplió.
+ *
+ * **Las reglas de negocio ya no se validan aquí.** Cuando los datos vivían en
+ * memoria, este archivo tenía que reimponer unicidad, integridad referencial y
+ * transiciones de estado, porque no había nadie más que lo hiciera. Ahora sí lo
+ * hay: el backend las aplica, y duplicarlas en el navegador solo garantizaría
+ * que las dos copias se separen con el tiempo. Lo que llega de vuelta es un
+ * `ErrorDeNegocio` con el mensaje del servidor, que es el que la UI muestra.
+ *
+ * Lo que sí queda del lado del navegador es la validación de formulario —campos
+ * obligatorios, formatos— porque ahí su valor es no hacer un viaje en vano, no
+ * decidir.
  */
 
-import {
-  codigoPlan,
-  existeNombreDuplicado,
-  normalizarParaUnicidad,
-  siguienteCodigoAsignatura,
-  siguienteCodigoCompetencia,
-  siguienteCodigoObjetivo,
-} from '../domain/codigos';
-import {
-  intentarTransicion,
-  permiteEdicion,
-  permiteFechaVigencia,
-  type AccionTransicion,
-} from '../domain/estado-plan';
+import { cliente } from '../../../shared/api/cliente';
 import type {
   Asignatura,
   Carrera,
@@ -32,89 +30,60 @@ import type {
   ObjetivoEducacional,
   PlanEstudios,
 } from '../domain/tipos';
+import type { AccionTransicion } from '../domain/estado-plan';
 import {
-  ErrorDeNegocio,
-  USUARIO_ACTUAL,
-  ahora,
-  clonar,
-  db,
-  demora,
-  nuevoId,
-  registrarAuditoria,
-} from './almacen-mock';
+  aAsignatura,
+  aCarrera,
+  aCompetencia,
+  aEventoAprobacion,
+  aEventoAuditoria,
+  aFacultad,
+  aObjetivo,
+  aPlanDetalle,
+  aPlanResumen,
+  type AsignaturaApi,
+  type CarreraApi,
+  type CompetenciaApi,
+  type DetallePlanApi,
+  type EventoAprobacionApi,
+  type EventoAuditoriaApi,
+  type FacultadApi,
+  type ObjetivoApi,
+  type ResumenPlanApi,
+} from './mapeadores';
 
 /* ── Facultades (RF001-RF008) ─────────────────────────────────────────── */
 
 export async function listarFacultades(): Promise<Facultad[]> {
-  // RF003 RN1: ordenado alfabéticamente por defecto.
-  const orden = [...db.facultades].sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'));
-  return demora(clonar(orden));
+  return (await cliente.get<FacultadApi[]>('/facultades')).map(aFacultad);
 }
 
 export async function crearFacultad(nombre: string): Promise<Facultad> {
-  const limpio = nombre.trim();
-  if (!limpio) throw new ErrorDeNegocio('El nombre de la facultad es obligatorio.');
-  // RF006: unicidad sin distinguir mayúsculas ni espacios.
-  if (existeNombreDuplicado(limpio, db.facultades)) {
-    throw new ErrorDeNegocio('Ya existe una facultad con ese nombre.');
-  }
-
-  // RF001 RN2: toda facultad nace Activa.
-  const facultad: Facultad = { id: nuevoId(), nombre: limpio, estado: 'Activo', creadoEn: ahora() };
-  db.facultades.push(facultad);
-  registrarAuditoria('Facultad', facultad.id, 'Creación', `Facultad "${limpio}" registrada.`);
-  return demora(clonar(facultad));
+  return aFacultad(await cliente.post<FacultadApi>('/facultades', { nombre }));
 }
 
 export async function editarFacultad(id: string, nombre: string): Promise<Facultad> {
-  const facultad = db.facultades.find((f) => f.id === id);
-  if (!facultad) throw new ErrorDeNegocio('La facultad no existe.');
-
-  const limpio = nombre.trim();
-  if (!limpio) throw new ErrorDeNegocio('No se permite dejar el nombre vacío.');
-  if (existeNombreDuplicado(limpio, db.facultades, id)) {
-    throw new ErrorDeNegocio('Ya existe otra facultad con ese nombre.');
-  }
-
-  const anterior = facultad.nombre;
-  facultad.nombre = limpio;
-  // RF002 RN2: el cambio queda en el histórico.
-  registrarAuditoria('Facultad', id, 'Edición', `Nombre: "${anterior}" → "${limpio}".`);
-  return demora(clonar(facultad));
+  return aFacultad(await cliente.patch<FacultadApi>(`/facultades/${id}`, { nombre }));
 }
 
-export async function inactivarFacultad(id: string): Promise<Facultad> {
-  const facultad = db.facultades.find((f) => f.id === id);
-  if (!facultad) throw new ErrorDeNegocio('La facultad no existe.');
-
-  // RF005 RN1: no se elimina físicamente.
-  facultad.estado = facultad.estado === 'Activo' ? 'Inactivo' : 'Activo';
-  registrarAuditoria('Facultad', id, 'Cambio de estado', `Estado: ${facultad.estado}.`);
-  return demora(clonar(facultad));
+/**
+ * RF005 — alterna el estado.
+ *
+ * Se llama `inactivar` por continuidad con la UI, pero reactiva igual: el
+ * endpoint recibe el estado deseado. Quien llama ya sabe en cuál está.
+ */
+export async function inactivarFacultad(id: string, activa = false): Promise<Facultad> {
+  return aFacultad(await cliente.patch<FacultadApi>(`/facultades/${id}/estado`, { activa }));
 }
 
-/** RF005: advertencia previa si la facultad tiene carreras con planes vigentes. */
 export async function impactoInactivarFacultad(id: string): Promise<{
   carreras: number;
   planesVigentes: number;
 }> {
-  const carreras = db.carreras.filter((c) => c.facultadId === id);
-  const idsCarrera = new Set(carreras.map((c) => c.id));
-  const planesVigentes = db.planes.filter(
-    (p) => idsCarrera.has(p.carreraId) && p.estado === 'Vigente',
-  ).length;
-  return demora({ carreras: carreras.length, planesVigentes }, 60);
+  return cliente.get(`/facultades/${id}/impacto-inactivacion`);
 }
 
 /* ── Carreras (RF009-RF019) ───────────────────────────────────────────── */
-
-export async function listarCarreras(facultadId?: string): Promise<Carrera[]> {
-  const filtradas = facultadId
-    ? db.carreras.filter((c) => c.facultadId === facultadId)
-    : db.carreras;
-  const orden = [...filtradas].sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'));
-  return demora(clonar(orden));
-}
 
 export interface DatosCarrera {
   nombre: string;
@@ -122,426 +91,166 @@ export interface DatosCarrera {
   duracionAnios: number;
 }
 
+export async function listarCarreras(facultadId?: string): Promise<Carrera[]> {
+  const filas = facultadId
+    ? await cliente.get<CarreraApi[]>(`/facultades/${facultadId}/carreras`)
+    : await cliente.get<CarreraApi[]>('/carreras');
+  return filas.map(aCarrera);
+}
+
 export async function crearCarrera(facultadId: string, datos: DatosCarrera): Promise<Carrera> {
-  const facultad = db.facultades.find((f) => f.id === facultadId);
-  if (!facultad) throw new ErrorDeNegocio('La facultad no existe.');
-  // RF004: una facultad inactiva no admite carreras nuevas.
-  if (facultad.estado === 'Inactivo') {
-    throw new ErrorDeNegocio('La facultad está inactiva y no admite nuevas carreras.');
-  }
-
-  validarDatosCarrera(datos);
-
-  // RF015 RN1: el nombre puede repetirse entre facultades, no dentro de una.
-  const hermanas = db.carreras.filter((c) => c.facultadId === facultadId);
-  if (existeNombreDuplicado(datos.nombre, hermanas)) {
-    throw new ErrorDeNegocio('Ya existe una carrera con ese nombre en esta facultad.');
-  }
-  // RF017 RN1: el código es único en toda la universidad.
-  if (existeCodigoCarrera(datos.codigo)) {
-    throw new ErrorDeNegocio('Ya existe una carrera con ese código en la universidad.');
-  }
-
-  const carrera: Carrera = {
-    id: nuevoId(),
-    facultadId,
-    nombre: datos.nombre.trim(),
-    codigo: datos.codigo.trim().toUpperCase(),
-    duracionAnios: datos.duracionAnios,
-    estado: 'Activo',
-    creadoEn: ahora(),
-  };
-  db.carreras.push(carrera);
-  registrarAuditoria('Carrera', carrera.id, 'Creación', `Carrera "${carrera.nombre}" registrada.`);
-  return demora(clonar(carrera));
+  return aCarrera(await cliente.post<CarreraApi>(`/facultades/${facultadId}/carreras`, datos));
 }
 
 export async function editarCarrera(id: string, datos: DatosCarrera): Promise<Carrera> {
-  const carrera = db.carreras.find((c) => c.id === id);
-  if (!carrera) throw new ErrorDeNegocio('La carrera no existe.');
-
-  validarDatosCarrera(datos);
-
-  const hermanas = db.carreras.filter((c) => c.facultadId === carrera.facultadId);
-  if (existeNombreDuplicado(datos.nombre, hermanas, id)) {
-    throw new ErrorDeNegocio('Ya existe otra carrera con ese nombre en esta facultad.');
-  }
-  if (existeCodigoCarrera(datos.codigo, id)) {
-    throw new ErrorDeNegocio('Ya existe otra carrera con ese código en la universidad.');
-  }
-
-  // RF012 RN1: no se puede reducir ciclos si hay asignaturas en los que desaparecerían.
-  const ciclosNuevos = datos.duracionAnios * 2;
-  const planesDeCarrera = new Set(db.planes.filter((p) => p.carreraId === id).map((p) => p.id));
-  const afectadas = db.asignaturas.filter(
-    (a) => planesDeCarrera.has(a.planId) && a.cicloNumero !== null && a.cicloNumero > ciclosNuevos,
-  );
-  if (afectadas.length > 0) {
-    throw new ErrorDeNegocio(
-      `No se puede reducir a ${ciclosNuevos} ciclos: ${afectadas.length} asignatura(s) están ubicadas en ciclos que dejarían de existir.`,
-    );
-  }
-
-  carrera.nombre = datos.nombre.trim();
-  carrera.codigo = datos.codigo.trim().toUpperCase();
-  carrera.duracionAnios = datos.duracionAnios;
-  registrarAuditoria('Carrera', id, 'Edición', `Datos generales actualizados.`);
-  return demora(clonar(carrera));
+  return aCarrera(await cliente.patch<CarreraApi>(`/carreras/${id}`, datos));
 }
 
-export async function inactivarCarrera(id: string): Promise<Carrera> {
-  const carrera = db.carreras.find((c) => c.id === id);
-  if (!carrera) throw new ErrorDeNegocio('La carrera no existe.');
-  carrera.estado = carrera.estado === 'Activo' ? 'Inactivo' : 'Activo';
-  registrarAuditoria('Carrera', id, 'Cambio de estado', `Estado: ${carrera.estado}.`);
-  return demora(clonar(carrera));
+export async function inactivarCarrera(id: string, activa = false): Promise<Carrera> {
+  return aCarrera(await cliente.patch<CarreraApi>(`/carreras/${id}/estado`, { activa }));
 }
 
-function validarDatosCarrera(datos: DatosCarrera): void {
-  if (!datos.nombre.trim()) throw new ErrorDeNegocio('El nombre de la carrera es obligatorio.');
-  if (!datos.codigo.trim()) throw new ErrorDeNegocio('El código de la carrera es obligatorio.');
-  // RF011 RN1: entero positivo.
-  if (!Number.isInteger(datos.duracionAnios) || datos.duracionAnios < 1) {
-    throw new ErrorDeNegocio('La duración debe ser un número entero de años mayor a cero.');
-  }
-}
-
-function existeCodigoCarrera(codigo: string, idIgnorado?: string): boolean {
-  const objetivo = normalizarParaUnicidad(codigo);
-  return db.carreras.some(
-    (c) => c.id !== idIgnorado && normalizarParaUnicidad(c.codigo) === objetivo,
-  );
-}
-
-/* ── Planes de estudio (RF020-RF032, RF075-RF093) ─────────────────────── */
+/* ── Planes de estudio (RF020-RF032) ──────────────────────────────────── */
 
 export async function listarPlanes(filtros?: {
   carreraId?: string;
   estado?: string;
 }): Promise<PlanEstudios[]> {
-  let planes = [...db.planes];
-  // RF030 / RF031 RN1: los filtros son combinables.
-  if (filtros?.carreraId) planes = planes.filter((p) => p.carreraId === filtros.carreraId);
-  if (filtros?.estado) planes = planes.filter((p) => p.estado === filtros.estado);
-  // RF030 RN1: fecha de creación descendente.
-  planes.sort((x, y) => y.creadoEn.localeCompare(x.creadoEn));
-  return demora(clonar(planes));
+  const filas = await cliente.get<ResumenPlanApi[]>('/planes', {
+    carreraId: filtros?.carreraId,
+    estado: filtros?.estado,
+  });
+  return filas.map(aPlanResumen);
 }
 
 export async function obtenerPlan(id: string): Promise<PlanEstudios> {
-  const plan = db.planes.find((p) => p.id === id);
-  if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-  return demora(clonar(plan));
-}
-
-export async function crearPlan(carreraId: string): Promise<PlanEstudios> {
-  const carrera = db.carreras.find((c) => c.id === carreraId);
-  if (!carrera) throw new ErrorDeNegocio('La carrera no existe.');
-  // RF020 / RF014 RN1: sin ciclos definidos no se puede crear un plan.
-  if (carrera.duracionAnios < 1) {
-    throw new ErrorDeNegocio('La carrera no tiene ciclos definidos. Defínelos antes de continuar.');
-  }
-
-  const previos = db.planes.filter((p) => p.carreraId === carreraId);
-  const version = previos.length === 0 ? 1 : Math.max(...previos.map((p) => p.version)) + 1;
-
-  const plan: PlanEstudios = {
-    id: nuevoId(),
-    carreraId,
-    // RF022: autogenerado, no editable.
-    codigo: codigoPlan(carrera.codigo, new Date().getFullYear(), version),
-    version,
-    estado: 'Borrador', // RF020 RN1
-    duracionAnios: carrera.duracionAnios,
-    fechaVigencia: null,
-    objetivoIds: [],
-    competenciaIds: [],
-    derivadoDe: null,
-    creadoEn: ahora(),
-  };
-  db.planes.push(plan);
-  registrarAuditoria('Plan', plan.id, 'Creación', `Plan ${plan.codigo} creado en Borrador.`);
-  return demora(clonar(plan));
+  return aPlanDetalle(await cliente.get<DetallePlanApi>(`/planes/${id}`));
 }
 
 /**
- * RF021 / RF023 / RF024 — edición del plan.
+ * El detalle completo, con validación y acciones disponibles.
  *
- * Cada campo lleva su propia precondición, y no una única puerta de entrada,
- * porque RF023 y RF027 se contradicen sobre la fecha de vigencia:
- *
- *   RF027    bloquea la edición fuera de Borrador / En revisión.
- *   RF023 RN1 exige que la vigencia solo se active con el plan **Aprobado**.
- *
- * Con un solo guard, uno de los dos quedaría sin aplicar. Se resuelve leyendo
- * RF027 por lo que enumera —"datos generales, asignaturas y malla curricular"—
- * y tratando la fecha de vigencia como un dato del flujo de aprobación, no como
- * dato general. Así cada regla rige donde le corresponde.
+ * `obtenerPlan` devuelve solo el plan porque es lo que esperan los hooks
+ * existentes. Esta función expone lo demás: qué inconsistencias tiene (RF097) y
+ * qué transiciones puede ejecutar **este** usuario sobre él, calculado en el
+ * servidor. Es lo que evita que la UI vuelva a implementar la máquina de
+ * estados y el RBAC para decidir qué botón habilitar.
  */
+export async function obtenerDetallePlan(id: string): Promise<DetallePlanApi> {
+  return cliente.get<DetallePlanApi>(`/planes/${id}`);
+}
+
+export async function crearPlan(carreraId: string): Promise<PlanEstudios> {
+  return aPlanResumen(await cliente.post<ResumenPlanApi>('/planes', { carreraId }));
+}
+
 export async function editarPlan(
   id: string,
   cambios: { duracionAnios?: number; fechaVigencia?: string | null },
 ): Promise<PlanEstudios> {
-  const plan = db.planes.find((p) => p.id === id);
-  if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-
-  if (cambios.duracionAnios !== undefined) {
-    // RF027: dato general, solo editable en Borrador / En revisión.
-    if (!permiteEdicion(plan.estado)) {
-      throw new ErrorDeNegocio(
-        `Un plan en estado ${plan.estado} no admite edición. Genera una nueva versión para modificarlo.`,
-      );
-    }
-    if (!Number.isInteger(cambios.duracionAnios) || cambios.duracionAnios < 1) {
-      throw new ErrorDeNegocio('La duración debe ser un número entero de años mayor a cero.');
-    }
-    plan.duracionAnios = cambios.duracionAnios;
-  }
-
-  if (cambios.fechaVigencia !== undefined) {
-    // RF023 RN1: fijarla antes de la aprobación daría un plan "vigente desde"
-    // una fecha que nadie aprobó. Limpiarla (null) sí se permite siempre.
-    if (cambios.fechaVigencia !== null && !permiteFechaVigencia(plan.estado)) {
-      throw new ErrorDeNegocio(
-        `La fecha de vigencia solo puede fijarse con el plan Aprobado; ahora está en ${plan.estado}.`,
-      );
-    }
-    plan.fechaVigencia = cambios.fechaVigencia;
-  }
-
-  registrarAuditoria('Plan', id, 'Edición', 'Datos generales del plan actualizados.');
-  return demora(clonar(plan));
+  return aPlanResumen(await cliente.patch<ResumenPlanApi>(`/planes/${id}`, cambios));
 }
 
-/** RF028 / RF029: asociar objetivos y competencias al plan. */
+/** RF028 / RF029: cada lista enviada reemplaza por completo a la anterior. */
 export async function asociarAlPlan(
   id: string,
   cambios: { objetivoIds?: string[]; competenciaIds?: string[] },
 ): Promise<PlanEstudios> {
-  const plan = db.planes.find((p) => p.id === id);
-  if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-  if (!permiteEdicion(plan.estado)) {
-    throw new ErrorDeNegocio(`Un plan en estado ${plan.estado} no admite cambios.`);
-  }
-
-  if (cambios.objetivoIds) plan.objetivoIds = [...cambios.objetivoIds];
-  if (cambios.competenciaIds) plan.competenciaIds = [...cambios.competenciaIds];
-
-  registrarAuditoria('Plan', id, 'Edición', 'Objetivos y competencias del plan actualizados.');
-  return demora(clonar(plan));
+  return aPlanResumen(await cliente.put<ResumenPlanApi>(`/planes/${id}/asociaciones`, cambios));
 }
 
-/** RF032: eliminar, solo en Borrador. */
 export async function eliminarPlan(id: string): Promise<void> {
-  const plan = db.planes.find((p) => p.id === id);
-  if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-  if (plan.estado !== 'Borrador') {
-    throw new ErrorDeNegocio(
-      `Un plan en estado ${plan.estado} no puede eliminarse; solo puede quedar como Histórico.`,
-    );
-  }
-  db.planes = db.planes.filter((p) => p.id !== id);
-  db.asignaturas = db.asignaturas.filter((a) => a.planId !== id);
-  registrarAuditoria('Plan', id, 'Eliminación', `Plan ${plan.codigo} eliminado en Borrador.`);
-  await demora(null, 80);
+  await cliente.delete(`/planes/${id}`);
 }
 
 /**
- * RF026 / RF085-RF087 / RF082 / RF090 - ejecuta una transición de estado.
- * El resultado del motor de validaciones llega desde fuera porque quien lo
- * calcula es la pantalla, que ya lo tiene para el banner.
+ * RF026 — ejecuta una transición de estado.
+ *
+ * `tieneBloqueos` ya no viaja: el servidor recalcula las validaciones antes de
+ * transicionar, porque un cliente podría mandar `false` y saltarse RF097. La
+ * firma lo conserva para no tocar a quien llama, y se ignora a propósito.
  */
 export async function cambiarEstadoPlan(
   id: string,
   accion: AccionTransicion,
   contexto: { tieneBloqueos: boolean; comentario?: string | undefined },
 ): Promise<PlanEstudios> {
-  const plan = db.planes.find((p) => p.id === id);
-  if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-
-  const resultado = intentarTransicion(plan.estado, accion, contexto);
-  if (!resultado.ok) throw new ErrorDeNegocio(resultado.motivo);
-
-  // RF090: una sola versión Vigente por carrera. Al marcar vigente, la anterior
-  // pasa a Histórico (RF082) en la misma operación.
-  if (resultado.nuevoEstado === 'Vigente') {
-    for (const otro of db.planes) {
-      if (otro.carreraId === plan.carreraId && otro.id !== plan.id && otro.estado === 'Vigente') {
-        otro.estado = 'Histórico';
-        registrarAuditoria(
-          'Plan',
-          otro.id,
-          'Cambio de estado',
-          `Pasa a Histórico al entrar en vigencia ${plan.codigo}.`,
-        );
-      }
-    }
-    // RF023 RN1: la vigencia se activa recién aquí.
-    plan.fechaVigencia = plan.fechaVigencia ?? ahora();
-  }
-
-  const anterior = plan.estado;
-  plan.estado = resultado.nuevoEstado;
-
-  const etiquetaAprobacion: Record<AccionTransicion, EventoAprobacion['accion'] | null> = {
-    'enviar-a-revision': 'Enviado a revisión',
-    aprobar: 'Aprobado',
-    observar: 'Observado',
-    'marcar-vigente': 'Marcado vigente',
-    archivar: null,
-  };
-
-  const etiqueta = etiquetaAprobacion[accion];
-  const comentarioLimpio = contexto.comentario?.trim() ?? '';
-  if (etiqueta) {
-    // RF088 / RF089: responsable y fecha, en un historial de solo lectura.
-    db.aprobaciones.unshift({
-      id: nuevoId(),
-      planId: id,
-      accion: etiqueta,
-      // Un comentario en blanco se guarda como null, no como cadena vacia:
-      // por eso no sirve `??`, que conservaria el "".
-      comentario: comentarioLimpio === '' ? null : comentarioLimpio,
-      usuario: USUARIO_ACTUAL,
-      fecha: ahora(),
-    });
-  }
-
-  // RF026 RN2: todo cambio de estado se registra con usuario y fecha.
-  registrarAuditoria('Plan', id, 'Cambio de estado', `${anterior} → ${plan.estado}.`);
-  return demora(clonar(plan));
+  const respuesta = await cliente.post<{ plan: ResumenPlanApi } | ResumenPlanApi>(
+    `/planes/${id}/transiciones`,
+    { accion, ...(contexto.comentario ? { comentario: contexto.comentario } : {}) },
+  );
+  return aPlanResumen('plan' in respuesta ? respuesta.plan : respuesta);
 }
 
-/** RF075: nueva versión a partir de un plan consolidado, copiando su malla. */
+/** RF075: nueva versión a partir de la vigente. */
 export async function generarNuevaVersion(idOrigen: string): Promise<PlanEstudios> {
-  const origen = db.planes.find((p) => p.id === idOrigen);
-  if (!origen) throw new ErrorDeNegocio('El plan de origen no existe.');
-
-  const carrera = db.carreras.find((c) => c.id === origen.carreraId);
-  if (!carrera) throw new ErrorDeNegocio('La carrera del plan no existe.');
-
-  const enCurso = db.planes.find(
-    (p) =>
-      p.carreraId === origen.carreraId && (p.estado === 'Borrador' || p.estado === 'En revisión'),
-  );
-  if (enCurso) {
-    throw new ErrorDeNegocio(
-      `Ya existe la versión ${enCurso.codigo} en estado ${enCurso.estado} para esta carrera. Ciérrala antes de generar otra.`,
-    );
-  }
-
-  const version =
-    Math.max(...db.planes.filter((p) => p.carreraId === origen.carreraId).map((p) => p.version)) +
-    1;
-
-  const nuevo: PlanEstudios = {
-    id: nuevoId(),
-    carreraId: origen.carreraId,
-    codigo: codigoPlan(carrera.codigo, new Date().getFullYear(), version),
-    version,
-    estado: 'Borrador',
-    duracionAnios: origen.duracionAnios,
-    fechaVigencia: null,
-    objetivoIds: [...origen.objetivoIds],
-    competenciaIds: [...origen.competenciaIds],
-    derivadoDe: origen.id,
-    creadoEn: ahora(),
-  };
-  db.planes.push(nuevo);
-
-  // La malla se copia: una versión nueva parte del contenido de la anterior.
-  for (const a of db.asignaturas.filter((x) => x.planId === origen.id)) {
-    db.asignaturas.push({
-      ...a,
-      id: nuevoId(),
-      planId: nuevo.id,
-      competenciaIds: [...a.competenciaIds],
-    });
-  }
-
-  registrarAuditoria(
-    'Plan',
-    nuevo.id,
-    'Creación',
-    `Versión ${version} generada desde ${origen.codigo}.`,
-  );
-  return demora(clonar(nuevo));
+  return aPlanResumen(await cliente.post<ResumenPlanApi>(`/planes/${idOrigen}/versiones`));
 }
 
-/** RF076 / RF079: versiones de la carrera, para el selector de histórico. */
+/** RF076 / RF091: todas las versiones de la carrera, de la más nueva a la más antigua. */
 export async function listarVersiones(carreraId: string): Promise<PlanEstudios[]> {
-  const versiones = db.planes
-    .filter((p) => p.carreraId === carreraId)
-    .sort((x, y) => y.version - x.version);
-  return demora(clonar(versiones));
+  const filas = await cliente.get<ResumenPlanApi[]>(`/carreras/${carreraId}/versiones`);
+  return filas.map(aPlanResumen);
 }
 
-/** RF078 / RF080 / RF008 / RF019 / RF059: bitácora de una entidad. */
+/* ── Histórico y evidencia (RF078, RF089, RF092, RF099) ───────────────── */
+
 export async function listarAuditoria(
   entidad: EventoAuditoria['entidad'],
   entidadId: string,
 ): Promise<EventoAuditoria[]> {
-  const eventos = db.auditoria
-    .filter((e) => e.entidad === entidad && e.entidadId === entidadId)
-    .sort((x, y) => y.fecha.localeCompare(x.fecha));
-  return demora(clonar(eventos));
+  const filas = await cliente.get<EventoAuditoriaApi[]>('/auditoria', { entidad, entidadId });
+  return filas.map(aEventoAuditoria);
 }
 
-/** RF089: historial de aprobaciones del plan. */
+/** RF089: historial del flujo de aprobación. */
 export async function listarAprobaciones(planId: string): Promise<EventoAprobacion[]> {
-  const eventos = db.aprobaciones
-    .filter((e) => e.planId === planId)
-    .sort((x, y) => y.fecha.localeCompare(x.fecha));
-  return demora(clonar(eventos));
+  const filas = await cliente.get<EventoAprobacionApi[]>(`/planes/${planId}/aprobaciones`);
+  return filas.map(aEventoAprobacion);
 }
 
-/** RF099: justificar una observación no bloqueante. */
+/** RF099: justificar una advertencia no bloqueante. */
 export async function justificarRegla(
   planId: string,
   codigoRegla: string,
   motivo: string,
 ): Promise<void> {
-  if (!motivo.trim()) throw new ErrorDeNegocio('La justificación no puede quedar vacía.');
-  db.justificaciones.push({
-    planId,
-    codigoRegla,
-    motivo: motivo.trim(),
-    usuario: USUARIO_ACTUAL,
-    fecha: ahora(),
-  });
-  registrarAuditoria('Plan', planId, 'Justificación', `Observación ${codigoRegla} justificada.`);
-  await demora(null, 80);
+  await cliente.post(`/planes/${planId}/justificaciones`, { codigoRegla, motivo });
 }
 
 export async function listarJustificaciones(planId: string): Promise<string[]> {
-  return demora(db.justificaciones.filter((j) => j.planId === planId).map((j) => j.codigoRegla));
+  return cliente.get<string[]>(`/planes/${planId}/justificaciones`);
+}
+
+export interface DiferenciaAsignatura {
+  codigo: string;
+  nombre: string;
+  cambio: 'agregada' | 'retirada' | 'modificada';
+  detalle: string;
+}
+
+/**
+ * RF092 — compara dos versiones del mismo plan.
+ *
+ * El emparejamiento por nombre lo hace el servidor, que es donde están las dos
+ * mallas completas. Traerlas al navegador para compararlas ahí significaría
+ * descargar dos planes enteros para mostrar una lista de diferencias.
+ */
+export async function compararVersiones(idA: string, idB: string): Promise<DiferenciaAsignatura[]> {
+  return cliente.get<DiferenciaAsignatura[]>('/planes/comparar', { a: idA, b: idB });
 }
 
 /* ── Objetivos educacionales (RF033-RF039) ────────────────────────────── */
 
 export async function listarObjetivos(): Promise<ObjetivoEducacional[]> {
-  return demora(clonar([...db.objetivos].sort((x, y) => x.codigo.localeCompare(y.codigo))));
+  return (await cliente.get<ObjetivoApi[]>('/objetivos')).map(aObjetivo);
 }
 
 export async function crearObjetivo(
   nombre: string,
   descripcion: string,
 ): Promise<ObjetivoEducacional> {
-  // RF033 RN1: nombre y descripción obligatorios.
-  if (!nombre.trim()) throw new ErrorDeNegocio('El nombre del objetivo es obligatorio.');
-  if (!descripcion.trim()) throw new ErrorDeNegocio('La descripción del objetivo es obligatoria.');
-
-  const objetivo: ObjetivoEducacional = {
-    id: nuevoId(),
-    // RF034: correlativo, no editable.
-    codigo: siguienteCodigoObjetivo(db.objetivos.map((o) => o.codigo)),
-    nombre: nombre.trim(),
-    descripcion: descripcion.trim(),
-    estado: 'Activo',
-  };
-  db.objetivos.push(objetivo);
-  registrarAuditoria('Objetivo', objetivo.id, 'Creación', `${objetivo.codigo} registrado.`);
-  return demora(clonar(objetivo));
+  return aObjetivo(await cliente.post<ObjetivoApi>('/objetivos', { nombre, descripcion }));
 }
 
 export async function editarObjetivo(
@@ -549,104 +258,44 @@ export async function editarObjetivo(
   nombre: string,
   descripcion: string,
 ): Promise<ObjetivoEducacional> {
-  const objetivo = db.objetivos.find((o) => o.id === id);
-  if (!objetivo) throw new ErrorDeNegocio('El objetivo no existe.');
-  if (!nombre.trim()) throw new ErrorDeNegocio('El nombre del objetivo es obligatorio.');
-  if (!descripcion.trim()) throw new ErrorDeNegocio('La descripción del objetivo es obligatoria.');
-
-  // RF036 RN1: el código no se modifica al editar.
-  objetivo.nombre = nombre.trim();
-  objetivo.descripcion = descripcion.trim();
-  registrarAuditoria('Objetivo', id, 'Edición', `${objetivo.codigo} actualizado.`);
-  return demora(clonar(objetivo));
+  return aObjetivo(await cliente.patch<ObjetivoApi>(`/objetivos/${id}`, { nombre, descripcion }));
 }
 
-export async function inactivarObjetivo(id: string): Promise<ObjetivoEducacional> {
-  const objetivo = db.objetivos.find((o) => o.id === id);
-  if (!objetivo) throw new ErrorDeNegocio('El objetivo no existe.');
-  objetivo.estado = objetivo.estado === 'Activo' ? 'Inactivo' : 'Activo';
-  registrarAuditoria('Objetivo', id, 'Cambio de estado', `Estado: ${objetivo.estado}.`);
-  return demora(clonar(objetivo));
+export async function inactivarObjetivo(id: string, activo = false): Promise<ObjetivoEducacional> {
+  return aObjetivo(await cliente.patch<ObjetivoApi>(`/objetivos/${id}/estado`, { activo }));
 }
 
-/** RF038: integridad referencial. Solo se elimina lo que nadie usa. */
+/** RF038: solo si no lo usa ningún plan. El servidor lo comprueba. */
 export async function eliminarObjetivo(id: string): Promise<void> {
-  const enUso = db.planes.filter((p) => p.objetivoIds.includes(id));
-  if (enUso.length > 0) {
-    throw new ErrorDeNegocio(
-      `No se puede eliminar: el objetivo está vinculado a ${enUso.length} plan(es). Inactívalo en su lugar.`,
-    );
-  }
-  db.objetivos = db.objetivos.filter((o) => o.id !== id);
-  await demora(null, 80);
+  await cliente.delete(`/objetivos/${id}`);
 }
 
 /* ── Competencias (RF040-RF046) ───────────────────────────────────────── */
 
 export async function listarCompetencias(): Promise<Competencia[]> {
-  return demora(clonar([...db.competencias].sort((x, y) => x.codigo.localeCompare(y.codigo))));
+  return (await cliente.get<CompetenciaApi[]>('/competencias')).map(aCompetencia);
 }
 
 export async function crearCompetencia(nombre: string): Promise<Competencia> {
-  // RF040 RN1: el nombre es obligatorio.
-  if (!nombre.trim()) throw new ErrorDeNegocio('El nombre de la competencia es obligatorio.');
-
-  const competencia: Competencia = {
-    id: nuevoId(),
-    // RF041: correlativo, no editable.
-    codigo: siguienteCodigoCompetencia(db.competencias.map((c) => c.codigo)),
-    nombre: nombre.trim(),
-    estado: 'Activo',
-  };
-  db.competencias.push(competencia);
-  registrarAuditoria(
-    'Competencia',
-    competencia.id,
-    'Creación',
-    `${competencia.codigo} registrada.`,
-  );
-  return demora(clonar(competencia));
+  return aCompetencia(await cliente.post<CompetenciaApi>('/competencias', { nombre }));
 }
 
 export async function editarCompetencia(id: string, nombre: string): Promise<Competencia> {
-  const competencia = db.competencias.find((c) => c.id === id);
-  if (!competencia) throw new ErrorDeNegocio('La competencia no existe.');
-  if (!nombre.trim()) throw new ErrorDeNegocio('El nombre de la competencia es obligatorio.');
-
-  competencia.nombre = nombre.trim();
-  registrarAuditoria('Competencia', id, 'Edición', `${competencia.codigo} actualizada.`);
-  return demora(clonar(competencia));
+  return aCompetencia(await cliente.patch<CompetenciaApi>(`/competencias/${id}`, { nombre }));
 }
 
-export async function inactivarCompetencia(id: string): Promise<Competencia> {
-  const competencia = db.competencias.find((c) => c.id === id);
-  if (!competencia) throw new ErrorDeNegocio('La competencia no existe.');
-  competencia.estado = competencia.estado === 'Activo' ? 'Inactivo' : 'Activo';
-  registrarAuditoria('Competencia', id, 'Cambio de estado', `Estado: ${competencia.estado}.`);
-  return demora(clonar(competencia));
+export async function inactivarCompetencia(id: string, activo = false): Promise<Competencia> {
+  return aCompetencia(
+    await cliente.patch<CompetenciaApi>(`/competencias/${id}/estado`, { activo }),
+  );
 }
 
-/** RF045: integridad referencial contra asignaturas y planes. */
+/** RF045: solo si no la usa ninguna asignatura ni ningún plan. */
 export async function eliminarCompetencia(id: string): Promise<void> {
-  const asignaturas = db.asignaturas.filter((a) => a.competenciaIds.includes(id)).length;
-  const planes = db.planes.filter((p) => p.competenciaIds.includes(id)).length;
-  if (asignaturas + planes > 0) {
-    throw new ErrorDeNegocio(
-      `No se puede eliminar: la competencia está vinculada a ${asignaturas} asignatura(s) y ${planes} plan(es). Inactívala en su lugar.`,
-    );
-  }
-  db.competencias = db.competencias.filter((c) => c.id !== id);
-  await demora(null, 80);
+  await cliente.delete(`/competencias/${id}`);
 }
 
-/* ── Asignaturas (RF047-RF059) y malla (RF060-RF074) ──────────────────── */
-
-export async function listarAsignaturas(planId: string): Promise<Asignatura[]> {
-  const lista = db.asignaturas
-    .filter((a) => a.planId === planId)
-    .sort((x, y) => x.codigo.localeCompare(y.codigo));
-  return demora(clonar(lista));
-}
+/* ── Asignaturas (RF047-RF059) ────────────────────────────────────────── */
 
 export interface DatosAsignatura {
   nombre: string;
@@ -658,218 +307,54 @@ export interface DatosAsignatura {
   competenciaIds: string[];
 }
 
+export async function listarAsignaturas(planId: string): Promise<Asignatura[]> {
+  const filas = await cliente.get<AsignaturaApi[]>(`/planes/${planId}/asignaturas`);
+  return filas.map(aAsignatura);
+}
+
 export async function crearAsignatura(planId: string, datos: DatosAsignatura): Promise<Asignatura> {
-  const plan = exigirPlanEditable(planId);
-  const carrera = db.carreras.find((c) => c.id === plan.carreraId);
-  if (!carrera) throw new ErrorDeNegocio('La carrera del plan no existe.');
-
-  validarDatosAsignatura(datos);
-
-  const asignatura: Asignatura = {
-    id: nuevoId(),
-    planId,
-    // RF053: autogenerado, no editable.
-    codigo: siguienteCodigoAsignatura(
-      carrera.codigo,
-      db.asignaturas.filter((a) => a.planId === planId).map((a) => a.codigo),
-    ),
-    nombre: datos.nombre.trim(),
-    descripcion: datos.descripcion.trim(),
-    tipo: datos.tipo,
-    condicion: datos.condicion,
-    creditos: datos.creditos,
-    horasTeoricas: datos.horasTeoricas,
-    competenciaIds: [...datos.competenciaIds],
-    cicloNumero: null,
-    orden: 0,
-    estado: 'Activo',
-  };
-  db.asignaturas.push(asignatura);
-  registrarAuditoria('Asignatura', asignatura.id, 'Creación', `${asignatura.codigo} registrada.`);
-  return demora(clonar(asignatura));
+  return aAsignatura(await cliente.post<AsignaturaApi>(`/planes/${planId}/asignaturas`, datos));
 }
 
 export async function editarAsignatura(id: string, datos: DatosAsignatura): Promise<Asignatura> {
-  const asignatura = db.asignaturas.find((a) => a.id === id);
-  if (!asignatura) throw new ErrorDeNegocio('La asignatura no existe.');
-  // RF050 RN1: edición completa solo con el plan editable.
-  exigirPlanEditable(asignatura.planId);
-  validarDatosAsignatura(datos);
-
-  Object.assign(asignatura, {
-    nombre: datos.nombre.trim(),
-    descripcion: datos.descripcion.trim(),
-    tipo: datos.tipo,
-    condicion: datos.condicion,
-    creditos: datos.creditos,
-    horasTeoricas: datos.horasTeoricas,
-    competenciaIds: [...datos.competenciaIds],
-  });
-  // RF059: cada modificación relevante queda registrada.
-  registrarAuditoria('Asignatura', id, 'Edición', `${asignatura.codigo} actualizada.`);
-  return demora(clonar(asignatura));
+  return aAsignatura(await cliente.patch<AsignaturaApi>(`/asignaturas/${id}`, datos));
 }
 
-export async function inactivarAsignatura(id: string): Promise<Asignatura> {
-  const asignatura = db.asignaturas.find((a) => a.id === id);
-  if (!asignatura) throw new ErrorDeNegocio('La asignatura no existe.');
-  exigirPlanEditable(asignatura.planId);
-  // RF052 RN1: no se elimina físicamente.
-  asignatura.estado = asignatura.estado === 'Activo' ? 'Inactivo' : 'Activo';
-  registrarAuditoria('Asignatura', id, 'Cambio de estado', `Estado: ${asignatura.estado}.`);
-  return demora(clonar(asignatura));
+export async function inactivarAsignatura(id: string, activa = false): Promise<Asignatura> {
+  return aAsignatura(await cliente.patch<AsignaturaApi>(`/asignaturas/${id}/estado`, { activa }));
 }
 
-function validarDatosAsignatura(datos: DatosAsignatura): void {
-  // RF047 RN1
-  if (!datos.nombre.trim()) throw new ErrorDeNegocio('El nombre de la asignatura es obligatorio.');
-  if (!datos.descripcion.trim()) throw new ErrorDeNegocio('La descripción es obligatoria.');
-  // RF054 RN1: mayor a cero.
-  if (!Number.isFinite(datos.creditos) || datos.creditos <= 0) {
-    throw new ErrorDeNegocio('Los créditos deben ser un número mayor a cero.');
-  }
-  // RF055 RN1: numérico y no negativo.
-  if (!Number.isFinite(datos.horasTeoricas) || datos.horasTeoricas < 0) {
-    throw new ErrorDeNegocio('Las horas teóricas deben ser un número no negativo.');
-  }
+/** RF052: a qué afecta inactivarla, para poder avisar antes de confirmar. */
+export async function impactoInactivarAsignatura(id: string): Promise<{
+  dependientes: string[];
+  cicloNumero: number | null;
+}> {
+  return cliente.get(`/asignaturas/${id}/impacto-inactivacion`);
 }
+
+/* ── Malla curricular (RF061-RF071) ───────────────────────────────────── */
 
 /**
- * RF061 / RF071 - ubica una asignatura en un ciclo, o la saca si `ciclo` es
- * null (RF062). Como `cicloNumero` es un único valor, RF065 (no repetirse en
- * varios ciclos) se cumple por construcción: reubicar es sobrescribir.
+ * RF061 / RF062 / RF070: coloca, mueve o retira una asignatura de la malla.
+ *
+ * Las tres son la misma escritura —fijar el ciclo a un número o a `null`— y por
+ * eso son un único endpoint. La respuesta trae los contadores que la pantalla
+ * necesita para refrescar sin recargar el plan entero.
  */
 export async function ubicarAsignatura(
-  id: string,
-  ciclo: number | null,
-  ordenDestino?: number,
-): Promise<Asignatura> {
-  const asignatura = db.asignaturas.find((a) => a.id === id);
-  if (!asignatura) throw new ErrorDeNegocio('La asignatura no existe.');
-  const plan = exigirPlanEditable(asignatura.planId);
-
-  if (ciclo !== null) {
-    const carrera = db.carreras.find((c) => c.id === plan.carreraId);
-    const totalCiclos = (carrera?.duracionAnios ?? 0) * 2;
-    if (ciclo < 1 || ciclo > totalCiclos) {
-      throw new ErrorDeNegocio(
-        `El ciclo ${ciclo} está fuera del rango de la carrera (1 a ${totalCiclos}).`,
-      );
-    }
-  }
-
-  const anterior = asignatura.cicloNumero;
-  asignatura.cicloNumero = ciclo;
-
-  // RF070: el orden dentro del ciclo es de presentación.
-  const hermanas = db.asignaturas
-    .filter((a) => a.planId === asignatura.planId && a.cicloNumero === ciclo && a.id !== id)
-    .sort((x, y) => x.orden - y.orden);
-
-  const posicion = ordenDestino ?? hermanas.length;
-  hermanas.splice(Math.max(0, Math.min(posicion, hermanas.length)), 0, asignatura);
-  hermanas.forEach((a, i) => {
-    a.orden = i;
-  });
-
-  const descripcion =
-    ciclo === null
-      ? `${asignatura.codigo} retirada del ciclo ${anterior ?? '—'}.`
-      : `${asignatura.codigo}: ciclo ${anterior ?? 'sin asignar'} → ${ciclo}.`;
-  registrarAuditoria('Asignatura', id, 'Ubicación en malla', descripcion);
-  return demora(clonar(asignatura), 60);
-}
-
-function exigirPlanEditable(planId: string): PlanEstudios {
-  const plan = db.planes.find((p) => p.id === planId);
-  if (!plan) throw new ErrorDeNegocio('El plan de estudios no existe.');
-  if (!permiteEdicion(plan.estado)) {
-    throw new ErrorDeNegocio(
-      `El plan está en estado ${plan.estado} y no admite cambios. Genera una nueva versión para modificarlo.`,
-    );
-  }
-  return plan;
-}
-
-/* ── Comparación de versiones (RF077) ─────────────────────────────────── */
-
-export interface DiferenciaAsignatura {
+  asignaturaId: string,
+  cicloNumero: number | null,
+  orden?: number,
+): Promise<{
+  asignaturaId: string;
   codigo: string;
-  nombre: string;
-  cambio: 'agregada' | 'retirada' | 'modificada';
-  detalle: string;
-}
-
-/**
- * RF077 - compara dos versiones del mismo plan. RN1 limita la comparación a
- * versiones de una misma carrera, así que se rechaza cualquier otro par.
- * El emparejamiento es por nombre y no por id: al generar una versión los ids
- * se renuevan, y lo que el usuario reconoce como "la misma asignatura" es el
- * nombre.
- */
-export async function compararVersiones(idA: string, idB: string): Promise<DiferenciaAsignatura[]> {
-  const a = db.planes.find((p) => p.id === idA);
-  const b = db.planes.find((p) => p.id === idB);
-  if (!a || !b) throw new ErrorDeNegocio('Alguna de las versiones no existe.');
-  if (a.carreraId !== b.carreraId) {
-    throw new ErrorDeNegocio('Solo se pueden comparar versiones de una misma carrera.');
-  }
-
-  const porNombre = (planId: string) =>
-    new Map(
-      db.asignaturas
-        .filter((x) => x.planId === planId)
-        .map((x) => [x.nombre.trim().toLowerCase(), x] as const),
-    );
-
-  const enA = porNombre(idA);
-  const enB = porNombre(idB);
-  const diferencias: DiferenciaAsignatura[] = [];
-
-  for (const [clave, asig] of enB) {
-    const previa = enA.get(clave);
-    if (!previa) {
-      diferencias.push({
-        codigo: asig.codigo,
-        nombre: asig.nombre,
-        cambio: 'agregada',
-        detalle: `Nueva en ${b.codigo}.`,
-      });
-      continue;
-    }
-    const cambios: string[] = [];
-    if (previa.creditos !== asig.creditos) {
-      cambios.push(`créditos ${previa.creditos} → ${asig.creditos}`);
-    }
-    if (previa.cicloNumero !== asig.cicloNumero) {
-      cambios.push(
-        `ciclo ${previa.cicloNumero ?? 'sin asignar'} → ${asig.cicloNumero ?? 'sin asignar'}`,
-      );
-    }
-    if (previa.tipo !== asig.tipo) cambios.push(`tipo ${previa.tipo} → ${asig.tipo}`);
-    if (previa.condicion !== asig.condicion) {
-      cambios.push(`condición ${previa.condicion} → ${asig.condicion}`);
-    }
-    if (cambios.length > 0) {
-      diferencias.push({
-        codigo: asig.codigo,
-        nombre: asig.nombre,
-        cambio: 'modificada',
-        detalle: cambios.join(' · '),
-      });
-    }
-  }
-
-  for (const [clave, asig] of enA) {
-    if (!enB.has(clave)) {
-      diferencias.push({
-        codigo: asig.codigo,
-        nombre: asig.nombre,
-        cambio: 'retirada',
-        detalle: `Ya no está en ${b.codigo}.`,
-      });
-    }
-  }
-
-  return demora(diferencias);
+  cicloAnterior: number | null;
+  cicloNuevo: number | null;
+  asignaturasSinCiclo: number;
+  creditosDelCiclo: number;
+}> {
+  return cliente.patch(`/asignaturas/${asignaturaId}/ubicacion`, {
+    cicloNumero,
+    ...(orden === undefined ? {} : { orden }),
+  });
 }

@@ -115,3 +115,16 @@ export class PlanEliminado extends EventoDePlan {
     this.detalle = `Plan ${codigo} eliminado definitivamente estando en Borrador.`;
   }
 }
+
+export class PlanJustificado extends EventoDePlan {
+  readonly nombre = 'plan.justificado';
+  readonly detalle: string;
+
+  constructor(actor: Actor, planId: string, codigo: string, codigoRegla: string) {
+    super(actor, planId, codigo);
+    // Qué regla se justificó, no el texto del motivo: el motivo vive en su
+    // propia tabla y ahí se lee entero. La bitácora dice que la decisión se
+    // tomó y quién la tomó, que es lo que se le pregunta.
+    this.detalle = `Advertencia ${codigoRegla} justificada en el plan ${codigo}.`;
+  }
+}

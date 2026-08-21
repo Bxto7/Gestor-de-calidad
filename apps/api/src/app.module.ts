@@ -42,6 +42,13 @@ import { SesionController } from './modules/auth/infrastructure/http/sesion.cont
 
 import type { PublicadorDeEventos } from './shared-kernel/domain-events/domain-event.js';
 
+import {
+  REPOSITORIO_BITACORA,
+  type RepositorioBitacoraPort,
+} from './modules/auditoria/application/ports/bitacora.port.js';
+import { ConsultarBitacora } from './modules/auditoria/application/use-cases/consultar-bitacora.use-case.js';
+import { BitacoraController } from './modules/auditoria/infrastructure/http/bitacora.controller.js';
+import { BitacoraRepositoryPrisma } from './modules/auditoria/infrastructure/persistence/bitacora.repository.js';
 import { BitacoraListener } from './modules/auditoria/infrastructure/listeners/bitacora.listener.js';
 
 import {
@@ -80,6 +87,7 @@ import {
   GestionarFacultades,
 } from './modules/plan-estudios/application/use-cases/gestionar-estructura.use-case.js';
 import { GestionarAsignaturas } from './modules/plan-estudios/application/use-cases/gestionar-asignaturas.use-case.js';
+import { ConsultarHistorial } from './modules/plan-estudios/application/use-cases/consultar-historial.use-case.js';
 import { GestionarPlanes } from './modules/plan-estudios/application/use-cases/gestionar-planes.use-case.js';
 import {
   GestionarCompetencias,
@@ -149,6 +157,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     AsignaturasController,
     ObjetivosController,
     CompetenciasController,
+    BitacoraController,
   ],
 
   providers: [
@@ -171,6 +180,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_CARRERA, useClass: CarreraRepositoryPrisma },
     { provide: REPOSITORIO_MALLA, useClass: MallaRepositoryPrisma },
     { provide: REPOSITORIO_ASIGNATURA, useClass: AsignaturaRepositoryPrisma },
+    { provide: REPOSITORIO_BITACORA, useClass: BitacoraRepositoryPrisma },
     { provide: REPOSITORIO_OBJETIVO, useClass: ObjetivoRepositoryPrisma },
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
@@ -265,6 +275,32 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new UbicarAsignatura(malla, planes, contenido, autorizacion, eventos),
+    },
+    {
+      provide: ConsultarBitacora,
+      inject: [REPOSITORIO_BITACORA, AUTHORIZATION_PORT],
+      useFactory: (bitacora: RepositorioBitacoraPort, autorizacion: AuthorizationPort) =>
+        new ConsultarBitacora(bitacora, autorizacion),
+    },
+    {
+      provide: ConsultarHistorial,
+      inject: [
+        REPOSITORIO_PLAN,
+        REPOSITORIO_ASIGNATURA,
+        REPOSITORIO_CONTENIDO,
+        REPOSITORIO_APROBACIONES,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        planes: RepositorioPlanPort,
+        asignaturas: RepositorioAsignaturaPort,
+        contenido: RepositorioContenidoPort,
+        aprobaciones: RepositorioAprobacionesPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new ConsultarHistorial(planes, asignaturas, contenido, aprobaciones, autorizacion, eventos),
     },
     {
       provide: GestionarPlanes,

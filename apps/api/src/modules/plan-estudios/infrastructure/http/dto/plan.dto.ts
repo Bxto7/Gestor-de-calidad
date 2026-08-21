@@ -103,3 +103,27 @@ export class FiltroPlanesDto {
   @IsIn(ESTADOS, { message: `El estado debe ser uno de: ${ESTADOS.join(', ')}.` })
   estado?: EstadoPlan;
 }
+
+/** RF092: las dos versiones a comparar. */
+export class CompararDto {
+  @IsUUID('4', { message: 'La primera versión debe identificarse por un UUID.' })
+  a!: string;
+
+  @IsUUID('4', { message: 'La segunda versión debe identificarse por un UUID.' })
+  b!: string;
+}
+
+/** RF099. */
+export class JustificarDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(64)
+  codigoRegla!: string;
+
+  // Un mínimo real: "ok" o "sí" no explican nada y dejan la decisión sin
+  // revisar. El máximo evita que la tabla de evidencia se use como cajón.
+  @IsString()
+  @MinLength(10, { message: 'La justificación debe explicar el motivo, no solo confirmarlo.' })
+  @MaxLength(2000)
+  motivo!: string;
+}

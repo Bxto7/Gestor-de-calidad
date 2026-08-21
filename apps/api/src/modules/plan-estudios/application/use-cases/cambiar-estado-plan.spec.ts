@@ -126,6 +126,8 @@ function montar(opciones: {
     registrar: async (e) => {
       aprobacionesRegistradas.push({ accion: e.accion, comentario: e.comentario });
     },
+    listar: async () => [],
+    justificar: async () => undefined,
   };
 
   const eventos: PublicadorDeEventos = {

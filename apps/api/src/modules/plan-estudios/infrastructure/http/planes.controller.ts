@@ -31,13 +31,16 @@ import { ActorActual } from '../../../auth/infrastructure/http/jwt.guard.js';
 import { CambiarEstadoPlan } from '../../application/use-cases/cambiar-estado-plan.use-case.js';
 import { GenerarNuevaVersion } from '../../application/use-cases/generar-nueva-version.use-case.js';
 import { ConsultarPlan } from '../../application/use-cases/consultar-plan.use-case.js';
+import { ConsultarHistorial } from '../../application/use-cases/consultar-historial.use-case.js';
 import { GestionarPlanes } from '../../application/use-cases/gestionar-planes.use-case.js';
 import {
   AsociarAlPlanDto,
   CambiarEstadoDto,
+  CompararDto,
   CrearPlanDto,
   EditarPlanDto,
   FiltroPlanesDto,
+  JustificarDto,
 } from './dto/plan.dto.js';
 
 @ApiTags('Planes de estudio')
@@ -49,6 +52,7 @@ export class PlanesController {
     private readonly cambiarEstado: CambiarEstadoPlan,
     private readonly nuevaVersion: GenerarNuevaVersion,
     private readonly gestionar: GestionarPlanes,
+    private readonly historial: ConsultarHistorial,
   ) {}
 
   @Get()
@@ -123,6 +127,56 @@ export class PlanesController {
     await this.gestionar.eliminar(actor, id);
   }
 
+  @Get('comparar')
+  @ApiOperation({
+    summary: 'Comparar dos versiones del plan',
+    description:
+      'RF092. Empareja las asignaturas por nombre y no por código, porque al ' +
+      'generar una versión los códigos se renuevan (RF075) y compararlos daría ' +
+      'todo como agregado y retirado.',
+  })
+  @ApiResponse({ status: 409, description: 'Las dos versiones no son de la misma carrera.' })
+  async comparar(@ActorActual() actor: Actor, @Query() dto: CompararDto) {
+    return this.historial.compararVersiones(actor, dto.a, dto.b);
+  }
+
+  @Get(':id/aprobaciones')
+  @ApiOperation({
+    summary: 'Historial del flujo de aprobación',
+    description:
+      'RF089. Separado de la bitácora general: aquí solo están los pasos del ' +
+      'flujo —enviado, aprobado, observado, marcado vigente— con su comentario.',
+  })
+  async aprobaciones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.historial.aprobacionesDe(actor, id);
+  }
+
+  @Get(':id/justificaciones')
+  @ApiOperation({
+    summary: 'Advertencias ya justificadas del plan',
+    description: 'RF099. Devuelve los códigos de regla, para que la UI no vuelva a pedirlas.',
+  })
+  async justificaciones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.historial.justificacionesDe(actor, id);
+  }
+
+  @Post(':id/justificaciones')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Justificar una advertencia no bloqueante',
+    description:
+      'RF099. El motivo es obligatorio: una justificación vacía cumple el ' +
+      'trámite sin justificar nada, y deja constancia de una decisión que nadie ' +
+      'puede revisar después.',
+  })
+  async justificar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: JustificarDto,
+  ) {
+    await this.historial.justificar(actor, id, dto.codigoRegla, dto.motivo);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Detalle del plan con su validación de consistencia',
@@ -134,7 +188,8 @@ export class PlanesController {
   @ApiResponse({ status: 404, description: 'El plan no existe.' })
   @ApiResponse({ status: 403, description: 'Sin permiso, o el plan es de otra carrera.' })
   async detalle(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
-    const { plan, validacion, accionesDisponibles } = await this.consultar.ejecutar(id, actor);
+    const { plan, validacion, accionesDisponibles, objetivoIds, competenciaIds } =
+      await this.consultar.ejecutar(id, actor);
 
     return {
       id: plan.id,
@@ -146,6 +201,8 @@ export class PlanesController {
       duracionAnios: plan.duracionAnios,
       fechaVigencia: plan.fechaVigencia,
       derivadoDeId: plan.derivadoDeId,
+      objetivoIds,
+      competenciaIds,
       esEditable: plan.esEditable,
       admiteNuevaVersion: plan.admiteNuevaVersion,
       // RF098: el reporte distingue bloqueantes de advertencias.
