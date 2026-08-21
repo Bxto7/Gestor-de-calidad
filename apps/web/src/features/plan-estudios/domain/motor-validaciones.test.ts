@@ -422,3 +422,30 @@ describe('RF097 / RF098 — reporte consolidado', () => {
     expect(codigos(r)).toContain('CICLO_VACIO');
   });
 });
+
+describe('RF027 — un plan cerrado no se valida', () => {
+  it('en Borrador reporta lo que está mal', () => {
+    const e = entradaValida();
+    e.plan = { ...e.plan, estado: 'Borrador', objetivoIds: [] };
+    expect(validarPlan(e).tieneBloqueos).toBe(true);
+  });
+
+  it('en Histórico no reporta nada', () => {
+    // Las reglas son un control previo a la aprobación: sobre un plan cerrado
+    // no queda transición que las exija y el contenido es inmutable. El plan
+    // 2018 de ISI llegaba con 69 asignaturas sin competencia y mostraba una
+    // alerta roja que nadie podía atender.
+    const e = entradaValida();
+    e.plan = { ...e.plan, estado: 'Histórico', objetivoIds: [] };
+    const r = validarPlan(e);
+
+    expect(r.hallazgos).toEqual([]);
+    expect(r.tieneBloqueos).toBe(false);
+  });
+
+  it('pero sigue calculando los créditos: es un hecho, no un control', () => {
+    const e = entradaValida();
+    e.plan = { ...e.plan, estado: 'Histórico' };
+    expect(validarPlan(e).totalCreditos).toBeGreaterThan(0);
+  });
+});

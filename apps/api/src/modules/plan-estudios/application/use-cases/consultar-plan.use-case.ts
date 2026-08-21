@@ -76,7 +76,7 @@ export class ConsultarPlan {
     ]);
 
     const validacion = validarPlan({
-      plan: { objetivoIds },
+      plan: { objetivoIds, estado: plan.estado },
       carrera,
       asignaturas,
       reglasJustificadas,

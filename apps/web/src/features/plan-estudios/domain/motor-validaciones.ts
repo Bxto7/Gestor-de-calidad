@@ -12,6 +12,7 @@
  */
 
 import type { Asignatura, Carrera, PlanEstudios } from './tipos';
+import { permiteEdicion } from './estado-plan';
 
 /** RF097 RN1 / RF098 RN1: bloqueante impide avanzar; advertencia solo informa. */
 export type Severidad = 'bloqueante' | 'advertencia';
@@ -109,6 +110,24 @@ function esNumero(v: number | null): v is number {
 export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
   const { plan, carrera, asignaturas, reglasJustificadas } = entrada;
   const activas = asignaturas.filter((a) => a.estado === 'Activo');
+
+  // En un plan cerrado no se ejecuta. Estas reglas son un control previo a la
+  // aprobación: las dos transiciones que exigen un plan limpio salen de
+  // Borrador y En revisión. Sobre un plan Aprobado, Vigente o Histórico no
+  // gobiernan nada —no queda transición que las pida y el contenido es
+  // inmutable—, así que reportarlas es pedir que se corrija lo intocable.
+  //
+  // El total de créditos sí se devuelve: es un hecho del plan, no un control.
+  if (!permiteEdicion(plan.estado)) {
+    return {
+      hallazgos: [],
+      bloqueantes: [],
+      advertencias: [],
+      tieneBloqueos: false,
+      totalCreditos: calcularTotalCreditos(activas),
+    };
+  }
+
   const ciclos = ciclosDeCarrera(carrera);
   const hallazgos: Hallazgo[] = [];
 

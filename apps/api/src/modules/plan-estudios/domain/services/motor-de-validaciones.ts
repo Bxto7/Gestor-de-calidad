@@ -10,6 +10,7 @@
  */
 
 import type { AsignaturaDelPlan, DatosCarrera } from '../../application/ports/repositorios.port.js';
+import { permiteEdicion, type EstadoPlan } from '../value-objects/estado-plan.js';
 
 /** RF097 RN1 / RF098 RN1: bloqueante impide avanzar; advertencia solo informa. */
 export type Severidad = 'bloqueante' | 'advertencia';
@@ -41,7 +42,7 @@ export interface RangoCreditos {
 
 export interface EntradaValidacion {
   /** Solo lo que la validación necesita del plan; no el agregado completo. */
-  plan: { objetivoIds: readonly string[] };
+  plan: { objetivoIds: readonly string[]; estado: EstadoPlan };
   carrera: DatosCarrera;
   asignaturas: AsignaturaDelPlan[];
   /** RF099: reglas no bloqueantes ya justificadas, que dejan de reportarse. */
@@ -144,9 +145,39 @@ function esNumero(v: number | null): v is number {
  * resultado, que es lo que consumen el banner del hub (RF098) y el bloqueo de
  * transiciones (RF085 / RF091).
  */
+/**
+ * RF097 — revisa la consistencia del plan antes de dejarlo avanzar.
+ *
+ * **En un plan cerrado no se ejecuta**, y conviene entender por qué. Todas estas
+ * reglas son un control *previo a la aprobación*: existen para decir "corrige
+ * esto antes de enviar a revisión o aprobar". Las dos únicas transiciones que
+ * exigen un plan limpio —`enviar-a-revision` y `aprobar`— salen de Borrador y de
+ * En revisión, que son justo los estados editables.
+ *
+ * Sobre un plan Aprobado, Vigente o Histórico no gobiernan nada: no queda
+ * transición que las exija, y su contenido es inmutable por RF027 y por los
+ * triggers de la base. Reportarlas ahí es pedir que se corrija lo que no se
+ * puede tocar, para una aprobación que ya ocurrió. El plan 2018 de ISI llegaba
+ * cargado con 69 asignaturas sin competencia y mostraba una alerta bloqueante
+ * roja que nadie podía atender ni necesitaba atender.
+ *
+ * El total de créditos sí se devuelve siempre: es un hecho del plan, no un
+ * control.
+ */
 export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
   const { plan, carrera, asignaturas, reglasJustificadas } = entrada;
   const activas = asignaturas.filter((a) => a.activa);
+
+  if (!permiteEdicion(plan.estado)) {
+    return {
+      hallazgos: [],
+      bloqueantes: [],
+      advertencias: [],
+      tieneBloqueos: false,
+      totalCreditos: calcularTotalCreditos(activas),
+    };
+  }
+
   const ciclos = ciclosDeCarrera(carrera);
   const hallazgos: Hallazgo[] = [];
 

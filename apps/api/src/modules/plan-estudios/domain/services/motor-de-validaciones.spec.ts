@@ -25,6 +25,7 @@ import {
   type EntradaValidacion,
 } from './motor-de-validaciones.js';
 import type { AsignaturaDelPlan, DatosCarrera } from '../../application/ports/repositorios.port.js';
+import type { EstadoPlan } from '../value-objects/estado-plan.js';
 
 /* ── Constructores de datos de prueba ─────────────────────────────────── */
 
@@ -32,10 +33,11 @@ function carrera(duracionAnios = 2): DatosCarrera {
   return { id: 'car-1', codigo: 'ISI', duracionAnios };
 }
 
-function plan(sobrescribir: { objetivoIds?: readonly string[] } = {}): {
-  objetivoIds: readonly string[];
-} {
-  return { objetivoIds: ['oe-1'], ...sobrescribir };
+function plan(
+  sobrescribir: { objetivoIds?: readonly string[]; estado?: EstadoPlan } = {},
+): EntradaValidacion['plan'] {
+  // Borrador por defecto: es el estado en el que las validaciones gobiernan.
+  return { objetivoIds: ['oe-1'], estado: 'Borrador', ...sobrescribir };
 }
 
 function asignatura(sobrescribir: Partial<AsignaturaDelPlan> = {}): AsignaturaDelPlan {
@@ -492,5 +494,51 @@ describe('RF056 / RF067 — los grupos de electivos cuentan una vez', () => {
     });
 
     expect(r.totalCreditos).toBe(6);
+  });
+});
+
+describe('RF027 — un plan cerrado no se valida', () => {
+  /** Un plan con todo mal: sin objetivos, sin competencias y sin ubicar. */
+  function planRoto(estado: EstadoPlan): EntradaValidacion {
+    return {
+      ...entradaValida(),
+      plan: plan({ objetivoIds: [], estado }),
+      asignaturas: [
+        asignatura({ id: 'a1', codigo: 'ISI-101', competenciaIds: [], cicloNumero: null }),
+        asignatura({ id: 'a2', codigo: 'ISI-102', competenciaIds: [], cicloNumero: 1 }),
+      ],
+    };
+  }
+
+  it('en Borrador y En revisión sí reporta, que es donde se puede corregir', () => {
+    for (const estado of ['Borrador', 'En revisión'] as const) {
+      const r = validarPlan(planRoto(estado));
+      expect(r.bloqueantes.length, estado).toBeGreaterThan(0);
+      expect(r.tieneBloqueos, estado).toBe(true);
+    }
+  });
+
+  it('en Aprobado, Vigente e Histórico no reporta nada', () => {
+    // Las reglas son un control previo a la aprobación. Ahí no queda transición
+    // que las exija y el contenido es inmutable: pedir que se corrijan sería
+    // pedir un imposible para un fin que ya no existe.
+    for (const estado of ['Aprobado', 'Vigente', 'Histórico'] as const) {
+      const r = validarPlan(planRoto(estado));
+      expect(r.hallazgos, estado).toEqual([]);
+      expect(r.tieneBloqueos, estado).toBe(false);
+    }
+  });
+
+  it('pero el total de créditos se calcula igual: es un hecho, no un control', () => {
+    const r = validarPlan(planRoto('Histórico'));
+    expect(r.totalCreditos).toBe(8);
+  });
+
+  it('la puerta de aprobación sigue cerrada donde importa', () => {
+    // Aprobar sale de "En revisión", que es editable: el control se aplica y
+    // sigue bloqueando. Este es el caso que no puede romperse al silenciar el
+    // resto.
+    const r = validarPlan(planRoto('En revisión'));
+    expect(r.tieneBloqueos).toBe(true);
   });
 });

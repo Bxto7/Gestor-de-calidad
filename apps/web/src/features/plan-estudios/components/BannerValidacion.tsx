@@ -27,6 +27,27 @@ export function BannerValidacion({
   const [aJustificar, setAJustificar] = useState<Hallazgo | null>(null);
   const [motivo, setMotivo] = useState('');
 
+  /*
+   * Un plan cerrado no se valida, y decirlo importa.
+   *
+   * Estas comprobaciones son previas a la aprobación; sobre un plan que ya no
+   * admite cambios no gobiernan nada y por eso no se ejecutan. Pintar aquí el
+   * mensaje verde de conformidad afirmaría que el plan las cumple, que es
+   * distinto de no haberlas comprobado y puede ser sencillamente falso: el plan
+   * 2018 de ISI tiene 69 asignaturas sin competencia y saldría como impecable.
+   */
+  if (soloLectura) {
+    return (
+      <div className="rounded-xl border border-borde bg-superficie-tenue px-4 py-3.5">
+        <p className="text-sm font-bold text-tinta">Sin validación de consistencia</p>
+        <p className="mt-0.5 text-sm text-tinta-suave">
+          Las comprobaciones se aplican antes de aprobar un plan. Este ya está cerrado y su
+          contenido no admite cambios, así que no se ejecutan.
+        </p>
+      </div>
+    );
+  }
+
   // RF098: mensaje de conformidad cuando no hay nada que reportar.
   if (resultado.hallazgos.length === 0) {
     return (

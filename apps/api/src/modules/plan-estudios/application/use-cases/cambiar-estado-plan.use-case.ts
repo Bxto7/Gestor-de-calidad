@@ -129,7 +129,7 @@ export class CambiarEstadoPlan {
     ]);
 
     return validarPlan({
-      plan: { objetivoIds },
+      plan: { objetivoIds, estado: plan.estado },
       carrera,
       asignaturas,
       reglasJustificadas,
