@@ -92,3 +92,26 @@ export class PlanArchivado extends EventoDePlan {
     this.detalle = `Pasa a Histórico. ${detalle}`;
   }
 }
+
+export class PlanEditado extends EventoDePlan {
+  readonly nombre = 'plan.editado';
+  readonly detalle: string;
+
+  constructor(actor: Actor, planId: string, codigo: string, cambios: string) {
+    super(actor, planId, codigo);
+    // El detalle nombra qué cambió, no solo que hubo una edición: al revisar
+    // una acreditación lo que se pregunta es qué se movió y cuánto.
+    this.detalle = `Plan ${codigo}: ${cambios}.`;
+  }
+}
+
+export class PlanEliminado extends EventoDePlan {
+  readonly nombre = 'plan.eliminado';
+  readonly detalle: string;
+
+  constructor(actor: Actor, planId: string, codigo: string) {
+    super(actor, planId, codigo);
+    // La fila desaparece: este texto es lo único que quedará de ese plan.
+    this.detalle = `Plan ${codigo} eliminado definitivamente estando en Borrador.`;
+  }
+}

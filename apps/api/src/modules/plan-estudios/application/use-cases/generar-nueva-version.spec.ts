@@ -62,6 +62,10 @@ function montar(opciones: {
     guardar: async (p) => void guardados.push(...p),
     eliminar: async () => {},
     copiarContenido: async (desde, hacia) => void copias.push({ desde, hacia }),
+    listar: async () => [],
+    versionesDeCarrera: async () => [],
+    asociarObjetivos: async () => undefined,
+    asociarCompetencias: async () => undefined,
   };
 
   const carrera =
@@ -74,6 +78,7 @@ function montar(opciones: {
     carreraPorId: async () => carrera,
     asignaturasDe: async () => [],
     objetivoIdsDe: async () => [],
+    competenciaIdsDe: async () => [],
     reglasJustificadasDe: async () => [],
   };
 

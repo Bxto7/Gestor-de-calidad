@@ -13,6 +13,7 @@ import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type {
   AsignaturaDelPlan,
   DatosCarrera,
+  FiltroPlanes,
   RepositorioAprobacionesPort,
   RepositorioContenidoPort,
   RepositorioPlanPort,
@@ -26,6 +27,28 @@ export class PlanRepositoryPrisma implements RepositorioPlanPort {
   async porId(id: string): Promise<PlanDeEstudios | null> {
     const fila = await this.prisma.planEstudios.findUnique({ where: { id } });
     return fila ? planADominio(fila) : null;
+  }
+
+  async listar(filtro?: FiltroPlanes): Promise<PlanDeEstudios[]> {
+    const filas = await this.prisma.planEstudios.findMany({
+      where: {
+        ...(filtro?.carreraId ? { carreraId: filtro.carreraId } : {}),
+        ...(filtro?.estado ? { estado: estadoAPrisma(filtro.estado) } : {}),
+      },
+      // RF030 RN1: los más recientes primero, que es como se busca un plan.
+      orderBy: [{ creadoEn: 'desc' }],
+    });
+    return filas.map(planADominio);
+  }
+
+  async versionesDeCarrera(carreraId: string): Promise<PlanDeEstudios[]> {
+    const filas = await this.prisma.planEstudios.findMany({
+      where: { carreraId },
+      // Por número de versión y no por fecha: es el orden que el usuario lee en
+      // la pantalla de histórico, y no depende de cuándo se creó cada fila.
+      orderBy: [{ version: 'desc' }],
+    });
+    return filas.map(planADominio);
   }
 
   /** RF090: como mucho hay una, garantizado por el índice único parcial. */
@@ -91,6 +114,27 @@ export class PlanRepositoryPrisma implements RepositorioPlanPort {
 
   async eliminar(id: string): Promise<void> {
     await this.prisma.planEstudios.delete({ where: { id } });
+  }
+
+  async asociarObjetivos(planId: string, objetivoIds: readonly string[]): Promise<void> {
+    // Borrar y volver a insertar dentro de una transacción: calcular el
+    // diferencial daría el mismo resultado con más código, y a medias dejaría
+    // el plan sin ningún objetivo asociado.
+    await this.prisma.$transaction([
+      this.prisma.planObjetivo.deleteMany({ where: { planId } }),
+      this.prisma.planObjetivo.createMany({
+        data: objetivoIds.map((objetivoId) => ({ planId, objetivoId })),
+      }),
+    ]);
+  }
+
+  async asociarCompetencias(planId: string, competenciaIds: readonly string[]): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.planCompetencia.deleteMany({ where: { planId } }),
+      this.prisma.planCompetencia.createMany({
+        data: competenciaIds.map((competenciaId) => ({ planId, competenciaId })),
+      }),
+    ]);
   }
 
   /**
@@ -179,6 +223,14 @@ export class ContenidoRepositoryPrisma implements RepositorioContenidoPort {
       select: { objetivoId: true },
     });
     return filas.map((f) => f.objetivoId);
+  }
+
+  async competenciaIdsDe(planId: string): Promise<string[]> {
+    const filas = await this.prisma.planCompetencia.findMany({
+      where: { planId },
+      select: { competenciaId: true },
+    });
+    return filas.map((f) => f.competenciaId);
   }
 
   async carreraDe(planId: string): Promise<DatosCarrera | null> {

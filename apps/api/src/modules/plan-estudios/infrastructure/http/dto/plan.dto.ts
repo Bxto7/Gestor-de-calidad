@@ -1,6 +1,25 @@
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayUnique,
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
-import type { AccionTransicion } from '../../../domain/value-objects/estado-plan.js';
+import {
+  ESTADOS_PLAN as ESTADOS,
+  type AccionTransicion,
+  type EstadoPlan,
+} from '../../../domain/value-objects/estado-plan.js';
 
 const ACCIONES: AccionTransicion[] = [
   'enviar-a-revision',
@@ -24,4 +43,63 @@ export class CambiarEstadoDto {
   @MinLength(3, { message: 'La observación es demasiado breve para ser útil.' })
   @MaxLength(2000)
   comentario?: string;
+}
+
+/** RF020: el alta solo necesita saber de qué carrera es. Lo demás lo deriva. */
+export class CrearPlanDto {
+  @IsUUID('4', { message: 'La carrera debe identificarse por un UUID.' })
+  carreraId!: string;
+}
+
+/**
+ * RF021 y RF023.
+ *
+ * Los dos campos son opcionales y se tratan por separado a propósito: cada uno
+ * tiene su propia precondición de estado, y enviarlos juntos en una única
+ * operación obligatoria haría imposible cambiar solo uno.
+ */
+export class EditarPlanDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'La duración debe ser un número entero de años.' })
+  @Min(1)
+  @Max(10)
+  duracionAnios?: number;
+
+  /**
+   * `null` retira la fecha; una fecha exige el plan Aprobado.
+   *
+   * Se admite explícitamente el null —de ahí el `ValidateIf`— porque
+   * `@IsOptional()` lo trataría como "no enviado" y no habría forma de
+   * distinguir entre borrar la fecha y no tocarla.
+   */
+  @ValidateIf((_objeto, valor) => valor !== null && valor !== undefined)
+  @IsDateString({}, { message: 'La fecha de vigencia debe tener formato de fecha.' })
+  fechaVigencia?: string | null;
+}
+
+/** RF028 y RF029: cada lista, si viene, reemplaza a la anterior por completo. */
+export class AsociarAlPlanDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  objetivoIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  competenciaIds?: string[];
+}
+
+/** RF024 / RF030 / RF031: filtros combinables del listado. */
+export class FiltroPlanesDto {
+  @IsOptional()
+  @IsUUID('4')
+  carreraId?: string;
+
+  @IsOptional()
+  @IsIn(ESTADOS, { message: `El estado debe ser uno de: ${ESTADOS.join(', ')}.` })
+  estado?: EstadoPlan;
 }

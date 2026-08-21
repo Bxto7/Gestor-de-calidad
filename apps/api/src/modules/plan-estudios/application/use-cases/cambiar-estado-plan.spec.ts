@@ -76,6 +76,7 @@ function contenidoSano(): RepositorioContenidoPort {
       );
     },
     objetivoIdsDe: async () => ['oe-1'],
+    competenciaIdsDe: async () => [],
     reglasJustificadasDe: async () => [],
   };
 }
@@ -115,6 +116,10 @@ function montar(opciones: {
     },
     eliminar: async () => {},
     copiarContenido: async () => {},
+    listar: async () => [],
+    versionesDeCarrera: async () => [],
+    asociarObjetivos: async () => undefined,
+    asociarCompetencias: async () => undefined,
   };
 
   const aprobaciones: RepositorioAprobacionesPort = {

@@ -80,6 +80,7 @@ import {
   GestionarFacultades,
 } from './modules/plan-estudios/application/use-cases/gestionar-estructura.use-case.js';
 import { GestionarAsignaturas } from './modules/plan-estudios/application/use-cases/gestionar-asignaturas.use-case.js';
+import { GestionarPlanes } from './modules/plan-estudios/application/use-cases/gestionar-planes.use-case.js';
 import {
   GestionarCompetencias,
   GestionarObjetivos,
@@ -264,6 +265,19 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new UbicarAsignatura(malla, planes, contenido, autorizacion, eventos),
+    },
+    {
+      provide: GestionarPlanes,
+      inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        planes: RepositorioPlanPort,
+        contenido: RepositorioContenidoPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new GestionarPlanes(planes, contenido, autorizacion, eventos, {
+          nuevo: () => randomUUID(),
+        }),
     },
     {
       provide: ConsultarPlan,

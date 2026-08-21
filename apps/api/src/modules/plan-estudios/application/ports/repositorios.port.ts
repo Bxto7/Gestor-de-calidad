@@ -32,6 +32,12 @@ export interface DatosCarrera {
 export interface RepositorioPlanPort {
   porId(id: string): Promise<PlanDeEstudios | null>;
 
+  /** RF024 / RF030 / RF031: listado con filtros combinables. */
+  listar(filtro?: FiltroPlanes): Promise<PlanDeEstudios[]>;
+
+  /** RF076 / RF091: todas las versiones de una carrera, de la más nueva a la más antigua. */
+  versionesDeCarrera(carreraId: string): Promise<PlanDeEstudios[]>;
+
   /** RF090: la versión Vigente de una carrera, si existe. */
   vigenteDeCarrera(carreraId: string): Promise<PlanDeEstudios | null>;
 
@@ -53,11 +59,22 @@ export interface RepositorioPlanPort {
 
   /** Copia la malla al generar una nueva versión (RF075). */
   copiarContenido(desdePlanId: string, haciaPlanId: string): Promise<void>;
+
+  /**
+   * RF028 / RF029: reemplaza el conjunto asociado al plan.
+   *
+   * Reemplaza en vez de añadir porque la pantalla trabaja con una lista de
+   * casillas marcadas: lo que envía es el estado final, no un incremento.
+   */
+  asociarObjetivos(planId: string, objetivoIds: readonly string[]): Promise<void>;
+  asociarCompetencias(planId: string, competenciaIds: readonly string[]): Promise<void>;
 }
 
 export interface RepositorioContenidoPort {
   asignaturasDe(planId: string): Promise<AsignaturaDelPlan[]>;
   objetivoIdsDe(planId: string): Promise<string[]>;
+  /** RF029: las competencias declaradas a nivel de plan, no las de asignatura. */
+  competenciaIdsDe(planId: string): Promise<string[]>;
   carreraDe(planId: string): Promise<DatosCarrera | null>;
   carreraPorId(carreraId: string): Promise<DatosCarrera | null>;
   /** RF099: reglas no bloqueantes ya justificadas para este plan. */

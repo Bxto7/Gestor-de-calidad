@@ -16,6 +16,7 @@ import {
   GestionarCarreras,
   GestionarFacultades,
 } from '../../application/use-cases/gestionar-estructura.use-case.js';
+import { GestionarPlanes } from '../../application/use-cases/gestionar-planes.use-case.js';
 import {
   CambiarEstadoDto,
   CrearFacultadDto,
@@ -112,7 +113,21 @@ export class FacultadesController {
 @ApiBearerAuth()
 @Controller('carreras')
 export class CarrerasController {
-  constructor(private readonly carreras: GestionarCarreras) {}
+  constructor(
+    private readonly carreras: GestionarCarreras,
+    private readonly planes: GestionarPlanes,
+  ) {}
+
+  @Get(':id/versiones')
+  @ApiOperation({
+    summary: 'Histórico de versiones del plan de esta carrera',
+    description:
+      'RF076 y RF091. De la versión más alta a la más baja, que es el orden en ' +
+      'que se lee un histórico. Incluye las que ya quedaron como Histórico.',
+  })
+  async versiones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.planes.versionesDe(actor, id);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Listar carreras (RF013, RF016)' })

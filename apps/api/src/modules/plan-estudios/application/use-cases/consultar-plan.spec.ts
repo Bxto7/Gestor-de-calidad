@@ -65,6 +65,10 @@ function montar(opciones: {
     guardar: async () => {},
     eliminar: async () => {},
     copiarContenido: async () => {},
+    listar: async () => [],
+    versionesDeCarrera: async () => [],
+    asociarObjetivos: async () => undefined,
+    asociarCompetencias: async () => undefined,
   };
 
   const contenido: RepositorioContenidoPort = {
@@ -72,6 +76,7 @@ function montar(opciones: {
     carreraPorId: async () => ({ id: ISI, codigo: 'ISI', duracionAnios: 1 }),
     asignaturasDe: async () => opciones.asignaturas ?? [asignatura(1), asignatura(2)],
     objetivoIdsDe: async () => opciones.objetivos ?? ['oe-1'],
+    competenciaIdsDe: async () => [],
     reglasJustificadasDe: async () => [],
   };
 

@@ -11,7 +11,19 @@
  * las reglas y duplicaría el mapeo.
  */
 
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
@@ -19,7 +31,14 @@ import { ActorActual } from '../../../auth/infrastructure/http/jwt.guard.js';
 import { CambiarEstadoPlan } from '../../application/use-cases/cambiar-estado-plan.use-case.js';
 import { GenerarNuevaVersion } from '../../application/use-cases/generar-nueva-version.use-case.js';
 import { ConsultarPlan } from '../../application/use-cases/consultar-plan.use-case.js';
-import { CambiarEstadoDto } from './dto/plan.dto.js';
+import { GestionarPlanes } from '../../application/use-cases/gestionar-planes.use-case.js';
+import {
+  AsociarAlPlanDto,
+  CambiarEstadoDto,
+  CrearPlanDto,
+  EditarPlanDto,
+  FiltroPlanesDto,
+} from './dto/plan.dto.js';
 
 @ApiTags('Planes de estudio')
 @ApiBearerAuth()
@@ -29,7 +48,80 @@ export class PlanesController {
     private readonly consultar: ConsultarPlan,
     private readonly cambiarEstado: CambiarEstadoPlan,
     private readonly nuevaVersion: GenerarNuevaVersion,
+    private readonly gestionar: GestionarPlanes,
   ) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Listar planes de estudio',
+    description: 'RF024, RF030 y RF031. Los filtros de carrera y estado son combinables.',
+  })
+  async listar(@ActorActual() actor: Actor, @Query() filtro: FiltroPlanesDto) {
+    return this.gestionar.listar(actor, filtro);
+  }
+
+  @Post()
+  @ApiOperation({
+    summary: 'Crear un plan de estudios',
+    description:
+      'RF020 a RF022. Nace en Borrador, con el código y la duración derivados ' +
+      'de la carrera. Rechaza crear un segundo plan editable para la misma.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'La carrera ya tiene un plan en curso, o no tiene ciclos.',
+  })
+  async crear(@ActorActual() actor: Actor, @Body() dto: CrearPlanDto) {
+    return this.gestionar.crear(actor, dto.carreraId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Editar los datos generales del plan',
+    description:
+      'RF021 y RF023. Cada campo lleva su propia precondición: la duración solo ' +
+      'en Borrador o En revisión; la fecha de vigencia solo con el plan Aprobado.',
+  })
+  async editar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: EditarPlanDto,
+  ) {
+    return this.gestionar.editar(actor, id, {
+      ...(dto.duracionAnios === undefined ? {} : { duracionAnios: dto.duracionAnios }),
+      ...(dto.fechaVigencia === undefined
+        ? {}
+        : { fechaVigencia: dto.fechaVigencia === null ? null : new Date(dto.fechaVigencia) }),
+    });
+  }
+
+  @Put(':id/asociaciones')
+  @ApiOperation({
+    summary: 'Asociar objetivos y competencias al plan',
+    description:
+      'RF028 y RF029. Cada lista enviada reemplaza por completo a la anterior: ' +
+      'la pantalla manda el estado final de sus casillas, no un incremento.',
+  })
+  async asociar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: AsociarAlPlanDto,
+  ) {
+    return this.gestionar.asociar(actor, id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Eliminar un plan en Borrador',
+    description:
+      'RF032. Solo en Borrador: un plan que llegó a Aprobado o Vigente forma ' +
+      'parte del histórico de la acreditación y su salida es quedar como Histórico.',
+  })
+  @ApiResponse({ status: 409, description: 'El plan ya no está en Borrador.' })
+  async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    await this.gestionar.eliminar(actor, id);
+  }
 
   @Get(':id')
   @ApiOperation({
