@@ -133,7 +133,19 @@ export function MallaCurricularPage() {
     const filas: (string | number)[][] = [
       ['Plan', planActual.codigo, 'Estado', planActual.estado],
       [],
-      ['Ciclo', 'Código', 'Asignatura', 'Tipo', 'Condición', 'Créditos', 'Horas teóricas'],
+      // La columna de grupo evita que la exportación repita el error que la
+      // pantalla ya no comete: sin ella, las seis opciones del ciclo 10 se leen
+      // como seis cursos obligatorios más.
+      [
+        'Ciclo',
+        'Código',
+        'Asignatura',
+        'Tipo',
+        'Condición',
+        'Créditos',
+        'Horas teóricas',
+        'Grupo de electivos',
+      ],
     ];
     for (const c of ciclos) {
       const delCiclo = activas.filter((a) => a.cicloNumero === c).sort((x, y) => x.orden - y.orden);
@@ -142,7 +154,18 @@ export function MallaCurricularPage() {
         continue;
       }
       for (const a of delCiclo) {
-        filas.push([c, a.codigo, a.nombre, a.tipo, a.condicion, a.creditos, a.horasTeoricas]);
+        filas.push([
+          c,
+          a.codigo,
+          a.nombre,
+          a.tipo,
+          a.condicion,
+          a.creditos,
+          a.horasTeoricas,
+          a.grupoElectivo
+            ? `${a.grupoElectivo.nombre} (elige ${a.grupoElectivo.cantidadAElegir})`
+            : '',
+        ]);
       }
     }
     for (const a of sinCiclo) {
@@ -154,6 +177,9 @@ export function MallaCurricularPage() {
         a.condicion,
         a.creditos,
         a.horasTeoricas,
+        a.grupoElectivo
+          ? `${a.grupoElectivo.nombre} (elige ${a.grupoElectivo.cantidadAElegir})`
+          : '',
       ]);
     }
     descargarCsv(`malla-${planActual.codigo}.csv`, filas);
@@ -315,6 +341,16 @@ export function MallaCurricularPage() {
                 .sort((x, y) => x.orden - y.orden);
               const creditos = creditosPorCiclo(activas, c);
 
+              // Las opciones de un grupo no son cursos que se lleven todos: son
+              // alternativas. Se separan para no pintarlas como tarjetas sueltas
+              // —el ciclo 10 parecía tener once asignaturas cuando son seis— y
+              // para que el recuento diga cuántas se cursan, no cuántas se
+              // ofrecen.
+              const sueltas = delCiclo.filter((a) => a.grupoElectivo === null);
+              const grupos = agruparElectivos(delCiclo);
+              const cuantasSeCursan =
+                sueltas.length + grupos.reduce((n, g) => n + g.cantidadAElegir, 0);
+
               return (
                 <section
                   key={c}
@@ -331,12 +367,12 @@ export function MallaCurricularPage() {
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="text-sm font-extrabold text-tinta">Ciclo {c}</h2>
                     <span className="text-xs font-semibold text-tinta-suave tabular-nums">
-                      {delCiclo.length} · {creditos} cr.
+                      {cuantasSeCursan} · {creditos} cr.
                     </span>
                   </div>
 
                   <ul className="mt-3 flex flex-1 flex-col gap-2">
-                    {delCiclo.map((a) => (
+                    {sueltas.map((a) => (
                       <li key={a.id}>
                         <TarjetaAsignatura
                           asignatura={a}
@@ -346,6 +382,19 @@ export function MallaCurricularPage() {
                           onArrastrar={setArrastrando}
                           onMover={mover}
                           conQuitar
+                        />
+                      </li>
+                    ))}
+
+                    {grupos.map((g) => (
+                      <li key={g.codigo}>
+                        <GrupoElectivos
+                          grupo={g}
+                          ciclos={ciclos}
+                          editable={editable}
+                          arrastrando={arrastrando}
+                          onArrastrar={setArrastrando}
+                          onMover={mover}
                         />
                       </li>
                     ))}
@@ -368,6 +417,94 @@ export function MallaCurricularPage() {
 }
 
 /* ── Tarjeta arrastrable ──────────────────────────────────────────────── */
+
+/** Un grupo de electivos tal como se pinta en la malla. */
+interface GrupoEnMalla {
+  codigo: string;
+  nombre: string;
+  cantidadAElegir: number;
+  opciones: Asignatura[];
+}
+
+/**
+ * Reúne las opciones de cada grupo presente en el ciclo.
+ *
+ * Conserva el orden en que llegan, que es el del plan: las opciones de un grupo
+ * aparecen juntas y el bloque queda donde estaba la primera.
+ */
+function agruparElectivos(delCiclo: readonly Asignatura[]): GrupoEnMalla[] {
+  const grupos = new Map<string, GrupoEnMalla>();
+
+  for (const a of delCiclo) {
+    if (a.grupoElectivo === null) continue;
+    const existente = grupos.get(a.grupoElectivo.codigo);
+    if (existente) {
+      existente.opciones.push(a);
+      continue;
+    }
+    grupos.set(a.grupoElectivo.codigo, {
+      codigo: a.grupoElectivo.codigo,
+      nombre: a.grupoElectivo.nombre,
+      cantidadAElegir: a.grupoElectivo.cantidadAElegir,
+      opciones: [a],
+    });
+  }
+
+  return [...grupos.values()];
+}
+
+/**
+ * Las opciones de un grupo, en un solo bloque.
+ *
+ * Pintadas como tarjetas sueltas parecían cursos que se llevan todos: el ciclo
+ * 10 del plan 2018 aparentaba once asignaturas cuando en realidad son cinco más
+ * una a elegir entre seis. El encabezado dice cuántas se cursan de cuántas se
+ * ofrecen, que es la información que faltaba.
+ */
+function GrupoElectivos({
+  grupo,
+  ciclos,
+  editable,
+  arrastrando,
+  onArrastrar,
+  onMover,
+}: {
+  grupo: GrupoEnMalla;
+  ciclos: number[];
+  editable: boolean;
+  arrastrando: string | null;
+  onArrastrar: (id: string | null) => void;
+  onMover: (id: string, ciclo: number | null) => void;
+}) {
+  const creditos = grupo.opciones[0]?.creditos ?? 0;
+
+  return (
+    <section className="rounded-xl border border-dashed border-uc-lila bg-uc-lila-claro/40 p-2.5">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 px-0.5">
+        <h3 className="text-xs font-extrabold text-uc-primary">{grupo.nombre}</h3>
+        <span className="text-[11px] font-semibold text-tinta-suave tabular-nums">
+          elige {grupo.cantidadAElegir} de {grupo.opciones.length} · {creditos} cr.
+        </span>
+      </div>
+
+      <ul className="flex flex-col gap-2">
+        {grupo.opciones.map((a) => (
+          <li key={a.id}>
+            <TarjetaAsignatura
+              asignatura={a}
+              ciclos={ciclos}
+              editable={editable}
+              arrastrando={arrastrando === a.id}
+              onArrastrar={onArrastrar}
+              onMover={onMover}
+              conQuitar
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function TarjetaAsignatura({
   asignatura,
