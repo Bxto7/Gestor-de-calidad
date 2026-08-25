@@ -129,7 +129,7 @@ export class CompetenciasController {
     summary: 'Atributos del graduado del marco vigente',
     description:
       'CLAUDE.md §6.2. Los once que define ICACIT, para poder mapear cada ' +
-      'competencia al atributo que desarrolla.',
+      'competencia a los atributos que desarrolla.',
   })
   async atributos(@ActorActual() actor: Actor) {
     return this.competencias.atributos(actor);
@@ -161,7 +161,7 @@ export class CompetenciasController {
   })
   @ApiResponse({ status: 409, description: 'Ya existe otra competencia con ese nombre.' })
   async crear(@ActorActual() actor: Actor, @Body() dto: DatosCompetenciaDto) {
-    return this.competencias.crear(actor, dto.nombre, dto.atributoId ?? null);
+    return this.competencias.crear(actor, dto.nombre, dto.atributoIds ?? []);
   }
 
   @Patch(':id')
@@ -171,7 +171,7 @@ export class CompetenciasController {
     @ActorActual() actor: Actor,
     @Body() dto: DatosCompetenciaDto,
   ) {
-    return this.competencias.editar(actor, id, dto.nombre, dto.atributoId ?? null);
+    return this.competencias.editar(actor, id, dto.nombre, dto.atributoIds ?? []);
   }
 
   @Patch(':id/estado')

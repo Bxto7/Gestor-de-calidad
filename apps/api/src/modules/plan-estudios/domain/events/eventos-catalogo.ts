@@ -45,11 +45,23 @@ export class ElementoCatalogoEditado extends DomainEvent {
     nombreAnterior: string,
     nombreNuevo: string,
     descripcionCambiada = false,
+    atributosAntes: readonly string[] = [],
+    atributosDespues: readonly string[] = [],
   ) {
     super(actor);
     const cambios: string[] = [];
     if (nombreAnterior !== nombreNuevo) cambios.push(`«${nombreAnterior}» → «${nombreNuevo}»`);
     if (descripcionCambiada) cambios.push('se actualizó la descripción');
+
+    // El mapeo con el marco de acreditación se audita aparte del nombre: es la
+    // traza que responde a «¿desde cuándo esta competencia dejó de cubrir tal
+    // atributo?», y sin ella el cambio quedaría registrado como «se guardó sin
+    // cambios».
+    const antes = ordenados(atributosAntes);
+    const despues = ordenados(atributosDespues);
+    if (antes.join() !== despues.join()) {
+      cambios.push(`atributos ICACIT: ${listar(antes)} → ${listar(despues)}`);
+    }
 
     this.detalle =
       cambios.length === 0
@@ -95,4 +107,14 @@ export class ElementoCatalogoEliminado extends DomainEvent {
     // que quedará de ella.
     this.detalle = `${ETIQUETA[entidad]} ${codigo} «${nombreElemento}» eliminado definitivamente.`;
   }
+}
+
+/** Orden estable: la lista viene de una tabla puente, que no garantiza ninguno. */
+function ordenados(codigos: readonly string[]): string[] {
+  return [...codigos].sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+/** «ninguno» y no una cadena vacía: en una bitácora el hueco no se distingue de un fallo. */
+function listar(codigos: readonly string[]): string {
+  return codigos.length === 0 ? 'ninguno' : codigos.join(', ');
 }

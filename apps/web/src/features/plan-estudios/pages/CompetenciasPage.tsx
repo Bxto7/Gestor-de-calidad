@@ -22,7 +22,6 @@ import {
   Entrada,
   EstadoVacio,
   Modal,
-  Selector,
 } from '@/shared/components/ui';
 import {
   useAsignaturas,
@@ -160,7 +159,7 @@ export function CompetenciasPage() {
                   Competencia
                 </th>
                 <th scope="col" className="px-5 py-3 font-bold">
-                  Atributo ICACIT
+                  Atributos ICACIT
                 </th>
                 <th scope="col" className="px-5 py-3 font-bold">
                   Uso
@@ -194,12 +193,21 @@ export function CompetenciasPage() {
                     </td>
                     <td className="px-5 py-4 font-semibold text-tinta">{c.nombre}</td>
                     <td className="px-5 py-4">
-                      {c.atributo ? (
-                        <span className="text-tinta-suave">
-                          <span className="font-mono text-xs font-bold text-tinta">
-                            {c.atributo.codigo}
-                          </span>{' '}
-                          {c.atributo.nombre}
+                      {c.atributos.length > 0 ? (
+                        // Uno por atributo: una competencia puede desarrollar
+                        // varios, y resumirlos en "AG-I06 +1" escondería justo
+                        // el dato que se viene a consultar.
+                        <span className="flex flex-wrap gap-1">
+                          {c.atributos.map((a) => (
+                            <span
+                              key={a.id}
+                              title={a.nombre}
+                              className="rounded-md bg-superficie-tenue px-2 py-0.5 text-xs text-tinta-suave"
+                            >
+                              <span className="font-mono font-bold text-tinta">{a.codigo}</span>{' '}
+                              {a.nombre}
+                            </span>
+                          ))}
                         </span>
                       ) : (
                         // Se dice, no se deja en blanco: una competencia sin
@@ -265,7 +273,9 @@ function ModalCompetencia({
   // El componente solo existe mientras el modal esta abierto, asi que el estado
   // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
   const [nombre, setNombre] = useState(competencia?.nombre ?? '');
-  const [atributoId, setAtributoId] = useState(competencia?.atributo?.id ?? '');
+  const [atributoIds, setAtributoIds] = useState<string[]>(
+    () => competencia?.atributos.map((a) => a.id) ?? [],
+  );
   const [error, setError] = useState<string | null>(null);
 
   const { data: atributos } = useAtributos();
@@ -273,14 +283,19 @@ function ModalCompetencia({
   const editar = useEditarCompetencia();
   const guardando = crear.isPending || editar.isPending;
 
+  function alternarAtributo(id: string) {
+    setAtributoIds((previos) =>
+      previos.includes(id) ? previos.filter((x) => x !== id) : [...previos, id],
+    );
+  }
+
   function guardar() {
     setError(null);
-    // Cadena vacía es "sin mapear", que es un estado válido: se puede registrar
-    // la competencia antes de decidir a qué atributo responde.
-    const atributo = atributoId === '' ? null : atributoId;
+    // Lista vacía es "sin mapear", que es un estado válido: se puede registrar
+    // la competencia antes de decidir a qué atributos responde.
     const accion = competencia
-      ? editar.mutateAsync({ id: competencia.id, nombre, atributoId: atributo })
-      : crear.mutateAsync({ nombre, atributoId: atributo });
+      ? editar.mutateAsync({ id: competencia.id, nombre, atributoIds })
+      : crear.mutateAsync({ nombre, atributoIds });
 
     accion.then(onCerrar).catch((e: unknown) => {
       setError(e instanceof Error ? e.message : 'No se pudo guardar la competencia.');
@@ -337,26 +352,47 @@ function ModalCompetencia({
 
         {/*
           §6.2: el mapeo con el marco de acreditación.
-        
+
+          Casillas y no una lista desplegable porque el mapeo es de varios a
+          varios: la matriz de la carrera asigna dos atributos a «Aprendizaje
+          autónomo». Un `<select multiple>` cabría, pero obliga a descubrir que
+          hay que pulsar Ctrl para marcar el segundo.
+
           Opcional a propósito —se puede registrar la competencia antes de
-          decidir a qué atributo responde—, pero la opción vacía dice "sin
-          mapear" en vez de quedarse en blanco: lo que falta tiene que verse.
+          decidir a qué atributos responde—, pero no marcar ninguna se dice en
+          voz alta en vez de quedarse en blanco: lo que falta tiene que verse.
         */}
-        <Campo
-          etiqueta="Atributo del graduado (ICACIT)"
-          ayuda="Qué atributo del perfil de egreso desarrolla esta competencia."
-        >
-          {(props) => (
-            <Selector {...props} value={atributoId} onChange={(e) => setAtributoId(e.target.value)}>
-              <option value="">Sin mapear</option>
-              {(atributos ?? []).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.codigo} · {a.nombre}
-                </option>
-              ))}
-            </Selector>
-          )}
-        </Campo>
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="text-[13px] font-semibold text-tinta">
+            Atributos del graduado (ICACIT)
+          </legend>
+
+          <div className="max-h-44 overflow-y-auto rounded-lg border border-borde bg-white">
+            {(atributos ?? []).map((a) => (
+              <label
+                key={a.id}
+                className="flex cursor-pointer items-start gap-2.5 border-b border-borde/60 px-3 py-2 last:border-0 hover:bg-superficie-tenue"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-uc-primary"
+                  checked={atributoIds.includes(a.id)}
+                  onChange={() => alternarAtributo(a.id)}
+                />
+                <span className="text-sm text-tinta">
+                  <span className="font-mono text-xs font-bold text-uc-primary">{a.codigo}</span>{' '}
+                  {a.nombre}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <p className="text-xs text-tinta-suave">
+            {atributoIds.length === 0
+              ? 'Sin mapear: quedará señalada en el reporte de cobertura.'
+              : `${atributoIds.length} de ${(atributos ?? []).length} atributos marcados.`}
+          </p>
+        </fieldset>
       </form>
     </Modal>
   );

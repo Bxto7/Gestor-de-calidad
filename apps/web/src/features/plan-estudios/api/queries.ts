@@ -275,8 +275,8 @@ export function useCompetencias() {
 
 export function useCrearCompetencia() {
   return useMutacionConInvalidacion(
-    (v: { nombre: string; atributoId: string | null }) =>
-      api.crearCompetencia(v.nombre, v.atributoId),
+    (v: { nombre: string; atributoIds: readonly string[] }) =>
+      api.crearCompetencia(v.nombre, v.atributoIds),
     // `claves.competencias` es prefijo de `atributos` y `cobertura`, así que
     // invalidar aquí refresca también el panel de cobertura.
     [claves.competencias],
@@ -285,8 +285,8 @@ export function useCrearCompetencia() {
 
 export function useEditarCompetencia() {
   return useMutacionConInvalidacion(
-    (v: { id: string; nombre: string; atributoId: string | null }) =>
-      api.editarCompetencia(v.id, v.nombre, v.atributoId),
+    (v: { id: string; nombre: string; atributoIds: readonly string[] }) =>
+      api.editarCompetencia(v.id, v.nombre, v.atributoIds),
     [claves.competencias],
   );
 }

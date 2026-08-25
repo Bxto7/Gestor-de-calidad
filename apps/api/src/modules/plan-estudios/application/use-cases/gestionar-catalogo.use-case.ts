@@ -233,13 +233,13 @@ export class GestionarCompetencias {
   async crear(
     actor: Actor,
     nombre: string,
-    atributoId: string | null = null,
+    atributoIds: readonly string[] = [],
   ): Promise<DatosCompetencia> {
     await exigir(this.autorizacion, actor, 'competencia.gestionar');
     const limpio = await this.validar(nombre);
 
     const codigo = siguienteCodigoCompetencia(await this.competencias.codigos());
-    const creada = await this.competencias.crear(codigo, limpio, atributoId);
+    const creada = await this.competencias.crear(codigo, limpio, sinRepetir(atributoIds));
 
     await this.eventos.publicar([
       new ElementoCatalogoCreado(actor, 'Competencia', creada.id, creada.codigo, creada.nombre),
@@ -252,7 +252,7 @@ export class GestionarCompetencias {
     actor: Actor,
     id: string,
     nombre: string,
-    atributoId: string | null = null,
+    atributoIds: readonly string[] = [],
   ): Promise<DatosCompetencia> {
     await exigir(this.autorizacion, actor, 'competencia.gestionar');
 
@@ -260,10 +260,20 @@ export class GestionarCompetencias {
     if (!actual) throw new NoEncontrado('la competencia', id);
 
     const limpio = await this.validar(nombre, id);
-    const editada = await this.competencias.actualizar(id, limpio, atributoId);
+    const editada = await this.competencias.actualizar(id, limpio, sinRepetir(atributoIds));
 
     await this.eventos.publicar([
-      new ElementoCatalogoEditado(actor, 'Competencia', id, actual.codigo, actual.nombre, limpio),
+      new ElementoCatalogoEditado(
+        actor,
+        'Competencia',
+        id,
+        actual.codigo,
+        actual.nombre,
+        limpio,
+        false,
+        actual.atributos.map((a) => a.codigo),
+        editada.atributos.map((a) => a.codigo),
+      ),
     ]);
     return editada;
   }
@@ -349,4 +359,15 @@ async function exigir(
 ): Promise<void> {
   const decision = await autorizacion.puede(actor.id, permiso, null);
   if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+}
+
+/**
+ * Quita atributos repetidos.
+ *
+ * La tabla puente lleva clave primaria compuesta: un identificador duplicado en
+ * la petición reventaría el INSERT. Mandar dos veces el mismo atributo expresa
+ * la misma intención que mandarlo una, así que se normaliza en vez de rechazar.
+ */
+function sinRepetir(ids: readonly string[]): readonly string[] {
+  return [...new Set(ids)];
 }

@@ -127,23 +127,34 @@ async function main(): Promise<void> {
   );
 
   for (const c of COMPETENCIAS) {
-    const atributoId = atributos.get(c.atributoIcacit);
-    if (!atributoId) {
-      throw new Error(
-        `La competencia ${c.codigo} apunta al atributo ${c.atributoIcacit}, que no existe. ` +
-          '¿Se ejecutó el seed?',
-      );
-    }
+    const atributoIds = c.atributosIcacit.map((codigo) => {
+      const id = atributos.get(codigo);
+      if (!id) {
+        throw new Error(
+          `La competencia ${c.codigo} apunta al atributo ${codigo}, que no existe. ` +
+            '¿Se ejecutó el seed?',
+        );
+      }
+      return id;
+    });
 
     const fila = await prisma.competencia.upsert({
       where: { codigo: c.codigo },
-      create: { codigo: c.codigo, nombre: c.nombre, atributoGraduadoId: atributoId },
-      update: { nombre: c.nombre, atributoGraduadoId: atributoId },
+      create: { codigo: c.codigo, nombre: c.nombre },
+      update: { nombre: c.nombre },
     });
     competencias.set(c.codigo, fila.id);
+
+    // El upsert no puede reemplazar el conjunto de atributos en un solo paso, y
+    // el script se reejecuta: se borra y se vuelve a escribir para que una
+    // segunda pasada deje exactamente lo que dice la matriz, ni más ni menos.
+    await prisma.competenciaAtributo.deleteMany({ where: { competenciaId: fila.id } });
+    await prisma.competenciaAtributo.createMany({
+      data: atributoIds.map((atributoId) => ({ competenciaId: fila.id, atributoId })),
+    });
   }
 
-  const cubiertos = new Set(COMPETENCIAS.map((c) => c.atributoIcacit));
+  const cubiertos = new Set(COMPETENCIAS.flatMap((c) => c.atributosIcacit));
   resumen.push(
     `${COMPETENCIAS.length} competencias, mapeadas a ${cubiertos.size} de ` +
       `${atributos.size} atributos ICACIT`,

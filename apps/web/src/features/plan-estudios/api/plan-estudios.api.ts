@@ -280,26 +280,22 @@ export async function listarCompetencias(): Promise<Competencia[]> {
 
 export async function crearCompetencia(
   nombre: string,
-  atributoId?: string | null,
+  atributoIds: readonly string[] = [],
 ): Promise<Competencia> {
   return aCompetencia(
-    await cliente.post<CompetenciaApi>('/competencias', {
-      nombre,
-      ...(atributoId ? { atributoId } : {}),
-    }),
+    await cliente.post<CompetenciaApi>('/competencias', { nombre, atributoIds }),
   );
 }
 
 export async function editarCompetencia(
   id: string,
   nombre: string,
-  atributoId?: string | null,
+  atributoIds: readonly string[] = [],
 ): Promise<Competencia> {
+  // Se manda siempre, también vacía: omitirla dejaría el mapeo anterior intacto
+  // y no habría forma de retirar un atributo desde la interfaz.
   return aCompetencia(
-    await cliente.patch<CompetenciaApi>(`/competencias/${id}`, {
-      nombre,
-      ...(atributoId ? { atributoId } : {}),
-    }),
+    await cliente.patch<CompetenciaApi>(`/competencias/${id}`, { nombre, atributoIds }),
   );
 }
 

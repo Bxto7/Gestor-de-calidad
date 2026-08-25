@@ -67,7 +67,7 @@ export interface CompetenciaApi {
   codigo: string;
   nombre: string;
   activa: boolean;
-  atributo: AtributoGraduado | null;
+  atributos: AtributoGraduado[];
   planesVinculados: number;
   asignaturasVinculadas: number;
   creadoEn: string;
@@ -188,7 +188,7 @@ export function aCompetencia(c: CompetenciaApi): Competencia {
     codigo: c.codigo,
     nombre: c.nombre,
     estado: aEstado(c.activa),
-    atributo: c.atributo,
+    atributos: c.atributos,
   };
 }
 

@@ -29,25 +29,43 @@ export interface AsignaturaFuente {
   readonly grupoElectivo?: 'ELEC GENER' | 'ELECT ESP1' | 'ELECT ESP2';
 }
 
-export const COMPETENCIAS: readonly { codigo: string; nombre: string; atributoIcacit: string }[] = [
-  { codigo: 'CPE-ISI01', nombre: 'Aprendizaje autónomo', atributoIcacit: 'AG-I06' },
+/**
+ * Las catorce competencias del plan 2018 y los atributos del graduado que
+ * desarrolla cada una, según la matriz oficial de la carrera.
+ *
+ * `atributosIcacit` es una lista y no un valor porque la matriz lo es: la
+ * primera competencia responde a dos atributos a la vez. Reducirlo a uno
+ * obligaría a elegir cuál conservar, y perder el otro falsea justo el documento
+ * del que depende la acreditación.
+ */
+export const COMPETENCIAS: readonly {
+  codigo: string;
+  nombre: string;
+  atributosIcacit: readonly string[];
+}[] = [
+  {
+    codigo: 'CPE-ISI01',
+    nombre: 'Aprendizaje autónomo',
+    // La matriz le asigna dos: AG-I06 y AG-I08.
+    atributosIcacit: ['AG-I06', 'AG-I08'],
+  },
   {
     codigo: 'CPE-ISI02',
     nombre: 'Aprendizaje experiencial y colaborativo',
-    atributoIcacit: 'AG-I03',
+    atributosIcacit: ['AG-I03'],
   },
-  { codigo: 'CPE-ISI03', nombre: 'Ciudadanía glocal', atributoIcacit: 'AG-I02' },
-  { codigo: 'CPE-ISI04', nombre: 'Comunicación efectiva', atributoIcacit: 'AG-I04' },
-  { codigo: 'CPE-ISI05', nombre: 'Gestión de TIC', atributoIcacit: 'AG-I06' },
-  { codigo: 'CPE-ISI06', nombre: 'Mentalidad emprendedora', atributoIcacit: 'AG-I05' },
-  { codigo: 'CPE-ISI07', nombre: 'Conocimientos de ingeniería', atributoIcacit: 'AG-I07' },
-  { codigo: 'CPE-ISI08', nombre: 'Experimentación', atributoIcacit: 'AG-I10' },
-  { codigo: 'CPE-ISI09', nombre: 'Medioambiente y sostenibilidad', atributoIcacit: 'AG-I01' },
-  { codigo: 'CPE-ISI10', nombre: 'El ingeniero y la sociedad', atributoIcacit: 'AG-I01' },
-  { codigo: 'CPE-ISI11', nombre: 'Gestión de proyectos', atributoIcacit: 'AG-I05' },
-  { codigo: 'CPE-ISI12', nombre: 'Diseño y desarrollo de soluciones', atributoIcacit: 'AG-I09' },
-  { codigo: 'CPE-ISI13', nombre: 'Análisis de problemas', atributoIcacit: 'AG-I08' },
-  { codigo: 'CPE-ISI14', nombre: 'Uso de herramientas modernas', atributoIcacit: 'AG-I11' },
+  { codigo: 'CPE-ISI03', nombre: 'Ciudadanía glocal', atributosIcacit: ['AG-I02'] },
+  { codigo: 'CPE-ISI04', nombre: 'Comunicación efectiva', atributosIcacit: ['AG-I04'] },
+  { codigo: 'CPE-ISI05', nombre: 'Gestión de TIC', atributosIcacit: ['AG-I06'] },
+  { codigo: 'CPE-ISI06', nombre: 'Mentalidad emprendedora', atributosIcacit: ['AG-I05'] },
+  { codigo: 'CPE-ISI07', nombre: 'Conocimientos de ingeniería', atributosIcacit: ['AG-I07'] },
+  { codigo: 'CPE-ISI08', nombre: 'Experimentación', atributosIcacit: ['AG-I10'] },
+  { codigo: 'CPE-ISI09', nombre: 'Medioambiente y sostenibilidad', atributosIcacit: ['AG-I01'] },
+  { codigo: 'CPE-ISI10', nombre: 'El ingeniero y la sociedad', atributosIcacit: ['AG-I01'] },
+  { codigo: 'CPE-ISI11', nombre: 'Gestión de proyectos', atributosIcacit: ['AG-I05'] },
+  { codigo: 'CPE-ISI12', nombre: 'Diseño y desarrollo de soluciones', atributosIcacit: ['AG-I09'] },
+  { codigo: 'CPE-ISI13', nombre: 'Análisis de problemas', atributosIcacit: ['AG-I08'] },
+  { codigo: 'CPE-ISI14', nombre: 'Uso de herramientas modernas', atributosIcacit: ['AG-I11'] },
 ];
 
 export const OBJETIVOS: readonly { codigo: string; nombre: string; descripcion: string }[] = [

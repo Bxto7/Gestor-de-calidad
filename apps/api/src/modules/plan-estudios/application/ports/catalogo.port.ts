@@ -49,8 +49,14 @@ export interface DatosCompetencia {
   readonly codigo: string;
   readonly nombre: string;
   readonly activa: boolean;
-  /** Atributo del graduado que desarrolla, si ya se mapeó. */
-  readonly atributo: DatosAtributo | null;
+  /**
+   * Atributos del graduado que desarrolla.
+   *
+   * Lista y no un valor: la matriz real asigna dos a alguna competencia, y
+   * quedarse con uno perdería la mitad del mapeo. Vacía si aún no se mapeó,
+   * que es lo que el reporte de cobertura tiene que poder señalar.
+   */
+  readonly atributos: readonly DatosAtributo[];
   /** RF045: los dos vínculos posibles, contados por separado. */
   readonly planesVinculados: number;
   readonly asignaturasVinculadas: number;
@@ -87,9 +93,13 @@ export interface RepositorioCompetenciaPort {
   porId(id: string): Promise<DatosCompetencia | null>;
   codigos(): Promise<string[]>;
 
-  /** `atributoId` nulo deja la competencia sin mapear, que es un estado válido. */
-  crear(codigo: string, nombre: string, atributoId: string | null): Promise<DatosCompetencia>;
-  actualizar(id: string, nombre: string, atributoId: string | null): Promise<DatosCompetencia>;
+  /** Lista vacía deja la competencia sin mapear, que es un estado válido. */
+  crear(codigo: string, nombre: string, atributoIds: readonly string[]): Promise<DatosCompetencia>;
+  actualizar(
+    id: string,
+    nombre: string,
+    atributoIds: readonly string[],
+  ): Promise<DatosCompetencia>;
   cambiarEstado(id: string, activa: boolean): Promise<DatosCompetencia>;
   eliminar(id: string): Promise<void>;
 

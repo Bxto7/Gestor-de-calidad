@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 /** Recorta antes de medir la longitud; si no, `"   "` supera el mínimo. */
 const Recortado = (): PropertyDecorator =>
@@ -29,15 +29,17 @@ export class DatosCompetenciaDto {
   nombre!: string;
 
   /**
-   * Atributo del graduado que desarrolla (§6.2).
+   * Atributos del graduado que desarrolla (§6.2).
    *
-   * Opcional: se puede registrar la competencia antes de decidir a qué atributo
-   * responde. Lo que no se puede es perder de vista que falta, y de eso se
-   * encarga el reporte de cobertura.
+   * Lista, porque la matriz real asigna dos a alguna competencia. Omitirla deja
+   * la competencia sin mapear: se puede registrar antes de decidir a qué
+   * atributo responde. Lo que no se puede es perder de vista que falta, y de eso
+   * se encarga el reporte de cobertura.
    */
   @IsOptional()
-  @IsUUID('4', { message: 'El atributo debe identificarse por un UUID.' })
-  atributoId?: string;
+  @IsArray()
+  @IsUUID('4', { each: true, message: 'Cada atributo debe identificarse por un UUID.' })
+  atributoIds?: string[];
 }
 
 /** RF039 y RF046: búsqueda por texto, más filtro de estado. */

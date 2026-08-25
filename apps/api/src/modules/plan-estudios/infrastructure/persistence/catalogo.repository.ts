@@ -132,7 +132,11 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       orderBy: { codigo: 'asc' },
       include: {
         _count: { select: { planes: true, asignaturas: true } },
-        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+        atributos: {
+          select: {
+            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+          },
+        },
       },
     });
     return filas.map(aCompetencia);
@@ -143,7 +147,11 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       where: { id },
       include: {
         _count: { select: { planes: true, asignaturas: true } },
-        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+        atributos: {
+          select: {
+            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+          },
+        },
       },
     });
     return fila ? aCompetencia(fila) : null;
@@ -162,9 +170,8 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       orderBy: { orden: 'asc' },
       include: {
         competencias: {
-          where: { estado: 'ACTIVO' },
-          orderBy: { codigo: 'asc' },
-          select: { id: true, codigo: true, nombre: true },
+          where: { competencia: { estado: 'ACTIVO' } },
+          select: { competencia: { select: { id: true, codigo: true, nombre: true } } },
         },
       },
     });
@@ -174,7 +181,10 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       marco: a.marco,
       codigo: a.codigo,
       nombre: a.nombre,
-      competencias: a.competencias,
+      // Ordenadas por código: el orden de una tabla puente no está garantizado.
+      competencias: a.competencias
+        .map((c) => c.competencia)
+        .sort((x, y) => x.codigo.localeCompare(y.codigo, 'es')),
     }));
   }
 
@@ -194,13 +204,21 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
   async crear(
     codigo: string,
     nombre: string,
-    atributoId: string | null,
+    atributoIds: readonly string[],
   ): Promise<DatosCompetencia> {
     const fila = await this.prisma.competencia.create({
-      data: { codigo, nombre, atributoGraduadoId: atributoId },
+      data: {
+        codigo,
+        nombre,
+        atributos: { create: atributoIds.map((atributoId) => ({ atributoId })) },
+      },
       include: {
         _count: { select: { planes: true, asignaturas: true } },
-        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+        atributos: {
+          select: {
+            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+          },
+        },
       },
     });
     return aCompetencia(fila);
@@ -209,15 +227,28 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
   async actualizar(
     id: string,
     nombre: string,
-    atributoId: string | null,
+    atributoIds: readonly string[],
   ): Promise<DatosCompetencia> {
-    const fila = await this.prisma.competencia.update({
-      where: { id },
-      data: { nombre, atributoGraduadoId: atributoId },
-      include: {
-        _count: { select: { planes: true, asignaturas: true } },
-        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
-      },
+    // Se reemplaza el conjunto entero dentro de una transacción: calcular el
+    // diferencial daría lo mismo con más código, y a medias dejaría la
+    // competencia sin ningún atributo.
+    const fila = await this.prisma.$transaction(async (tx) => {
+      await tx.competenciaAtributo.deleteMany({ where: { competenciaId: id } });
+      return tx.competencia.update({
+        where: { id },
+        data: {
+          nombre,
+          atributos: { create: atributoIds.map((atributoId) => ({ atributoId })) },
+        },
+        include: {
+          _count: { select: { planes: true, asignaturas: true } },
+          atributos: {
+            select: {
+              atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+            },
+          },
+        },
+      });
     });
     return aCompetencia(fila);
   }
@@ -228,7 +259,11 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       data: { estado: activa ? 'ACTIVO' : 'INACTIVO' },
       include: {
         _count: { select: { planes: true, asignaturas: true } },
-        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+        atributos: {
+          select: {
+            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+          },
+        },
       },
     });
     return aCompetencia(fila);
@@ -277,14 +312,14 @@ function aCompetencia(fila: {
   estado: string;
   creadoEn: Date;
   _count: { planes: number; asignaturas: number };
-  atributo: { id: string; marco: string; codigo: string; nombre: string } | null;
+  atributos: { atributo: { id: string; marco: string; codigo: string; nombre: string } }[];
 }): DatosCompetencia {
   return {
     id: fila.id,
     codigo: fila.codigo,
     nombre: fila.nombre,
     activa: fila.estado === 'ACTIVO',
-    atributo: fila.atributo,
+    atributos: fila.atributos.map((a) => a.atributo),
     planesVinculados: fila._count.planes,
     asignaturasVinculadas: fila._count.asignaturas,
     creadoEn: fila.creadoEn,

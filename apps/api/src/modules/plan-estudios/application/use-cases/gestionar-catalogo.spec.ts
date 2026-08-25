@@ -269,12 +269,23 @@ function competencia(sobre: Partial<DatosCompetencia> = {}): DatosCompetencia {
     codigo: 'CPE-01',
     nombre: 'Resolver problemas de ingeniería',
     activa: true,
-    atributo: null,
+    atributos: [],
     planesVinculados: 0,
     asignaturasVinculadas: 0,
     creadoEn: new Date('2026-01-01'),
     ...sobre,
   };
+}
+
+/**
+ * Atributos a partir de sus códigos.
+ *
+ * El doble usa el código también como identificador: en estas pruebas nunca se
+ * resuelve contra una tabla real, y así la aserción se lee con los códigos que
+ * salen en la bitácora en vez de con UUID opacos.
+ */
+function atributos(codigos: readonly string[]) {
+  return codigos.map((codigo) => ({ id: codigo, marco: 'ICACIT', codigo, nombre: codigo }));
 }
 
 function montarCompetencias(
@@ -295,11 +306,12 @@ function montarCompetencias(
     codigos: async () => opciones.codigos ?? [],
     cobertura: async () => [],
     atributos: async () => [],
-    crear: async (codigo, nombre) => {
+    crear: async (codigo, nombre, atributoIds) => {
       creadas.push({ codigo, nombre });
-      return competencia({ codigo, nombre });
+      return competencia({ codigo, nombre, atributos: atributos(atributoIds) });
     },
-    actualizar: async (_id, nombre) => competencia({ nombre }),
+    actualizar: async (_id, nombre, atributoIds) =>
+      competencia({ nombre, atributos: atributos(atributoIds) }),
     cambiarEstado: async (_id, activa) => competencia({ activa }),
     eliminar: async (id) => void eliminadas.push(id),
     existeNombre: async () => opciones.nombreDuplicado ?? false,
@@ -395,6 +407,42 @@ describe('RF043 / RF042 — edición y consulta de competencias', () => {
     });
     await caso.editar(ACTOR, 'cpe-1', 'Nombre nuevo');
     expect(publicados[0]?.detalle).toContain('«Nombre antiguo» → «Nombre nuevo»');
+  });
+
+  it('la bitácora registra el cambio de atributos ICACIT', async () => {
+    // Es la traza que responde a «¿desde cuándo dejó de cubrir ese atributo?».
+    // Sin ella el cambio se archivaría como «se guardó sin cambios».
+    const { caso, publicados } = montarCompetencias({
+      existente: competencia({ atributos: atributos(['AG-I06']) }),
+    });
+    await caso.editar(ACTOR, 'cpe-1', 'Resolver problemas de ingeniería', ['AG-I06', 'AG-I08']);
+    expect(publicados[0]?.detalle).toContain('atributos ICACIT: AG-I06 → AG-I06, AG-I08');
+  });
+
+  it('retirar el último atributo se audita como «ninguno», no como un hueco', async () => {
+    const { caso, publicados } = montarCompetencias({
+      existente: competencia({ atributos: atributos(['AG-I08']) }),
+    });
+    await caso.editar(ACTOR, 'cpe-1', 'Resolver problemas de ingeniería', []);
+    expect(publicados[0]?.detalle).toContain('atributos ICACIT: AG-I08 → ninguno');
+  });
+
+  it('reordenar los mismos atributos no es un cambio', async () => {
+    const { caso, publicados } = montarCompetencias({
+      existente: competencia({ atributos: atributos(['AG-I08', 'AG-I06']) }),
+    });
+    await caso.editar(ACTOR, 'cpe-1', 'Resolver problemas de ingeniería', ['AG-I06', 'AG-I08']);
+    expect(publicados[0]?.detalle).toContain('sin cambios');
+  });
+
+  it('un atributo repetido en la petición no llega dos veces al repositorio', async () => {
+    // La tabla puente tiene clave compuesta: repetirlo reventaría el INSERT.
+    const { caso, publicados } = montarCompetencias({
+      existente: competencia({ atributos: [] }),
+    });
+    await caso.editar(ACTOR, 'cpe-1', 'Resolver problemas de ingeniería', ['AG-I06', 'AG-I06']);
+    // Con el punto final: sin él, «ninguno → AG-I06, AG-I06» también encajaría.
+    expect(publicados[0]?.detalle).toContain('atributos ICACIT: ninguno → AG-I06.');
   });
 
   it('leer exige permiso', async () => {

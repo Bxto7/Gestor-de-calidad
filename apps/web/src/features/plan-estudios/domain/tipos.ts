@@ -105,8 +105,13 @@ export interface Competencia {
   codigo: string;
   nombre: string;
   estado: EstadoActivacion;
-  /** Atributo del graduado que desarrolla, si ya se mapeó. */
-  atributo: AtributoGraduado | null;
+  /**
+   * Atributos del graduado que desarrolla.
+   *
+   * Varios y no uno porque la matriz de la carrera lo es: «Aprendizaje
+   * autónomo» responde a AG-I06 y AG-I08 a la vez. Vacía si aún no se mapeó.
+   */
+  atributos: AtributoGraduado[];
 }
 
 export interface Asignatura {

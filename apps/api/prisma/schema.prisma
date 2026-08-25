@@ -355,7 +355,7 @@ model AtributoGraduado {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  competencias Competencia[]
+  competencias CompetenciaAtributo[]
 
   @@unique([marco, codigo])
   @@map("atributos_graduado")
@@ -369,21 +369,35 @@ model Competencia {
   nombre String           @db.VarChar(300)
   estado EstadoActivacion @default(ACTIVO)
 
-  /// Atributo del graduado que esta competencia desarrolla.
-  ///
-  /// Opcional porque una competencia puede registrarse antes de decidir a qué
-  /// atributo responde, y porque no todo marco exige el mapeo. Que falte es
-  /// justamente lo que el reporte de cobertura tiene que poder señalar.
-  atributoGraduadoId String? @map("atributo_graduado_id") @db.Uuid
-
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  atributo    AtributoGraduado?       @relation(fields: [atributoGraduadoId], references: [id], onDelete: SetNull)
+  atributos   CompetenciaAtributo[]
   planes      PlanCompetencia[]
   asignaturas AsignaturaCompetencia[]
 
   @@map("competencias")
+  @@schema("plan_estudios")
+}
+
+/// Qué atributos del graduado desarrolla cada competencia (§6.2).
+///
+/// Es muchos-a-muchos y no una columna en `Competencia` porque la matriz real
+/// lo es: en el plan 2018 de ISI, "Aprendizaje autónomo" responde a la vez a
+/// AG-I06 (Aprendizaje a lo largo de la vida) y a AG-I08 (Análisis de
+/// Problemas). Con una sola referencia habría que elegir cuál guardar y perder
+/// la otra, que es tanto como falsear la matriz de la que depende la
+/// acreditación.
+model CompetenciaAtributo {
+  competenciaId String @map("competencia_id") @db.Uuid
+  atributoId    String @map("atributo_id") @db.Uuid
+
+  competencia Competencia      @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  atributo    AtributoGraduado @relation(fields: [atributoId], references: [id], onDelete: Cascade)
+
+  @@id([competenciaId, atributoId])
+  @@index([atributoId])
+  @@map("competencia_atributo")
   @@schema("plan_estudios")
 }
 
