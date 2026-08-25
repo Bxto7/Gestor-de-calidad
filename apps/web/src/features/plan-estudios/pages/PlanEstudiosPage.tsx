@@ -65,7 +65,7 @@ export function PlanEstudiosPage() {
   const { data: plan, isLoading } = usePlan(planId);
   const { data: carreras } = useCarreras();
   const { data: facultades } = useFacultades();
-  const { data: asignaturas } = useAsignaturas(planId);
+  const { data: asignaturas, isPending: cargandoAsignaturas } = useAsignaturas(planId);
   const { data: justificadas } = useJustificaciones(planId);
   const { data: aprobaciones } = useAprobaciones(planId);
   const { data: versiones } = useVersiones(plan?.carreraId ?? '');
@@ -107,11 +107,15 @@ export function PlanEstudiosPage() {
    * RF093 RN1 exige que el estado mostrado nunca venga de una caché vieja.
    */
   const validacion = useMemo(() => {
-    if (!plan || !carrera) return null;
+    // Sin las asignaturas no se valida nada. Antes se pasaba `?? []` y la
+    // pantalla anunciaba "0 créditos" y los diez ciclos vacíos mientras la
+    // petición seguía en vuelo: presentar un dato que aún no se tiene como un
+    // hecho sobre el plan, con la apariencia de un hallazgo del currículo.
+    if (!plan || !carrera || !asignaturas) return null;
     return validarPlan({
       plan,
       carrera,
-      asignaturas: asignaturas ?? [],
+      asignaturas,
       reglasJustificadas: justificadas ?? [],
       // RF064 / RF100: rangos institucionales pendientes de definir. Mientras no
       // existan, ambas validaciones se omiten en vez de inventar un umbral.
@@ -120,7 +124,15 @@ export function PlanEstudiosPage() {
     });
   }, [plan, carrera, asignaturas, justificadas]);
 
-  if (isLoading || !plan || !carrera) return <Cargando etiqueta="Cargando plan de estudios…" />;
+  // Se espera también a las asignaturas: son la mitad de lo que esta pantalla
+  // afirma —créditos totales, ciclos ocupados, validación— y renderizar sin
+  // ellas no es mostrar menos, es mostrar algo falso.
+  // `!asignaturas` además de `cargandoAsignaturas`: cubre también el caso en que
+  // la petición terminó en error, donde `data` queda indefinido y sin este
+  // guard la pantalla volvería a afirmar que el plan está vacío.
+  if (isLoading || cargandoAsignaturas || !plan || !carrera || !asignaturas) {
+    return <Cargando etiqueta="Cargando plan de estudios…" />;
+  }
 
   const editable = permiteEdicion(plan.estado);
   const ciclos = ciclosDeCarrera(carrera);
@@ -180,7 +192,7 @@ export function PlanEstudiosPage() {
       a: `/plan-estudios/planes/${planId}/asignaturas`,
       titulo: 'Asignaturas',
       detalle: 'Cursos del plan, con créditos, horas y competencias.',
-      dato: `${(asignaturas ?? []).length} registrada(s)`,
+      dato: `${asignaturas.length} registrada(s)`,
     },
     {
       a: `/plan-estudios/planes/${planId}/malla`,
@@ -557,8 +569,8 @@ export function PlanEstudiosPage() {
         }
       >
         <p className="text-sm">
-          Se eliminarán <strong>{plan.codigo}</strong> y sus {(asignaturas ?? []).length}{' '}
-          asignatura(s). Esta acción no se puede deshacer y solo es posible en estado Borrador.
+          Se eliminarán <strong>{plan.codigo}</strong> y sus {asignaturas.length} asignatura(s).
+          Esta acción no se puede deshacer y solo es posible en estado Borrador.
         </p>
       </Modal>
     </>
