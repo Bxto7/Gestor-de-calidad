@@ -8,9 +8,10 @@
  */
 
 import { useMemo, useState } from 'react';
-import { NavLink, Outlet, Link } from 'react-router-dom';
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+import { LimiteDeError } from '@/shared/components/LimiteDeError';
 
 import isotipoUC from '@/assets/marca/isotipo-uc-negro.png';
 import { CtxEncabezado, type ContextoEncabezado, type Encabezado } from './encabezado';
@@ -43,6 +44,7 @@ function IconoSalir() {
 export function AppLayout() {
   const [encabezado, setEncabezado] = useState<Encabezado>({ migas: [], acciones: null });
   const { identidad, salir } = useSesion();
+  const ubicacion = useLocation();
 
   // Iniciales del nombre real, no unas fijas: "Ana María Quispe" → "AQ".
   const iniciales = useMemo(() => {
@@ -167,7 +169,19 @@ export function AppLayout() {
           </header>
 
           <main className="mx-auto w-full max-w-[1320px] flex-1 px-8 py-8">
-            <Outlet />
+            {/*
+              La frontera va aquí dentro y no envolviendo el layout: si una
+              pantalla falla, la barra lateral sigue viva y el usuario puede
+              irse a otra en vez de quedarse encerrado.
+
+              La `key` con la ruta la reinicia al navegar. Sin ella, una
+              frontera que ya capturó un error sigue mostrándolo para el resto
+              de la sesión, y un fallo puntual se convierte en una aplicación
+              rota.
+            */}
+            <LimiteDeError key={ubicacion.pathname}>
+              <Outlet />
+            </LimiteDeError>
           </main>
         </div>
       </div>
