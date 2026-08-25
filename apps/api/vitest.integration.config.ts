@@ -18,12 +18,18 @@ import { defineConfig } from 'vitest/config';
  * Testcontainers necesita un Docker accesible desde el proceso de pruebas, y en
  * Windows con Docker Desktop eso todavía obliga a configuración por máquina.
  * La diferencia es de arranque, no de aislamiento: la base sigue siendo
- * desechable y nunca es la de staging.
+ * desechable y nunca es la de staging. Que lo sea deja de ser una convención y
+ * pasa a comprobarse: `preparar.ts` aborta la suite si la base no está marcada
+ * como de usar y tirar.
  */
 export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/integration/**/*.int.spec.ts'],
+
+    // Corta antes de que corra el primer TRUNCATE si la base no está marcada
+    // como desechable. Ver `exigir-base-desechable.ts`.
+    setupFiles: ['test/integration/preparar.ts'],
 
     // Comparten una sola base y cada archivo la vacía con TRUNCATE. En paralelo
     // se borrarían los datos entre sí a mitad de una prueba.

@@ -29,6 +29,8 @@ import type {
   Facultad,
   ObjetivoEducacional,
   PlanEstudios,
+  AtributoGraduado,
+  CoberturaAtributo,
 } from '../domain/tipos';
 import type { AccionTransicion } from '../domain/estado-plan';
 import {
@@ -276,12 +278,45 @@ export async function listarCompetencias(): Promise<Competencia[]> {
   return (await cliente.get<CompetenciaApi[]>('/competencias')).map(aCompetencia);
 }
 
-export async function crearCompetencia(nombre: string): Promise<Competencia> {
-  return aCompetencia(await cliente.post<CompetenciaApi>('/competencias', { nombre }));
+export async function crearCompetencia(
+  nombre: string,
+  atributoId?: string | null,
+): Promise<Competencia> {
+  return aCompetencia(
+    await cliente.post<CompetenciaApi>('/competencias', {
+      nombre,
+      ...(atributoId ? { atributoId } : {}),
+    }),
+  );
 }
 
-export async function editarCompetencia(id: string, nombre: string): Promise<Competencia> {
-  return aCompetencia(await cliente.patch<CompetenciaApi>(`/competencias/${id}`, { nombre }));
+export async function editarCompetencia(
+  id: string,
+  nombre: string,
+  atributoId?: string | null,
+): Promise<Competencia> {
+  return aCompetencia(
+    await cliente.patch<CompetenciaApi>(`/competencias/${id}`, {
+      nombre,
+      ...(atributoId ? { atributoId } : {}),
+    }),
+  );
+}
+
+/** §6.2: los atributos del graduado del marco vigente, para poder mapear. */
+export async function listarAtributos(): Promise<AtributoGraduado[]> {
+  return cliente.get<AtributoGraduado[]>('/competencias/atributos');
+}
+
+/**
+ * §6.2 — cobertura del marco.
+ *
+ * Devuelve los once atributos, incluidos los que ninguna competencia cubre.
+ * Esos son los que una acreditación busca, y no aparecerían recorriendo el
+ * catálogo de competencias.
+ */
+export async function obtenerCobertura(): Promise<CoberturaAtributo[]> {
+  return cliente.get<CoberturaAtributo[]>('/competencias/cobertura');
 }
 
 export async function inactivarCompetencia(id: string, activo = false): Promise<Competencia> {

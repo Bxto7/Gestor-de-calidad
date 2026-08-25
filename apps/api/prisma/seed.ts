@@ -187,6 +187,36 @@ const ROLES: {
   },
 ];
 
+/** Marco de acreditación vigente. §1 anticipa otros; hoy solo se siembra este. */
+const MARCO = 'ICACIT';
+
+/**
+ * Los once atributos del graduado que exige ICACIT (CLAUDE.md §6.2).
+ *
+ * Van en la semilla y no en una carga de datos porque no pertenecen a ninguna
+ * universidad ni a ningún plan: son el estándar contra el que se acredita, igual
+ * que los roles y permisos son el andamiaje del sistema.
+ *
+ * Que estén los once —incluidos los que ninguna competencia cubra todavía— es
+ * el requisito del que depende poder responder "¿qué atributo se nos quedó sin
+ * cubrir?". Guardar el atributo como texto dentro de cada competencia diría qué
+ * está mapeado y jamás qué falta, porque lo que falta no estaría escrito en
+ * ninguna parte.
+ */
+const ATRIBUTOS_ICACIT: { codigo: string; nombre: string }[] = [
+  { codigo: 'AG-I01', nombre: 'El Profesional y el Mundo' },
+  { codigo: 'AG-I02', nombre: 'Ética' },
+  { codigo: 'AG-I03', nombre: 'Trabajo Individual y en Equipo' },
+  { codigo: 'AG-I04', nombre: 'Comunicación' },
+  { codigo: 'AG-I05', nombre: 'Gestión de Proyectos' },
+  { codigo: 'AG-I06', nombre: 'Aprendizaje a lo largo de la vida' },
+  { codigo: 'AG-I07', nombre: 'Conocimientos de Ingeniería' },
+  { codigo: 'AG-I08', nombre: 'Análisis de Problema' },
+  { codigo: 'AG-I09', nombre: 'Diseño y Desarrollo de Soluciones' },
+  { codigo: 'AG-I10', nombre: 'Indagación' },
+  { codigo: 'AG-I11', nombre: 'Uso de Herramientas' },
+];
+
 async function main() {
   console.log('Sembrando catálogo de permisos y roles…\n');
 
@@ -235,6 +265,15 @@ async function main() {
 
     console.log(`  ${rol.codigo.padEnd(24)} ${String(permisos.length).padStart(2)} permisos`);
   }
+
+  for (const [indice, a] of ATRIBUTOS_ICACIT.entries()) {
+    await prisma.atributoGraduado.upsert({
+      where: { marco_codigo: { marco: MARCO, codigo: a.codigo } },
+      create: { marco: MARCO, codigo: a.codigo, nombre: a.nombre, orden: indice + 1 },
+      update: { nombre: a.nombre, orden: indice + 1 },
+    });
+  }
+  console.log(`\n  atributos del graduado (${MARCO}): ${ATRIBUTOS_ICACIT.length}`);
 
   console.log('\nListo. No se creó ningún usuario: el primer administrador se');
   console.log('registra con un comando explícito, nunca por semilla (§6.5).');

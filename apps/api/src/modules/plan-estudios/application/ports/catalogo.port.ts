@@ -24,12 +24,33 @@ export interface DatosObjetivo {
   readonly creadoEn: Date;
 }
 
+/** Un atributo del graduado del marco de acreditación vigente (§6.2). */
+export interface DatosAtributo {
+  readonly id: string;
+  readonly marco: string;
+  readonly codigo: string;
+  readonly nombre: string;
+}
+
+/**
+ * Cobertura de un atributo: qué competencias lo desarrollan.
+ *
+ * Los que salen con la lista vacía son el dato que importa. Un evaluador no
+ * pregunta cuántas competencias tiene el programa, pregunta si alguno de los
+ * once atributos se quedó sin cubrir.
+ */
+export interface CoberturaAtributo extends DatosAtributo {
+  readonly competencias: readonly { id: string; codigo: string; nombre: string }[];
+}
+
 export interface DatosCompetencia {
   readonly id: string;
   /** RF041: correlativo CPE-01, CPE-02… No editable. */
   readonly codigo: string;
   readonly nombre: string;
   readonly activa: boolean;
+  /** Atributo del graduado que desarrolla, si ya se mapeó. */
+  readonly atributo: DatosAtributo | null;
   /** RF045: los dos vínculos posibles, contados por separado. */
   readonly planesVinculados: number;
   readonly asignaturasVinculadas: number;
@@ -57,11 +78,18 @@ export interface RepositorioObjetivoPort {
 
 export interface RepositorioCompetenciaPort {
   listar(filtro?: FiltroCatalogo): Promise<DatosCompetencia[]>;
+
+  /** Los atributos del marco, con las competencias que cubren cada uno. */
+  cobertura(marco: string): Promise<CoberturaAtributo[]>;
+
+  /** Para poder asignar el atributo al crear o editar una competencia. */
+  atributos(marco: string): Promise<DatosAtributo[]>;
   porId(id: string): Promise<DatosCompetencia | null>;
   codigos(): Promise<string[]>;
 
-  crear(codigo: string, nombre: string): Promise<DatosCompetencia>;
-  actualizar(id: string, nombre: string): Promise<DatosCompetencia>;
+  /** `atributoId` nulo deja la competencia sin mapear, que es un estado válido. */
+  crear(codigo: string, nombre: string, atributoId: string | null): Promise<DatosCompetencia>;
+  actualizar(id: string, nombre: string, atributoId: string | null): Promise<DatosCompetencia>;
   cambiarEstado(id: string, activa: boolean): Promise<DatosCompetencia>;
   eliminar(id: string): Promise<void>;
 

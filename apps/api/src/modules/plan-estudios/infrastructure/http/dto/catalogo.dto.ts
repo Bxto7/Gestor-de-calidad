@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 /** Recorta antes de medir la longitud; si no, `"   "` supera el mínimo. */
 const Recortado = (): PropertyDecorator =>
@@ -27,6 +27,17 @@ export class DatosCompetenciaDto {
   @IsString()
   @Length(5, 300, { message: 'El nombre debe tener entre 5 y 300 caracteres.' })
   nombre!: string;
+
+  /**
+   * Atributo del graduado que desarrolla (§6.2).
+   *
+   * Opcional: se puede registrar la competencia antes de decidir a qué atributo
+   * responde. Lo que no se puede es perder de vista que falta, y de eso se
+   * encarga el reporte de cobertura.
+   */
+  @IsOptional()
+  @IsUUID('4', { message: 'El atributo debe identificarse por un UUID.' })
+  atributoId?: string;
 }
 
 /** RF039 y RF046: búsqueda por texto, más filtro de estado. */

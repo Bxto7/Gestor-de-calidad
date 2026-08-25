@@ -12,6 +12,8 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
 import type {
+  CoberturaAtributo,
+  DatosAtributo,
   DatosCompetencia,
   DatosObjetivo,
   FiltroCatalogo,
@@ -128,7 +130,10 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
         ...(filtro?.texto ? dondeTexto(filtro.texto) : {}),
       },
       orderBy: { codigo: 'asc' },
-      include: { _count: { select: { planes: true, asignaturas: true } } },
+      include: {
+        _count: { select: { planes: true, asignaturas: true } },
+        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+      },
     });
     return filas.map(aCompetencia);
   }
@@ -136,9 +141,49 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
   async porId(id: string): Promise<DatosCompetencia | null> {
     const fila = await this.prisma.competencia.findUnique({
       where: { id },
-      include: { _count: { select: { planes: true, asignaturas: true } } },
+      include: {
+        _count: { select: { planes: true, asignaturas: true } },
+        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+      },
     });
     return fila ? aCompetencia(fila) : null;
+  }
+
+  /**
+   * Los atributos del marco con las competencias que cubren cada uno.
+   *
+   * Se parte de los atributos y no de las competencias a propósito: recorrer
+   * las competencias solo enseñaría los atributos ya mapeados, y lo que hay que
+   * ver son los que se quedaron sin ninguna.
+   */
+  async cobertura(marco: string): Promise<CoberturaAtributo[]> {
+    const filas = await this.prisma.atributoGraduado.findMany({
+      where: { marco },
+      orderBy: { orden: 'asc' },
+      include: {
+        competencias: {
+          where: { estado: 'ACTIVO' },
+          orderBy: { codigo: 'asc' },
+          select: { id: true, codigo: true, nombre: true },
+        },
+      },
+    });
+
+    return filas.map((a) => ({
+      id: a.id,
+      marco: a.marco,
+      codigo: a.codigo,
+      nombre: a.nombre,
+      competencias: a.competencias,
+    }));
+  }
+
+  async atributos(marco: string): Promise<DatosAtributo[]> {
+    return this.prisma.atributoGraduado.findMany({
+      where: { marco },
+      orderBy: { orden: 'asc' },
+      select: { id: true, marco: true, codigo: true, nombre: true },
+    });
   }
 
   async codigos(): Promise<string[]> {
@@ -146,19 +191,33 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     return filas.map((f) => f.codigo);
   }
 
-  async crear(codigo: string, nombre: string): Promise<DatosCompetencia> {
+  async crear(
+    codigo: string,
+    nombre: string,
+    atributoId: string | null,
+  ): Promise<DatosCompetencia> {
     const fila = await this.prisma.competencia.create({
-      data: { codigo, nombre },
-      include: { _count: { select: { planes: true, asignaturas: true } } },
+      data: { codigo, nombre, atributoGraduadoId: atributoId },
+      include: {
+        _count: { select: { planes: true, asignaturas: true } },
+        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+      },
     });
     return aCompetencia(fila);
   }
 
-  async actualizar(id: string, nombre: string): Promise<DatosCompetencia> {
+  async actualizar(
+    id: string,
+    nombre: string,
+    atributoId: string | null,
+  ): Promise<DatosCompetencia> {
     const fila = await this.prisma.competencia.update({
       where: { id },
-      data: { nombre },
-      include: { _count: { select: { planes: true, asignaturas: true } } },
+      data: { nombre, atributoGraduadoId: atributoId },
+      include: {
+        _count: { select: { planes: true, asignaturas: true } },
+        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+      },
     });
     return aCompetencia(fila);
   }
@@ -167,7 +226,10 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     const fila = await this.prisma.competencia.update({
       where: { id },
       data: { estado: activa ? 'ACTIVO' : 'INACTIVO' },
-      include: { _count: { select: { planes: true, asignaturas: true } } },
+      include: {
+        _count: { select: { planes: true, asignaturas: true } },
+        atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+      },
     });
     return aCompetencia(fila);
   }
@@ -215,12 +277,14 @@ function aCompetencia(fila: {
   estado: string;
   creadoEn: Date;
   _count: { planes: number; asignaturas: number };
+  atributo: { id: string; marco: string; codigo: string; nombre: string } | null;
 }): DatosCompetencia {
   return {
     id: fila.id,
     codigo: fila.codigo,
     nombre: fila.nombre,
     activa: fila.estado === 'ACTIVO',
+    atributo: fila.atributo,
     planesVinculados: fila._count.planes,
     asignaturasVinculadas: fila._count.asignaturas,
     creadoEn: fila.creadoEn,

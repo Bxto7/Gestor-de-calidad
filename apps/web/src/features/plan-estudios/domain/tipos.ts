@@ -79,12 +79,34 @@ export interface ObjetivoEducacional {
   estado: EstadoActivacion;
 }
 
+/** Atributo del graduado de un marco de acreditación (CLAUDE.md §6.2). */
+export interface AtributoGraduado {
+  id: string;
+  marco: string;
+  /** AG-I01…AG-I11 en ICACIT. */
+  codigo: string;
+  nombre: string;
+}
+
+/**
+ * Cobertura de un atributo: qué competencias lo desarrollan.
+ *
+ * Los que llegan con la lista vacía son el dato que importa: un atributo sin
+ * cubrir es un hallazgo de acreditación, y no se vería recorriendo el catálogo
+ * de competencias.
+ */
+export interface CoberturaAtributo extends AtributoGraduado {
+  competencias: { id: string; codigo: string; nombre: string }[];
+}
+
 export interface Competencia {
   id: string;
   /** RF041: correlativo CPE-01, CPE-02… */
   codigo: string;
   nombre: string;
   estado: EstadoActivacion;
+  /** Atributo del graduado que desarrolla, si ya se mapeó. */
+  atributo: AtributoGraduado | null;
 }
 
 export interface Asignatura {

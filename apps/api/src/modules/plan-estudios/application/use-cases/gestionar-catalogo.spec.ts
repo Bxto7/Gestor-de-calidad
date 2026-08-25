@@ -269,6 +269,7 @@ function competencia(sobre: Partial<DatosCompetencia> = {}): DatosCompetencia {
     codigo: 'CPE-01',
     nombre: 'Resolver problemas de ingeniería',
     activa: true,
+    atributo: null,
     planesVinculados: 0,
     asignaturasVinculadas: 0,
     creadoEn: new Date('2026-01-01'),
@@ -292,6 +293,8 @@ function montarCompetencias(
     listar: async () => [competencia()],
     porId: async () => (opciones.existente === undefined ? competencia() : opciones.existente),
     codigos: async () => opciones.codigos ?? [],
+    cobertura: async () => [],
+    atributos: async () => [],
     crear: async (codigo, nombre) => {
       creadas.push({ codigo, nombre });
       return competencia({ codigo, nombre });

@@ -18,6 +18,7 @@
 
 import type {
   Asignatura,
+  AtributoGraduado,
   Carrera,
   Competencia,
   CondicionAsignatura,
@@ -66,6 +67,7 @@ export interface CompetenciaApi {
   codigo: string;
   nombre: string;
   activa: boolean;
+  atributo: AtributoGraduado | null;
   planesVinculados: number;
   asignaturasVinculadas: number;
   creadoEn: string;
@@ -181,7 +183,13 @@ export function aObjetivo(o: ObjetivoApi): ObjetivoEducacional {
 }
 
 export function aCompetencia(c: CompetenciaApi): Competencia {
-  return { id: c.id, codigo: c.codigo, nombre: c.nombre, estado: aEstado(c.activa) };
+  return {
+    id: c.id,
+    codigo: c.codigo,
+    nombre: c.nombre,
+    estado: aEstado(c.activa),
+    atributo: c.atributo,
+  };
 }
 
 export function aAsignatura(a: AsignaturaApi): Asignatura {

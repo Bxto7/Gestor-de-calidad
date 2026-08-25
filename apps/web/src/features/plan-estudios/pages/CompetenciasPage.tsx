@@ -12,6 +12,7 @@ import { useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { CoberturaIcacit } from '../components/CoberturaIcacit';
 import {
   Badge,
   Boton,
@@ -21,11 +22,13 @@ import {
   Entrada,
   EstadoVacio,
   Modal,
+  Selector,
 } from '@/shared/components/ui';
 import {
   useAsignaturas,
   useAsociarAlPlan,
   useCompetencias,
+  useAtributos,
   useCrearCompetencia,
   useEditarCompetencia,
   useInactivarCompetencia,
@@ -115,6 +118,9 @@ export function CompetenciasPage() {
         </p>
       )}
 
+      {/* §6.2: qué atributo del graduado cubre cada competencia, y cuál no. */}
+      <CoberturaIcacit />
+
       <div className="mb-5">
         <Entrada
           type="search"
@@ -154,6 +160,9 @@ export function CompetenciasPage() {
                   Competencia
                 </th>
                 <th scope="col" className="px-5 py-3 font-bold">
+                  Atributo ICACIT
+                </th>
+                <th scope="col" className="px-5 py-3 font-bold">
                   Uso
                 </th>
                 <th scope="col" className="px-5 py-3 font-bold">
@@ -184,6 +193,23 @@ export function CompetenciasPage() {
                       {c.codigo}
                     </td>
                     <td className="px-5 py-4 font-semibold text-tinta">{c.nombre}</td>
+                    <td className="px-5 py-4">
+                      {c.atributo ? (
+                        <span className="text-tinta-suave">
+                          <span className="font-mono text-xs font-bold text-tinta">
+                            {c.atributo.codigo}
+                          </span>{' '}
+                          {c.atributo.nombre}
+                        </span>
+                      ) : (
+                        // Se dice, no se deja en blanco: una competencia sin
+                        // mapear es lo que hay que corregir antes de una
+                        // acreditación, y un guion la esconde entre las demás.
+                        <span className="text-xs font-semibold text-estado-progreso-fg">
+                          Sin mapear
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-tinta-suave">
                       {uso === 0 ? '—' : plural(uso, 'asignatura', 'asignaturas')}
                     </td>
@@ -239,17 +265,22 @@ function ModalCompetencia({
   // El componente solo existe mientras el modal esta abierto, asi que el estado
   // inicial ya es el correcto: no hace falta sincronizarlo con un efecto.
   const [nombre, setNombre] = useState(competencia?.nombre ?? '');
+  const [atributoId, setAtributoId] = useState(competencia?.atributo?.id ?? '');
   const [error, setError] = useState<string | null>(null);
 
+  const { data: atributos } = useAtributos();
   const crear = useCrearCompetencia();
   const editar = useEditarCompetencia();
   const guardando = crear.isPending || editar.isPending;
 
   function guardar() {
     setError(null);
+    // Cadena vacía es "sin mapear", que es un estado válido: se puede registrar
+    // la competencia antes de decidir a qué atributo responde.
+    const atributo = atributoId === '' ? null : atributoId;
     const accion = competencia
-      ? editar.mutateAsync({ id: competencia.id, nombre })
-      : crear.mutateAsync(nombre);
+      ? editar.mutateAsync({ id: competencia.id, nombre, atributoId: atributo })
+      : crear.mutateAsync({ nombre, atributoId: atributo });
 
     accion.then(onCerrar).catch((e: unknown) => {
       setError(e instanceof Error ? e.message : 'No se pudo guardar la competencia.');
@@ -301,6 +332,29 @@ function ModalCompetencia({
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej. Análisis y resolución de problemas"
             />
+          )}
+        </Campo>
+
+        {/*
+          §6.2: el mapeo con el marco de acreditación.
+        
+          Opcional a propósito —se puede registrar la competencia antes de
+          decidir a qué atributo responde—, pero la opción vacía dice "sin
+          mapear" en vez de quedarse en blanco: lo que falta tiene que verse.
+        */}
+        <Campo
+          etiqueta="Atributo del graduado (ICACIT)"
+          ayuda="Qué atributo del perfil de egreso desarrolla esta competencia."
+        >
+          {(props) => (
+            <Selector {...props} value={atributoId} onChange={(e) => setAtributoId(e.target.value)}>
+              <option value="">Sin mapear</option>
+              {(atributos ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.codigo} · {a.nombre}
+                </option>
+              ))}
+            </Selector>
           )}
         </Campo>
       </form>

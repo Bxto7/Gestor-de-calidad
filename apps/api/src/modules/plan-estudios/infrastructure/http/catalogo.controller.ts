@@ -122,6 +122,31 @@ export class CompetenciasController {
     return this.competencias.listar(actor, filtro);
   }
 
+  // Antes de `:id`: si fuera después, Nest tomaría "atributos" y "cobertura"
+  // como identificadores y `ParseUUIDPipe` respondería 400.
+  @Get('atributos')
+  @ApiOperation({
+    summary: 'Atributos del graduado del marco vigente',
+    description:
+      'CLAUDE.md §6.2. Los once que define ICACIT, para poder mapear cada ' +
+      'competencia al atributo que desarrolla.',
+  })
+  async atributos(@ActorActual() actor: Actor) {
+    return this.competencias.atributos(actor);
+  }
+
+  @Get('cobertura')
+  @ApiOperation({
+    summary: 'Cobertura del marco de acreditación',
+    description:
+      'Qué competencias desarrollan cada atributo del graduado. Devuelve los ' +
+      'once, también los que no cubre ninguna: un atributo vacío es el hallazgo ' +
+      'que una acreditación busca, y no aparecería recorriendo las competencias.',
+  })
+  async cobertura(@ActorActual() actor: Actor) {
+    return this.competencias.cobertura(actor);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de una competencia' })
   @ApiResponse({ status: 404, description: 'La competencia no existe.' })
@@ -136,7 +161,7 @@ export class CompetenciasController {
   })
   @ApiResponse({ status: 409, description: 'Ya existe otra competencia con ese nombre.' })
   async crear(@ActorActual() actor: Actor, @Body() dto: DatosCompetenciaDto) {
-    return this.competencias.crear(actor, dto.nombre);
+    return this.competencias.crear(actor, dto.nombre, dto.atributoId ?? null);
   }
 
   @Patch(':id')
@@ -146,7 +171,7 @@ export class CompetenciasController {
     @ActorActual() actor: Actor,
     @Body() dto: DatosCompetenciaDto,
   ) {
-    return this.competencias.editar(actor, id, dto.nombre);
+    return this.competencias.editar(actor, id, dto.nombre, dto.atributoId ?? null);
   }
 
   @Patch(':id/estado')

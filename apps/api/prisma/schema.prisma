@@ -331,6 +331,37 @@ model ObjetivoEducacional {
   @@schema("plan_estudios")
 }
 
+/// Atributo del graduado de un marco de acreditación (CLAUDE.md §1, §6.2).
+///
+/// ICACIT define once atributos que todo egresado de ingeniería debe demostrar.
+/// Una acreditación no pregunta "¿qué competencias tiene el plan?" sino "¿qué
+/// atributo cubre cada una, y queda alguno sin cubrir?". Sin esta tabla la
+/// segunda mitad de esa pregunta no se puede responder: con el atributo guardado
+/// como texto suelto en la competencia se sabe qué está mapeado, pero nunca qué
+/// falta, porque lo que falta no está escrito en ningún sitio.
+///
+/// Lleva `marco` porque §1 anticipa otros —SINEACE-CONEAU, SUNEDU— y porque un
+/// mismo código de atributo puede significar cosas distintas en cada uno.
+model AtributoGraduado {
+  id     String @id @default(uuid()) @db.Uuid
+  /// Marco al que pertenece: ICACIT, SINEACE… Por ahora solo hay uno.
+  marco  String @default("ICACIT") @db.VarChar(32)
+  /// Identificador del marco: AG-I01…AG-I11 en ICACIT.
+  codigo String @db.VarChar(16)
+  nombre String @db.VarChar(200)
+  /// Orden de presentación dentro del marco, para listarlos como el estándar.
+  orden  Int    @db.SmallInt
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  competencias Competencia[]
+
+  @@unique([marco, codigo])
+  @@map("atributos_graduado")
+  @@schema("plan_estudios")
+}
+
 model Competencia {
   id     String           @id @default(uuid()) @db.Uuid
   /// RF041 RN1: correlativo CPE-01, CPE-02…, no editable.
@@ -338,9 +369,17 @@ model Competencia {
   nombre String           @db.VarChar(300)
   estado EstadoActivacion @default(ACTIVO)
 
+  /// Atributo del graduado que esta competencia desarrolla.
+  ///
+  /// Opcional porque una competencia puede registrarse antes de decidir a qué
+  /// atributo responde, y porque no todo marco exige el mapeo. Que falte es
+  /// justamente lo que el reporte de cobertura tiene que poder señalar.
+  atributoGraduadoId String? @map("atributo_graduado_id") @db.Uuid
+
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
+  atributo    AtributoGraduado?       @relation(fields: [atributoGraduadoId], references: [id], onDelete: SetNull)
   planes      PlanCompetencia[]
   asignaturas AsignaturaCompetencia[]
 

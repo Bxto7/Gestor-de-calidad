@@ -117,15 +117,37 @@ async function main(): Promise<void> {
   /* ── Catálogo institucional ────────────────────────────────────────── */
 
   const competencias = new Map<string, string>();
+  // Los atributos del graduado los siembra `prisma/seed.ts`: son el estándar de
+  // ICACIT, no un dato de esta universidad. Aquí solo se enlazan.
+  const atributos = new Map(
+    (await prisma.atributoGraduado.findMany({ where: { marco: 'ICACIT' } })).map((a) => [
+      a.codigo,
+      a.id,
+    ]),
+  );
+
   for (const c of COMPETENCIAS) {
+    const atributoId = atributos.get(c.atributoIcacit);
+    if (!atributoId) {
+      throw new Error(
+        `La competencia ${c.codigo} apunta al atributo ${c.atributoIcacit}, que no existe. ` +
+          '¿Se ejecutó el seed?',
+      );
+    }
+
     const fila = await prisma.competencia.upsert({
       where: { codigo: c.codigo },
-      create: { codigo: c.codigo, nombre: c.nombre },
-      update: { nombre: c.nombre },
+      create: { codigo: c.codigo, nombre: c.nombre, atributoGraduadoId: atributoId },
+      update: { nombre: c.nombre, atributoGraduadoId: atributoId },
     });
     competencias.set(c.codigo, fila.id);
   }
-  resumen.push(`${COMPETENCIAS.length} competencias`);
+
+  const cubiertos = new Set(COMPETENCIAS.map((c) => c.atributoIcacit));
+  resumen.push(
+    `${COMPETENCIAS.length} competencias, mapeadas a ${cubiertos.size} de ` +
+      `${atributos.size} atributos ICACIT`,
+  );
 
   const objetivos: string[] = [];
   for (const o of OBJETIVOS) {
@@ -344,10 +366,6 @@ async function main(): Promise<void> {
   console.log(
     `  · ${sinModelar.length} requisitos que no son una asignatura ("140 créditos aprobados",\n` +
       '    "certificado de inglés B1"). El grafo de dependencias solo enlaza asignaturas.',
-  );
-  console.log(
-    '  · La correspondencia de cada competencia con su atributo del graduado\n' +
-      '    ICACIT (AG-I01…AG-I11), que es justo la trazabilidad que pide una acreditación.',
   );
   console.log(
     `  · Horas teóricas (cargadas en ${HORAS_DESCONOCIDAS}) y sumillas: no están en la fuente.\n`,

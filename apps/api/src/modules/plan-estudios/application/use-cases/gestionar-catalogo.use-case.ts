@@ -39,6 +39,8 @@ import {
   siguienteCodigoObjetivo,
 } from '../../domain/value-objects/codigos.js';
 import type {
+  CoberturaAtributo,
+  DatosAtributo,
   DatosCompetencia,
   DatosObjetivo,
   FiltroCatalogo,
@@ -174,6 +176,14 @@ export class GestionarObjetivos {
   }
 }
 
+/**
+ * Marco de acreditación vigente (§1).
+ *
+ * Constante y no configurable todavía: solo hay uno sembrado. El día que haya
+ * dos, esto pasa a ser un dato de la institución, no del código.
+ */
+const MARCO_VIGENTE = 'ICACIT';
+
 /* ── Competencias ─────────────────────────────────────────────────────── */
 
 export class GestionarCompetencias {
@@ -196,13 +206,40 @@ export class GestionarCompetencias {
     return competencia;
   }
 
+  /**
+   * Los atributos del graduado del marco vigente.
+   *
+   * La pantalla los necesita para ofrecerlos al crear una competencia; sin la
+   * lista no habría forma de mapear nada sin escribir el código a mano.
+   */
+  async atributos(actor: Actor): Promise<DatosAtributo[]> {
+    await exigir(this.autorizacion, actor, 'competencia.leer');
+    return this.competencias.atributos(MARCO_VIGENTE);
+  }
+
+  /**
+   * Cobertura del marco: qué atributo desarrolla cada competencia y cuál no
+   * desarrolla ninguna (§6.2).
+   *
+   * Es la vista que pide una acreditación. Se devuelven todos los atributos,
+   * también los vacíos, porque el hallazgo que importa es el que falta.
+   */
+  async cobertura(actor: Actor): Promise<CoberturaAtributo[]> {
+    await exigir(this.autorizacion, actor, 'competencia.leer');
+    return this.competencias.cobertura(MARCO_VIGENTE);
+  }
+
   /** RF040 y RF041. La competencia solo lleva nombre; no tiene descripción. */
-  async crear(actor: Actor, nombre: string): Promise<DatosCompetencia> {
+  async crear(
+    actor: Actor,
+    nombre: string,
+    atributoId: string | null = null,
+  ): Promise<DatosCompetencia> {
     await exigir(this.autorizacion, actor, 'competencia.gestionar');
     const limpio = await this.validar(nombre);
 
     const codigo = siguienteCodigoCompetencia(await this.competencias.codigos());
-    const creada = await this.competencias.crear(codigo, limpio);
+    const creada = await this.competencias.crear(codigo, limpio, atributoId);
 
     await this.eventos.publicar([
       new ElementoCatalogoCreado(actor, 'Competencia', creada.id, creada.codigo, creada.nombre),
@@ -211,14 +248,19 @@ export class GestionarCompetencias {
   }
 
   /** RF043: RN1, el código no se modifica. */
-  async editar(actor: Actor, id: string, nombre: string): Promise<DatosCompetencia> {
+  async editar(
+    actor: Actor,
+    id: string,
+    nombre: string,
+    atributoId: string | null = null,
+  ): Promise<DatosCompetencia> {
     await exigir(this.autorizacion, actor, 'competencia.gestionar');
 
     const actual = await this.competencias.porId(id);
     if (!actual) throw new NoEncontrado('la competencia', id);
 
     const limpio = await this.validar(nombre, id);
-    const editada = await this.competencias.actualizar(id, limpio);
+    const editada = await this.competencias.actualizar(id, limpio, atributoId);
 
     await this.eventos.publicar([
       new ElementoCatalogoEditado(actor, 'Competencia', id, actual.codigo, actual.nombre, limpio),

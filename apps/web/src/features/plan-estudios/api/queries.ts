@@ -33,6 +33,8 @@ export const claves = {
   versiones: (carreraId: string) => ['versiones', carreraId] as const,
   objetivos: ['objetivos'] as const,
   competencias: ['competencias'] as const,
+  atributos: ['competencias', 'atributos'] as const,
+  cobertura: ['competencias', 'cobertura'] as const,
   asignaturas: (planId: string) => ['asignaturas', planId] as const,
   auditoria: (entidad: string, id: string) => ['auditoria', entidad, id] as const,
   aprobaciones: (planId: string) => ['aprobaciones', planId] as const,
@@ -252,20 +254,39 @@ export function useEliminarObjetivo() {
   return useMutacionConInvalidacion((id: string) => api.eliminarObjetivo(id), [claves.objetivos]);
 }
 
+/** §6.2: los atributos del marco, para el selector del formulario. */
+export function useAtributos() {
+  return useQuery({ queryKey: claves.atributos, queryFn: api.listarAtributos });
+}
+
+/**
+ * Cobertura del marco de acreditación.
+ *
+ * Hija de `competencias` en la clave: cambiar el mapeo de una competencia
+ * cambia la cobertura, y así una sola invalidación alcanza a las dos.
+ */
+export function useCobertura() {
+  return useQuery({ queryKey: claves.cobertura, queryFn: api.obtenerCobertura });
+}
+
 export function useCompetencias() {
   return useQuery({ queryKey: claves.competencias, queryFn: api.listarCompetencias });
 }
 
 export function useCrearCompetencia() {
   return useMutacionConInvalidacion(
-    (nombre: string) => api.crearCompetencia(nombre),
+    (v: { nombre: string; atributoId: string | null }) =>
+      api.crearCompetencia(v.nombre, v.atributoId),
+    // `claves.competencias` es prefijo de `atributos` y `cobertura`, así que
+    // invalidar aquí refresca también el panel de cobertura.
     [claves.competencias],
   );
 }
 
 export function useEditarCompetencia() {
   return useMutacionConInvalidacion(
-    (v: { id: string; nombre: string }) => api.editarCompetencia(v.id, v.nombre),
+    (v: { id: string; nombre: string; atributoId: string | null }) =>
+      api.editarCompetencia(v.id, v.nombre, v.atributoId),
     [claves.competencias],
   );
 }
