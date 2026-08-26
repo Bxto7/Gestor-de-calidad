@@ -13,6 +13,7 @@ import { useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
   Badge,
   Boton,
@@ -48,7 +49,7 @@ export function MallaCurricularPage() {
 
   const { data: plan } = usePlan(planId);
   const { data: carreras } = useCarreras();
-  const { data: asignaturas, isLoading } = useAsignaturas(planId);
+  const { data: asignaturas, isLoading, error: falloAsignaturas } = useAsignaturas(planId);
   const ubicar = useUbicarAsignatura(planId);
 
   const [filtroTipo, setFiltroTipo] = useState<'todos' | TipoAsignatura>('todos');
@@ -61,7 +62,7 @@ export function MallaCurricularPage() {
   // encola, espera y descarga; aquí solo se pinta en qué punto va.
   const documento = useGenerarDocumento();
 
-  const { puedeEn } = useSesion();
+  const { puede, puedeEn } = useSesion();
 
   const carrera = carreras?.find((c) => c.id === plan?.carreraId);
 
@@ -94,6 +95,26 @@ export function MallaCurricularPage() {
   }, [plan?.codigo, planId]);
 
   if (isLoading || !plan || !carrera) return <Cargando etiqueta="Cargando malla curricular…" />;
+
+  // Sin las asignaturas no hay malla que enseñar. Antes se caía en
+  // `asignaturas ?? []` y la pantalla dibujaba diez ciclos vacíos y «0
+  // créditos»: no es mostrar menos, es afirmar algo falso sobre el plan.
+  if (!asignaturas) {
+    const sinAcceso =
+      falloAsignaturas instanceof ErrorDeNegocio && falloAsignaturas.estado === 403;
+
+    return (
+      <EstadoVacio
+        titulo={sinAcceso ? 'No puedes ver la malla de este plan' : 'No se pudo cargar la malla'}
+        detalle={
+          sinAcceso
+            ? 'Tu rol no incluye el permiso para consultar las asignaturas. El resto de la ' +
+              'información del plan sí está disponible.'
+            : 'Las asignaturas no llegaron. Recarga la página para reintentarlo.'
+        }
+      />
+    );
+  }
 
   // Capturado tras el guard: TypeScript no conserva el estrechamiento de `plan`
   // dentro de los closures que se crean más abajo.
@@ -149,14 +170,24 @@ export function MallaCurricularPage() {
         <div className="flex flex-wrap gap-2">
           <Boton
             variante="secundario"
-            disabled={documento.enCurso !== null}
+            disabled={!puede('reporte.generar') || documento.enCurso !== null}
+            title={
+              puede('reporte.generar')
+                ? undefined
+                : 'Tu rol no incluye el permiso para generar documentos.'
+            }
             onClick={() => void documento.generar(planActual.id, 'RESUMEN_PLAN')}
           >
             {documento.enCurso === 'RESUMEN_PLAN' ? 'Generando PDF…' : 'PDF del plan'}
           </Boton>
           <Boton
             variante="secundario"
-            disabled={documento.enCurso !== null}
+            disabled={!puede('reporte.generar') || documento.enCurso !== null}
+            title={
+              puede('reporte.generar')
+                ? undefined
+                : 'Tu rol no incluye el permiso para generar documentos.'
+            }
             onClick={() => void documento.generar(planActual.id, 'MALLA_EXCEL')}
           >
             {documento.enCurso === 'MALLA_EXCEL' ? 'Generando Excel…' : 'Excel de la malla'}

@@ -15,6 +15,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { ErrorDeNegocio } from '@/shared/api/cliente';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import {
   AreaTexto,
   Badge,
@@ -71,10 +73,19 @@ export function PlanEstudiosPage() {
   const { publicar } = useEncabezado();
   const navegar = useNavigate();
 
+  // Las transiciones de estado las decide el servidor y llegan en
+  // `accionesDisponibles`. `puede` se usa solo para lo que no pasa por ahí:
+  // a qué secciones se ofrece navegar y si se puede pedir un documento.
+  const { puede } = useSesion();
+
   const { data: plan, isLoading } = usePlan(planId);
   const { data: carreras } = useCarreras();
   const { data: facultades } = useFacultades();
-  const { data: asignaturas, isPending: cargandoAsignaturas } = useAsignaturas(planId);
+  const {
+    data: asignaturas,
+    isPending: cargandoAsignaturas,
+    error: falloAsignaturas,
+  } = useAsignaturas(planId);
   const { data: justificadas } = useJustificaciones(planId);
   const { data: aprobaciones } = useAprobaciones(planId);
   const { data: versiones } = useVersiones(plan?.carreraId ?? '');
@@ -136,15 +147,19 @@ export function PlanEstudiosPage() {
     });
   }, [plan, carrera, asignaturas, justificadas]);
 
-  // Se espera también a las asignaturas: son la mitad de lo que esta pantalla
-  // afirma —créditos totales, ciclos ocupados, validación— y renderizar sin
-  // ellas no es mostrar menos, es mostrar algo falso.
-  // `!asignaturas` además de `cargandoAsignaturas`: cubre también el caso en que
-  // la petición terminó en error, donde `data` queda indefinido y sin este
-  // guard la pantalla volvería a afirmar que el plan está vacío.
-  if (isLoading || cargandoAsignaturas || !plan || !carrera || !asignaturas) {
+  // Solo se espera a lo que identifica la pantalla. Las asignaturas se tratan
+  // aparte, más abajo: bloquear la página entera por ellas convertía un 403
+  // —que es una respuesta, no un fallo— en un spinner eterno. Un rol con
+  // `plan.leer` y sin `asignatura.leer`, como el administrador, se quedaba ahí
+  // para siempre sin que nada le dijera por qué.
+  if (isLoading || !plan || !carrera) {
     return <Cargando etiqueta="Cargando plan de estudios…" />;
   }
+
+  // Por qué no hay asignaturas, si no las hay. Se distingue «todavía no han
+  // llegado» de «este rol no puede verlas» porque exigen respuestas distintas:
+  // la primera se espera, la segunda no cambia por esperar.
+  const sinAcceso = falloAsignaturas instanceof ErrorDeNegocio && falloAsignaturas.estado === 403;
 
   const editable = permiteEdicion(plan.estado);
   const ciclos = ciclosDeCarrera(carrera);
@@ -187,32 +202,45 @@ export function PlanEstudiosPage() {
       });
   }
 
+  /*
+    RF111–RF119: cada sección declara el permiso de lectura que exige, y las que
+    el rol no tiene no se ofrecen.
+
+    No es seguridad —la aplica el backend en cada petición— sino no llevar a
+    nadie a una pantalla que va a rechazarle. El administrador del sistema tiene
+    `plan.leer` pero no `asignatura.leer`: sin este filtro, la tarjeta de
+    Asignaturas le abría una página que solo podía darle un 403.
+  */
   const SECCIONES = [
     {
       a: `/plan-estudios/planes/${planId}/objetivos`,
       titulo: 'Objetivos Educacionales',
       detalle: 'Logros esperados del egresado, asociables al plan.',
       dato: `${plan.objetivoIds.length} asociado(s)`,
+      permiso: 'objetivo.leer',
     },
     {
       a: `/plan-estudios/planes/${planId}/competencias`,
       titulo: 'Competencias',
       detalle: 'Capacidades vinculables al plan y a cada asignatura.',
       dato: `${plan.competenciaIds.length} a nivel de plan`,
+      permiso: 'competencia.leer',
     },
     {
       a: `/plan-estudios/planes/${planId}/asignaturas`,
       titulo: 'Asignaturas',
       detalle: 'Cursos del plan, con créditos, horas y competencias.',
-      dato: `${asignaturas.length} registrada(s)`,
+      dato: asignaturas ? `${asignaturas.length} registrada(s)` : '—',
+      permiso: 'asignatura.leer',
     },
     {
       a: `/plan-estudios/planes/${planId}/malla`,
       titulo: 'Malla Curricular',
       detalle: 'Ubicación de cada asignatura en su ciclo académico.',
       dato: `${ciclos.length} ciclos`,
+      permiso: 'asignatura.leer',
     },
-  ];
+  ].filter((s) => puede(s.permiso));
 
   return (
     <>
@@ -258,11 +286,17 @@ export function PlanEstudiosPage() {
           */}
           <Boton
             variante="secundario"
-            disabled={!YA_APROBADO.includes(plan.estado) || documento.enCurso !== null}
+            disabled={
+              !puede('reporte.generar') ||
+              !YA_APROBADO.includes(plan.estado) ||
+              documento.enCurso !== null
+            }
             title={
-              YA_APROBADO.includes(plan.estado)
-                ? 'Documento de respaldo para el expediente de acreditación.'
-                : 'Disponible cuando el plan haya sido aprobado.'
+              !puede('reporte.generar')
+                ? 'Tu rol no incluye el permiso para generar documentos.'
+                : YA_APROBADO.includes(plan.estado)
+                  ? 'Documento de respaldo para el expediente de acreditación.'
+                  : 'Disponible cuando el plan haya sido aprobado.'
             }
             onClick={() => void documento.generar(plan.id, 'EVIDENCIA_APROBACION')}
           >
@@ -305,8 +339,11 @@ export function PlanEstudiosPage() {
         {/* RF067: total calculado, nunca editable a mano. */}
         <Metrica
           etiqueta="Total de créditos"
-          valor={String(validacion?.totalCreditos ?? 0)}
-          nota="Calculado automáticamente"
+          // Un guion y no un cero: sin las asignaturas el total no se conoce, y
+          // «0 créditos» sería un hallazgo sobre el currículo que nadie ha
+          // comprobado.
+          valor={validacion ? String(validacion.totalCreditos) : '—'}
+          nota={validacion ? 'Calculado automáticamente' : notaSinAsignaturas(sinAcceso)}
         />
         <Metrica
           etiqueta="Ciclos de la carrera"
@@ -332,13 +369,26 @@ export function PlanEstudiosPage() {
           Validación de consistencia
         </h2>
 
-        {validacion && (
+        {validacion ? (
           <BannerValidacion
             resultado={validacion}
             justificando={justificar.isPending}
             soloLectura={!editable}
             onJustificar={(codigoRegla, motivo) => justificar.mutateAsync({ codigoRegla, motivo })}
           />
+        ) : (
+          // Sin asignaturas no hay validación posible, y callarlo dejaría la
+          // pantalla pareciendo que el plan no tiene ninguna observación.
+          <p className="rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave">
+            {cargandoAsignaturas
+              ? 'Comprobando las validaciones de consistencia…'
+              : sinAcceso
+                ? 'Tu rol no incluye el permiso para consultar las asignaturas de este plan, ' +
+                  'así que no se pueden ejecutar las validaciones de consistencia ni calcular ' +
+                  'el total de créditos. El resto de la información del plan sí está disponible.'
+                : 'No se pudieron cargar las asignaturas, así que las validaciones de ' +
+                  'consistencia no se han ejecutado. Recarga la página para reintentarlo.'}
+          </p>
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -417,41 +467,45 @@ export function PlanEstudiosPage() {
       </section>
 
       {/* ── Secciones del plan ──────────────────────────────────────── */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-xs font-bold tracking-[0.14em] text-tinta-suave uppercase">
-          Secciones de este plan
-        </h2>
-        <ul className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-superficie">
-          {SECCIONES.map((s) => (
-            <li key={s.a}>
-              <Link
-                to={s.a}
-                className="flex items-center gap-4 px-5 py-4 transition hover:bg-superficie-tenue"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold text-tinta">{s.titulo}</span>
-                  <span className="block text-sm text-tinta-suave">{s.detalle}</span>
-                </span>
-                <span className="shrink-0 text-sm font-semibold text-tinta-tenue">{s.dato}</span>
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="shrink-0 text-tinta-tenue"
+      {/* Sin ninguna sección visible no se pinta ni el encabezado: un título
+          sobre una lista vacía parece un fallo de carga. */}
+      {SECCIONES.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-xs font-bold tracking-[0.14em] text-tinta-suave uppercase">
+            Secciones de este plan
+          </h2>
+          <ul className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-superficie">
+            {SECCIONES.map((s) => (
+              <li key={s.a}>
+                <Link
+                  to={s.a}
+                  className="flex items-center gap-4 px-5 py-4 transition hover:bg-superficie-tenue"
                 >
-                  <path d="M9 6l6 6-6 6" />
-                </svg>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-tinta">{s.titulo}</span>
+                    <span className="block text-sm text-tinta-suave">{s.detalle}</span>
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-tinta-tenue">{s.dato}</span>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="shrink-0 text-tinta-tenue"
+                  >
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* ── Versiones (RF076, RF077, RF079, RF081) ──────────────────── */}
       {versiones && versiones.length > 1 && (
@@ -514,9 +568,7 @@ export function PlanEstudiosPage() {
           <>
             <Boton
               variante="secundario"
-              disabled={
-                !aprobaciones || aprobaciones.length === 0 || documento.enCurso !== null
-              }
+              disabled={!aprobaciones || aprobaciones.length === 0 || documento.enCurso !== null}
               onClick={() => void documento.generar(plan.id, 'HISTORICO_CAMBIOS')}
             >
               {documento.enCurso === 'HISTORICO_CAMBIOS' ? 'Generando…' : 'Exportar PDF'}
@@ -616,8 +668,8 @@ export function PlanEstudiosPage() {
         }
       >
         <p className="text-sm">
-          Se eliminarán <strong>{plan.codigo}</strong> y sus {asignaturas.length} asignatura(s).
-          Esta acción no se puede deshacer y solo es posible en estado Borrador.
+          Se eliminarán <strong>{plan.codigo}</strong> y sus {asignaturas?.length ?? 0}{' '}
+          asignatura(s). Esta acción no se puede deshacer y solo es posible en estado Borrador.
         </p>
       </Modal>
     </>
@@ -798,4 +850,17 @@ function EdicionDuracion({
       </Boton>
     </div>
   );
+}
+
+/**
+ * Qué poner bajo una métrica que no se pudo calcular.
+ *
+ * Nunca «0»: un cero es una afirmación sobre el plan y aquí lo que hay es
+ * ausencia de dato. La distinción entre no poder verlo y no haber podido
+ * traerlo importa, porque solo una de las dos se arregla recargando.
+ */
+function notaSinAsignaturas(sinAcceso: boolean): string {
+  return sinAcceso
+    ? 'Tu rol no puede ver las asignaturas'
+    : 'No se pudieron cargar las asignaturas';
 }
