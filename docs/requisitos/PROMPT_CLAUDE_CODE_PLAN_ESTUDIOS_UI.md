@@ -1,16 +1,22 @@
 # Prompt para Claude Code — Frontend: Módulo "Plan de Estudios"
 
-> Cómo usar este archivo: pégalo como instrucción de tarea en Claude Code, estando parado en la raíz del repo `App-ICACIT`. Claude Code ya lee `CLAUDE.md` automáticamente para arquitectura, stack y convenciones — este prompt no repite eso, solo especifica la construcción de este módulo. Cada requerimiento funcional (RF) está copiado **tal cual** del documento fuente ("Módulo de Plan de Estudios — Especificación de Requerimientos", Huancayo, 15 de agosto de 2026), reorganizado en campos para lectura rápida, sin alterar su contenido.
+> **Qué es este archivo hoy.** Nació como prompt de construcción del frontend y hoy es, además, el **catálogo de requerimientos del módulo**: la única copia legible de los RF fuera del PDF original. Cada RF sigue copiado **tal cual** del documento fuente ("Módulo de Plan de Estudios — Especificación de Requerimientos", Huancayo, 15 de agosto de 2026), reorganizado en campos para lectura rápida, sin alterar su contenido.
 >
-> **Alcance:** capa de presentación (UI) + la lógica de negocio/validación descrita en cada RF. No incluye integración real contra NestJS/Prisma todavía — usa datos mock/locales, pero estructura los componentes para consumir datos vía `@tanstack/react-query` cuando exista el backend real (no hardcodees llamadas ni forma de datos que luego haya que reescribir).
+> Ese "tal cual" es la regla que sostiene el archivo: **el texto de un RF no se reescribe nunca**. Cuando lo implementado se aparta de lo que pide un RF, la diferencia se anota en la sección 8, no editando el requisito. Si se editara, el documento dejaría de servir para contrastar lo construido contra lo pedido, que es justo para lo que existe.
+>
+> **Estado de la construcción (25 de agosto de 2026).** El módulo ya no es solo UI: existe API NestJS + Prisma + PostgreSQL, worker de BullMQ para generación de documentos, y el frontend consume HTTP real. No queda ningún dato mock. Los bloques que la sección 6 declaraba fuera de alcance —RF101–RF110 y RF111–RF119— están implementados.
+>
+> **Antes de citar cualquier RF en un expediente, lee la sección 8.** Hay cuatro puntos en los que el sistema se aparta del requisito y que **la universidad todavía no ha ratificado**.
 >
 > **Nota sobre referencias cruzadas:** algunos RF citan entre paréntesis otro RF ("ver RFxxx") que en el documento fuente no corresponde al contenido real (quedaron de una renumeración anterior no propagada del todo). Ya se corrigieron en el texto de este archivo; ver tabla en la sección 7.
 
 ---
 
-## 1. Encargo para Claude Code
+## 1. Encargo original
 
 Crea el módulo **"Plan de Estudios"** del Sistema de Gestión de Calidad de la **Universidad Continental**, con las 8 pantallas de la sección 3, usando React o HTML/CSS, fuente **Manrope**, paleta morada institucional.
+
+> Se conserva el encargo tal como se dio, aunque ya esté cumplido: es lo que explica por qué el documento está redactado en imperativo. Las ocho pantallas existen y están conectadas al backend.
 
 ## 2. Sistema de diseño
 
@@ -1193,7 +1199,7 @@ Esta pantalla concentra cuatro subprocesos del documento fuente: **Configuració
 
 ## 4. Comportamiento clave (transversal a todas las pantallas)
 
-- Todos los códigos (carrera, objetivo, competencia, asignatura, plan — facultad no aplica) se **autogeneran y son de solo lectura**.
+- Todos los códigos (carrera, objetivo, competencia, asignatura, plan — facultad no aplica) se **autogeneran y son de solo lectura**. Sin excepción desde la aplicación; la carga de planes históricos entra por debajo, ver divergencia D-5.
 - Validaciones de unicidad de nombre/código con mensaje de error inline.
 - El plan de estudios bloquea edición fuera del estado "Borrador"/"En revisión".
 - El drag-and-drop entre el panel de disponibles y los ciclos usa la **Drag and Drop API nativa** del navegador.
@@ -1202,11 +1208,34 @@ Esta pantalla concentra cuatro subprocesos del documento fuente: **Configuració
 
 - Isotipo/ícono de UC (sin texto, para el sidebar): `assets/logo-uc-icon.png` (ya existente en el repo).
 
-## 6. Fuera de alcance de este prompt (existen en el documento fuente, no en estas 8 pantallas)
+## 6. Bloques del documento fuente fuera de estas 8 pantallas
 
-- **2.11 Búsqueda, Filtrado y Reportes (RF101–RF110):** búsqueda global de planes, reporte de créditos por ciclo, reporte por área de formación, exportación integral del plan, reporte de cobertura de competencias, panel estadístico general, consulta de solo lectura para Usuario consultor, bitácora de accesos.
-- **2.12 Seguridad, Roles y Permisos (RF111–RF119):** restricciones de acceso por rol sobre cada operación (creación de facultades/carreras, edición/aprobación del plan, gestión de asignaturas, visibilidad de histórico). No se implementan aquí porque el módulo de Auth/Roles aún no existe — cuando exista, estos RF definen qué botones/acciones ocultar según rol.
-- **RF-PEND-01** (sugerencia de asignaturas comparando mallas de otras universidades): pendiente, sin especificar, no forma parte de este build.
+Esta sección los declaraba «fuera de alcance». Dos de los tres ya no lo están.
+
+### 2.11 Búsqueda, Filtrado y Reportes (RF101–RF110) — **implementado**
+
+El documento fuente los resume en una línea y **no los detalla**. Lo construido cubre las capacidades que esa línea nombra:
+
+| Capacidad que nombra el resumen | Dónde está hoy |
+|---|---|
+| Búsqueda global de planes | `GET /reportes/planes` · pestaña «Búsqueda de planes» |
+| Reporte de créditos por ciclo | `GET /reportes/planes/:id` · pantalla de reporte del plan |
+| Reporte por área de formación | Mismo endpoint: cortes por tipo y por condición |
+| Exportación integral del plan | RF072/RF073 — PDF y Excel generados en servidor |
+| Reporte de cobertura de competencias | `GET /competencias/cobertura` · panel ICACIT |
+| Panel estadístico general | `GET /reportes/panel` · pestaña «Panel general» |
+| Consulta de solo lectura para Usuario consultor | Rol `USUARIO_CONSULTOR`; los reportes exigen `plan.leer`, no `reporte.generar` |
+| Bitácora de accesos | `GET /auditoria/accesos` · pestaña «Accesos» |
+
+> **La asignación de cada capacidad a un número de RF concreto está INFERIDA.** Son ocho capacidades para diez números, y el documento fuente no dice cuál es cuál. Ver sección 8, punto D-4: hay que contrastarlo contra el PDF antes de citar «RF103» o «RF107» en ningún sitio.
+
+### 2.12 Seguridad, Roles y Permisos (RF111–RF119) — **implementado**
+
+El módulo de Auth existe: cinco roles y veintinueve permisos como datos (no como código), alcance por carrera para los permisos que lo requieren, y ocultación de acciones y de entradas de menú según el rol. La nota anterior —«no se implementan aquí porque el módulo de Auth/Roles aún no existe»— ya no aplica.
+
+### RF-PEND-01 — **sigue fuera de alcance**
+
+Sugerencia de asignaturas comparando mallas de otras universidades. Sin especificar. El puerto `RecommendationPort` existe con un adaptador nulo, de modo que implementarlo no obligue a tocar el dominio.
 
 ## 7. Corrección de referencias cruzadas del documento fuente (afectan a los RF de este prompt)
 
@@ -1220,3 +1249,128 @@ El PDF original cita algunos RF entre paréntesis que no corresponden al conteni
 | RF080 | "(RF090)" | RF078 |
 | RF082 | "(ver RF102)" | RF090 |
 | RF085 | "(ver RF103)" | RF097 |
+
+---
+
+## 8. Divergencias entre el documento fuente y lo implementado
+
+Aquí se anota cada punto en el que el sistema **no hace exactamente lo que pide un RF**. El texto de los RF de la sección 3 no se toca: si se editara para que coincidiera con el código, este documento dejaría de servir para contrastar lo construido contra lo pedido.
+
+Dos estados, y la diferencia importa:
+
+- **Ratificada** — el sistema hace más de lo que el requisito pedía, sin contradecirlo. No requiere decisión de nadie.
+- **PENDIENTE** — el sistema se aparta de lo que el requisito dice. **Nadie de la universidad lo ha aprobado todavía.** Hasta que alguien decida, el código y el requisito discrepan.
+
+| # | RF | Resumen | Estado |
+|---|---|---|---|
+| D-1 | RF092 | La evidencia de aprobación se genera también desde Vigente e Histórico, no solo desde Aprobado | **PENDIENTE** |
+| D-2 | RF056 · RF067 | El documento no modela grupos de electivos; el plan real los tiene y sin ellos el total de créditos es incorrecto | **PENDIENTE** |
+| D-3 | RF084 | El requisito admite «PDF o Excel»; solo está el PDF | **PENDIENTE** |
+| D-4 | RF101–RF110 | Qué número lleva cada capacidad de reportes está inferido, no verificado | **PENDIENTE** |
+| D-5 | RF041 · RF053 | El código lo genera el sistema, salvo en la carga de planes históricos | **PENDIENTE** |
+| D-6 | — | El documento no tiene ningún RF que defina cómo se registran los prerrequisitos | **PENDIENTE** |
+| D-7 | RF072 | Generación en servidor y en cola, no impresión del navegador | Ratificada |
+| D-8 | RF073 | `.xlsx` real con tipos, no CSV | Ratificada |
+| D-9 | RF055 · RF047 | Datos del plan ISI 2018 cargados incompletos: horas teóricas en 0 y sumillas en «pendiente» | **PENDIENTE** |
+
+### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
+
+**Pide:** «Precondiciones: El plan se encuentra en estado Aprobado.»
+
+**Hace:** la acepta desde **Aprobado, Vigente e Histórico**.
+
+**Por qué:** Vigente e Histórico son estados posteriores a la aprobación. La lectura literal deja sin evidencia documental precisamente a los planes archivados, que son los que un evaluador de acreditación pide. Con la regla estricta, el plan ISI 2018 —el único cargado— no podría generar su propia evidencia.
+
+**Dónde:** `generar-documentos.use-case.ts`, constante `YA_APROBADO`, con el motivo anotado. La interfaz deshabilita el botón antes de Aprobado y explica por qué.
+
+**Qué hay que decidir:** si la universidad confirma la ampliación, corregir la precondición en el PDF. Si prefiere la lectura literal, es cambiar una línea — y aceptar que los planes históricos se quedan sin evidencia.
+
+### D-2 · RF056 y RF067 — grupos de electivos
+
+**Pide:** RF056 clasifica cada asignatura como obligatoria o electiva, y nada más. No existe el concepto de *grupo* de electivos ni de «elegir N de M».
+
+**Hace:** existe la entidad `GrupoElectivo`. Cada grupo declara cuántas de sus opciones se cursan, y RF067 cuenta el aporte del grupo una sola vez.
+
+**Por qué:** el plan real ISI 2018 los tiene — «un electivo por ciclo, a escoger». Sin modelarlos, las dieciséis opciones de electivo se contaban como dieciséis cursos obligatorios y el plan declaraba **249 créditos en vez de los 210** que dice el documento oficial de la carrera. No es una mejora opcional: sin esto la cifra que el sistema publica es falsa.
+
+**Qué hay que decidir:** esto es una **ampliación del modelo de datos**, no una corrección de redacción. Si el PDF es la especificación de referencia, le falta un RF que defina los grupos de electivos.
+
+### D-3 · RF084 — formato del histórico de cambios
+
+**Pide:** «Genera un archivo (PDF o Excel) con el detalle cronológico de cambios.»
+
+**Hace:** solo PDF.
+
+**Por qué:** no hubo un caso de uso que justificara el Excel del histórico. La malla sí lo tiene (RF073) porque se exporta para análisis externos; un histórico de aprobaciones se lee, no se tabula.
+
+**Qué hay que decidir:** si hace falta el Excel. Es un valor más en el enum de tipos y un renderizador que ya existe: cuestión de horas, no de días.
+
+### D-4 · RF101–RF110 — numeración inferida
+
+**Pide:** el documento fuente los cita en una línea de resumen —ocho capacidades— y los declara fuera de su alcance. No hay texto de RF para ninguno.
+
+**Hace:** las ocho capacidades están implementadas (ver sección 6).
+
+**El problema:** son ocho capacidades para diez números. **Qué capacidad es RF103 y cuál es RF107 no consta en ninguna parte de lo que tenemos.** La correspondencia está inferida del orden en que la línea de resumen las nombra.
+
+**Qué hay que decidir:** contrastarlo contra el PDF completo. Hasta entonces, **no citar un número concreto de ese rango** en un expediente de acreditación ni en un informe de avance: la trazabilidad requisito↔implementación de ese bloque no está verificada.
+
+### D-5 · RF041 y RF053 — códigos autogenerados
+
+**Pide:** ambos dicen «RN1: El código no es editable manualmente».
+
+**Hace:** la aplicación lo cumple sin excepción — ningún endpoint acepta un código. Pero el script de carga de planes históricos (`cargar-plan-isi-2018.ts`) escribe directamente en la base los códigos institucionales reales: `ASUC01113`, `CPE-ISI07`.
+
+**Por qué:** RN1 es la regla correcta para dar de alta una asignatura nueva. Esto no es un alta: es la carga de un plan que ya existe, con los códigos que aparecen en el récord de cada estudiante y en los expedientes de acreditación. Si el sistema inventara los suyos (`ISI-101`, `CPE-01`), el dato quedaría inservible para cotejar con cualquier documento oficial de la universidad.
+
+**Qué hay que decidir:** el PDF debería contemplar la carga de planes preexistentes como caso aparte de la creación. Hoy no la menciona, y sin eso el script contradice RN1 sobre el papel.
+
+### D-6 · Sin RF que defina los prerrequisitos
+
+**Pide:** nada. El documento menciona prerrequisitos en RF052 (impacto al inactivar), RF059 (histórico), RF062 (coherencia al mover de ciclo) y RF097 (validación de circularidad) — pero **no hay ningún RF que diga cómo se registran**.
+
+**Hace:** existen prerrequisitos y correquisitos entre asignaturas, con validación de circularidad.
+
+**Además:** el plan ISI 2018 tiene **16 requisitos que el modelo no sabe expresar** («20 créditos aprobados», «60 créditos aprobados», certificado de inglés B1). Están conservados como texto en `scripts/datos/isi-2018.ts` bajo `requisitoNoModelable` para no perderlos, pero **no se cargan y no participan en ninguna validación**.
+
+**Qué hay que decidir:** dos cosas. Un RF que defina el registro de prerrequisitos, y si los requisitos por créditos acumulados deben modelarse. Son reales y hoy el sistema no los conoce.
+
+### D-7 · RF072 — generación del PDF · *ratificada*
+
+**Pide:** «El sistema compila la información del plan» y entrega el archivo. No dice cómo.
+
+**Hace:** lo genera el servidor con PDFKit, despachado a una cola BullMQ y producido por un proceso worker aparte.
+
+**Por qué:** la primera versión usaba la impresión del navegador, que no producía un documento con formato institucional y no permitía medir nada. El RNF de `CLAUDE.md` §3.4 pide menos de 5 s bajo carga; medido con k6 sobre el plan real de 74 asignaturas, el p(95) de extremo a extremo es de 942 ms.
+
+### D-8 · RF073 — exportación a Excel · *ratificada*
+
+**Pide:** «Genera un archivo Excel con la estructura de ciclos y asignaturas.»
+
+**Hace:** un `.xlsx` real de tres hojas, con los créditos guardados **como número** y no como texto, autofiltro y cabecera congelada.
+
+**Por qué:** la versión anterior era un CSV renombrado. Abría en Excel y era inútil para lo único que RF073 justifica —«análisis externos»—: una columna de créditos en texto no se puede sumar ni llevar a una tabla dinámica.
+
+### D-9 · RF055 y RF047 — datos incompletos del plan cargado
+
+**Pide:** RF055 define las horas teóricas de cada asignatura; RF047 crea la asignatura con nombre **y descripción**.
+
+**Hace:** el plan ISI 2018 está cargado con **horas teóricas en 0** y **todas las sumillas con un texto de relleno** («Sumilla pendiente de cargar desde el sílabo oficial de la asignatura»).
+
+**Por qué:** el documento del que se cargó el plan no los trae. Se prefirió un valor visiblemente vacío antes que inventarlo.
+
+**Qué hay que decidir:** de dónde salen esos datos. Mientras tanto, cualquier reporte que use horas teóricas dará cero, y el PDF del plan sale con las sumillas en blanco.
+
+---
+
+## 9. Construido sin que el documento fuente lo pida
+
+No son divergencias: son cosas que el sistema hace y que el PDF no menciona. Si es la especificación de referencia, le faltan.
+
+**Mapeo competencia ↔ atributo del graduado ICACIT.** Viene de `CLAUDE.md` §6.2, no del documento de requisitos. Cada competencia se mapea a los atributos del perfil del graduado que desarrolla, y un reporte enseña qué atributos no cubre ninguna competencia — que es el hallazgo que busca una acreditación. La relación es de **varios a varios**: en la matriz de ISI, «Aprendizaje autónomo» desarrolla AG-I06 y AG-I08 a la vez.
+
+**Bitácora de accesos.** Separada de la bitácora de cambios que sí pide el documento (RF078, RF080). Registra entrada, salida, intentos fallidos y reuso de *refresh token* —señal de robo de sesión—. El refresco normal no se registra: rota cada quince minutos por usuario activo y enterraría lo demás.
+
+**Trabajos de generación de documentos.** Cada solicitud de PDF o Excel es una fila con estado consultable (En cola → Generando → Listo | Fallido) que sobrevive al proceso. El documento fuente supone que el archivo se entrega en el acto; con generación en cola hace falta poder preguntar por él, y poder volver mañana a descargarlo.
+
+**Procedencia en cada documento generado.** Todo PDF y todo Excel llevan al pie qué sistema los produjo y cuándo. Un archivo suelto en un expediente que no dice de dónde salió no vale como evidencia de nada.
