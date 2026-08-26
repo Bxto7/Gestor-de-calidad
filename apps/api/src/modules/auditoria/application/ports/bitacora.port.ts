@@ -29,8 +29,24 @@ export interface FiltroBitacora {
   readonly limite?: number;
 }
 
+/**
+ * Bitácora de accesos: quién entró, cuándo y quién no pudo.
+ *
+ * Consulta aparte de `FiltroBitacora` porque la pregunta es distinta. Aquella
+ * responde «qué le pasó a este plan» y por eso exige decir cuál; esta responde
+ * «quién ha estado entrando», que por definición no se acota a una entidad.
+ */
+export interface FiltroAccesos {
+  readonly usuarioId?: string;
+  readonly desde?: Date;
+  /** Solo intentos rechazados y reusos de token: la consulta de una revisión. */
+  readonly soloIncidentes?: boolean;
+  readonly limite?: number;
+}
+
 export interface RepositorioBitacoraPort {
   listar(filtro: FiltroBitacora): Promise<EventoBitacora[]>;
+  listarAccesos(filtro: FiltroAccesos): Promise<EventoBitacora[]>;
 }
 
 export const REPOSITORIO_BITACORA = Symbol('RepositorioBitacoraPort');

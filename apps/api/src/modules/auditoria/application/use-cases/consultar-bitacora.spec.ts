@@ -12,17 +12,23 @@ import type { Actor } from '../../../../shared-kernel/domain-events/domain-event
 import { AccesoDenegado, ReglaDeNegocioViolada } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { FiltroBitacora, RepositorioBitacoraPort } from '../ports/bitacora.port.js';
+import type { FiltroAccesos } from '../ports/bitacora.port.js';
 import { ConsultarBitacora } from './consultar-bitacora.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Administrador' };
 
 function montar(permitido = true) {
   const recibidos: FiltroBitacora[] = [];
+  const accesosPedidos: FiltroAccesos[] = [];
   const permisos: string[] = [];
 
   const repo: RepositorioBitacoraPort = {
     listar: async (filtro) => {
       recibidos.push(filtro);
+      return [];
+    },
+    listarAccesos: async (filtro) => {
+      accesosPedidos.push(filtro);
       return [];
     },
   };
@@ -36,7 +42,7 @@ function montar(permitido = true) {
     carreraACargoDe: async () => null,
   };
 
-  return { caso: new ConsultarBitacora(repo, autorizacion), recibidos, permisos };
+  return { caso: new ConsultarBitacora(repo, autorizacion), recibidos, accesosPedidos, permisos };
 }
 
 describe('Permiso', () => {
@@ -93,5 +99,32 @@ describe('Techo del listado', () => {
     const { caso, recibidos } = montar();
     await caso.ejecutar(ACTOR, { limite: 100_000 });
     expect(recibidos[0]?.limite).toBe(200);
+  });
+});
+
+describe('bitácora de accesos', () => {
+  it('no exige indicar una entidad concreta', async () => {
+    // Es lo contrario del histórico de un plan: aquí la pregunta es sobre el
+    // conjunto, «quién ha estado entrando», y no sobre una fila.
+    const { caso, accesosPedidos } = montar();
+    await caso.accesos(ACTOR, {});
+    expect(accesosPedidos).toHaveLength(1);
+  });
+
+  it('aplica el mismo techo de filas que el resto de la bitácora', async () => {
+    const { caso, accesosPedidos } = montar();
+    await caso.accesos(ACTOR, { limite: 5000 });
+    expect(accesosPedidos[0]?.limite).toBe(200);
+  });
+
+  it('exige el permiso de auditoría', async () => {
+    const { caso } = montar(false);
+    await expect(caso.accesos(ACTOR, {})).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('deja pasar el filtro de solo incidentes', async () => {
+    const { caso, accesosPedidos } = montar();
+    await caso.accesos(ACTOR, { soloIncidentes: true });
+    expect(accesosPedidos[0]?.soloIncidentes).toBe(true);
   });
 });

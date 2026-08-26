@@ -12,7 +12,7 @@
  * NestJS"— y lo que permite instanciarlas a mano en las pruebas.
  */
 
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -39,6 +39,14 @@ import { UsuarioRepositoryPrisma } from './modules/auth/infrastructure/usuario.r
 import { Seguridad } from './modules/auth/infrastructure/seguridad.js';
 import { JwtGuard } from './modules/auth/infrastructure/http/jwt.guard.js';
 import { SesionController } from './modules/auth/infrastructure/http/sesion.controller.js';
+import {
+  REPOSITORIO_GESTION_USUARIOS,
+  type RepositorioGestionUsuariosPort,
+} from './modules/auth/application/ports/gestion-usuarios.port.js';
+import { GestionarUsuarios } from './modules/auth/application/use-cases/gestionar-usuarios.use-case.js';
+import { GestionUsuariosRepositoryPrisma } from './modules/auth/infrastructure/persistence/gestion-usuarios.repository.js';
+import { UsuariosController } from './modules/auth/infrastructure/http/usuarios.controller.js';
+import { RegistroDeSeguridadBitacora } from './modules/auth/infrastructure/registro-de-seguridad.js';
 
 import type { PublicadorDeEventos } from './shared-kernel/domain-events/domain-event.js';
 
@@ -178,6 +186,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
 
   controllers: [
     SesionController,
+    UsuariosController,
     FacultadesController,
     CarrerasController,
     PlanesController,
@@ -203,6 +212,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     /* ── Puertos → adaptadores ─────────────────────────────────────────── */
     { provide: AUTHORIZATION_PORT, useClass: AuthorizationAdapter },
     { provide: REPOSITORIO_USUARIO, useClass: UsuarioRepositoryPrisma },
+    { provide: REPOSITORIO_GESTION_USUARIOS, useClass: GestionUsuariosRepositoryPrisma },
     { provide: SEGURIDAD_PORT, useExisting: Seguridad },
     { provide: REPOSITORIO_PLAN, useClass: PlanRepositoryPrisma },
     { provide: REPOSITORIO_CONTENIDO, useClass: ContenidoRepositoryPrisma },
@@ -231,17 +241,16 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     /* ── Casos de uso ──────────────────────────────────────────────────── */
     {
       provide: IniciarSesion,
-      inject: [REPOSITORIO_USUARIO, SEGURIDAD_PORT],
-      useFactory: (usuarios: RepositorioUsuarioPort, seguridad: SeguridadPort) => {
-        const log = new Logger('Seguridad');
-        return new IniciarSesion(usuarios, seguridad, {
-          intentoFallido: (email) => log.warn(`Intento de acceso fallido para ${email}.`),
-          reusoDeToken: (usuarioId) =>
-            log.error(
-              `Reuso de refresh token revocado (usuario ${usuarioId}). Se revoca la sesión.`,
-            ),
-        });
-      },
+      inject: [REPOSITORIO_USUARIO, SEGURIDAD_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        usuarios: RepositorioUsuarioPort,
+        seguridad: SeguridadPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        // El registro va a la bitácora además de al log: la rotación de logs se
+        // lleva por delante lo que una revisión de seguridad consulta meses
+        // después.
+        new IniciarSesion(usuarios, seguridad, new RegistroDeSeguridadBitacora(eventos)),
     },
     {
       provide: GestionarFacultades,
@@ -261,6 +270,16 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos),
+    },
+    {
+      provide: GestionarUsuarios,
+      inject: [REPOSITORIO_GESTION_USUARIOS, SEGURIDAD_PORT, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        usuarios: RepositorioGestionUsuariosPort,
+        seguridad: SeguridadPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarUsuarios(usuarios, seguridad, autorizacion, eventos),
     },
     {
       provide: ConsultarSesion,

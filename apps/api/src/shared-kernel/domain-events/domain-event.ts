@@ -9,13 +9,37 @@
  * Es lo que justifica que viva en `shared-kernel/` y no dentro de un módulo:
  * si se eliminara, se romperían los dos.
  */
+/**
+ * Las entidades sobre las que la bitácora puede hablar.
+ *
+ * Lista cerrada a propósito: la bitácora se consulta filtrando por entidad, y
+ * una cadena libre acabaría con «Plan», «plan» y «PlanEstudios» conviviendo como
+ * si fueran cosas distintas.
+ *
+ * Es un `const` y no solo un tipo porque la capa HTTP necesita validarlo en
+ * tiempo de ejecución. Cuando eran dos listas separadas divergieron: se
+ * añadieron `Usuario` y `Sesión` al tipo y el filtro de la API siguió
+ * rechazándolos con un 400.
+ */
+export const ENTIDADES_AUDITABLES = [
+  'Facultad',
+  'Carrera',
+  'Plan',
+  'Asignatura',
+  'Objetivo',
+  'Competencia',
+  'Usuario',
+  'Sesión',
+] as const;
+
+export type EntidadAuditable = (typeof ENTIDADES_AUDITABLES)[number];
+
 export abstract class DomainEvent {
   /** Nombre estable del evento, para que el listener pueda discriminar. */
   abstract readonly nombre: string;
 
-  /** Entidad afectada, en el vocabulario de la bitácora. */
-  abstract readonly entidad:
-    'Facultad' | 'Carrera' | 'Plan' | 'Asignatura' | 'Objetivo' | 'Competencia';
+  /** Entidad afectada, en el vocabulario de la bitácora. Ver `ENTIDADES_AUDITABLES`. */
+  abstract readonly entidad: EntidadAuditable;
 
   abstract readonly entidadId: string;
 

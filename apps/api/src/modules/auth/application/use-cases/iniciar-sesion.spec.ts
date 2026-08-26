@@ -61,6 +61,11 @@ function montar(
       verificados.push(hash);
       return hash === HASH_VALIDO && password === 'correcta';
     },
+    // El login no hashea nunca; está en el puerto porque lo usa la
+    // administración de cuentas. Si el doble lo ejecutara sería un fallo.
+    hashearPassword: async () => {
+      throw new Error('Iniciar sesión no debe hashear contraseñas.');
+    },
     emitirAccessToken: async (c) => `access-de-${c.sub}`,
     generarRefreshToken: () => 'refresh-nuevo',
     hashearRefreshToken: (t) => `hash:${t}`,
@@ -70,6 +75,8 @@ function montar(
   const registro: RegistroDeSeguridad = {
     intentoFallido: (email) => void incidentes.push(`fallido:${email}`),
     reusoDeToken: (id) => void incidentes.push(`reuso:${id}`),
+    accesoConcedido: (id) => void incidentes.push(`acceso:${id}`),
+    sesionCerrada: (id) => void incidentes.push(`cierre:${id}`),
   };
 
   const caso = new IniciarSesion(usuarios, seguridad, registro, () => AHORA);
@@ -236,5 +243,39 @@ describe('Cierre de sesión', () => {
     const { caso, revocadosTodos } = montar();
     await caso.cerrarSesion('u-1');
     expect(revocadosTodos).toEqual(['u-1']);
+  });
+});
+
+describe('bitácora de accesos', () => {
+  it('un acceso correcto se registra, no solo los fallidos', async () => {
+    // Una bitácora que solo anota lo que falló no responde a «¿quién entró el
+    // martes?», que es la pregunta que hace una revisión de seguridad.
+    const { caso, incidentes } = montar({ usuario: usuario() });
+    await caso.ejecutar('ana@sgc.local', 'correcta');
+
+    expect(incidentes).toContain('acceso:u-1');
+  });
+
+  it('cerrar sesión también deja constancia', async () => {
+    const { caso, incidentes } = montar({ usuario: usuario() });
+    await caso.cerrarSesion('u-1');
+
+    expect(incidentes).toContain('cierre:u-1');
+  });
+
+  it('el refresco de token NO se registra', async () => {
+    // Rota cada quince minutos por usuario activo: anotarlo llenaría la
+    // bitácora de ruido y enterraría los accesos que sí importan.
+    const { caso, incidentes } = montar({
+      sesion: {
+        id: 'sesion-1',
+        expiraEn: new Date(AHORA.getTime() + 60_000),
+        revocadoEn: null,
+        usuario: { id: 'u-1', nombreCompleto: 'Ana', activo: true },
+      },
+    });
+    await caso.refrescar('refresh-viejo');
+
+    expect(incidentes).toHaveLength(0);
   });
 });

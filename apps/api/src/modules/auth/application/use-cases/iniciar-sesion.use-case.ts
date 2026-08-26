@@ -28,10 +28,22 @@ export interface SesionEmitida {
   readonly nombre: string;
 }
 
-/** Registro de incidentes de seguridad, sin acoplar a un logger concreto. */
+/**
+ * Registro de accesos e incidentes, sin acoplar a un logger ni a la bitácora.
+ *
+ * El caso de uso solo declara qué ocurrió; que eso acabe en el log del servidor,
+ * en la bitácora de auditoría o en ambos lo decide el adaptador.
+ *
+ * El refresco de token **no** está aquí a propósito. Rota cada quince minutos
+ * por usuario activo: registrarlo llenaría la bitácora de ruido y enterraría los
+ * accesos que sí importan. Lo que se registra son los hitos —entrar, salir,
+ * fallar— y el reuso de un token, que es señal de robo.
+ */
 export interface RegistroDeSeguridad {
   intentoFallido(email: string): void;
   reusoDeToken(usuarioId: string): void;
+  accesoConcedido(usuarioId: string, nombre: string): void;
+  sesionCerrada(usuarioId: string): void;
 }
 
 export class IniciarSesion {
@@ -57,6 +69,7 @@ export class IniciarSesion {
       throw new AccesoDenegado('Correo o contraseña incorrectos.');
     }
 
+    this.registro.accesoConcedido(usuario.id, usuario.nombreCompleto);
     return this.emitir(usuario.id, usuario.nombreCompleto);
   }
 
@@ -88,6 +101,7 @@ export class IniciarSesion {
 
   async cerrarSesion(usuarioId: string): Promise<void> {
     await this.usuarios.revocarTodosDe(usuarioId);
+    this.registro.sesionCerrada(usuarioId);
   }
 
   private async emitir(usuarioId: string, nombre: string): Promise<SesionEmitida> {

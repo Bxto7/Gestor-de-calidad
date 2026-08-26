@@ -16,6 +16,7 @@ import { AccesoDenegado, ReglaDeNegocioViolada } from '../../../../shared-kernel
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type {
   EventoBitacora,
+  FiltroAccesos,
   FiltroBitacora,
   RepositorioBitacoraPort,
 } from '../ports/bitacora.port.js';
@@ -49,6 +50,23 @@ export class ConsultarBitacora {
     }
 
     return this.bitacora.listar({
+      ...filtro,
+      limite: Math.min(filtro.limite ?? LIMITE_MAXIMO, LIMITE_MAXIMO),
+    });
+  }
+
+  /**
+   * Bitácora de accesos (bloque de reportes RF101–RF110).
+   *
+   * No pasa por la regla de «di qué entidad»: aquí no hay una entidad concreta
+   * que consultar, la pregunta es sobre el conjunto. Lo que la acota es el
+   * límite y el índice por (entidad, fecha), no el identificador.
+   */
+  async accesos(actor: Actor, filtro: FiltroAccesos): Promise<EventoBitacora[]> {
+    const decision = await this.autorizacion.puede(actor.id, 'auditoria.leer', null);
+    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+
+    return this.bitacora.listarAccesos({
       ...filtro,
       limite: Math.min(filtro.limite ?? LIMITE_MAXIMO, LIMITE_MAXIMO),
     });

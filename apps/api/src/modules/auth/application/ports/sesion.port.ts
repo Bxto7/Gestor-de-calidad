@@ -33,6 +33,12 @@ export interface RepositorioUsuarioPort {
 /** Operaciones criptográficas. La implementación elige argon2id y JWT (§4.4). */
 export interface SeguridadPort {
   verificarPassword(hash: string, password: string): Promise<boolean>;
+  /**
+   * Declarado aquí y no solo en la clase: la administración de cuentas necesita
+   * hashear, y sin el método en el puerto tendría que importar `Seguridad`
+   * —y con ella argon2— desde la capa de aplicación.
+   */
+  hashearPassword(password: string): Promise<string>;
   emitirAccessToken(carga: { sub: string; nombre: string }): Promise<string>;
   generarRefreshToken(): string;
   hashearRefreshToken(token: string): string;

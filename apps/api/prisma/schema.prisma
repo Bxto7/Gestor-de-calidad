@@ -629,6 +629,10 @@ model EventoAuditoria {
 
   @@index([entidad, entidadId, fecha])
   @@index([fecha])
+  /// Bitácora de accesos: la consulta filtra por acción y ordena por fecha.
+  /// Sin este índice, buscar los intentos fallidos —que son raros— obligaría a
+  /// recorrer hacia atrás toda la actividad reciente para encontrar unos pocos.
+  @@index([accion, fecha])
   @@map("audit_log")
   @@schema("auditoria")
 }
