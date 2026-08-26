@@ -126,6 +126,13 @@ import {
   FacultadRepositoryPrisma,
 } from './modules/plan-estudios/infrastructure/persistence/estructura.repository.js';
 import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
+import {
+  REPOSITORIO_REPORTES,
+  type RepositorioReportesPort,
+} from './modules/plan-estudios/application/ports/reportes.port.js';
+import { ConsultarReportes } from './modules/plan-estudios/application/use-cases/consultar-reportes.use-case.js';
+import { ReportesRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/reportes.repository.js';
+import { ReportesController } from './modules/plan-estudios/infrastructure/http/reportes.controller.js';
 import { AsignaturaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/asignatura.repository.js';
 import {
   CompetenciaRepositoryPrisma,
@@ -197,6 +204,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     CompetenciasController,
     DocumentosDelPlanController,
     DocumentosController,
+    ReportesController,
     BitacoraController,
   ],
 
@@ -237,6 +245,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: RENDERIZADOR_PDF, useClass: RenderizadorPdfKit },
     { provide: RENDERIZADOR_HOJA, useClass: RenderizadorExcelJs },
     { provide: COLA_DOCUMENTOS, useClass: ColaDeDocumentosBullMq },
+    { provide: REPOSITORIO_REPORTES, useClass: ReportesRepositoryPrisma },
 
     /* ── Casos de uso ──────────────────────────────────────────────────── */
     {
@@ -426,6 +435,12 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         pdf: RenderizadorPdfPort,
         hoja: RenderizadorHojaPort,
       ) => new GenerarDocumento(documentos, datos, almacen, pdf, hoja),
+    },
+    {
+      provide: ConsultarReportes,
+      inject: [REPOSITORIO_REPORTES, AUTHORIZATION_PORT],
+      useFactory: (reportes: RepositorioReportesPort, autorizacion: AuthorizationPort) =>
+        new ConsultarReportes(reportes, autorizacion),
     },
     {
       provide: ConsultarPlan,
