@@ -86,8 +86,20 @@ const ROLES: {
     codigo: 'ADMIN_SISTEMA',
     nombre: 'Administrador del sistema',
     descripcion: 'Gestión de la estructura base (facultades, carreras).',
-    // Dueño de la estructura y de las cuentas. No aprueba planes: esa decisión
-    // es académica y corresponde al Director de carrera.
+    // Dueño de la estructura y de las cuentas. **Lee todo, no decide nada
+    // académico**: esa separación es la que define el rol.
+    //
+    // Los tres `.leer` de contenido curricular estaban fuera y se añadieron
+    // después de comprobar el resultado: con `plan.leer` pero sin
+    // `asignatura.leer`, el administrador abría un plan y encontraba la mitad
+    // vacía —sin créditos, sin malla, sin validaciones— sobre un plan que sí
+    // existe. Puede administrar cuentas y estructura de una universidad cuyo
+    // contenido no podía consultar.
+    //
+    // Lo que sigue fuera, y a propósito: no crea ni edita contenido, no aprueba
+    // planes y **no tiene `reporte.generar`**. Ese permiso no es de lectura:
+    // produce evidencia documental que sale de la universidad hacia un
+    // expediente de acreditación, y eso es una responsabilidad académica.
     permisos: [
       'facultad.leer',
       'facultad.crear',
@@ -99,6 +111,9 @@ const ROLES: {
       'carrera.inactivar',
       'plan.leer',
       'plan.leer_historico',
+      'objetivo.leer',
+      'competencia.leer',
+      'asignatura.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
