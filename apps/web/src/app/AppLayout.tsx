@@ -7,7 +7,7 @@
  * Informática") viven en los datos, no en la URL.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
@@ -16,9 +16,30 @@ import { LimiteDeError } from '@/shared/components/LimiteDeError';
 import isotipoUC from '@/assets/marca/isotipo-uc-negro.png';
 import { CtxEncabezado, type ContextoEncabezado, type Encabezado } from './encabezado';
 
-const ENLACES = [
+/**
+ * Menú principal.
+ *
+ * `permiso` esconde la entrada cuando el rol no la tiene. No es seguridad —esa
+ * la aplica el backend en cada petición— sino no ofrecer una puerta que se
+ * cierra en la cara: un docente que pulsara «Usuarios» solo vería un 403.
+ */
+const ENLACES: {
+  a: string;
+  etiqueta: string;
+  icono: () => ReactElement;
+  exacto: boolean;
+  permiso?: string;
+}[] = [
   { a: '/', etiqueta: 'Resumen', icono: IconoResumen, exacto: true },
   { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
+  { a: '/reportes', etiqueta: 'Reportes', icono: IconoReportes, exacto: false, permiso: 'plan.leer' },
+  {
+    a: '/usuarios',
+    etiqueta: 'Usuarios',
+    icono: IconoUsuarios,
+    exacto: false,
+    permiso: 'usuario.gestionar',
+  },
 ];
 
 /** Puerta de salida. Trazo simple para que pese lo mismo que los del menú. */
@@ -43,7 +64,7 @@ function IconoSalir() {
 
 export function AppLayout() {
   const [encabezado, setEncabezado] = useState<Encabezado>({ migas: [], acciones: null });
-  const { identidad, salir } = useSesion();
+  const { identidad, salir, puede } = useSesion();
   const ubicacion = useLocation();
 
   // Iniciales del nombre real, no unas fijas: "Ana María Quispe" → "AQ".
@@ -87,7 +108,8 @@ export function AppLayout() {
           </div>
 
           <nav className="mt-2 flex flex-1 flex-col gap-0.5 px-3" aria-label="Navegación principal">
-            {ENLACES.map(({ a, etiqueta, icono: Icono, exacto }) => (
+            {ENLACES.filter((e) => !e.permiso || puede(e.permiso)).map(
+              ({ a, etiqueta, icono: Icono, exacto }) => (
               <NavLink
                 key={a}
                 to={a}
@@ -104,7 +126,8 @@ export function AppLayout() {
                 <Icono />
                 {etiqueta}
               </NavLink>
-            ))}
+              ),
+            )}
           </nav>
 
           <div className="m-3 flex items-center gap-3 rounded-xl bg-white/10 px-3 py-3">
@@ -226,6 +249,46 @@ function IconoPlan() {
       <path d="M5 4.5h9.5L19 9v10.5H5z" />
       <path d="M14 4.5V9h5" />
       <path d="M8.5 13h7M8.5 16.5h4.5" />
+    </svg>
+  );
+}
+
+/** Reportes: barras. */
+function IconoReportes() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </svg>
+  );
+}
+
+/** Usuarios: dos siluetas. */
+function IconoUsuarios() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
     </svg>
   );
 }

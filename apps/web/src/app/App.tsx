@@ -13,6 +13,9 @@ import { MallaCurricularPage } from '@/features/plan-estudios/pages/MallaCurricu
 import { ObjetivosPage } from '@/features/plan-estudios/pages/ObjetivosPage';
 import { PlanEstudiosPage } from '@/features/plan-estudios/pages/PlanEstudiosPage';
 import { ResumenPage } from '@/features/plan-estudios/pages/ResumenPage';
+import { ReportePlanPage } from '@/features/reportes/pages/ReportePlanPage';
+import { ReportesPage } from '@/features/reportes/pages/ReportesPage';
+import { UsuariosPage } from '@/features/usuarios/pages/UsuariosPage';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 
 const queryClient = new QueryClient({
@@ -58,6 +61,9 @@ export function App() {
                   path="plan-estudios/planes/:planId/malla"
                   element={<MallaCurricularPage />}
                 />
+                <Route path="reportes" element={<ReportesPage />} />
+                <Route path="reportes/planes/:planId" element={<ReportePlanPage />} />
+                <Route path="usuarios" element={<UsuariosPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Route>
