@@ -188,7 +188,13 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     }),
 
     // §4.4: límite global además del específico de login.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    //
+    // Configurable porque una prueba de carga necesita subirlo: con 120 req/min
+    // por IP, k6 mediría el rate limiter en vez de la aplicación. En producción
+    // se deja el valor por defecto.
+    ThrottlerModule.forRoot([
+      { ttl: 60_000, limit: Number(process.env['THROTTLE_LIMIT'] ?? 120) },
+    ]),
   ],
 
   controllers: [

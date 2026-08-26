@@ -48,3 +48,7 @@ acoplar su ciclo de vida ni sus recursos al VPS core, y solo se aprovisiona cuan
 - PostgreSQL y Redis **nunca** expuestos fuera de la red interna de Docker. El firewall de
   Hetzner solo abre 22 (SSH restringido por IP) y 80/443.
 - `.env` fuera de control de versiones, con permisos restringidos en el VPS.
+- **`TRUST_PROXY=1` en el VPS.** Caddy va delante, y sin esto Express toma su IP como la del
+  cliente: el rate limiting de §4.4 —120 peticiones y 5 inicios de sesión por minuto— deja de
+  ser por persona y pasa a ser por instalación. Es un número de saltos y no `true`: confiar sin
+  contarlos permite falsificar `X-Forwarded-For` y esquivar el límite del login.

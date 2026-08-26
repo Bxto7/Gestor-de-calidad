@@ -8,14 +8,34 @@ import 'reflect-metadata';
 
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module.js';
 
 async function arrancar(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
   app.setGlobalPrefix('api/v1');
+
+  // ── Confianza en el proxy ────────────────────────────────────────────────
+  //
+  // Sin esto, Express toma como IP del cliente la del socket. Detrás de Caddy
+  // (§5.2) esa es siempre la de Caddy, así que **toda la universidad comparte
+  // un único cubo de rate limiting**: los 120 req/min globales y los 5 logins
+  // por minuto de §4.4 dejarían de ser por persona y pasarían a ser por
+  // instalación. Cinco personas entrando a primera hora bloquearían al resto.
+  //
+  // El valor es el número de saltos de proxy y no `true`. Confiar sin contarlos
+  // deja que cualquiera mande un `X-Forwarded-For` inventado y se salte el
+  // límite eligiendo una IP distinta en cada intento — que es exactamente lo
+  // que el límite del login existe para impedir.
+  //
+  // 0 (por defecto) en desarrollo, donde no hay proxy; 1 en el VPS.
+  const saltosDeProxy = Number(process.env['TRUST_PROXY'] ?? 0);
+  if (saltosDeProxy > 0) {
+    app.set('trust proxy', saltosDeProxy);
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -42,6 +62,7 @@ async function arrancar(): Promise<void> {
   const log = new Logger('Arranque');
   log.log(`API escuchando en http://localhost:${puerto}/api/v1`);
   log.log(`Documentación en http://localhost:${puerto}/api/docs`);
+  if (saltosDeProxy > 0) log.log(`Confiando en ${saltosDeProxy} proxy(s) para la IP del cliente.`);
 }
 
 arrancar().catch((error: unknown) => {

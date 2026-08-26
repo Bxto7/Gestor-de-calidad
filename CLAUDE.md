@@ -354,7 +354,7 @@ Si a futuro la universidad requiere una certificación formal (por ejemplo ISO/I
 | Característica (ISO 25010:2023) | Cómo se cumple hoy en la arquitectura | Estado |
 |---|---|---|
 | Adecuación funcional | 131 RF + 24 RNF documentados y trazables por módulo (sección 1) | ✅ ya definido |
-| Eficiencia de desempeño | Generación de documentos en cola BullMQ con worker propio (3.4), implementada; medida en el plan real de 74 asignaturas: 112–483 ms por documento, frente al RNF de < 5 s. Pruebas de carga con k6 en Staging (4.7/6.4) | ✅ implementado y medido en desarrollo / 🔲 sin validar bajo concurrencia: falta k6 en Staging |
+| Eficiencia de desempeño | Generación de documentos en cola BullMQ con worker propio (3.4). Scripts de k6 en `tests/carga/`, con el RNF escrito como umbral que hace fallar la prueba. Última medición local: extremo a extremo p(95) = 942 ms frente a los 5 s del RNF; consultas p(95) = 104 ms con 15 usuarios concurrentes | ✅ implementado y medido en desarrollo / 🔲 falta ejecutarlo en Staging, que aún no existe (§5 pendiente): el número que cuenta es el del VPS |
 | Compatibilidad | API REST + OpenAPI autogenerado (4.2), evita acoplar frontend/backend a un formato propietario | ✅ ya definido |
 | Capacidad de interacción (antes "usabilidad") | Tailwind + `@dnd-kit` accesible (4.1); objetivo WCAG 2.1 AA + `axe-core` (4.7/6.2) | 🔲 objetivo definido, pruebas automatizadas pendientes |
 | Fiabilidad | Máquina de estados explícita (3.4), auditoría append-only (3.4/5.3), backups diarios + RTO ≤4h (5.6) | ✅ ya definido |
