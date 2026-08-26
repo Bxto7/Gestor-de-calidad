@@ -6,3 +6,8 @@ dist/
 coverage/
 *.tmp.ts
 *.log.tmp
+
+# Documentos generados por el worker. Son artefactos: se regeneran desde los
+# datos, pesan y además pueden contener información del plan que no tiene por
+# qué viajar en el repositorio.
+var/

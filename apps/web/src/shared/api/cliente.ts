@@ -141,6 +141,19 @@ interface Opciones {
   cuerpo?: unknown;
   /** Parámetros de consulta. Los `undefined` se descartan, no se envían vacíos. */
   parametros?: Record<string, string | number | boolean | undefined>;
+  /**
+   * La respuesta correcta es un archivo, no JSON.
+   *
+   * Solo cambia cómo se lee el cuerpo cuando la petición sale bien: los errores
+   * siguen llegando en JSON y pasan por la misma traducción. Un 409 «todavía se
+   * está generando» tiene que verse como aviso, no como un archivo corrupto.
+   */
+  binario?: boolean;
+}
+
+export interface ArchivoDescargado {
+  readonly blob: Blob;
+  readonly nombreArchivo: string;
 }
 
 function construirUrl(ruta: string, parametros?: Opciones['parametros']): string {
@@ -182,7 +195,9 @@ async function ejecutar(ruta: string, opciones: Opciones, reintentar: boolean): 
     limpiarSesion();
   }
 
-  if (respuesta.ok) return leerCuerpo(respuesta);
+  if (respuesta.ok) {
+    return opciones.binario ? leerArchivo(respuesta) : leerCuerpo(respuesta);
+  }
 
   const cuerpo = (await leerCuerpo(respuesta)) as CuerpoDeError | null;
   const mensaje = mensajeDeError(cuerpo, respuesta.status);
@@ -211,7 +226,27 @@ export const cliente = {
 
   delete: (ruta: string): Promise<void> =>
     ejecutar(ruta, { metodo: 'DELETE' }, true) as Promise<void>,
+
+  descargar: (ruta: string): Promise<ArchivoDescargado> =>
+    ejecutar(ruta, { metodo: 'GET', binario: true }, true) as Promise<ArchivoDescargado>,
 };
+
+/**
+ * Lee un archivo y el nombre que el servidor le puso.
+ *
+ * El nombre viene en `Content-Disposition`. Si faltara, se usa uno genérico en
+ * vez de dejar que el navegador invente uno a partir de la URL — que sería el
+ * identificador del trabajo, ilegible.
+ */
+async function leerArchivo(respuesta: Response): Promise<ArchivoDescargado> {
+  const disposicion = respuesta.headers.get('Content-Disposition') ?? '';
+  const encontrado = /filename="?([^";]+)"?/.exec(disposicion);
+
+  return {
+    blob: await respuesta.blob(),
+    nombreArchivo: encontrado?.[1] ?? 'documento',
+  };
+}
 
 /** Para el login, que no puede llevar token porque todavía no lo hay. */
 export async function pedirSinSesion<T>(ruta: string, cuerpo: unknown): Promise<T> {

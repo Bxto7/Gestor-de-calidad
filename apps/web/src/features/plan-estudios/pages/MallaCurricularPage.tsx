@@ -29,7 +29,7 @@ import {
   creditosPorCiclo,
 } from '../domain/motor-validaciones';
 import { TIPOS_ASIGNATURA, type Asignatura, type TipoAsignatura } from '../domain/tipos';
-import { descargarCsv, imprimirVista } from '../utilidades/exportar';
+import { useGenerarDocumento } from '../api/useGenerarDocumento';
 import { plural } from '../utilidades/formato';
 
 const TONO_TIPO: Record<TipoAsignatura, TonoBadge> = {
@@ -56,6 +56,10 @@ export function MallaCurricularPage() {
   const [cicloActivo, setCicloActivo] = useState<number | 'panel' | null>(null);
   const [vista, setVista] = useState<Vista>('malla');
   const [error, setError] = useState<string | null>(null);
+
+  // RF072 y RF073: los documentos los genera el servidor en una cola. El hook
+  // encola, espera y descarga; aquí solo se pinta en qué punto va.
+  const documento = useGenerarDocumento();
 
   const { puedeEn } = useSesion();
 
@@ -127,63 +131,6 @@ export function MallaCurricularPage() {
     setCicloActivo(zona);
   }
 
-  function exportarCsv() {
-    // RF073: estructura de ciclos y asignaturas. Se genera aunque el plan esté
-    // vacío: la RN dice que en ese caso sale solo la estructura de ciclos.
-    const filas: (string | number)[][] = [
-      ['Plan', planActual.codigo, 'Estado', planActual.estado],
-      [],
-      // La columna de grupo evita que la exportación repita el error que la
-      // pantalla ya no comete: sin ella, las seis opciones del ciclo 10 se leen
-      // como seis cursos obligatorios más.
-      [
-        'Ciclo',
-        'Código',
-        'Asignatura',
-        'Tipo',
-        'Condición',
-        'Créditos',
-        'Horas teóricas',
-        'Grupo de electivos',
-      ],
-    ];
-    for (const c of ciclos) {
-      const delCiclo = activas.filter((a) => a.cicloNumero === c).sort((x, y) => x.orden - y.orden);
-      if (delCiclo.length === 0) {
-        filas.push([c, '', '(sin asignaturas)', '', '', '', '']);
-        continue;
-      }
-      for (const a of delCiclo) {
-        filas.push([
-          c,
-          a.codigo,
-          a.nombre,
-          a.tipo,
-          a.condicion,
-          a.creditos,
-          a.horasTeoricas,
-          a.grupoElectivo
-            ? `${a.grupoElectivo.nombre} (elige ${a.grupoElectivo.cantidadAElegir})`
-            : '',
-        ]);
-      }
-    }
-    for (const a of sinCiclo) {
-      filas.push([
-        'Sin ciclo',
-        a.codigo,
-        a.nombre,
-        a.tipo,
-        a.condicion,
-        a.creditos,
-        a.horasTeoricas,
-        a.grupoElectivo
-          ? `${a.grupoElectivo.nombre} (elige ${a.grupoElectivo.cantidadAElegir})`
-          : '',
-      ]);
-    }
-    descargarCsv(`malla-${planActual.codigo}.csv`, filas);
-  }
 
   // Del motor y no con un `reduce` propio: las opciones de un grupo de electivos
   // no se suman todas, y una copia suelta del cálculo se olvidaría de eso.
@@ -200,14 +147,43 @@ export function MallaCurricularPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Boton variante="secundario" onClick={imprimirVista}>
-            Generar PDF del plan
+          <Boton
+            variante="secundario"
+            disabled={documento.enCurso !== null}
+            onClick={() => void documento.generar(planActual.id, 'RESUMEN_PLAN')}
+          >
+            {documento.enCurso === 'RESUMEN_PLAN' ? 'Generando PDF…' : 'PDF del plan'}
           </Boton>
-          <Boton variante="secundario" onClick={exportarCsv}>
-            Excel
+          <Boton
+            variante="secundario"
+            disabled={documento.enCurso !== null}
+            onClick={() => void documento.generar(planActual.id, 'MALLA_EXCEL')}
+          >
+            {documento.enCurso === 'MALLA_EXCEL' ? 'Generando Excel…' : 'Excel de la malla'}
           </Boton>
         </div>
       </div>
+
+      {/*
+        El fallo llega del worker, no de la petición: cuando algo va mal el
+        servidor ya respondió que sí hace rato. Sin enseñarlo aquí, el botón
+        volvería a su estado normal y el archivo no aparecería, sin explicación.
+      */}
+      {documento.error && (
+        <p
+          role="alert"
+          className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg print:hidden"
+        >
+          <span>{documento.error}</span>
+          <button
+            type="button"
+            onClick={documento.descartarError}
+            className="shrink-0 font-semibold underline"
+          >
+            Descartar
+          </button>
+        </p>
+      )}
 
       {/* RF068: alerta visible mientras queden asignaturas fuera de la malla. */}
       {sinCiclo.length > 0 && (

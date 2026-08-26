@@ -194,7 +194,7 @@ export interface RecommendationPort {
 | ORM | Prisma | Migraciones declarativas, tipado end-to-end, buen ajuste con PostgreSQL |
 | Autenticación | `@nestjs/jwt` + `passport-jwt`, `argon2` para hashing | Argon2 sobre bcrypt: mejor resistencia a ataques con hardware dedicado |
 | Colas | BullMQ sobre Redis | Generación de documentos, notificaciones, futura comunicación async con IA |
-| Documentos | `puppeteer` (PDF vía HTML→PDF) o `pdfkit` (PDF programático), `exceljs` (Excel) | Puppeteer da más control visual; PDFKit es más liviano en recursos |
+| Documentos | **`pdfkit`** (PDF programático) + `exceljs` (Excel), generados en un job de BullMQ | Elegido PDFKit sobre Puppeteer: no arrastra Chromium (~300 MB de imagen, 200–400 MB de RAM por render) a un VPS de 4 GB compartido. El contenido de cada documento vive en `domain/documentos/` y los renderizadores solo lo dibujan, así que cambiar a Puppeteer sería un adaptador nuevo, no una reescritura. Ver `docs/arquitectura/dependencias.md` |
 | Testing | Jest (unit + integración), Supertest (e2e HTTP) | Cobertura ≥80% en `domain/` y `application/`; ver sección 4.7 para el resto del stack de calidad |
 | Linting/formato | ESLint + Prettier, `strict` TypeScript | No negociable en CI |
 
@@ -354,7 +354,7 @@ Si a futuro la universidad requiere una certificación formal (por ejemplo ISO/I
 | Característica (ISO 25010:2023) | Cómo se cumple hoy en la arquitectura | Estado |
 |---|---|---|
 | Adecuación funcional | 131 RF + 24 RNF documentados y trazables por módulo (sección 1) | ✅ ya definido |
-| Eficiencia de desempeño | Generación de documentos como jobs en cola, RNF < 5s (3.4); pruebas de carga con k6 en Staging (4.7/6.4) | 🔲 arquitectura lista, tooling de pruebas pendiente de implementar |
+| Eficiencia de desempeño | Generación de documentos en cola BullMQ con worker propio (3.4), implementada; medida en el plan real de 74 asignaturas: 112–483 ms por documento, frente al RNF de < 5 s. Pruebas de carga con k6 en Staging (4.7/6.4) | ✅ implementado y medido en desarrollo / 🔲 sin validar bajo concurrencia: falta k6 en Staging |
 | Compatibilidad | API REST + OpenAPI autogenerado (4.2), evita acoplar frontend/backend a un formato propietario | ✅ ya definido |
 | Capacidad de interacción (antes "usabilidad") | Tailwind + `@dnd-kit` accesible (4.1); objetivo WCAG 2.1 AA + `axe-core` (4.7/6.2) | 🔲 objetivo definido, pruebas automatizadas pendientes |
 | Fiabilidad | Máquina de estados explícita (3.4), auditoría append-only (3.4/5.3), backups diarios + RTO ≤4h (5.6) | ✅ ya definido |

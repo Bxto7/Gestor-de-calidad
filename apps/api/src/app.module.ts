@@ -123,6 +123,35 @@ import {
   CompetenciaRepositoryPrisma,
   ObjetivoRepositoryPrisma,
 } from './modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
+import {
+  ALMACEN_ARCHIVOS,
+  COLA_DOCUMENTOS,
+  RENDERIZADOR_HOJA,
+  RENDERIZADOR_PDF,
+  REPOSITORIO_DATOS_DOCUMENTO,
+  REPOSITORIO_DOCUMENTOS,
+  type AlmacenDeArchivosPort,
+  type ColaDeDocumentosPort,
+  type RenderizadorHojaPort,
+  type RenderizadorPdfPort,
+  type RepositorioDatosDocumentoPort,
+  type RepositorioDocumentosPort,
+} from './modules/plan-estudios/application/ports/documentos.port.js';
+import {
+  ConsultarDocumento,
+  GenerarDocumento,
+  SolicitarDocumento,
+} from './modules/plan-estudios/application/use-cases/generar-documentos.use-case.js';
+import { DocumentoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/documentos.repository.js';
+import { DatosDocumentoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/datos-documento.repository.js';
+import { AlmacenEnDisco } from './modules/plan-estudios/infrastructure/documents/almacen-en-disco.js';
+import { RenderizadorPdfKit } from './modules/plan-estudios/infrastructure/documents/pdfkit.renderer.js';
+import { RenderizadorExcelJs } from './modules/plan-estudios/infrastructure/documents/exceljs.renderer.js';
+import { ColaDeDocumentosBullMq } from './modules/plan-estudios/infrastructure/queue/documentos.cola.js';
+import {
+  DocumentosController,
+  DocumentosDelPlanController,
+} from './modules/plan-estudios/infrastructure/http/documentos.controller.js';
 
 const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
 
@@ -157,6 +186,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     AsignaturasController,
     ObjetivosController,
     CompetenciasController,
+    DocumentosDelPlanController,
+    DocumentosController,
     BitacoraController,
   ],
 
@@ -184,6 +215,18 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_OBJETIVO, useClass: ObjetivoRepositoryPrisma },
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
+    { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
+    { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
+    {
+      // Por fábrica y no por `useClass`: el constructor lleva un parámetro con
+      // valor por defecto, y Nest intentaría inyectar un `string` que ningún
+      // proveedor declara.
+      provide: ALMACEN_ARCHIVOS,
+      useFactory: () => new AlmacenEnDisco(),
+    },
+    { provide: RENDERIZADOR_PDF, useClass: RenderizadorPdfKit },
+    { provide: RENDERIZADOR_HOJA, useClass: RenderizadorExcelJs },
+    { provide: COLA_DOCUMENTOS, useClass: ColaDeDocumentosBullMq },
 
     /* ── Casos de uso ──────────────────────────────────────────────────── */
     {
@@ -316,6 +359,56 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         }),
     },
     {
+      provide: SolicitarDocumento,
+      inject: [
+        REPOSITORIO_PLAN,
+        REPOSITORIO_APROBACIONES,
+        REPOSITORIO_DOCUMENTOS,
+        COLA_DOCUMENTOS,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        planes: RepositorioPlanPort,
+        aprobaciones: RepositorioAprobacionesPort,
+        documentos: RepositorioDocumentosPort,
+        cola: ColaDeDocumentosPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new SolicitarDocumento(planes, aprobaciones, documentos, cola, autorizacion, eventos),
+    },
+    {
+      provide: ConsultarDocumento,
+      inject: [REPOSITORIO_DOCUMENTOS, REPOSITORIO_PLAN, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      useFactory: (
+        documentos: RepositorioDocumentosPort,
+        planes: RepositorioPlanPort,
+        almacen: AlmacenDeArchivosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarDocumento(documentos, planes, almacen, autorizacion),
+    },
+    {
+      // Se registra también en la API aunque solo lo ejecute el worker: el
+      // módulo del worker importa este mismo, y duplicar la definición allí
+      // sería una segunda composición que se desincroniza en el primer cambio.
+      provide: GenerarDocumento,
+      inject: [
+        REPOSITORIO_DOCUMENTOS,
+        REPOSITORIO_DATOS_DOCUMENTO,
+        ALMACEN_ARCHIVOS,
+        RENDERIZADOR_PDF,
+        RENDERIZADOR_HOJA,
+      ],
+      useFactory: (
+        documentos: RepositorioDocumentosPort,
+        datos: RepositorioDatosDocumentoPort,
+        almacen: AlmacenDeArchivosPort,
+        pdf: RenderizadorPdfPort,
+        hoja: RenderizadorHojaPort,
+      ) => new GenerarDocumento(documentos, datos, almacen, pdf, hoja),
+    },
+    {
       provide: ConsultarPlan,
       inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT],
       useFactory: (
@@ -355,5 +448,10 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         }),
     },
   ],
+
+  // Lo único que sale de aquí: el proceso worker importa este módulo y necesita
+  // este caso de uso para atender la cola. El resto sigue siendo interno, para
+  // que importar `AppModule` no se convierta en acceso a todo.
+  exports: [GenerarDocumento],
 })
 export class AppModule {}

@@ -4,19 +4,34 @@ Infraestructura del VPS core (Hetzner + Docker Compose). Ver `CLAUDE.md` §5.
 
 | Carpeta | Contenido previsto |
 |---|---|
-| `docker/` | `docker-compose.yml` (dev), `docker-compose.prod.yml`, `api.Dockerfile` |
+| `docker/` | `docker-compose.yml` (dev, ya existe), `docker-compose.prod.yml`, `api.Dockerfile` |
 | `caddy/` | `Caddyfile` — reverse proxy, TLS automático, sirve el frontend estático |
 | `scripts/` | `backup-db.sh` (`pg_dump` diario → Backblaze B2), utilidades de despliegue |
 
 ## Topología de servicios
 
 ```
-api        # NestJS, imagen construida en CI
-worker     # mismo código que api, proceso dedicado a consumir colas BullMQ
+api        # NestJS, imagen construida en CI            -> npm start
+worker     # mismo código que api, otro entrypoint      -> npm run start:worker
 postgres   # PostgreSQL 16, volumen persistente
-redis      # cola + cache
+redis      # cola de documentos + cache
 caddy      # reverse proxy + TLS + estáticos del frontend
 ```
+
+`api` y `worker` son el mismo build: `dist/main.js` levanta el servidor HTTP y
+`dist/worker.js` un contexto sin servidor que consume la cola. El worker genera los PDF y
+Excel (§3.4), que ocupan CPU durante cientos de milisegundos y dentro de la API competirían
+con las peticiones que la cola existe para no bloquear.
+
+En **desarrollo** el compose levanta solo `postgres` (5433) y `redis` (6380); la API, el
+worker y el frontend corren en la máquina. Los puertos no son los estándar a propósito:
+apuntar por descuido a otro PostgreSQL da un error de autenticación, pero apuntar a otro
+Redis **no da ningún error** — encolaría los trabajos en la cola de otro proyecto y los
+consumiría su worker.
+
+Los documentos generados se guardan en el directorio que indique `DOCUMENTOS_DIR`
+(`apps/api/var/documentos` en local). En el VPS debe ser un volumen con nombre, o cada
+despliegue borraría los archivos ya generados.
 
 El frontend se compila a estáticos y lo sirve Caddy: no necesita contenedor propio.
 

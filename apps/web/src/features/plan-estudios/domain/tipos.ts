@@ -172,3 +172,43 @@ export interface Justificacion {
   usuario: string;
   fecha: string;
 }
+
+/* ── Documentos generados (RF072, RF073, RF084, RF092) ─────────────────── */
+
+export const TIPOS_DOCUMENTO = [
+  'RESUMEN_PLAN',
+  'MALLA_EXCEL',
+  'EVIDENCIA_APROBACION',
+  'HISTORICO_CAMBIOS',
+] as const;
+
+export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
+
+/**
+ * `Fallido` es un estado y no un error de la petición.
+ *
+ * El documento se genera en el worker, mucho después de que la petición que lo
+ * pidió haya terminado. Cuando algo va mal no hay a quién devolverle un error:
+ * el fallo se guarda y la pantalla lo lee al consultar el estado.
+ */
+export type EstadoDocumento = 'En cola' | 'Generando' | 'Listo' | 'Fallido';
+
+export interface TrabajoDocumento {
+  id: string;
+  planId: string;
+  tipo: TipoDocumento;
+  estado: EstadoDocumento;
+  nombreArchivo: string | null;
+  bytes: number | null;
+  error: string | null;
+  solicitadoEn: string;
+  terminadoEn: string | null;
+}
+
+/** Cómo se llama cada documento en la interfaz. */
+export const NOMBRE_DOCUMENTO: Readonly<Record<TipoDocumento, string>> = {
+  RESUMEN_PLAN: 'PDF del plan',
+  MALLA_EXCEL: 'Excel de la malla',
+  EVIDENCIA_APROBACION: 'Evidencia de aprobación',
+  HISTORICO_CAMBIOS: 'Histórico de cambios',
+};

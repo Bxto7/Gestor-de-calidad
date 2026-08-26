@@ -1,12 +1,12 @@
 # Servicios de apoyo para desarrollo local.
 #
-# Levanta solo lo que la aplicación necesita tener detrás —PostgreSQL— y no la
-# API ni el frontend: en desarrollo esos dos corren en la máquina, con recarga
-# en caliente y depurador enganchado. Meterlos en un contenedor aquí obligaría a
-# reconstruir la imagen en cada cambio.
+# Levanta solo lo que la aplicación necesita tener detrás —PostgreSQL y Redis—
+# y no la API ni el frontend: en desarrollo esos dos corren en la máquina, con
+# recarga en caliente y depurador enganchado. Meterlos en un contenedor aquí
+# obligaría a reconstruir la imagen en cada cambio.
 #
-# El compose de producción (CLAUDE.md §5.2) sí incluirá `api`, `worker`, `redis`
-# y `caddy`. Este archivo no es ese; son dos ficheros distintos a propósito.
+# El compose de producción (CLAUDE.md §5.2) sí incluirá `api`, `worker` y
+# `caddy`. Este archivo no es ese; son dos ficheros distintos a propósito.
 #
 #   Arrancar:  docker compose -f infra/docker/docker-compose.yml up -d
 #   Parar:     docker compose -f infra/docker/docker-compose.yml down
@@ -42,8 +42,30 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: sgc_redis
+    # 6380 por el mismo motivo que el 5433 de arriba: es habitual tener ya otro
+    # Redis ocupando el 6379. Aquí el riesgo es peor que con PostgreSQL, porque
+    # Redis no pide credenciales: apuntar por descuido al de otro proyecto no
+    # daría error, encolaría trabajos en su cola y los consumiría su worker.
+    ports:
+      - '6380:6379'
+    # `appendonly` para que los trabajos encolados sobrevivan a un reinicio del
+    # contenedor. En desarrollo importa poco; tenerlo igual que en producción
+    # evita descubrir el comportamiento distinto en el peor momento.
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - datos_redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   # Con nombre, no anónimo: sobrevive a `down` y solo desaparece con `down -v`.
   # Perder la base cada vez que se para el entorno haría inservible el trabajo
   # de sembrar datos de prueba.
   datos_postgres:
+  datos_redis:

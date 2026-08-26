@@ -207,6 +207,29 @@ enum CondicionAsignatura {
 }
 
 /// RF061: la relación entre asignaturas distingue el orden temporal.
+/// RF072, RF073, RF084 y RF092: qué documento se pidió generar.
+enum TipoDocumento {
+  RESUMEN_PLAN
+  MALLA_EXCEL
+  EVIDENCIA_APROBACION
+  HISTORICO_CAMBIOS
+
+  @@schema("plan_estudios")
+}
+
+/// Estado de un trabajo de generación. `FALLIDO` es un estado y no una
+/// excepción: el trabajo corre en el worker, donde no hay ninguna petición HTTP
+/// viva a la que devolverle el error. Sin guardarlo, la pantalla esperaría para
+/// siempre un archivo que no va a llegar.
+enum EstadoDocumento {
+  EN_COLA
+  GENERANDO
+  LISTO
+  FALLIDO
+
+  @@schema("plan_estudios")
+}
+
 enum TipoDependencia {
   PRERREQUISITO
   CORREQUISITO
@@ -307,6 +330,7 @@ model PlanEstudios {
   gruposElectivos GrupoElectivo[]
   aprobaciones    EventoAprobacion[]
   justificaciones Justificacion[]
+  documentos      DocumentoGenerado[]
 
   @@unique([carreraId, version])
   @@index([carreraId, estado])
@@ -607,4 +631,39 @@ model EventoAuditoria {
   @@index([fecha])
   @@map("audit_log")
   @@schema("auditoria")
+}
+
+/// Trabajo de generación de un documento (§3.4: en cola, no en el request).
+///
+/// El estado vive aquí y no solo en BullMQ porque los trabajos de la cola
+/// caducan y se limpian: el usuario tiene que poder volver mañana a por su
+/// archivo, y una acreditación tiene que poder rastrear qué evidencia se generó
+/// y cuándo.
+model DocumentoGenerado {
+  id     String          @id @default(uuid()) @db.Uuid
+  planId String          @map("plan_id") @db.Uuid
+  tipo   TipoDocumento
+  estado EstadoDocumento @default(EN_COLA)
+
+  nombreArchivo String? @map("nombre_archivo") @db.VarChar(200)
+  tipoMime      String? @map("tipo_mime") @db.VarChar(120)
+  bytes         Int?
+  /// Dónde quedó el archivo. Opaca a propósito: hoy una ruta en disco, mañana
+  /// una clave de Backblaze B2 (§5.6), sin que cambie nada más.
+  ubicacion     String? @db.VarChar(500)
+  /// Solo con estado FALLIDO. Redactado para una persona, no una traza.
+  error         String? @db.Text
+
+  /// Se guarda el identificador, sin clave foránea a usuarios: igual que el
+  /// resto de evidencia, el registro debe seguir siendo legible aunque la
+  /// cuenta desaparezca.
+  solicitadoPor String    @map("solicitado_por") @db.Uuid
+  solicitadoEn  DateTime  @default(now()) @map("solicitado_en") @db.Timestamptz(6)
+  terminadoEn   DateTime? @map("terminado_en") @db.Timestamptz(6)
+
+  plan PlanEstudios @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, solicitadoEn])
+  @@map("documentos_generados")
+  @@schema("plan_estudios")
 }

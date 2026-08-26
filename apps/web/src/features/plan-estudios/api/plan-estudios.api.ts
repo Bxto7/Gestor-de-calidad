@@ -19,7 +19,7 @@
  * decidir.
  */
 
-import { cliente } from '../../../shared/api/cliente';
+import { cliente, type ArchivoDescargado } from '../../../shared/api/cliente';
 import type {
   Asignatura,
   Carrera,
@@ -31,6 +31,8 @@ import type {
   PlanEstudios,
   AtributoGraduado,
   CoberturaAtributo,
+  TipoDocumento,
+  TrabajoDocumento,
 } from '../domain/tipos';
 import type { AccionTransicion } from '../domain/estado-plan';
 import {
@@ -388,4 +390,50 @@ export async function ubicarAsignatura(
     cicloNumero,
     ...(orden === undefined ? {} : { orden }),
   });
+}
+
+/* ── Documentos (RF072, RF073, RF084, RF092) ───────────────────────────── */
+
+/**
+ * Pide un documento. Devuelve el trabajo, no el archivo.
+ *
+ * El servidor responde 202 en cuanto lo encola: generar el PDF de un plan de 74
+ * asignaturas no cabe en el presupuesto de una petición HTTP. Quien llame tiene
+ * que consultar el estado hasta que pase a «Listo».
+ */
+export async function solicitarDocumento(
+  planId: string,
+  tipo: TipoDocumento,
+): Promise<TrabajoDocumento> {
+  return cliente.post<TrabajoDocumento>(`/planes/${planId}/documentos`, { tipo });
+}
+
+export async function estadoDocumento(id: string): Promise<TrabajoDocumento> {
+  return cliente.get<TrabajoDocumento>(`/documentos/${id}`);
+}
+
+export async function listarDocumentos(planId: string): Promise<TrabajoDocumento[]> {
+  return cliente.get<TrabajoDocumento[]>(`/planes/${planId}/documentos`);
+}
+
+export async function descargarDocumento(id: string): Promise<ArchivoDescargado> {
+  return cliente.descargar(`/documentos/${id}/archivo`);
+}
+
+/**
+ * Provoca la descarga en el navegador.
+ *
+ * Hace falta el enlace sintético porque el archivo llega por `fetch` —con la
+ * cabecera de autorización— y no navegando a la URL. Un `window.open` sobre el
+ * endpoint no llevaría el token y devolvería un 401.
+ */
+export function guardarArchivo(archivo: ArchivoDescargado): void {
+  const url = URL.createObjectURL(archivo.blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = archivo.nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  URL.revokeObjectURL(url);
 }

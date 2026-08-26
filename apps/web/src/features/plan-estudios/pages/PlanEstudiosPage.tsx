@@ -55,7 +55,16 @@ import {
 } from '../domain/estado-plan';
 import { ciclosDeCarrera, validarPlan } from '../domain/motor-validaciones';
 import { formatearFecha, formatearFechaHora } from '../utilidades/formato';
-import { descargarCsv, filasHistorico } from '../utilidades/exportar';
+import { useGenerarDocumento } from '../api/useGenerarDocumento';
+
+/**
+ * Estados en los que el plan ya recorrió la aprobación.
+ *
+ * RF092 dice «Aprobado», pero Vigente e Histórico vienen después: la lectura
+ * estricta dejaría sin evidencia precisamente a los planes archivados, que son
+ * los que pide un evaluador.
+ */
+const YA_APROBADO: readonly string[] = ['Aprobado', 'Vigente', 'Histórico'];
 
 export function PlanEstudiosPage() {
   const { planId = '' } = useParams();
@@ -82,6 +91,9 @@ export function PlanEstudiosPage() {
   const [comentario, setComentario] = useState('');
   const [verHistorial, setVerHistorial] = useState(false);
   const [verAprobaciones, setVerAprobaciones] = useState(false);
+
+  // RF084 y RF092: los genera el servidor en cola, igual que los de la malla.
+  const documento = useGenerarDocumento();
   const [comparandoCon, setComparandoCon] = useState<string | null>(null);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
 
@@ -239,8 +251,43 @@ export function PlanEstudiosPage() {
           <Boton variante="secundario" onClick={() => setVerAprobaciones(true)}>
             Aprobaciones
           </Boton>
+          {/*
+            RF092. Solo desde Aprobado en adelante: antes de eso no hay
+            aprobación que evidenciar. Se muestra deshabilitado en vez de
+            esconderse, para que se sepa que existe y qué falta para usarlo.
+          */}
+          <Boton
+            variante="secundario"
+            disabled={!YA_APROBADO.includes(plan.estado) || documento.enCurso !== null}
+            title={
+              YA_APROBADO.includes(plan.estado)
+                ? 'Documento de respaldo para el expediente de acreditación.'
+                : 'Disponible cuando el plan haya sido aprobado.'
+            }
+            onClick={() => void documento.generar(plan.id, 'EVIDENCIA_APROBACION')}
+          >
+            {documento.enCurso === 'EVIDENCIA_APROBACION'
+              ? 'Generando…'
+              : 'Evidencia de aprobación'}
+          </Boton>
         </div>
       </div>
+
+      {documento.error && (
+        <p
+          role="alert"
+          className="mb-6 flex items-start justify-between gap-3 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg"
+        >
+          <span>{documento.error}</span>
+          <button
+            type="button"
+            onClick={documento.descartarError}
+            className="shrink-0 font-semibold underline"
+          >
+            Descartar
+          </button>
+        </p>
+      )}
 
       <Tarjeta className="mb-6">
         <StepperEstado actual={plan.estado} />
@@ -467,12 +514,12 @@ export function PlanEstudiosPage() {
           <>
             <Boton
               variante="secundario"
-              disabled={!aprobaciones || aprobaciones.length === 0}
-              onClick={() =>
-                descargarCsv(`historico-${plan.codigo}.csv`, filasHistorico(aprobaciones ?? []))
+              disabled={
+                !aprobaciones || aprobaciones.length === 0 || documento.enCurso !== null
               }
+              onClick={() => void documento.generar(plan.id, 'HISTORICO_CAMBIOS')}
             >
-              Exportar
+              {documento.enCurso === 'HISTORICO_CAMBIOS' ? 'Generando…' : 'Exportar PDF'}
             </Boton>
             <Boton variante="secundario" onClick={() => setVerAprobaciones(false)}>
               Cerrar
