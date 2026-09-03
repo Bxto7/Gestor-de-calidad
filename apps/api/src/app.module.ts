@@ -85,6 +85,22 @@ import {
   CriteriosController,
   CriteriosDeCarreraController,
 } from './modules/plan-estudios/infrastructure/http/acreditacion.controller.js';
+
+/* ── Mejora continua ─────────────────────────────────────────────────────── */
+import {
+  CONTENIDO_CURRICULAR,
+  type ContenidoCurricularPort,
+} from './modules/plan-estudios/application/ports/contenido-curricular.port.js';
+import { ContenidoCurricularAdapter } from './modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
+import {
+  REPOSITORIO_PLAN_MEDICION,
+  type RepositorioPlanMedicionPort,
+} from './modules/mejora-continua/application/ports/plan-medicion.port.js';
+import { ConfigurarPlanMedicion } from './modules/mejora-continua/application/use-cases/configurar-plan-medicion.use-case.js';
+import { GestionarPlanesMedicion } from './modules/mejora-continua/application/use-cases/gestionar-planes-medicion.use-case.js';
+import { ProgramarMediciones } from './modules/mejora-continua/application/use-cases/programar-mediciones.use-case.js';
+import { PlanMedicionRepositoryPrisma } from './modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
+import { PlanesMedicionController } from './modules/mejora-continua/infrastructure/http/planes-medicion.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
@@ -226,6 +242,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     AtributosDelPlanController,
     CriteriosDeCarreraController,
     CriteriosController,
+    PlanesMedicionController,
     DocumentosDelPlanController,
     DocumentosController,
     ReportesController,
@@ -258,6 +275,10 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
     { provide: REPOSITORIO_ATRIBUTO, useClass: AtributoRepositoryPrisma },
     { provide: REPOSITORIO_CRITERIO, useClass: CriterioRepositoryPrisma },
+    // La frontera entre módulos: lo expone `plan-estudios` y lo consume
+    // `mejora-continua`, que solo conoce la interfaz (§3.2).
+    { provide: CONTENIDO_CURRICULAR, useClass: ContenidoCurricularAdapter },
+    { provide: REPOSITORIO_PLAN_MEDICION, useClass: PlanMedicionRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
@@ -361,6 +382,46 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarCriterios(criterios, autorizacion, eventos),
+    },
+    {
+      provide: GestionarPlanesMedicion,
+      inject: [
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        planes: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarPlanesMedicion(planes, curricular, autorizacion, eventos),
+    },
+    {
+      provide: ConfigurarPlanMedicion,
+      inject: [
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        planes: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new ConfigurarPlanMedicion(planes, curricular, autorizacion, eventos),
+    },
+    {
+      // Sin el puerto curricular: todo lo que valida sale del propio plan.
+      provide: ProgramarMediciones,
+      inject: [REPOSITORIO_PLAN_MEDICION, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        planes: RepositorioPlanMedicionPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new ProgramarMediciones(planes, autorizacion, eventos),
     },
     {
       provide: GestionarAsignaturas,

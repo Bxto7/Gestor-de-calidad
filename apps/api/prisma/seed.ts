@@ -69,6 +69,13 @@ const PERMISOS = [
   ['asignatura.gestionar', 'Crear, editar e inactivar asignaturas', 'plan-estudios'],
   ['malla.editar', 'Ubicar asignaturas en los ciclos', 'plan-estudios'],
 
+  // Mejora continua — Planes de Medición
+  ['medicion.leer', 'Consultar planes de medición', 'mejora-continua'],
+  ['medicion.crear', 'Crear un plan de medición', 'mejora-continua'],
+  ['medicion.editar', 'Editar un plan de medición en Borrador', 'mejora-continua'],
+  ['medicion.eliminar', 'Eliminar un plan de medición en Borrador', 'mejora-continua'],
+  ['medicion.aprobar', 'Aprobar, observar y dar vigencia a un plan de medición', 'mejora-continua'],
+
   // Transversales
   ['reporte.generar', 'Generar PDF y Excel del plan', 'plan-estudios'],
   ['auditoria.leer', 'Consultar el histórico de cambios', 'auditoria'],
@@ -120,6 +127,9 @@ const ROLES: {
       'atributo.leer',
       'criterio.leer',
       'asignatura.leer',
+      // Solo lectura, como con el resto del contenido académico: decidir qué se
+      // mide y aprobarlo es una responsabilidad académica, no de administración.
+      'medicion.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
@@ -158,6 +168,13 @@ const ROLES: {
       'asignatura.leer',
       'asignatura.gestionar',
       'malla.editar',
+      // RF-PM-006 le reserva la aprobación: «el Coordinador académico envía a
+      // revisión, y el Director de carrera aprueba, rechaza u observa».
+      'medicion.leer',
+      'medicion.crear',
+      'medicion.editar',
+      'medicion.eliminar',
+      'medicion.aprobar',
       'reporte.generar',
       'auditoria.leer',
     ],
@@ -191,6 +208,12 @@ const ROLES: {
       'asignatura.leer',
       'asignatura.gestionar',
       'malla.editar',
+      // Configura y envía a revisión, pero no aprueba: la misma separación que
+      // ya lo deja fuera de `plan.aprobar`. Quien construye no da el visto bueno.
+      'medicion.leer',
+      'medicion.crear',
+      'medicion.editar',
+      'medicion.eliminar',
       'reporte.generar',
     ],
   },
@@ -211,6 +234,8 @@ const ROLES: {
       'atributo.leer',
       'criterio.leer',
       'asignatura.leer',
+      // Ve en qué periodos se mide la competencia de la asignatura que dicta.
+      'medicion.leer',
       'reporte.generar',
     ],
   },
@@ -222,7 +247,14 @@ const ROLES: {
     // porque su definición dice "vigentes" y no "todos".
     // RF122 y RF131 lo nombran entre quienes visualizan atributos y criterios:
     // ambos listados llevan indicador de estado y son solo de lectura.
-    permisos: ['facultad.leer', 'carrera.leer', 'plan.leer', 'atributo.leer', 'criterio.leer'],
+    permisos: [
+      'facultad.leer',
+      'carrera.leer',
+      'plan.leer',
+      'atributo.leer',
+      'criterio.leer',
+      'medicion.leer',
+    ],
   },
 ];
 
