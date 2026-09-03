@@ -142,7 +142,12 @@ describe('RF121 — editar atributo del graduado', () => {
     const { publicador, vistos } = capturarEventos();
     const caso = new GestionarAtributos(repo(), permitirTodo(), publicador);
 
-    const editado = await caso.editar(ACTOR, 'atr-1', 'AG-I02', 'Diseño y desarrollo de soluciones');
+    const editado = await caso.editar(
+      ACTOR,
+      'atr-1',
+      'AG-I02',
+      'Diseño y desarrollo de soluciones',
+    );
 
     expect(editado.nombre).toBe('Diseño y desarrollo de soluciones');
     expect(vistos).toHaveLength(1);
@@ -330,7 +335,10 @@ describe('RF122 — atributos declarados por un plan', () => {
   it('declarar la lista vacía deja el plan sin atributos', async () => {
     const { publicador, vistos } = capturarEventos();
     const caso = new GestionarAtributos(
-      repo({ delPlan: async () => [atributo({ codigo: 'AG-I01' })], declararEnPlan: async () => [] }),
+      repo({
+        delPlan: async () => [atributo({ codigo: 'AG-I01' })],
+        declararEnPlan: async () => [],
+      }),
       permitirTodo(),
       publicador,
     );

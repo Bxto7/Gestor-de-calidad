@@ -208,9 +208,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // Configurable porque una prueba de carga necesita subirlo: con 120 req/min
     // por IP, k6 mediría el rate limiter en vez de la aplicación. En producción
     // se deja el valor por defecto.
-    ThrottlerModule.forRoot([
-      { ttl: 60_000, limit: Number(process.env['THROTTLE_LIMIT'] ?? 120) },
-    ]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: Number(process.env['THROTTLE_LIMIT'] ?? 120) }]),
   ],
 
   controllers: [
@@ -310,7 +308,12 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarUsuarios,
-      inject: [REPOSITORIO_GESTION_USUARIOS, SEGURIDAD_PORT, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_GESTION_USUARIOS,
+        SEGURIDAD_PORT,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
       useFactory: (
         usuarios: RepositorioGestionUsuariosPort,
         seguridad: SeguridadPort,
@@ -449,8 +452,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         cola: ColaDeDocumentosPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) =>
-        new SolicitarDocumento(planes, aprobaciones, documentos, cola, autorizacion, eventos),
+      ) => new SolicitarDocumento(planes, aprobaciones, documentos, cola, autorizacion, eventos),
     },
     {
       provide: ConsultarDocumento,

@@ -117,11 +117,7 @@ export class GestionarAtributos {
    * cuántas competencias quedaron sin el atributo es justo lo que una
    * acreditación pregunta después, cuando el aviso ya no existe.
    */
-  async cambiarEstado(
-    actor: Actor,
-    id: string,
-    activo: boolean,
-  ): Promise<DatosAtributoCompleto> {
+  async cambiarEstado(actor: Actor, id: string, activo: boolean): Promise<DatosAtributoCompleto> {
     await this.exigir(actor, 'atributo.gestionar');
     const previo = await this.exigirAtributo(id);
 

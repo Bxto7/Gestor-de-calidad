@@ -88,10 +88,7 @@ export class GestionUsuariosRepositoryPrisma implements RepositorioGestionUsuari
     return aUsuario(fila);
   }
 
-  async actualizar(
-    id: string,
-    datos: Omit<DatosUsuarioEntrada, 'email'>,
-  ): Promise<DatosUsuario> {
+  async actualizar(id: string, datos: Omit<DatosUsuarioEntrada, 'email'>): Promise<DatosUsuario> {
     const roles = await this.idsDeRoles(datos.rolCodigos);
 
     // En una transacción: si se borraran los roles y fallara la inserción, la

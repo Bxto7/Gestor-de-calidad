@@ -67,8 +67,8 @@ export function ReportePlanPage() {
       <Tarjeta className="mb-5">
         <h2 className="mb-1 text-sm font-bold text-tinta">Créditos por ciclo</h2>
         <p className="mb-4 text-sm text-tinta-suave">
-          Los electivos cuentan una vez por grupo, no una por opción. Los ciclos vacíos se
-          incluyen: lo que falta es el hallazgo.
+          Los electivos cuentan una vez por grupo, no una por opción. Los ciclos vacíos se incluyen:
+          lo que falta es el hallazgo.
         </p>
 
         <div className="overflow-x-auto">
@@ -204,9 +204,10 @@ function Resumen({
     <Tarjeta>
       <p className="text-xs font-semibold tracking-wide text-tinta-suave uppercase">{etiqueta}</p>
       <p
-        className={['mt-1 text-3xl font-extrabold', alerta ? 'text-alerta-fg' : 'text-uc-primary'].join(
-          ' ',
-        )}
+        className={[
+          'mt-1 text-3xl font-extrabold',
+          alerta ? 'text-alerta-fg' : 'text-uc-primary',
+        ].join(' ')}
       >
         {valor}
       </p>

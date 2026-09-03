@@ -32,7 +32,13 @@ const ENLACES: {
 }[] = [
   { a: '/', etiqueta: 'Resumen', icono: IconoResumen, exacto: true },
   { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
-  { a: '/reportes', etiqueta: 'Reportes', icono: IconoReportes, exacto: false, permiso: 'plan.leer' },
+  {
+    a: '/reportes',
+    etiqueta: 'Reportes',
+    icono: IconoReportes,
+    exacto: false,
+    permiso: 'plan.leer',
+  },
   {
     a: '/usuarios',
     etiqueta: 'Usuarios',
@@ -110,22 +116,22 @@ export function AppLayout() {
           <nav className="mt-2 flex flex-1 flex-col gap-0.5 px-3" aria-label="Navegación principal">
             {ENLACES.filter((e) => !e.permiso || puede(e.permiso)).map(
               ({ a, etiqueta, icono: Icono, exacto }) => (
-              <NavLink
-                key={a}
-                to={a}
-                end={exacto}
-                className={({ isActive }) =>
-                  [
-                    'flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 text-sm font-semibold transition',
-                    isActive
-                      ? 'border-l-white bg-white/12 text-white'
-                      : 'border-l-transparent text-uc-lila hover:bg-white/8 hover:text-white',
-                  ].join(' ')
-                }
-              >
-                <Icono />
-                {etiqueta}
-              </NavLink>
+                <NavLink
+                  key={a}
+                  to={a}
+                  end={exacto}
+                  className={({ isActive }) =>
+                    [
+                      'flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 text-sm font-semibold transition',
+                      isActive
+                        ? 'border-l-white bg-white/12 text-white'
+                        : 'border-l-transparent text-uc-lila hover:bg-white/8 hover:text-white',
+                    ].join(' ')
+                  }
+                >
+                  <Icono />
+                  {etiqueta}
+                </NavLink>
               ),
             )}
           </nav>

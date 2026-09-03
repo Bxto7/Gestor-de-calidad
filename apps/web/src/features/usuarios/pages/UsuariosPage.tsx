@@ -155,9 +155,7 @@ export function UsuariosPage() {
                           type="button"
                           disabled={esYo || cambiarEstado.isPending}
                           title={esYo ? 'Quedarías sin acceso para revertirlo.' : undefined}
-                          onClick={() =>
-                            cambiarEstado.mutate({ id: u.id, activo: !u.activo })
-                          }
+                          onClick={() => cambiarEstado.mutate({ id: u.id, activo: !u.activo })}
                           className="text-uc-primary hover:underline disabled:cursor-not-allowed disabled:text-tinta-tenue disabled:no-underline"
                         >
                           {u.activo ? 'Desactivar' : 'Reactivar'}
@@ -346,11 +344,7 @@ function FormularioUsuario({
           ayuda="Obligatoria para los roles que conceden permisos acotados a una carrera, como Director o Coordinador."
         >
           {(props) => (
-            <Selector
-              {...props}
-              value={carreraId}
-              onChange={(e) => setCarreraId(e.target.value)}
-            >
+            <Selector {...props} value={carreraId} onChange={(e) => setCarreraId(e.target.value)}>
               <option value="">Sin alcance de carrera</option>
               {(carreras ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
@@ -397,8 +391,8 @@ function CredencialTemporal({
       }
     >
       <p className="mb-3 text-sm text-tinta-suave">
-        Se muestra <strong className="text-tinta">una sola vez</strong>. No se guarda en claro,
-        así que no hay forma de volver a consultarla: si se pierde, hay que restablecerla.
+        Se muestra <strong className="text-tinta">una sola vez</strong>. No se guarda en claro, así
+        que no hay forma de volver a consultarla: si se pierde, hay que restablecerla.
       </p>
 
       <div className="flex items-center gap-2">

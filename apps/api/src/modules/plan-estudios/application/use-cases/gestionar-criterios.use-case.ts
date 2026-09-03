@@ -82,12 +82,7 @@ export class GestionarCriterios {
   }
 
   /** RF130: revalida unicidad excluyendo el propio registro. RN2: queda auditado. */
-  async editar(
-    actor: Actor,
-    id: string,
-    codigo: string,
-    nombre: string,
-  ): Promise<DatosCriterio> {
+  async editar(actor: Actor, id: string, codigo: string, nombre: string): Promise<DatosCriterio> {
     const previo = await this.exigirCriterio(id);
     await this.exigir(actor, 'criterio.gestionar', previo.carreraId);
     const limpio = validarNombre(nombre);
@@ -147,7 +142,9 @@ export class GestionarCriterios {
 function validarNombre(nombre: string): string {
   const limpio = limpiarNombre(nombre);
   if (limpio.length < 3) {
-    throw new ReglaDeNegocioViolada('El nombre del criterio de acreditación no puede quedar vacío.');
+    throw new ReglaDeNegocioViolada(
+      'El nombre del criterio de acreditación no puede quedar vacío.',
+    );
   }
   return limpio;
 }

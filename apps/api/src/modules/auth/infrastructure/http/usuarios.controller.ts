@@ -69,7 +69,10 @@ export class UsuariosController {
       'respuesta. No se guarda en claro ni se puede volver a consultar: si se ' +
       'pierde, se restablece.',
   })
-  @ApiResponse({ status: 409, description: 'El correo ya está en uso, o los roles no son válidos.' })
+  @ApiResponse({
+    status: 409,
+    description: 'El correo ya está en uso, o los roles no son válidos.',
+  })
   async crear(@ActorActual() actor: Actor, @Body() dto: CrearUsuarioDto) {
     return this.usuarios.crear(actor, {
       email: dto.email,
@@ -86,7 +89,10 @@ export class UsuariosController {
       'El correo no se edita: es el identificador con el que se inicia sesión ' +
       'y cambiarlo equivale a crear otra cuenta.',
   })
-  @ApiResponse({ status: 409, description: 'Regla de negocio: propia cuenta, o último administrador.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Regla de negocio: propia cuenta, o último administrador.',
+  })
   async editar(
     @Param('id', ParseUUIDPipe) id: string,
     @ActorActual() actor: Actor,

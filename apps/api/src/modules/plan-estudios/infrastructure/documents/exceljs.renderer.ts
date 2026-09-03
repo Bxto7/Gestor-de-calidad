@@ -96,7 +96,9 @@ function hojaDeSeccion(libro: ExcelJS.Workbook, seccion: Seccion, nombre: string
   }
 
   for (const fila of tabla.filas) {
-    hoja.addRow(tabla.columnas.map((columna, i) => valorDeCelda(fila[i] ?? '', columna.alineacion)));
+    hoja.addRow(
+      tabla.columnas.map((columna, i) => valorDeCelda(fila[i] ?? '', columna.alineacion)),
+    );
   }
 
   // Filtro y cabecera congelada: con 74 asignaturas, desplazarse sin ellos deja
@@ -117,7 +119,10 @@ function hojaDeSeccion(libro: ExcelJS.Workbook, seccion: Seccion, nombre: string
  * dominio. Se comprueba además que el texto sea realmente un número, para que
  * un «—» o un vacío no acaben convertidos en cero.
  */
-function valorDeCelda(texto: string, alineacion: 'izquierda' | 'derecha' | undefined): string | number {
+function valorDeCelda(
+  texto: string,
+  alineacion: 'izquierda' | 'derecha' | undefined,
+): string | number {
   if (alineacion !== 'derecha') return texto;
   if (texto.trim() === '') return texto;
 

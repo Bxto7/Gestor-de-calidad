@@ -71,7 +71,11 @@ export class RenderizadorPdfKit implements RenderizadorPdfPort {
 type Pdf = PDFKit.PDFDocument;
 
 function portada(doc: Pdf, documento: Documento): void {
-  doc.fillColor(ACENTO).font('Helvetica-Bold').fontSize(20).text(t(documento.titulo), MARGEN, MARGEN);
+  doc
+    .fillColor(ACENTO)
+    .font('Helvetica-Bold')
+    .fontSize(20)
+    .text(t(documento.titulo), MARGEN, MARGEN);
   doc.moveDown(0.2);
   doc.fillColor(TINTA_SUAVE).font('Helvetica').fontSize(11).text(t(documento.subtitulo));
   doc.moveDown(0.8);
@@ -81,9 +85,13 @@ function portada(doc: Pdf, documento: Documento): void {
     doc.fillColor(TINTA_SUAVE).font('Helvetica-Bold').fontSize(9).text(t(m.etiqueta), MARGEN, y, {
       width: 110,
     });
-    doc.fillColor(TINTA).font('Helvetica').fontSize(9).text(t(m.valor), MARGEN + 115, y, {
-      width: ANCHO_UTIL - 115,
-    });
+    doc
+      .fillColor(TINTA)
+      .font('Helvetica')
+      .fontSize(9)
+      .text(t(m.valor), MARGEN + 115, y, {
+        width: ANCHO_UTIL - 115,
+      });
     doc.y = Math.max(doc.y, y) + 2;
   }
 

@@ -284,9 +284,7 @@ export async function crearCompetencia(
   nombre: string,
   atributoIds: readonly string[] = [],
 ): Promise<Competencia> {
-  return aCompetencia(
-    await cliente.post<CompetenciaApi>('/competencias', { nombre, atributoIds }),
-  );
+  return aCompetencia(await cliente.post<CompetenciaApi>('/competencias', { nombre, atributoIds }));
 }
 
 export async function editarCompetencia(

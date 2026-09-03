@@ -151,8 +151,8 @@ function PanelGeneral() {
       <Tarjeta>
         <h2 className="mb-1 text-sm font-bold text-tinta">Carreras sin versión vigente</h2>
         <p className="mb-3 text-sm text-tinta-suave">
-          Una carrera que se imparte sin un plan vigente registrado no tiene con qué responder a
-          una acreditación.
+          Una carrera que se imparte sin un plan vigente registrado no tiene con qué responder a una
+          acreditación.
         </p>
         {data.carrerasSinPlanVigente.length === 0 ? (
           <p className="text-sm font-semibold text-estado-activo-fg">

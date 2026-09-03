@@ -16,10 +16,7 @@
  * documento fuente. Conviene contrastarla antes de citarla en un expediente.
  */
 
-import type {
-  AsignaturaParaReporte,
-  CicloConfigurado,
-} from '../../domain/reportes/calculos.js';
+import type { AsignaturaParaReporte, CicloConfigurado } from '../../domain/reportes/calculos.js';
 import type { EstadoPlan } from '../../domain/value-objects/estado-plan.js';
 
 /** Una fila de la búsqueda global. */

@@ -386,12 +386,7 @@ export function armarEvidenciaDeAprobacion(datos: DatosParaDocumento): Documento
     // recorrido, y el repositorio los devuelve al revés para la pantalla.
     filas: [...datos.aprobaciones]
       .sort((x, y) => x.fecha.getTime() - y.fecha.getTime())
-      .map((e) => [
-        fechaYHoraLegible(e.fecha),
-        e.accion,
-        e.usuarioNombre,
-        e.comentario ?? '—',
-      ]),
+      .map((e) => [fechaYHoraLegible(e.fecha), e.accion, e.usuarioNombre, e.comentario ?? '—']),
     siVacia: 'No hay pasos de aprobación registrados para este plan.',
   };
 

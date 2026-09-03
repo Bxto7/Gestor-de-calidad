@@ -460,10 +460,7 @@ describe('RF124–RF126 — regresión tras introducir PlanAtributo', () => {
   it('la competencia conserva sus atributos, que no dependen de ningún plan', async () => {
     const { caso } = montarCompetencias({ existente: competencia({ atributos: [] }) });
 
-    const editada = await caso.editar(ACTOR, 'cpe-1', 'Aprendizaje autónomo', [
-      'AG-I06',
-      'AG-I08',
-    ]);
+    const editada = await caso.editar(ACTOR, 'cpe-1', 'Aprendizaje autónomo', ['AG-I06', 'AG-I08']);
 
     expect(editada.atributos.map((a) => a.codigo)).toEqual(['AG-I06', 'AG-I08']);
   });
