@@ -61,6 +61,10 @@ const PERMISOS = [
   ['objetivo.gestionar', 'Crear, editar e inactivar objetivos', 'plan-estudios'],
   ['competencia.leer', 'Consultar competencias', 'plan-estudios'],
   ['competencia.gestionar', 'Crear, editar e inactivar competencias', 'plan-estudios'],
+  ['atributo.leer', 'Consultar atributos del graduado', 'plan-estudios'],
+  ['atributo.gestionar', 'Crear, editar e inactivar atributos del graduado', 'plan-estudios'],
+  ['criterio.leer', 'Consultar criterios de acreditación', 'plan-estudios'],
+  ['criterio.gestionar', 'Crear, editar e inactivar criterios de acreditación', 'plan-estudios'],
   ['asignatura.leer', 'Consultar asignaturas', 'plan-estudios'],
   ['asignatura.gestionar', 'Crear, editar e inactivar asignaturas', 'plan-estudios'],
   ['malla.editar', 'Ubicar asignaturas en los ciclos', 'plan-estudios'],
@@ -113,6 +117,8 @@ const ROLES: {
       'plan.leer_historico',
       'objetivo.leer',
       'competencia.leer',
+      'atributo.leer',
+      'criterio.leer',
       'asignatura.leer',
       'auditoria.leer',
       'usuario.gestionar',
@@ -143,6 +149,12 @@ const ROLES: {
       'objetivo.gestionar',
       'competencia.leer',
       'competencia.gestionar',
+      // RF120 y RF129 nombran al Director como quien registra atributos del
+      // graduado y criterios de acreditación de su carrera.
+      'atributo.leer',
+      'atributo.gestionar',
+      'criterio.leer',
+      'criterio.gestionar',
       'asignatura.leer',
       'asignatura.gestionar',
       'malla.editar',
@@ -170,6 +182,12 @@ const ROLES: {
       'objetivo.gestionar',
       'competencia.leer',
       'competencia.gestionar',
+      // RF120 y RF129 listan al Coordinador junto al Director como actor de
+      // registro y edición; lo que no tiene, aquí como en el plan, es aprobar.
+      'atributo.leer',
+      'atributo.gestionar',
+      'criterio.leer',
+      'criterio.gestionar',
       'asignatura.leer',
       'asignatura.gestionar',
       'malla.editar',
@@ -188,6 +206,10 @@ const ROLES: {
       'plan.leer',
       'objetivo.leer',
       'competencia.leer',
+      // RF122 y RF131 incluyen al consultor entre quienes visualizan; el docente
+      // ya ve el detalle curricular, y el atributo es parte de él.
+      'atributo.leer',
+      'criterio.leer',
       'asignatura.leer',
       'reporte.generar',
     ],
@@ -198,7 +220,9 @@ const ROLES: {
     descripcion: 'Consulta de planes de estudio vigentes.',
     // El más restringido: solo planes vigentes. Sin `plan.leer_historico`,
     // porque su definición dice "vigentes" y no "todos".
-    permisos: ['facultad.leer', 'carrera.leer', 'plan.leer'],
+    // RF122 y RF131 lo nombran entre quienes visualizan atributos y criterios:
+    // ambos listados llevan indicador de estado y son solo de lectura.
+    permisos: ['facultad.leer', 'carrera.leer', 'plan.leer', 'atributo.leer', 'criterio.leer'],
   },
 ];
 
