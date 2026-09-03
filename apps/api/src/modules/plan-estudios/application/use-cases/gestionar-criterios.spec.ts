@@ -128,7 +128,7 @@ describe('RF129 — registrar criterio de acreditación', () => {
   it('la autorización se pide con el alcance de la carrera', async () => {
     // El Director gestiona «su carrera»: ese alcance lo aporta el tercer
     // argumento. Pasar null aquí le daría acceso a los criterios de todas.
-    let alcance: string | null = 'no-invocado';
+    let alcance: string | null | undefined = 'no-invocado';
     const autorizacion: AuthorizationPort = {
       puede: async (_id, _permiso, carreraId) => {
         alcance = carreraId;
