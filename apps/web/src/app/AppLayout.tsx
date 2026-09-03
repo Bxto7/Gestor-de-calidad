@@ -33,6 +33,13 @@ const ENLACES: {
   { a: '/', etiqueta: 'Resumen', icono: IconoResumen, exacto: true },
   { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
   {
+    a: '/acreditacion/atributos',
+    etiqueta: 'Atributos del Graduado',
+    icono: IconoPlan,
+    exacto: false,
+    permiso: 'atributo.leer',
+  },
+  {
     a: '/mejora-continua/medicion',
     etiqueta: 'Planes de Medición',
     icono: IconoPlan,

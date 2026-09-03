@@ -37,6 +37,12 @@ const ACTIVOS: readonly Modulo[] = [
       'Planes de medición de competencias: meta, competencias por atributo del graduado, periodos y la matriz de programación con su seguimiento.',
     a: '/mejora-continua/medicion',
   },
+  {
+    titulo: 'Atributos del Graduado',
+    detalle:
+      'El perfil contra el que se acredita el programa. Catálogo del marco de acreditación, con el recuento de qué competencias desarrollan cada atributo.',
+    a: '/acreditacion/atributos',
+  },
 ];
 
 type EstadoCriterio = 'cubierto' | 'parcial' | 'pendiente';
@@ -71,8 +77,8 @@ const CRITERIOS: readonly Criterio[] = [
   {
     numero: 3,
     nombre: 'Atributos del Graduado',
-    estado: 'parcial',
-    nota: 'Catálogo del marco y su mapeo a competencias. Falta su pantalla propia.',
+    estado: 'cubierto',
+    nota: 'Catálogo del marco, su mapeo a competencias y el reporte de cobertura.',
   },
   {
     numero: 4,
