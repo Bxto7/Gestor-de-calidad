@@ -70,6 +70,22 @@ import {
   type RepositorioObjetivoPort,
 } from './modules/plan-estudios/application/ports/catalogo.port.js';
 import {
+  REPOSITORIO_ATRIBUTO,
+  REPOSITORIO_CRITERIO,
+  type RepositorioAtributoPort,
+  type RepositorioCriterioPort,
+} from './modules/plan-estudios/application/ports/acreditacion.port.js';
+import { GestionarAtributos } from './modules/plan-estudios/application/use-cases/gestionar-atributos.use-case.js';
+import { GestionarCriterios } from './modules/plan-estudios/application/use-cases/gestionar-criterios.use-case.js';
+import { AtributoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/atributo.repository.js';
+import { CriterioRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
+import {
+  AtributosController,
+  AtributosDelPlanController,
+  CriteriosController,
+  CriteriosDeCarreraController,
+} from './modules/plan-estudios/infrastructure/http/acreditacion.controller.js';
+import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
   type RepositorioCarreraPort,
@@ -192,9 +208,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // Configurable porque una prueba de carga necesita subirlo: con 120 req/min
     // por IP, k6 mediría el rate limiter en vez de la aplicación. En producción
     // se deja el valor por defecto.
-    ThrottlerModule.forRoot([
-      { ttl: 60_000, limit: Number(process.env['THROTTLE_LIMIT'] ?? 120) },
-    ]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: Number(process.env['THROTTLE_LIMIT'] ?? 120) }]),
   ],
 
   controllers: [
@@ -208,6 +222,10 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     AsignaturasController,
     ObjetivosController,
     CompetenciasController,
+    AtributosController,
+    AtributosDelPlanController,
+    CriteriosDeCarreraController,
+    CriteriosController,
     DocumentosDelPlanController,
     DocumentosController,
     ReportesController,
@@ -238,6 +256,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_BITACORA, useClass: BitacoraRepositoryPrisma },
     { provide: REPOSITORIO_OBJETIVO, useClass: ObjetivoRepositoryPrisma },
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
+    { provide: REPOSITORIO_ATRIBUTO, useClass: AtributoRepositoryPrisma },
+    { provide: REPOSITORIO_CRITERIO, useClass: CriterioRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
@@ -288,7 +308,12 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarUsuarios,
-      inject: [REPOSITORIO_GESTION_USUARIOS, SEGURIDAD_PORT, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_GESTION_USUARIOS,
+        SEGURIDAD_PORT,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
       useFactory: (
         usuarios: RepositorioGestionUsuariosPort,
         seguridad: SeguridadPort,
@@ -318,6 +343,24 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarCompetencias(competencias, autorizacion, eventos),
+    },
+    {
+      provide: GestionarAtributos,
+      inject: [REPOSITORIO_ATRIBUTO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        atributos: RepositorioAtributoPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarAtributos(atributos, autorizacion, eventos),
+    },
+    {
+      provide: GestionarCriterios,
+      inject: [REPOSITORIO_CRITERIO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        criterios: RepositorioCriterioPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarCriterios(criterios, autorizacion, eventos),
     },
     {
       provide: GestionarAsignaturas,
@@ -409,8 +452,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         cola: ColaDeDocumentosPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) =>
-        new SolicitarDocumento(planes, aprobaciones, documentos, cola, autorizacion, eventos),
+      ) => new SolicitarDocumento(planes, aprobaciones, documentos, cola, autorizacion, eventos),
     },
     {
       provide: ConsultarDocumento,

@@ -266,9 +266,10 @@ model Carrera {
   creadoEn      DateTime         @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  facultad Facultad       @relation(fields: [facultadId], references: [id], onDelete: Restrict)
-  ciclos   Ciclo[]
-  planes   PlanEstudios[]
+  facultad  Facultad               @relation(fields: [facultadId], references: [id], onDelete: Restrict)
+  ciclos    Ciclo[]
+  planes    PlanEstudios[]
+  criterios CriterioAcreditacion[]
 
   /// RF015 RN1: el mismo nombre puede repetirse entre facultades, pero no
   /// dentro de una.
@@ -331,6 +332,7 @@ model PlanEstudios {
   aprobaciones    EventoAprobacion[]
   justificaciones Justificacion[]
   documentos      DocumentoGenerado[]
+  atributos       PlanAtributo[]
 
   @@unique([carreraId, version])
   @@index([carreraId, estado])
@@ -376,10 +378,14 @@ model AtributoGraduado {
   /// Orden de presentación dentro del marco, para listarlos como el estándar.
   orden  Int    @db.SmallInt
 
+  /// RF123: inactivar conserva el histórico. No se borra físicamente.
+  estado EstadoActivacion @default(ACTIVO)
+
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
   competencias CompetenciaAtributo[]
+  planes       PlanAtributo[]
 
   @@unique([marco, codigo])
   @@map("atributos_graduado")
@@ -422,6 +428,52 @@ model CompetenciaAtributo {
   @@id([competenciaId, atributoId])
   @@index([atributoId])
   @@map("competencia_atributo")
+  @@schema("plan_estudios")
+}
+
+/// Qué atributos del graduado adopta cada plan de estudios (RF122).
+///
+/// El atributo es catálogo del marco de acreditación y se comparte entre
+/// planes; esta tabla declara cuáles adopta cada uno. Hacer el atributo
+/// propiedad del plan —que es como se lee RF120 al pie de la letra— filtraría
+/// atributos de un plan a otro, porque `Competencia` es un catálogo global
+/// compartido: la competencia CPE-03 vive a la vez en el plan 2018 y en el
+/// 2022, y su fila en `competencia_atributo` es una sola.
+model PlanAtributo {
+  planId     String @map("plan_id") @db.Uuid
+  atributoId String @map("atributo_id") @db.Uuid
+
+  plan     PlanEstudios     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  atributo AtributoGraduado @relation(fields: [atributoId], references: [id], onDelete: Restrict)
+
+  @@id([planId, atributoId])
+  @@index([atributoId])
+  @@map("plan_atributo")
+  @@schema("plan_estudios")
+}
+
+/// Criterio de acreditación de una carrera (RF129–RF132).
+///
+/// Por carrera y no por plan de estudios: el criterio describe al programa, que
+/// sobrevive a sus sucesivos planes. Es uno de los tres aspectos sobre los que
+/// el submódulo Plan de Mejora genera acciones.
+model CriterioAcreditacion {
+  id        String           @id @default(uuid()) @db.Uuid
+  carreraId String           @map("carrera_id") @db.Uuid
+  codigo    String           @db.VarChar(16)
+  nombre    String           @db.VarChar(300)
+  estado    EstadoActivacion @default(ACTIVO)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  carrera Carrera @relation(fields: [carreraId], references: [id], onDelete: Restrict)
+
+  /// RF129 RN: único dentro de la carrera, no en todo el sistema. Dos programas
+  /// pueden llamar «C-01» a criterios distintos sin que eso sea un choque.
+  @@unique([carreraId, codigo])
+  @@index([carreraId])
+  @@map("criterios_acreditacion")
   @@schema("plan_estudios")
 }
 

@@ -95,11 +95,7 @@ export interface RepositorioCompetenciaPort {
 
   /** Lista vacía deja la competencia sin mapear, que es un estado válido. */
   crear(codigo: string, nombre: string, atributoIds: readonly string[]): Promise<DatosCompetencia>;
-  actualizar(
-    id: string,
-    nombre: string,
-    atributoIds: readonly string[],
-  ): Promise<DatosCompetencia>;
+  actualizar(id: string, nombre: string, atributoIds: readonly string[]): Promise<DatosCompetencia>;
   cambiarEstado(id: string, activa: boolean): Promise<DatosCompetencia>;
   eliminar(id: string): Promise<void>;
 

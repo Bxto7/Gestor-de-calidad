@@ -94,10 +94,7 @@ export function useGenerarDocumento() {
 }
 
 /** Sondea hasta que el trabajo deja de estar en curso, o hasta rendirse. */
-async function esperar(
-  id: string,
-  vivo: { current: boolean },
-): Promise<TrabajoDocumento> {
+async function esperar(id: string, vivo: { current: boolean }): Promise<TrabajoDocumento> {
   const limite = Date.now() + ESPERA_MAXIMA_MS;
 
   for (;;) {

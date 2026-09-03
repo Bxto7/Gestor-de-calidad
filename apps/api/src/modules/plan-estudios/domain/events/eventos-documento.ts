@@ -29,7 +29,6 @@ export class DocumentoSolicitado extends DomainEvent {
     tipo: string,
   ) {
     super(actor);
-    this.detalle =
-      `Plan ${codigoPlan}: se solicitó generar «${NOMBRE_DOCUMENTO[tipo] ?? tipo}».`;
+    this.detalle = `Plan ${codigoPlan}: se solicitó generar «${NOMBRE_DOCUMENTO[tipo] ?? tipo}».`;
   }
 }

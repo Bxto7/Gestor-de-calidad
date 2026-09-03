@@ -136,7 +136,13 @@ describe('áreas de formación', () => {
     const grupo = { codigo: 'GE-1', cantidadAElegir: 1 };
     const r = reporteAreasDeFormacion([
       asignatura({ id: '1', codigo: 'OBL', creditos: 10, tipo: 'Especialidad' }),
-      asignatura({ id: '2', codigo: 'EL1', creditos: 3, tipo: 'Especialidad', grupoElectivo: grupo }),
+      asignatura({
+        id: '2',
+        codigo: 'EL1',
+        creditos: 3,
+        tipo: 'Especialidad',
+        grupoElectivo: grupo,
+      }),
       asignatura({ id: '3', codigo: 'EL2', creditos: 3, tipo: 'General', grupoElectivo: grupo }),
     ]);
 
@@ -148,7 +154,13 @@ describe('áreas de formación', () => {
     const grupo = { codigo: 'GE-1', cantidadAElegir: 1 };
     const opciones = [
       asignatura({ id: '2', codigo: 'EL2', creditos: 3, tipo: 'General', grupoElectivo: grupo }),
-      asignatura({ id: '1', codigo: 'EL1', creditos: 3, tipo: 'Especialidad', grupoElectivo: grupo }),
+      asignatura({
+        id: '1',
+        codigo: 'EL1',
+        creditos: 3,
+        tipo: 'Especialidad',
+        grupoElectivo: grupo,
+      }),
     ];
 
     const unOrden = reporteAreasDeFormacion(opciones);

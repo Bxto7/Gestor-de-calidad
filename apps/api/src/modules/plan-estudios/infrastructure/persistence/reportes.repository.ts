@@ -167,7 +167,10 @@ export class ReportesRepositoryPrisma implements RepositorioReportesPort {
         where: { marco },
         select: {
           codigo: true,
-          competencias: { where: { competencia: { estado: 'ACTIVO' } }, select: { atributoId: true } },
+          competencias: {
+            where: { competencia: { estado: 'ACTIVO' } },
+            select: { atributoId: true },
+          },
         },
         orderBy: { orden: 'asc' },
       }),

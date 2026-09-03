@@ -189,14 +189,12 @@ interface UnidadCurricular {
 function enUnidades(activas: readonly AsignaturaParaReporte[]): UnidadCurricular[] {
   const sueltas = activas
     .filter((a) => a.grupoElectivo === null)
-    .map(
-      (a): UnidadCurricular => ({
-        creditos: a.creditos,
-        asignaturas: 1,
-        tipo: a.tipo,
-        condicion: a.condicion,
-      }),
-    );
+    .map((a): UnidadCurricular => ({
+      creditos: a.creditos,
+      asignaturas: 1,
+      tipo: a.tipo,
+      condicion: a.condicion,
+    }));
 
   const porGrupo = new Map<string, AsignaturaParaReporte[]>();
   for (const a of activas) {

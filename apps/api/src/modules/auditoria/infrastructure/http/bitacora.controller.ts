@@ -9,16 +9,7 @@
 
 import { Controller, Get, Query } from '@nestjs/common';
 import { Transform } from 'class-transformer';
-import {
-  IsBoolean,
-  IsDate,
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsUUID,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsBoolean, IsDate, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import {

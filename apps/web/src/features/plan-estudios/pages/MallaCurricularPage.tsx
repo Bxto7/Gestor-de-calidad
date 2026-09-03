@@ -100,8 +100,7 @@ export function MallaCurricularPage() {
   // `asignaturas ?? []` y la pantalla dibujaba diez ciclos vacíos y «0
   // créditos»: no es mostrar menos, es afirmar algo falso sobre el plan.
   if (!asignaturas) {
-    const sinAcceso =
-      falloAsignaturas instanceof ErrorDeNegocio && falloAsignaturas.estado === 403;
+    const sinAcceso = falloAsignaturas instanceof ErrorDeNegocio && falloAsignaturas.estado === 403;
 
     return (
       <EstadoVacio
@@ -151,7 +150,6 @@ export function MallaCurricularPage() {
     e.dataTransfer.dropEffect = 'move';
     setCicloActivo(zona);
   }
-
 
   // Del motor y no con un `reduce` propio: las opciones de un grupo de electivos
   // no se suman todas, y una copia suelta del cálculo se olvidaría de eso.

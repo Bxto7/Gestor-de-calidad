@@ -158,7 +158,10 @@ describe('RF072 — resumen del plan en PDF', () => {
   it('las asignaturas inactivas no cuentan', async () => {
     const doc = armarResumenDelPlan(
       datos({
-        asignaturas: [asignatura({ creditos: 4 }), asignatura({ id: 'a-2', creditos: 9, activa: false })],
+        asignaturas: [
+          asignatura({ creditos: 4 }),
+          asignatura({ id: 'a-2', creditos: 9, activa: false }),
+        ],
       }),
     );
     expect(texto(doc.secciones)).toContain('un total de 4 créditos');
@@ -212,8 +215,20 @@ describe('RF073 — malla en hoja de cálculo', () => {
     const doc = armarMallaParaHojaDeCalculo(
       datos({
         asignaturas: [
-          asignatura({ id: 'e1', codigo: 'EL1', creditos: 3, cicloNumero: 1, grupoElectivo: grupo }),
-          asignatura({ id: 'e2', codigo: 'EL2', creditos: 3, cicloNumero: 1, grupoElectivo: grupo }),
+          asignatura({
+            id: 'e1',
+            codigo: 'EL1',
+            creditos: 3,
+            cicloNumero: 1,
+            grupoElectivo: grupo,
+          }),
+          asignatura({
+            id: 'e2',
+            codigo: 'EL2',
+            creditos: 3,
+            cicloNumero: 1,
+            grupoElectivo: grupo,
+          }),
         ],
       }),
     );

@@ -48,7 +48,9 @@ export class RegistroDeSeguridadBitacora implements RegistroDeSeguridad {
     this.anotar(new SesionCerrada(usuarioId));
   }
 
-  private anotar(evento: AccesoConcedido | AccesoRechazado | SesionCerrada | ReusoDeTokenDetectado): void {
+  private anotar(
+    evento: AccesoConcedido | AccesoRechazado | SesionCerrada | ReusoDeTokenDetectado,
+  ): void {
     void this.eventos.publicar([evento]).catch((error: unknown) => {
       this.log.error(
         `No se pudo anotar «${evento.nombre}» en la bitácora: ` +

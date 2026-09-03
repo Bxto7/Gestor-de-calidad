@@ -214,10 +214,7 @@ export class GestionarUsuarios {
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 
-  private async validarRoles(
-    codigos: readonly string[],
-    carreraId: string | null,
-  ): Promise<void> {
+  private async validarRoles(codigos: readonly string[], carreraId: string | null): Promise<void> {
     if (codigos.length === 0) {
       // Una cuenta sin rol puede entrar y no puede hacer absolutamente nada.
       // Es un estado que solo genera un ticket de soporte.
@@ -305,7 +302,9 @@ function describirCambios(antes: DatosUsuario, despues: DatosUsuario): string[] 
   }
 
   if (antes.carreraId !== despues.carreraId) {
-    cambios.push(`alcance de carrera ${antes.carreraId ?? 'ninguno'} → ${despues.carreraId ?? 'ninguno'}`);
+    cambios.push(
+      `alcance de carrera ${antes.carreraId ?? 'ninguno'} → ${despues.carreraId ?? 'ninguno'}`,
+    );
   }
 
   return cambios;
