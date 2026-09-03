@@ -13,6 +13,7 @@ import { MallaCurricularPage } from '@/features/plan-estudios/pages/MallaCurricu
 import { PlanesMedicionPage } from '@/features/mejora-continua/pages/PlanesMedicionPage';
 import { PlanMedicionPage } from '@/features/mejora-continua/pages/PlanMedicionPage';
 import { AtributosPage } from '@/features/acreditacion/pages/AtributosPage';
+import { CriteriosPage } from '@/features/acreditacion/pages/CriteriosPage';
 import { ObjetivosPage } from '@/features/plan-estudios/pages/ObjetivosPage';
 import { PlanEstudiosPage } from '@/features/plan-estudios/pages/PlanEstudiosPage';
 import { ResumenPage } from '@/features/plan-estudios/pages/ResumenPage';
@@ -65,6 +66,7 @@ export function App() {
                   element={<MallaCurricularPage />}
                 />
                 <Route path="acreditacion/atributos" element={<AtributosPage />} />
+                <Route path="acreditacion/criterios" element={<CriteriosPage />} />
                 <Route path="mejora-continua/medicion" element={<PlanesMedicionPage />} />
                 <Route path="mejora-continua/medicion/:id" element={<PlanMedicionPage />} />
                 <Route path="reportes" element={<ReportesPage />} />

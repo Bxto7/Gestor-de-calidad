@@ -43,6 +43,12 @@ const ACTIVOS: readonly Modulo[] = [
       'El perfil contra el que se acredita el programa. Catálogo del marco de acreditación, con el recuento de qué competencias desarrollan cada atributo.',
     a: '/acreditacion/atributos',
   },
+  {
+    titulo: 'Criterios de Acreditación',
+    detalle:
+      'Los criterios del programa, por carrera profesional. Son uno de los tres aspectos sobre los que se generarán los planes de mejora.',
+    a: '/acreditacion/criterios',
+  },
 ];
 
 type EstadoCriterio = 'cubierto' | 'parcial' | 'pendiente';
