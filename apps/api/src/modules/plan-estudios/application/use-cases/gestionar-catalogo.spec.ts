@@ -450,3 +450,31 @@ describe('RF043 / RF042 — edición y consulta de competencias', () => {
     await expect(caso.listar(ACTOR)).rejects.toBeInstanceOf(AccesoDenegado);
   });
 });
+
+describe('RF124–RF126 — regresión tras introducir PlanAtributo', () => {
+  // `plan_atributo` declara qué atributos adopta cada plan y es una tabla
+  // aparte, a propósito. La competencia conserva sus atributos con
+  // independencia de qué plan los adopte: si algún día se fusionaran ambas
+  // relaciones, la competencia empezaría a perder atributos al cambiar de plan
+  // y estas dos pruebas lo delatarían.
+  it('la competencia conserva sus atributos, que no dependen de ningún plan', async () => {
+    const { caso } = montarCompetencias({ existente: competencia({ atributos: [] }) });
+
+    const editada = await caso.editar(ACTOR, 'cpe-1', 'Aprendizaje autónomo', [
+      'AG-I06',
+      'AG-I08',
+    ]);
+
+    expect(editada.atributos.map((a) => a.codigo)).toEqual(['AG-I06', 'AG-I08']);
+  });
+
+  it('retirar todos los atributos de una competencia se sigue auditando como «ninguno»', async () => {
+    const { caso, publicados } = montarCompetencias({
+      existente: competencia({ atributos: atributos(['AG-I06']) }),
+    });
+
+    await caso.editar(ACTOR, 'cpe-1', 'Aprendizaje autónomo', []);
+
+    expect(publicados[0]?.detalle).toContain('AG-I06 → ninguno');
+  });
+});
