@@ -45,7 +45,8 @@ const VISTA = {
 };
 
 function montar(sobre: { editable?: boolean; seguimiento?: boolean } = {}) {
-  const onProgramar = vi.fn();
+  const onProgramar =
+    vi.fn<(celdas: readonly { competenciaId: string; periodoId: string }[]) => void>();
   const onMarcar = vi.fn();
   render(
     <MatrizProgramacion
@@ -90,7 +91,7 @@ describe('RNF12 — programar emite la matriz completa', () => {
     await userEvent.click(screen.getByRole('button', { name: /CPE-02 en 2024-I: no programada/i }));
 
     expect(onProgramar).toHaveBeenCalledOnce();
-    const enviadas = onProgramar.mock.calls[0]?.[0] as { competenciaId: string }[];
+    const enviadas = onProgramar.mock.calls[0]?.[0] ?? [];
     expect(enviadas).toHaveLength(3);
   });
 
@@ -99,7 +100,7 @@ describe('RNF12 — programar emite la matriz completa', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /CPE-01 en 2024-I: pendiente/i }));
 
-    const enviadas = onProgramar.mock.calls[0]?.[0] as { competenciaId: string }[];
+    const enviadas = onProgramar.mock.calls[0]?.[0] ?? [];
     expect(enviadas).toHaveLength(1);
   });
 });
@@ -138,8 +139,10 @@ describe('permisos', () => {
 
 describe('la vía alternativa escribe lo mismo que la cuadrícula', () => {
   it('activar c2/p1 por el selector emite el mismo conjunto que pulsarla en la tabla', async () => {
+    type Celdas = readonly { competenciaId: string; periodoId: string }[];
+
     // Camino 1: la cuadrícula.
-    const porCuadricula = vi.fn();
+    const porCuadricula = vi.fn<(celdas: Celdas) => void>();
     const { unmount } = render(
       <MatrizProgramacion
         vista={VISTA}
@@ -153,7 +156,7 @@ describe('la vía alternativa escribe lo mismo que la cuadrícula', () => {
     unmount();
 
     // Camino 2: el selector de la fila de CPE-02.
-    const porSelector = vi.fn();
+    const porSelector = vi.fn<(celdas: Celdas) => void>();
     render(
       <MatrizProgramacion
         vista={VISTA}
@@ -168,8 +171,7 @@ describe('la vía alternativa escribe lo mismo que la cuadrícula', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: '2024-I' }));
     await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
-    const clave = (xs: { competenciaId: string; periodoId: string }[]) =>
-      xs.map((x) => `${x.competenciaId}|${x.periodoId}`).sort();
+    const clave = (xs: Celdas = []) => xs.map((x) => `${x.competenciaId}|${x.periodoId}`).sort();
 
     expect(clave(porSelector.mock.calls[0]?.[0])).toEqual(clave(porCuadricula.mock.calls[0]?.[0]));
   });
