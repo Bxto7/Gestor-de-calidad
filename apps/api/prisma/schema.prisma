@@ -7,7 +7,8 @@
 // §3.2 prohíbe que un módulo acceda a las tablas de otro. Con un único cliente
 // Prisma esa regla solo puede vivir en la disciplina del equipo, así que aquí
 // se le da respaldo real: cada módulo tiene su propio **schema de PostgreSQL**
-// (`auth`, `plan_estudios`, `auditoria`). Eso permite, más adelante, conceder
+// (`auth`, `plan_estudios`, `auditoria`, `mejora_continua`). Eso permite, más
+// adelante, conceder
 // permisos distintos por schema a nivel de rol de base de datos, y hace que un
 // cruce indebido se vea a simple vista en el SQL.
 //
@@ -28,7 +29,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["auth", "plan_estudios", "auditoria"]
+  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua"]
 }
 
 // ============================================================================
@@ -722,4 +723,125 @@ model DocumentoGenerado {
   @@index([planId, solicitadoEn])
   @@map("documentos_generados")
   @@schema("plan_estudios")
+}
+
+// ============================================================================
+// Módulo MEJORA CONTINUA — Planes de Medición (RF-PM-000 a RF-PM-046)
+// ============================================================================
+
+/// RF-PM-002: la Directa se organiza por periodos académicos y la Indirecta por
+/// años calendario. El tipo decide qué configuración de periodos se habilita.
+enum TipoMedicion {
+  DIRECTA
+  INDIRECTA
+
+  @@schema("mejora_continua")
+}
+
+/// RF-PM-005 RN1. Mismos nombres que `EstadoPlan` pero enum propio: las reglas
+/// difieren —RF-PM-007 RN1 permite editar solo en Borrador— y compartir el tipo
+/// ataría dos módulos que evolucionan por separado.
+enum EstadoMedicion {
+  BORRADOR
+  EN_REVISION
+  APROBADO
+  VIGENTE
+  HISTORICO
+
+  @@schema("mejora_continua")
+}
+
+/// Plan de medición de competencias (RF-PM-001 a RF-PM-012).
+///
+/// `planEstudiosId` no lleva clave foránea a propósito: apunta a otro esquema y
+/// §3.2 prohíbe que dos módulos compartan tablas. La validez se comprueba con
+/// `ContenidoCurricularPort` antes de escribir. Es sostenible porque los
+/// identificadores son inmutables y en `plan_estudios` nada se borra
+/// físicamente: se inactiva.
+model PlanMedicion {
+  id             String         @id @default(uuid()) @db.Uuid
+  planEstudiosId String         @map("plan_estudios_id") @db.Uuid
+  tipo           TipoMedicion
+  /// RF-PM-004 RN1: autogenerado, no editable.
+  codigo         String         @unique @db.VarChar(64)
+  version        Int            @default(1) @db.SmallInt
+  /// RF-PM-011 RN2: fracción decimal (70 % → 0.700). Decimal y no Float: un
+  /// umbral de aprobación no debe arrastrar error de coma flotante.
+  meta           Decimal        @db.Decimal(4, 3)
+  estado         EstadoMedicion @default(BORRADOR)
+
+  /// Periodo desde el que se propusieron los periodos iniciales (RF-PM-016).
+  /// Solo para la Directa; permite reproducir la propuesta.
+  periodoInicioAnio  Int? @map("periodo_inicio_anio") @db.SmallInt
+  periodoInicioMitad Int? @map("periodo_inicio_mitad") @db.SmallInt
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  periodos     PeriodoMedicion[]
+  competencias CompetenciaDelPlan[]
+  programacion Programacion[]
+
+  @@index([planEstudiosId, tipo])
+  @@map("planes_medicion")
+  @@schema("mejora_continua")
+}
+
+/// Periodo del plan: académico en la Directa («2024-I»), año en la Indirecta
+/// («2024»). RF-PM-016 a RF-PM-021.
+model PeriodoMedicion {
+  id             String    @id @default(uuid()) @db.Uuid
+  planMedicionId String    @map("plan_medicion_id") @db.Uuid
+  etiqueta       String    @db.VarChar(16)
+  /// RF-PM-019: el orden cronológico. No se deriva de la etiqueta porque un
+  /// periodo añadido a mano puede no seguir el patrón.
+  orden          Int       @db.SmallInt
+  /// RF-PM-017 RN1: opcional al crear, obligatoria antes de aprobar. Solo Directa.
+  fechaCierre    DateTime? @map("fecha_cierre") @db.Date
+
+  plan         PlanMedicion   @relation(fields: [planMedicionId], references: [id], onDelete: Cascade)
+  programacion Programacion[]
+
+  /// RF-PM-018 y RF-PM-021: sin periodos ni años duplicados.
+  @@unique([planMedicionId, etiqueta])
+  @@index([planMedicionId, orden])
+  @@map("periodos_medicion")
+  @@schema("mejora_continua")
+}
+
+/// Competencias incluidas en el plan (RF-PM-013 RN1: una sola vez cada una).
+model CompetenciaDelPlan {
+  planMedicionId String @map("plan_medicion_id") @db.Uuid
+  competenciaId  String @map("competencia_id") @db.Uuid
+
+  plan PlanMedicion @relation(fields: [planMedicionId], references: [id], onDelete: Cascade)
+
+  @@id([planMedicionId, competenciaId])
+  @@map("competencias_del_plan")
+  @@schema("mejora_continua")
+}
+
+/// Una celda de la matriz competencia × periodo (RF-PM-022, RF-PM-026).
+///
+/// La fila solo existe si la celda está programada: RF-PM-022 RN2 dice que la
+/// celda admite dos valores, programada o no, y la ausencia expresa el segundo
+/// sin materializar una matriz que sería casi toda hueco.
+model Programacion {
+  planMedicionId String @map("plan_medicion_id") @db.Uuid
+  competenciaId  String @map("competencia_id") @db.Uuid
+  periodoId      String @map("periodo_id") @db.Uuid
+
+  /// RF-PM-026: segundo estado, distinto del de programación.
+  realizada      Boolean   @default(false)
+  /// RF-PM-026 RN2: el cambio queda con usuario y fecha.
+  realizadaEn    DateTime? @map("realizada_en") @db.Timestamptz(6)
+  realizadaPorId String?   @map("realizada_por_id") @db.Uuid
+
+  plan    PlanMedicion    @relation(fields: [planMedicionId], references: [id], onDelete: Cascade)
+  periodo PeriodoMedicion @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+
+  @@id([planMedicionId, competenciaId, periodoId])
+  @@index([periodoId])
+  @@map("programacion_medicion")
+  @@schema("mejora_continua")
 }
