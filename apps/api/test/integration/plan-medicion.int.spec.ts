@@ -291,6 +291,46 @@ describe('RF-PM-022 — la matriz', () => {
     expect(await repo.matriz(planId)).toEqual([]);
   });
 
+  /**
+   * Fijar la fecha de cierre obliga a reenviar todos los periodos, y RF-PM-017
+   * la exige para aprobar: si eso borrara la matriz, todo plan la perdería
+   * justo antes de aprobarse. El periodo que sigue ahí conserva sus celdas; el
+   * que desaparece se las lleva, como comprueba la prueba anterior.
+   */
+  it('fijar la fecha de cierre no borra la programación de los periodos que siguen', async () => {
+    const { planId, periodos } = await conMatriz([CMP1, CMP2], ['2024-I', '2024-II']);
+    await repo.programar(planId, [
+      { competenciaId: CMP1, periodoId: periodos[0]!.id },
+      { competenciaId: CMP2, periodoId: periodos[1]!.id },
+    ]);
+    await repo.marcarRealizada(planId, CMP1, periodos[0]!.id, true, ACTOR_ID);
+
+    const tras = await repo.declararPeriodos(planId, [
+      { etiqueta: '2024-I', orden: 1, fechaCierre: new Date('2024-07-15') },
+      { etiqueta: '2024-II', orden: 2, fechaCierre: new Date('2024-12-20') },
+    ]);
+
+    const porEtiqueta = new Map(tras.periodos.map((p) => [p.etiqueta, p.id]));
+    const matriz = await repo.matriz(planId);
+
+    expect(matriz).toHaveLength(2);
+    expect(matriz).toContainEqual(
+      expect.objectContaining({
+        competenciaId: CMP2,
+        periodoId: porEtiqueta.get('2024-II'),
+        realizada: false,
+      }),
+    );
+    // La constancia de que la medición ocurrió tampoco se pierde.
+    expect(matriz).toContainEqual(
+      expect.objectContaining({
+        competenciaId: CMP1,
+        periodoId: porEtiqueta.get('2024-I'),
+        realizada: true,
+      }),
+    );
+  });
+
   it('eliminar el plan se lleva periodos, competencias y matriz', async () => {
     const { planId, periodos } = await conMatriz([CMP1], ['2024-I']);
     await repo.programar(planId, [{ competenciaId: CMP1, periodoId: periodos[0]!.id }]);

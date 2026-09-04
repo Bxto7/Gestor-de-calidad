@@ -190,22 +190,67 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
    * RNF12: atómico. Las celdas de los periodos que desaparecen caen por la
    * cascada de `Programacion.periodo`, que es lo que RF-PM-016 permite hacer
    * mientras el plan está en Borrador.
+   *
+   * El periodo que **sigue ahí** conserva su programación. Como se borra y se
+   * recrea, su fila nace con otro id y la cascada se llevaría también sus
+   * celdas; se reinyectan emparejando por etiqueta, que es lo que identifica a
+   * un periodo para quien lo usa. Sin esto, fijar la fecha de cierre —que
+   * RF-PM-017 exige para aprobar, y que obliga a reenviar la lista entera—
+   * borraría la matriz de todo plan justo antes de aprobarlo.
+   *
+   * Es el mismo criterio que `programar` aplica a las marcas de realizada.
    */
   async declararPeriodos(
     id: string,
     periodos: readonly { etiqueta: string; orden: number; fechaCierre: Date | null }[],
   ): Promise<DatosPlanMedicion> {
-    await this.prisma.$transaction([
-      this.prisma.periodoMedicion.deleteMany({ where: { planMedicionId: id } }),
-      this.prisma.periodoMedicion.createMany({
+    await this.prisma.$transaction(async (tx) => {
+      // Qué etiqueta tenía cada celda, antes de que los ids cambien.
+      const anteriores = await tx.periodoMedicion.findMany({
+        where: { planMedicionId: id },
+        select: { id: true, etiqueta: true },
+      });
+      const etiquetaDe = new Map(anteriores.map((p) => [p.id, p.etiqueta]));
+
+      const celdas = await tx.programacion.findMany({ where: { planMedicionId: id } });
+
+      await tx.periodoMedicion.deleteMany({ where: { planMedicionId: id } });
+      await tx.periodoMedicion.createMany({
         data: periodos.map((p) => ({
           planMedicionId: id,
           etiqueta: p.etiqueta,
           orden: p.orden,
           fechaCierre: p.fechaCierre,
         })),
-      }),
-    ]);
+      });
+
+      if (celdas.length === 0) return;
+
+      const nuevos = await tx.periodoMedicion.findMany({
+        where: { planMedicionId: id },
+        select: { id: true, etiqueta: true },
+      });
+      const idDe = new Map(nuevos.map((p) => [p.etiqueta, p.id]));
+
+      const rescatadas = celdas.flatMap((c) => {
+        const nuevoId = idDe.get(etiquetaDe.get(c.periodoId) ?? '');
+        // Sin equivalente: el periodo desapareció de verdad y la celda con él.
+        if (!nuevoId) return [];
+        return [
+          {
+            planMedicionId: id,
+            competenciaId: c.competenciaId,
+            periodoId: nuevoId,
+            realizada: c.realizada,
+            realizadaEn: c.realizadaEn,
+            realizadaPorId: c.realizadaPorId,
+          },
+        ];
+      });
+
+      if (rescatadas.length > 0) await tx.programacion.createMany({ data: rescatadas });
+    });
+
     return this.exigir(id);
   }
 
