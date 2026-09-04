@@ -36,6 +36,11 @@ export interface DatosPlanMedicion {
   readonly competenciaIds: readonly string[];
   readonly periodos: readonly DatosPeriodo[];
   readonly creadoEn: Date;
+  /** RF-PM-030 RN1: de qué versión proviene. `null` en un alta o un duplicado. */
+  readonly derivadoDeId: string | null;
+  /** RF-PM-039: quién aprobó y cuándo. Nulos mientras no se haya aprobado. */
+  readonly aprobadoPorId: string | null;
+  readonly aprobadoEn: Date | null;
 }
 
 /**

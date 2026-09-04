@@ -75,6 +75,9 @@ function plan(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
     competenciaIds: ['cmp-1'],
     periodos: [{ id: 'per-1', etiqueta: '2024-I', orden: 1, fechaCierre: new Date('2024-07-31') }],
     creadoEn: new Date('2026-01-01'),
+    derivadoDeId: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }

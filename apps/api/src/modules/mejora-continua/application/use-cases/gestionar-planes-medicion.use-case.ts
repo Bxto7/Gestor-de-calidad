@@ -242,6 +242,19 @@ export class GestionarPlanesMedicion {
   }
 
   /**
+   * RF-PM-031: el linaje de versiones del plan.
+   *
+   * Exige solo `medicion.leer`: consultar cómo evolucionó un plan es lectura, y
+   * el requerimiento la ofrece también al Usuario consultor.
+   */
+  async linaje(actor: Actor, id: string): Promise<DatosPlanMedicion[]> {
+    await this.exigir(actor, 'medicion.leer');
+    // Que exista, para distinguir «sin linaje» de «no hay tal plan».
+    await this.exigirPlan(id);
+    return this.planes.linajeDe(id);
+  }
+
+  /**
    * El plan guarda ids de competencia; los códigos viven en Plan de Estudios y
    * se piden por el puerto, que es para esto que existe. Sin ellos el motor
    * nombraría sus hallazgos con UUID, que no le dicen nada a quien los lee.

@@ -46,6 +46,9 @@ const SELECCION = {
   periodoInicioAnio: true,
   periodoInicioMitad: true,
   creadoEn: true,
+  derivadoDeId: true,
+  aprobadoPorId: true,
+  aprobadoEn: true,
   competencias: { select: { competenciaId: true } },
   periodos: {
     select: { id: true, etiqueta: true, orden: true, fechaCierre: true },
@@ -64,6 +67,9 @@ interface Fila {
   periodoInicioAnio: number | null;
   periodoInicioMitad: number | null;
   creadoEn: Date;
+  derivadoDeId: string | null;
+  aprobadoPorId: string | null;
+  aprobadoEn: Date | null;
   competencias: { competenciaId: string }[];
   periodos: { id: string; etiqueta: string; orden: number; fechaCierre: Date | null }[];
 }
@@ -85,6 +91,9 @@ function aDatos(fila: Fila): DatosPlanMedicion {
     competenciaIds: fila.competencias.map((c) => c.competenciaId),
     periodos: fila.periodos,
     creadoEn: fila.creadoEn,
+    derivadoDeId: fila.derivadoDeId,
+    aprobadoPorId: fila.aprobadoPorId,
+    aprobadoEn: fila.aprobadoEn,
   };
 }
 
