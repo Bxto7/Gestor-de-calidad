@@ -39,6 +39,7 @@ import {
   useProgramarMatriz,
   useTransicionar,
 } from '../api/queries';
+import { EditorDePeriodos } from '../components/EditorDePeriodos';
 import { GrupoDeCompetencias } from '../components/GrupoDeCompetencias';
 import { PanelConsistencia } from '../components/PanelConsistencia';
 import { MatrizProgramacion } from '../components/MatrizProgramacion';
@@ -199,46 +200,21 @@ export function PlanMedicionPage() {
       {/* ── Periodos ─────────────────────────────────────────────────── */}
       <Tarjeta>
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-tinta">Periodos ({plan.periodos.length})</h2>
-            {editable && (propuestos ?? []).length > 0 && plan.periodos.length === 0 && (
-              <Boton
-                variante="secundario"
-                tamano="sm"
-                onClick={() =>
-                  void ejecutar(() =>
-                    declararPeriodos.mutateAsync(
-                      (propuestos ?? []).map((p) => ({ etiqueta: p.etiqueta, orden: p.orden })),
-                    ),
-                  )
-                }
-              >
-                Usar la propuesta ({(propuestos ?? []).length})
-              </Boton>
-            )}
-          </div>
+          <h2 className="text-sm font-semibold text-tinta">Periodos ({plan.periodos.length})</h2>
 
-          {plan.periodos.length === 0 ? (
-            <EstadoVacio
-              titulo="Sin periodos definidos"
-              detalle={
-                plan.tipo === 'DIRECTA'
-                  ? 'Usa la propuesta para partir de los periodos del plan de estudios.'
-                  : 'La medición indirecta cubre años calendario que eliges tú.'
-              }
-            />
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {plan.periodos.map((p) => (
-                <li key={p.id}>
-                  <Badge tono="neutro">
-                    {p.etiqueta}
-                    {p.fechaCierre && ` · cierra ${p.fechaCierre.slice(0, 10)}`}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+          {/*
+            La `key` reinicia el editor cuando el servidor confirma el guardado.
+            Sin ella, su borrador local seguiría mostrando lo que se envió aunque
+            el backend hubiera normalizado algo.
+          */}
+          <EditorDePeriodos
+            key={plan.periodos.map((p) => `${p.etiqueta}|${p.fechaCierre ?? ''}`).join(',')}
+            periodos={plan.periodos}
+            propuesta={propuestos ?? []}
+            editable={editable}
+            guardando={declararPeriodos.isPending}
+            onGuardar={(periodos) => void ejecutar(() => declararPeriodos.mutateAsync(periodos))}
+          />
         </div>
       </Tarjeta>
 
