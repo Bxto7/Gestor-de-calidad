@@ -1256,10 +1256,13 @@ El PDF original cita algunos RF entre paréntesis que no corresponden al conteni
 
 Aquí se anota cada punto en el que el sistema **no hace exactamente lo que pide un RF**. El texto de los RF de la sección 3 no se toca: si se editara para que coincidiera con el código, este documento dejaría de servir para contrastar lo construido contra lo pedido.
 
-Dos estados, y la diferencia importa:
+Tres estados, y la diferencia importa:
 
 - **Ratificada** — el sistema hace más de lo que el requisito pedía, sin contradecirlo. No requiere decisión de nadie.
+- **Aprobada** — el sistema **sí** contradice lo que el requisito dice, y alguien lo decidió a sabiendas. Lleva fecha y motivo: sin eso no es una decisión, es un cambio que nadie recuerda haber autorizado.
 - **PENDIENTE** — el sistema se aparta de lo que el requisito dice. **Nadie de la universidad lo ha aprobado todavía.** Hasta que alguien decida, el código y el requisito discrepan.
+
+El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta entonces las dos etiquetas cubrían «no hace falta decidir» y «nadie ha decidido», pero no «se decidió que sí».
 
 | # | RF | Resumen | Estado |
 |---|---|---|---|
@@ -1272,7 +1275,7 @@ Dos estados, y la diferencia importa:
 | D-7 | RF072 | Generación en servidor y en cola, no impresión del navegador | Ratificada |
 | D-8 | RF073 | `.xlsx` real con tipos, no CSV | Ratificada |
 | D-9 | RF055 · RF047 | Datos del plan ISI 2018 cargados incompletos: horas teóricas en 0 y sumillas en «pendiente» | **PENDIENTE** |
-| D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | **PENDIENTE** |
+| D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | Aprobada (2026-09-04) |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1386,7 +1389,11 @@ Se conservó el tono y la saturación de cada uno; solo bajó la luminosidad, y 
 
 La alternativa era desactivar la regla `color-contrast` en las pruebas, y con ella la suite habría quedado ciega a **cualquier** regresión futura de contraste, no solo a estas cinco.
 
-**Qué hay que decidir:** si la universidad acepta el cambio de paleta. Es visible: afecta a los badges de estado y a todo el texto secundario. Si prefiere los colores originales, hay que decidir también qué se hace con el objetivo de WCAG 2.1 AA de §6.2, porque las dos cosas no caben a la vez.
+**Decidido el 4 de septiembre de 2026:** aprobado. El criterio es que la paleta nueva **sigue el estándar** —WCAG 2.1 AA, objetivo declarado en CLAUDE.md §6.2— y que cumplirlo pesa más que la lista literal de §2. La instrucción «no inventar colores fuera de esta lista» queda acotada: sigue valiendo para todo lo demás, y deja de valer cuando un color de esa lista incumple el estándar de accesibilidad. Un color nuevo que se aparte de §2 sin esa razón sigue sin estar permitido.
+
+Comparadas las dos versiones en el navegador, la diferencia es **sutil**: los colores se oscurecieron lo mínimo para cruzar el umbral, conservando tono y saturación. No es un rediseño.
+
+Pendiente menor: si esta decisión tiene que constar con nombre en el expediente de acreditación, añadir aquí quién la tomó.
 
 ---
 

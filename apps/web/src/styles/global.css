@@ -5,8 +5,8 @@
    Valores tomados de docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md §2.
    No inventar colores fuera de esta lista.
 
-   EXCEPCIÓN, 4 de septiembre de 2026: cinco colores de texto se oscurecieron
-   respecto de §2 del documento. Los originales no llegaban al 4.5:1 que WCAG
+   EXCEPCIÓN APROBADA el 4 de septiembre de 2026: cinco colores de texto se
+   oscurecieron respecto de §2 del documento. Los originales no llegaban al 4.5:1 que WCAG
    2.1 AA exige para texto normal —entre 2.56 y 3.80—, y AA es objetivo
    declarado del proyecto en CLAUDE.md §6.2. Lo destapó `axe-core` la primera
    vez que se midió, en `tests/e2e/specs/accesibilidad.spec.ts`.
@@ -15,8 +15,13 @@
    hasta 4.6:1 y no hasta 4.5 exacto. La primera tanda apuntó al umbral justo y
    uno de los badges se quedó en 4.48 medido por el navegador: al convertir a
    hexadecimal se redondea, y ese redondeo se comía el último decimal. El valor
-   original va anotado junto a cada uno. La desviación queda registrada en la sección 8 del documento de
-   requisitos, que es donde ese documento pide anotarlas.
+   original va anotado junto a cada uno.
+
+   La desviación está registrada y aprobada como D-10 en la sección 8 del
+   documento de requisitos. La regla de arriba no se levanta, se acota: sigue
+   prohibido inventar colores fuera de la lista, y deja de aplicar solo cuando
+   un color de esa lista incumple WCAG 2.1 AA. Uno nuevo sin esa razón sigue
+   sin estar permitido.
    ========================================================================== */
 
 @theme {

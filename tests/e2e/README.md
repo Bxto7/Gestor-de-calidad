@@ -99,8 +99,8 @@ Fue la primera medición del proyecto y no salió limpia: encontró una sola reg
 orden de encabezados roto. Se arregló oscureciendo cinco colores de texto de `global.css`,
 que iban de 2.56:1 a 3.80:1 donde AA exige 4.5:1. Esa desviación respecto del documento de UI
 está registrada como **D-10** en la sección 8 de
-`docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, en estado PENDIENTE: la universidad
-tiene que decidir si acepta el cambio de paleta.
+`docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, **aprobada el 4 de septiembre de
+2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
 
 **Automatizado no es completo.** `axe-core` detecta alrededor de un tercio de los problemas
 reales de accesibilidad. Si el orden de tabulación tiene sentido, si un texto alternativo
