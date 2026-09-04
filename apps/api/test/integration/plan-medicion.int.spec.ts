@@ -342,6 +342,37 @@ describe('RF-PM-022 — la matriz', () => {
   });
 });
 
+describe('RF-PM-030 RN1 — el linaje', () => {
+  it('borrar un plan intermedio no rompe el vínculo de sus descendientes', async () => {
+    // `SetNull` y no `Cascade`: el descendiente sobrevive a su origen. Con
+    // `Cascade` se borraría en silencio, y RF-PM-031 dejaría de poder mostrar
+    // la cadena que ese requerimiento existe para mostrar.
+    const v1 = await repo.crear({
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo: 'PM-LINAJE-D-v1',
+      meta: 0.7,
+      periodoInicio: null,
+    });
+    const v2 = await prisma.planMedicion.create({
+      data: {
+        planEstudiosId,
+        tipo: 'DIRECTA',
+        codigo: 'PM-LINAJE-D-v2',
+        version: 2,
+        meta: 0.7,
+        derivadoDeId: v1.id,
+      },
+    });
+
+    await repo.eliminar(v1.id);
+
+    const tras = await prisma.planMedicion.findUnique({ where: { id: v2.id } });
+    expect(tras).not.toBeNull();
+    expect(tras?.derivadoDeId).toBeNull();
+  });
+});
+
 describe('RNF04 — la matriz de 50 × 15', () => {
   it('se lee en menos de tres segundos', async () => {
     const p = await crear();
