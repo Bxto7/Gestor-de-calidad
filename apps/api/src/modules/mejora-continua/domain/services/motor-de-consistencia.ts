@@ -22,7 +22,12 @@ export interface Hallazgo {
   readonly severidad: Severidad;
   readonly titulo: string;
   readonly detalle: string;
-  /** Entidades afectadas, para poder señalarlas en la matriz. */
+  /**
+   * Las entidades afectadas, ya en texto legible —«CPE-02 · Trabajo en equipo»,
+   * «2024-I»—, no sus identificadores. Es la misma convención que sigue el
+   * motor de validaciones del Plan de Estudios, y por la misma razón: quien lee
+   * un hallazgo necesita saber qué corregir, y un UUID no se lo dice.
+   */
   readonly afectados: readonly string[];
 }
 
@@ -40,9 +45,22 @@ export interface PeriodoParaValidar {
   readonly fechaCierre: Date | null;
 }
 
+/**
+ * La competencia entra con su código, no solo con su id.
+ *
+ * Simétrico con `PeriodoParaValidar`, que ya traía su etiqueta. Sin el código,
+ * el motor no tendría con qué nombrar a la competencia en un hallazgo y
+ * acabaría escupiendo el UUID —que es justo lo que hacía.
+ */
+export interface CompetenciaParaValidar {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nombre: string;
+}
+
 export interface EntradaConsistencia {
   readonly tipo: 'DIRECTA' | 'INDIRECTA';
-  readonly competenciaIds: readonly string[];
+  readonly competencias: readonly CompetenciaParaValidar[];
   readonly periodos: readonly PeriodoParaValidar[];
   readonly programacion: readonly { competenciaId: string; periodoId: string }[];
 }
@@ -51,7 +69,7 @@ export function validarConsistencia(entrada: EntradaConsistencia): ResultadoCons
   const hallazgos: Hallazgo[] = [];
 
   // RF-PM-015.
-  if (entrada.competenciaIds.length === 0) {
+  if (entrada.competencias.length === 0) {
     hallazgos.push({
       codigo: 'PM-SIN-COMPETENCIAS',
       rf: 'RF-PM-015',
@@ -84,7 +102,7 @@ export function validarConsistencia(entrada: EntradaConsistencia): ResultadoCons
   // problema real —que faltan periodos— bajo su síntoma.
   if (entrada.periodos.length > 0) {
     const conProgramacion = new Set(entrada.programacion.map((p) => p.competenciaId));
-    const sinProgramar = entrada.competenciaIds.filter((id) => !conProgramacion.has(id));
+    const sinProgramar = entrada.competencias.filter((c) => !conProgramacion.has(c.id));
 
     if (sinProgramar.length > 0) {
       hallazgos.push({
@@ -93,7 +111,7 @@ export function validarConsistencia(entrada: EntradaConsistencia): ResultadoCons
         severidad: 'bloqueante',
         titulo: 'Hay competencias sin ningún periodo programado',
         detalle: 'Cada competencia del plan debe medirse en al menos un periodo.',
-        afectados: sinProgramar,
+        afectados: sinProgramar.map((c) => `${c.codigo} · ${c.nombre}`),
       });
     }
   }

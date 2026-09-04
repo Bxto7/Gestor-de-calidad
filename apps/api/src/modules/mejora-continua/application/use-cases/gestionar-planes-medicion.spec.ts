@@ -425,4 +425,28 @@ describe('RF-PM-010 y RF-PM-038 — consulta', () => {
     // Consultar no muta: no debe dejar rastro en la bitácora.
     expect(vistos).toHaveLength(0);
   });
+
+  it('nombra las competencias del hallazgo por su código, no por su id', async () => {
+    const { caso } = montar({ repo: { matriz: async () => [] } });
+
+    const r = await caso.consistencia(ACTOR, 'pm-1');
+    const hallazgo = r.bloqueantes.find((h) => h.rf === 'RF-PM-025');
+
+    expect(hallazgo?.afectados).toEqual(['CPE-01 · Una']);
+  });
+
+  it('una competencia retirada del plan de estudios se explica en vez de callarse', async () => {
+    // El plan de medición la declaró y el de estudios ya no la tiene: no hay
+    // código que resolver. Sigue siendo una competencia sin programar, así que
+    // desaparecer del hallazgo sería peor que aparecer sin nombre.
+    const { caso } = montar({
+      repo: { matriz: async () => [] },
+      contenido: { competenciasDelPlan: async () => [] },
+    });
+
+    const r = await caso.consistencia(ACTOR, 'pm-1');
+    const hallazgo = r.bloqueantes.find((h) => h.rf === 'RF-PM-025');
+
+    expect(hallazgo?.afectados).toEqual(['cmp-1 · ya no está en el plan de estudios']);
+  });
 });
