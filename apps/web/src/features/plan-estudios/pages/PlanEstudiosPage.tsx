@@ -789,7 +789,7 @@ function ModalComparacion({
     >
       {isLoading && <Cargando />}
 
-      {!isLoading && diferencias && diferencias.length === 0 && (
+      {!isLoading && diferencias?.length === 0 && (
         <EstadoVacio
           titulo="No existen diferencias"
           detalle="Las dos versiones tienen exactamente las mismas asignaturas."
