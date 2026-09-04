@@ -37,9 +37,6 @@ export class ConsultarBitacora {
   ) {}
 
   async ejecutar(actor: Actor, filtro: FiltroBitacora): Promise<EventoBitacora[]> {
-    const decision = await this.autorizacion.puede(actor.id, 'auditoria.leer', null);
-    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
-
     // Pedir el histórico de una entidad exige decir cuál. Sin esto, un `entidad`
     // suelto devolvería la bitácora entera de todas las facultades, que no es lo
     // que quiere ninguna pantalla y sí un listado caro.
@@ -49,10 +46,42 @@ export class ConsultarBitacora {
       );
     }
 
+    await this.exigirLectura(actor, filtro);
+
     return this.bitacora.listar({
       ...filtro,
       limite: Math.min(filtro.limite ?? LIMITE_MAXIMO, LIMITE_MAXIMO),
     });
+  }
+
+  /**
+   * Dos puertas, y la diferencia es cuánto abre cada una.
+   *
+   * `auditoria.leer` da la bitácora entera: todos los accesos, todos los
+   * módulos, todas las entidades. Es lo que necesita quien audita el sistema, y
+   * por eso solo lo tienen el administrador y la dirección de carrera.
+   *
+   * `auditoria.leer_entidad` da **una sola entidad, y hay que saber su id**. Es
+   * lo que necesita quien abre un plan de medición y quiere ver qué se hizo
+   * sobre él. Sin ella, el Coordinador académico —que crea y edita esos planes—
+   * no podía ver el historial de sus propios cambios, y RF-PM-032 quedaba sin
+   * cumplir justo para el rol que más los modifica.
+   *
+   * Lo que este permiso NO comprueba es que el actor pueda ver la entidad en
+   * cuestión: conocer su UUID basta. Es un debilitamiento real y acotado —los
+   * identificadores no se adivinan y no se listan sin permiso— que se prefiere a
+   * la alternativa, que sería que este módulo conociera los permisos de todos
+   * los demás para saber quién puede ver qué. Eso rompería §3.2 y crecería con
+   * cada módulo nuevo.
+   */
+  private async exigirLectura(actor: Actor, filtro: FiltroBitacora): Promise<void> {
+    const completa = await this.autorizacion.puede(actor.id, 'auditoria.leer', null);
+    if (completa.permitido) return;
+
+    const acotada = await this.autorizacion.puede(actor.id, 'auditoria.leer_entidad', null);
+    if (acotada.permitido && filtro.entidad && filtro.entidadId) return;
+
+    throw new AccesoDenegado(completa.motivo);
   }
 
   /**

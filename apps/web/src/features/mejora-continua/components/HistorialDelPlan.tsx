@@ -26,8 +26,10 @@ export function HistorialDelPlan({ eventos }: HistorialDelPlanProps) {
     );
   }
 
+  // El nombre de la lista no es decoración: en esta pantalla hay tres y quien
+  // usa lector de pantalla necesita saber en cuál está.
   return (
-    <ol className="space-y-2">
+    <ol aria-label="Movimientos del plan" className="space-y-2">
       {eventos.map((e) => (
         <li key={e.id} className="rounded-lg border border-borde px-3 py-2 text-sm">
           <p className="text-tinta">{e.detalle}</p>

@@ -26,8 +26,10 @@ export interface LineaDeVersionesProps {
 export function LineaDeVersiones({ versiones, actualId }: LineaDeVersionesProps) {
   if (versiones.length < 2) return null;
 
+  // El nombre de la lista no es decoración: la pantalla tiene varias y esta hay
+  // que poder distinguirla al recorrerla.
   return (
-    <ol className="space-y-2">
+    <ol aria-label="Versiones del plan" className="space-y-2">
       {versiones.map((v) => {
         const esActual = v.id === actualId;
 

@@ -42,6 +42,17 @@ async function entrar(email: string, password: string): Promise<Sesion> {
   });
 
   if (!login.ok) {
+    // El 429 se distingue del resto porque su causa y su remedio son otros: no
+    // falta ningún dato, es que `sesion.controller.ts:33` limita el acceso a
+    // cinco por minuto y la suite se ha ejecutado varias veces seguidas. Sin
+    // este mensaje, quien lo vea irá a revisar los scripts y no encontrará nada.
+    if (login.status === 429) {
+      throw new Error(
+        'Demasiados intentos de acceso: el login admite cinco por minuto y esta ' +
+          'suite gasta dos por ejecución. Espera un minuto y vuelve a lanzarla.',
+      );
+    }
+
     throw new Error(
       `No se pudo iniciar sesión como ${email} (${login.status}). ` +
         'Comprueba que `scripts/preparar-e2e.ts` y `scripts/crear-usuario.ts` se ejecutaron.',

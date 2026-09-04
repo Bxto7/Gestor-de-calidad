@@ -146,13 +146,17 @@ export async function versionesDe(id: string): Promise<PlanMedicion[]> {
 /**
  * RF-PM-032: el histórico de movimientos del plan.
  *
- * Contra `/bitacora` y no contra un endpoint de este módulo: el controlador de
+ * Contra `/auditoria` y no contra un endpoint de este módulo: el controlador de
  * auditoría cuelga de la raíz a propósito —lo dice en su cabecera— y CLAUDE.md
- * §3.2 prohíbe que un módulo consulte las tablas de otro. Aquí no hace falta
+ * §3.2 prohíbe que un módulo consulte las tablas de otro. Aquí no hacía falta
  * construir nada nuevo: lo que faltaba era mirarlo.
+ *
+ * Pide siempre `entidad` y `entidadId` juntos, y no por comodidad: quien no
+ * tiene `auditoria.leer` entera solo puede consultar con los dos, por la puerta
+ * acotada `auditoria.leer_entidad`.
  */
 export async function historialDe(id: string): Promise<EventoBitacora[]> {
-  return cliente.get<EventoBitacora[]>('/bitacora', {
+  return cliente.get<EventoBitacora[]>('/auditoria', {
     entidad: 'PlanMedicion',
     entidadId: id,
     limite: 50,

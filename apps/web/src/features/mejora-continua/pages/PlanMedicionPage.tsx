@@ -77,7 +77,7 @@ export function PlanMedicionPage() {
   const { data: vista } = useMatriz(id);
   const { data: consistencia } = useConsistencia(id);
   const { data: versiones } = useVersiones(id);
-  const { data: historial } = useHistorial(id);
+  const { data: historial, isError: historialDenegado } = useHistorial(id);
   const nuevaVersion = useNuevaVersion(id);
   const duplicar = useDuplicarPlan(id);
   const { data: propuestos } = usePeriodosPropuestos(id);
@@ -328,7 +328,18 @@ export function PlanMedicionPage() {
       <Tarjeta>
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-tinta">Historial</h2>
-          <HistorialDelPlan eventos={historial ?? []} />
+          {/*
+            Se distingue «no hay movimientos» de «no puedes verlos». Pintar el
+            vacío ante un 403 afirmaría que no pasó nada, que es falso y además
+            tranquilizador: quien lo lea concluirá que el plan no se ha tocado.
+          */}
+          {historialDenegado ? (
+            <p className="text-sm text-tinta-suave">
+              Tu rol no permite consultar el historial de este plan.
+            </p>
+          ) : (
+            <HistorialDelPlan eventos={historial ?? []} />
+          )}
         </div>
       </Tarjeta>
     </div>

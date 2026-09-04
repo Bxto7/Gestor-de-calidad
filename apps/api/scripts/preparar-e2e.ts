@@ -125,9 +125,72 @@ async function main(): Promise<void> {
     });
   }
 
+  await planDeMedicionVigente(plan.id);
+
   console.log(
-    `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias.`,
+    `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias, ` +
+      'y un plan de medición vigente de partida.',
   );
+}
+
+/**
+ * Un plan de medición ya VIGENTE, como punto de partida.
+ *
+ * Lo necesita el recorrido de RF-PM-030, que solo versiona planes cerrados. Sin
+ * él esa prueba se salta siempre —incluso en CI— y una prueba que nunca corre no
+ * protege nada.
+ *
+ * Nace vigente de un `create` y no recorriendo la máquina de estados, por lo
+ * mismo que el plan de estudios de arriba: llegar hasta Vigente es lo que prueba
+ * `flujo-medicion`, no esto. Aquí es el punto de partida.
+ */
+async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
+  const codigo = 'PM-PE-E2E-v1-D-v1';
+
+  const existente = await prisma.planMedicion.findUnique({ where: { codigo } });
+  if (existente) return;
+
+  const competencias = await prisma.competencia.findMany({
+    where: { codigo: { in: COMPETENCIAS.map((c) => c.codigo) } },
+    select: { id: true },
+  });
+
+  const creado = await prisma.planMedicion.create({
+    data: {
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo,
+      version: 1,
+      meta: 0.7,
+      estado: 'VIGENTE',
+      periodoInicioAnio: 2026,
+      periodoInicioMitad: 1,
+    },
+  });
+
+  await prisma.competenciaDelPlan.createMany({
+    data: competencias.slice(0, 2).map((c) => ({
+      planMedicionId: creado.id,
+      competenciaId: c.id,
+    })),
+  });
+
+  await prisma.periodoMedicion.createMany({
+    data: [
+      {
+        planMedicionId: creado.id,
+        etiqueta: '2026-I',
+        orden: 1,
+        fechaCierre: new Date('2026-07-15'),
+      },
+      {
+        planMedicionId: creado.id,
+        etiqueta: '2026-II',
+        orden: 2,
+        fechaCierre: new Date('2026-12-18'),
+      },
+    ],
+  });
 }
 
 main()
