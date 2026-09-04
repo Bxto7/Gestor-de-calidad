@@ -4,6 +4,19 @@
    Sistema de diseño — SGC Universidad Continental
    Valores tomados de docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md §2.
    No inventar colores fuera de esta lista.
+
+   EXCEPCIÓN, 4 de septiembre de 2026: cinco colores de texto se oscurecieron
+   respecto de §2 del documento. Los originales no llegaban al 4.5:1 que WCAG
+   2.1 AA exige para texto normal —entre 2.56 y 3.80—, y AA es objetivo
+   declarado del proyecto en CLAUDE.md §6.2. Lo destapó `axe-core` la primera
+   vez que se midió, en `tests/e2e/specs/accesibilidad.spec.ts`.
+
+   Se conservó el tono y la saturación de cada uno: solo bajó la luminosidad,
+   hasta 4.6:1 y no hasta 4.5 exacto. La primera tanda apuntó al umbral justo y
+   uno de los badges se quedó en 4.48 medido por el navegador: al convertir a
+   hexadecimal se redondea, y ese redondeo se comía el último decimal. El valor
+   original va anotado junto a cada uno. La desviación queda registrada en la sección 8 del documento de
+   requisitos, que es donde ese documento pide anotarlas.
    ========================================================================== */
 
 @theme {
@@ -16,20 +29,30 @@
   --color-uc-lila-claro: #e9e1fb;
 
   /* Estados: texto sobre fondo (§2 "Estados") */
-  --color-estado-activo-fg: #1a9c5e;
+  /* §2 decía #1a9c5e — 3.16:1 sobre su fondo. */
+  --color-estado-activo-fg: #157d4c;
   --color-estado-activo-bg: #e7f6ee;
-  --color-estado-progreso-fg: #b8860b;
+  /* §2 decía #b8860b — 2.95:1. */
+  --color-estado-progreso-fg: #8e6808;
   --color-estado-progreso-bg: #fbf3e3;
-  --color-estado-inactivo-fg: #9a97a6;
+  /* §2 decía #9a97a6 — 2.56:1, el peor de los cuatro. */
+  --color-estado-inactivo-fg: #6f6b7d;
   --color-estado-inactivo-bg: #f3f2f6;
-  --color-estado-aprobado-fg: #1a7fc0;
+  /* §2 decía #1a7fc0 — 3.80:1. */
+  --color-estado-aprobado-fg: #1771ab;
   --color-estado-aprobado-bg: #e7f1fb;
 
   /* Neutros con sesgo hacia el morado institucional: un gris puro
-     desentona contra la paleta. */
+     desentona contra la paleta.
+     Los tres escalones quedan en 15.98:1, 6.71:1 y 4.62:1 sobre el fondo más
+     oscuro en que aparecen. `tinta-suave` también se oscureció, y no por
+     contraste —ya cumplía con 4.91:1— sino porque al subir `tinta-tenue` hasta
+     el umbral los dos quedaban casi idénticos y la jerarquía de tres niveles se
+     colapsaba a dos. */
   --color-tinta: #1a1526;
-  --color-tinta-suave: #6b6779;
-  --color-tinta-tenue: #9a97a6;
+  --color-tinta-suave: #565269;
+  /* §2 decía #9a97a6 — 2.56:1. */
+  --color-tinta-tenue: #6f6b7d;
   --color-borde: #e2e1ea;
   --color-superficie: #ffffff;
   --color-superficie-tenue: #f7f5fb;

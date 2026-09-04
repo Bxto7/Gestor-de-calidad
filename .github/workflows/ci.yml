@@ -13,6 +13,7 @@
 #   §5.4-5  Build ........................ parcial: estático del frontend + esquema
 #   §5.4-6  Push a ghcr.io ............... PENDIENTE: no hay imágenes que publicar
 #   §5.4-7  Deploy al VPS ................ PENDIENTE: no hay VPS aprovisionado
+#   §6.4    E2E + accesibilidad .......... implementado (job `e2e`)
 #   §5.4-8  Smoke tests en Staging ....... PENDIENTE: depende de §5.4-7
 
 name: CI
@@ -227,19 +228,138 @@ jobs:
       - name: Pruebas de integración
         run: npm run test:integration
 
+  e2e:
+    name: "Extremo a extremo y accesibilidad"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/e2e
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sgc
+          POSTGRES_PASSWORD: sgc
+          POSTGRES_DB: sgc_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sgc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://sgc:sgc@localhost:5432/sgc_e2e
+      # No es un secreto del repositorio, y es deliberado: el usuario lo crea el
+      # script en una base efímera que muere con el job y no existe en ningún
+      # otro sitio. Convertirlo en secreto añadiría un paso manual de alta —y un
+      # job que falla en silencio hasta que alguien se acuerde de darlo— para
+      # proteger una credencial que no abre nada.
+      SGC_E2E_PASSWORD: E2E.Pruebas.2026!
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # ── Backend: esquema, datos y arranque ────────────────────────────────
+      - name: Instalar dependencias de la API
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Generar cliente Prisma
+        working-directory: apps/api
+        run: npx prisma generate
+
+      - name: Aplicar migraciones
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Sembrar roles, permisos y atributos
+        working-directory: apps/api
+        run: npx tsx prisma/seed.ts
+
+      - name: Preparar la carrera y el plan de pruebas
+        working-directory: apps/api
+        run: npm run e2e:preparar
+
+      - name: Crear las cuentas de prueba
+        working-directory: apps/api
+        run: |
+          SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-editor@sgc.local --nombre "E2E Editor"             --rol COORDINADOR_ACADEMICO --carrera E2E
+          SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-lector@sgc.local --nombre "E2E Lector"             --rol USUARIO_CONSULTOR
+
+      - name: Construir la API
+        working-directory: apps/api
+        run: npm run build
+
+      # `THROTTLE_LIMIT` alto a propósito: con 120/min la suite mediría el
+      # limitador y no la aplicación. Estas pruebas NO lo ejercitan, y el README
+      # de la suite lo dice para que nadie lea un verde aquí como que funciona.
+      - name: Arrancar la API
+        working-directory: apps/api
+        run: THROTTLE_LIMIT=10000 npm start &
+
+      - name: Esperar a que la API responda
+        run: |
+          for i in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/v1/planes-medicion)" = "401" ]; then
+              echo "API lista"; exit 0
+            fi
+            sleep 2
+          done
+          echo "La API no arrancó en 2 minutos"; exit 1
+
+      # ── Frontend: el bundle construido, no el servidor de desarrollo ──────
+      - name: Instalar dependencias del frontend
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Construir el frontend
+        working-directory: apps/web
+        run: npm run build
+
+      # ── La suite ──────────────────────────────────────────────────────────
+      - name: Instalar dependencias de la suite
+        run: npm ci
+
+      - name: Typecheck y formato
+        run: npm run typecheck && npm run format:check
+
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Ejecutar
+        run: npx playwright test
+
+      # Solo cuando falla: el informe de una ejecución en verde no lo abre nadie
+      # y ocupa espacio de artefactos.
+      - name: Guardar el informe
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informe-e2e
+          path: tests/e2e/playwright-report/
+          retention-days: 7
+
 # ── Etapas pendientes ────────────────────────────────────────────────────────
 #
 # No están escritas como pasos comentados porque envejecerían mal. Lo que hace
 # falta antes de poder añadirlas:
 #
-# §6.4 — Pruebas de API/contrato y E2E
-#   La integración de los adaptadores contra Postgres ya corre. Falta el nivel
-#   de API/contrato con Supertest, que exige arrancar la aplicación de NestJS
-#   dentro del runner de pruebas: Vitest transpila con esbuild y esbuild no
-#   emite metadatos de decoradores, así que el contenedor de inyección arranca
-#   vacío. Se resuelve con `unplugin-swc`, y es el mismo motivo por el que
-#   `start:dev` no funciona hoy. Los flujos E2E de Playwright dependen además
-#   de que el frontend consuma la API real, no la capa simulada.
+# §6.4 — Pruebas de API/contrato
+#   La integración de los adaptadores contra Postgres ya corre, y los flujos E2E
+#   también (job `e2e`). Falta el nivel de API/contrato con Supertest, que exige
+#   arrancar la aplicación de NestJS dentro del runner de pruebas: Vitest
+#   transpila con esbuild y esbuild no emite metadatos de decoradores, así que el
+#   contenedor de inyección arranca vacío. Se resuelve con `unplugin-swc`, y es
+#   el mismo motivo por el que `start:dev` no funciona hoy.
+#
+#   El E2E no necesitaba nada de eso: maneja un navegador contra la API ya
+#   levantada, no la aplicación en proceso.
 #
 #   Falta también Redis efímero, que hoy no hace falta porque no hay colas.
 #

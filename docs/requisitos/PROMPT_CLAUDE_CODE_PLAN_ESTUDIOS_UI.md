@@ -1272,6 +1272,7 @@ Dos estados, y la diferencia importa:
 | D-7 | RF072 | Generación en servidor y en cola, no impresión del navegador | Ratificada |
 | D-8 | RF073 | `.xlsx` real con tipos, no CSV | Ratificada |
 | D-9 | RF055 · RF047 | Datos del plan ISI 2018 cargados incompletos: horas teóricas en 0 y sumillas en «pendiente» | **PENDIENTE** |
+| D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | **PENDIENTE** |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1360,6 +1361,32 @@ Dos estados, y la diferencia importa:
 **Por qué:** el documento del que se cargó el plan no los trae. Se prefirió un valor visiblemente vacío antes que inventarlo.
 
 **Qué hay que decidir:** de dónde salen esos datos. Mientras tanto, cualquier reporte que use horas teóricas dará cero, y el PDF del plan sale con las sumillas en blanco.
+
+---
+
+### D-10 · §2 «Paleta» — cinco colores de texto oscurecidos
+
+**Pide:** §2 fija los colores de los badges de estado y de los neutros, y `global.css` recoge la instrucción tal cual: «no inventar colores fuera de esta lista».
+
+**Hace:** cinco valores de **texto** son más oscuros que los del documento. Los fondos no se tocan.
+
+| Token | §2 decía | Ahora | Contraste antes → después |
+|---|---|---|---|
+| `estado-activo-fg` | `#1a9c5e` | `#157d4c` | 3.16 → 4.62 |
+| `estado-progreso-fg` | `#b8860b` | `#8e6808` | 2.95 → 4.60 |
+| `estado-aprobado-fg` | `#1a7fc0` | `#1771ab` | 3.80 → 4.61 |
+| `estado-inactivo-fg` | `#9a97a6` | `#6f6b7d` | 2.56 → 4.62 |
+| `tinta-tenue` | `#9a97a6` | `#6f6b7d` | 2.56 → 4.62 |
+
+`tinta-suave` pasó de `#6b6779` a `#565269`, y esa no es por contraste: ya cumplía con 4.91:1. Al subir `tinta-tenue` hasta el umbral los dos quedaban casi idénticos y la jerarquía de tres grises se colapsaba a dos.
+
+**Por qué:** ninguno llegaba al 4.5:1 que WCAG 2.1 AA exige para texto normal, y AA es objetivo declarado del proyecto en CLAUDE.md §6.2. Lo destapó `axe-core` la primera vez que se midió, el 4 de septiembre de 2026, en `tests/e2e/specs/accesibilidad.spec.ts`. El peor —`#9a97a6`, el gris de las descripciones— estaba en 2.56, que no es una tecnicidad de norma: a esa relación cuesta leerlo de verdad.
+
+Se conservó el tono y la saturación de cada uno; solo bajó la luminosidad, y hasta 4.6:1 en vez de 4.5 exacto porque el redondeo al pasar a hexadecimal se comía el último decimal.
+
+La alternativa era desactivar la regla `color-contrast` en las pruebas, y con ella la suite habría quedado ciega a **cualquier** regresión futura de contraste, no solo a estas cinco.
+
+**Qué hay que decidir:** si la universidad acepta el cambio de paleta. Es visible: afecta a los badges de estado y a todo el texto secundario. Si prefiere los colores originales, hay que decidir también qué se hace con el objetivo de WCAG 2.1 AA de §6.2, porque las dos cosas no caben a la vez.
 
 ---
 
