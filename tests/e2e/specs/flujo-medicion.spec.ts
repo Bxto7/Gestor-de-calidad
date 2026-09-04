@@ -34,7 +34,14 @@ test('crear, configurar, programar y enviar a revisión un plan de medición', a
   await expect(enlace).toBeVisible();
   await enlace.click();
 
-  await expect(page.getByText('Borrador')).toBeVisible();
+  // Se exige la URL del detalle antes de nada: sin esto, una aserción que
+  // casara también en el listado daría por buena una navegación que no ocurrió.
+  await expect(page).toHaveURL(/\/mejora-continua\/medicion\/[0-9a-f-]{36}$/);
+
+  // Dentro de la cabecera, no en toda la página: `getByText('Borrador')` casa
+  // además con la opción «Borrador» del filtro de estado del listado.
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('main').getByText('Borrador', { exact: true })).toBeVisible();
 
   // ── Competencias, agrupadas por atributo del graduado (RF-PM-013) ───────
   //
