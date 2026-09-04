@@ -40,6 +40,7 @@ import {
   useTransicionar,
 } from '../api/queries';
 import { GrupoDeCompetencias } from '../components/GrupoDeCompetencias';
+import { PanelConsistencia } from '../components/PanelConsistencia';
 import { MatrizProgramacion } from '../components/MatrizProgramacion';
 import {
   describirTransicion,
@@ -159,25 +160,7 @@ export function PlanMedicionPage() {
           </div>
 
           {/* RF-PM-038: todos los hallazgos de una vez, para corregirlos juntos. */}
-          {consistencia && consistencia.hallazgos.length > 0 && (
-            <ul className="space-y-2">
-              {consistencia.hallazgos.map((h) => (
-                <li key={h.codigo} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  <span className="font-semibold">{h.titulo}</span>
-                  <span className="ml-2 text-xs text-slate-500">{h.rf}</span>
-                  <p className="text-slate-600">{h.detalle}</p>
-                  {h.afectados.length > 0 && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Afecta a: {h.afectados.join(', ')}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {consistencia && !consistencia.tieneBloqueos && (
-            <p className="text-sm text-estado-aprobado-fg">Sin inconsistencias pendientes.</p>
-          )}
+          {consistencia && <PanelConsistencia resultado={consistencia} />}
         </div>
       </Tarjeta>
 
