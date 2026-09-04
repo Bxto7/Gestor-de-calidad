@@ -98,7 +98,12 @@ async function main(): Promise<void> {
       facultadId: facultad.id,
       codigo: 'E2E',
       nombre: 'Carrera de Pruebas Automatizadas',
-      duracionAnios: 5,
+      // Dos años y no cinco: RF-PM-016 propone dos periodos por año, así que
+      // esto da cuatro. RF-PM-017 exige fecha de cierre en TODOS antes de
+      // aprobar, y con diez la prueba pasaría más tiempo rellenando fechas que
+      // ejercitando la matriz. Cuatro bastan para tener un primero, un último y
+      // algo en medio.
+      duracionAnios: 2,
     },
   });
 
@@ -123,7 +128,8 @@ async function main(): Promise<void> {
       codigo: 'PE-E2E-v1',
       version: 1,
       estado: 'VIGENTE',
-      duracionAnios: 5,
+      // El mismo dos de la carrera: de aquí sale la propuesta de periodos.
+      duracionAnios: 2,
       fechaVigencia: new Date('2026-01-01'),
     },
   });
@@ -719,8 +725,14 @@ test('crear, configurar, programar y enviar a revisión un plan de medición', a
   await page.getByRole('button', { name: /Usar la propuesta/ }).click();
   const primerCierre = page.getByLabel('Cierre de 2026-I');
   await expect(primerCierre).toBeVisible();
+
+  // Los cuatro, no dos: RF-PM-017 exige la fecha en todos los periodos antes de
+  // aprobar, y dejar uno sin fechar mantendría vivo el bloqueante que la
+  // aserción de consistencia de más abajo espera no encontrar.
   await primerCierre.fill('2026-07-15');
   await page.getByLabel('Cierre de 2026-II').fill('2026-12-18');
+  await page.getByLabel('Cierre de 2027-I').fill('2027-07-16');
+  await page.getByLabel('Cierre de 2027-II').fill('2027-12-17');
   await page.getByRole('button', { name: 'Guardar periodos' }).click();
 
   // ── La matriz, con el ratón ───────────────────────────────────────────
