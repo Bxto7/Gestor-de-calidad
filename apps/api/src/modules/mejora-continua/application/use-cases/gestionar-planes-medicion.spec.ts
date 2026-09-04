@@ -228,41 +228,28 @@ describe('RF-PM-001 a RF-PM-004 — crear', () => {
     ).rejects.toThrow(ReglaDeNegocioViolada);
   });
 
-  it('RF-PM-002 RN2 y RF-PM-041 RN1: no admite un segundo Vigente del mismo tipo', async () => {
-    const { caso } = montar({ repo: { vigenteDe: async () => plan({ estado: 'Vigente' }) } });
-
-    await expect(
-      caso.crear(ACTOR, {
-        planEstudiosId: 'pe-1',
-        tipo: 'DIRECTA',
-        metaPorcentaje: 70,
-        periodoInicio: null,
-      }),
-    ).rejects.toThrow(ReglaDeNegocioViolada);
-  });
-
-  it('un Vigente Directa no impide crear el Indirecta', async () => {
-    // RF-PM-002 RN2 los cuenta por separado: son dos planes distintos sobre el
-    // mismo plan de estudios, no dos versiones del mismo.
-    let tipoConsultado = '';
-    const { caso } = montar({
-      repo: {
-        vigenteDe: async (_id, tipo) => {
-          tipoConsultado = tipo;
-          return null;
-        },
-      },
-    });
-
-    await caso.crear(ACTOR, {
-      planEstudiosId: 'pe-1',
-      tipo: 'INDIRECTA',
-      metaPorcentaje: 70,
-      periodoInicio: null,
-    });
-
-    expect(tipoConsultado).toBe('INDIRECTA');
-  });
+  /*
+   * Aquí vivían dos pruebas del guardián que `crear` tenía y ya no tiene:
+   * «no admite un segundo Vigente del mismo tipo» y «un Vigente Directa no
+   * impide crear el Indirecta».
+   *
+   * No se borran porque estorbaran, sino porque afirmaban un comportamiento que
+   * resultó ser incorrecto: RF-PM-041 RN1 prohíbe dos VIGENTES, no crear, y ese
+   * guardián dejaba el módulo sin salida —una vez en vigor el primer plan, no se
+   * podía crear ninguno más—.
+   *
+   * Lo que protegían sigue protegido, y mejor:
+   *
+   * - Que no haya dos vigentes: el índice único parcial, con prueba de
+   *   integración («el índice parcial rechaza el segundo Vigente del mismo
+   *   tipo»), y `marcarVigenteRelevando`, que archiva al anterior en la misma
+   *   transacción.
+   * - Que Directa e Indirecta se cuenten por separado: la prueba de integración
+   *   «no releva al vigente del otro tipo».
+   *
+   * Y el comportamiento nuevo tiene el suyo, más abajo: «se puede crear un
+   * Borrador aunque exista un Vigente».
+   */
 
   it('RF-PM-012: la meta fuera de rango se rechaza', async () => {
     const { caso } = montar();
@@ -458,5 +445,117 @@ describe('RF-PM-010 y RF-PM-038 — consulta', () => {
     const hallazgo = r.bloqueantes.find((h) => h.rf === 'RF-PM-025');
 
     expect(hallazgo?.afectados).toEqual(['cmp-1 · ya no está en el plan de estudios']);
+  });
+});
+
+describe('RF-PM-041 RN1 — el guardián de crear se acota', () => {
+  it('se puede crear un Borrador aunque exista un Vigente', async () => {
+    // Antes se rechazaba, y eso dejaba el módulo sin salida: en cuanto el primer
+    // plan entraba en vigor no se podía crear ningún otro, y RF-PM-030 —que
+    // exige partir de un plan Vigente— era imposible de cumplir.
+    const { caso } = montar({ repo: { vigenteDe: async () => plan({ estado: 'Vigente' }) } });
+
+    await expect(
+      caso.crear(ACTOR, {
+        planEstudiosId: 'pe-1',
+        tipo: 'DIRECTA',
+        metaPorcentaje: 70,
+        periodoInicio: null,
+      }),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('RF-PM-041 RN1 — el relevo al entrar en vigor', () => {
+  it('marcar vigente usa la operación que releva, no un cambio de estado suelto', async () => {
+    const relevos: string[] = [];
+    const { caso } = montar({
+      repo: {
+        porId: async () => plan({ estado: 'Aprobado' }),
+        marcarVigenteRelevando: async (id) => {
+          relevos.push(id);
+          return {
+            plan: plan({ estado: 'Vigente' }),
+            relevado: plan({ id: 'pm-0', codigo: 'PM-VIEJO-D-v1' }),
+          };
+        },
+      },
+    });
+
+    await caso.transicionar(ACTOR, 'pm-1', 'marcar-vigente', {});
+
+    expect(relevos).toEqual(['pm-1']);
+  });
+
+  it('el archivado del anterior deja escrito por qué', async () => {
+    const { caso, vistos } = montar({
+      repo: {
+        porId: async () => plan({ estado: 'Aprobado' }),
+        marcarVigenteRelevando: async () => ({
+          plan: plan({ estado: 'Vigente', codigo: 'PM-NUEVO-D-v2' }),
+          relevado: plan({ id: 'pm-0', codigo: 'PM-VIEJO-D-v1' }),
+        }),
+      },
+    });
+
+    await caso.transicionar(ACTOR, 'pm-1', 'marcar-vigente', {});
+
+    // Sin el motivo, la bitácora muestra un archivado que nadie pidió y que
+    // dentro de un año nadie sabrá explicar.
+    expect(vistos.some((e) => e.detalle.includes('PM-NUEVO-D-v2'))).toBe(true);
+    expect(vistos.filter((e) => e.nombre === 'medicion.transicion')).toHaveLength(2);
+  });
+
+  it('sin anterior vigente, solo se registra la transición del propio plan', async () => {
+    const { caso, vistos } = montar({
+      repo: {
+        porId: async () => plan({ estado: 'Aprobado' }),
+        marcarVigenteRelevando: async () => ({
+          plan: plan({ estado: 'Vigente' }),
+          relevado: null,
+        }),
+      },
+    });
+
+    await caso.transicionar(ACTOR, 'pm-1', 'marcar-vigente', {});
+
+    expect(vistos.filter((e) => e.nombre === 'medicion.transicion')).toHaveLength(1);
+  });
+});
+
+describe('RF-PM-039 — quién aprobó y cuándo', () => {
+  it('se guardan al aprobar', async () => {
+    const aprobaciones: { actorId: string; fecha: Date }[] = [];
+    const { caso } = montar({
+      repo: {
+        porId: async () => plan({ estado: 'En revisión' }),
+        cambiarEstado: async (_id, estado, aprobacion) => {
+          if (aprobacion) aprobaciones.push(aprobacion);
+          return plan({ estado });
+        },
+      },
+    });
+
+    await caso.transicionar(ACTOR, 'pm-1', 'aprobar', {});
+
+    expect(aprobaciones).toHaveLength(1);
+    expect(aprobaciones[0]?.actorId).toBe(ACTOR.id);
+  });
+
+  it('una transición que no es aprobar no los toca', async () => {
+    const conAprobacion: boolean[] = [];
+    const { caso } = montar({
+      repo: {
+        porId: async () => plan({ estado: 'Borrador' }),
+        cambiarEstado: async (_id, estado, aprobacion) => {
+          conAprobacion.push(aprobacion !== undefined);
+          return plan({ estado });
+        },
+      },
+    });
+
+    await caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {});
+
+    expect(conAprobacion).toEqual([false]);
   });
 });

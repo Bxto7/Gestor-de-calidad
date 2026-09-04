@@ -93,15 +93,14 @@ export class GestionarPlanesMedicion {
       );
     }
 
-    // RF-PM-002 RN2 y RF-PM-041 RN1. El índice único parcial lo respalda, pero
-    // comprobarlo antes permite dar el motivo concreto que pide RNF08 en lugar
-    // de dejar salir un error de restricción de PostgreSQL.
-    const vigente = await this.planes.vigenteDe(datos.planEstudiosId, datos.tipo);
-    if (vigente) {
-      throw new ReglaDeNegocioViolada(
-        `Ya existe un plan de medición ${datos.tipo} vigente para ${base.codigo} (${vigente.codigo}).`,
-      );
-    }
+    // Aquí NO se comprueba que exista un Vigente, y es deliberado. RF-PM-041 RN1
+    // prohíbe DOS VIGENTES, no crear: el plan nace en Borrador y el índice
+    // parcial solo restringe las filas VIGENTE. La comprobación que había antes
+    // era más estricta que el invariante que decía proteger, y con eso dejaba el
+    // módulo sin salida —una vez en vigor el primer plan, no se podía crear
+    // ninguno más— además de hacer imposible RF-PM-030, que exige partir de un
+    // plan Aprobado o Vigente. El relevo se resuelve al marcar vigente, en
+    // `transicionar`.
 
     const meta = metaDesdePorcentaje(datos.metaPorcentaje);
     const codigo = siguienteCodigo(
@@ -192,9 +191,27 @@ export class GestionarPlanesMedicion {
     });
     if (!r.ok) throw new ReglaDeNegocioViolada(r.motivo);
 
-    const actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado);
+    let actualizado: DatosPlanMedicion;
+    let relevado: DatosPlanMedicion | null = null;
 
-    await this.eventos.publicar([
+    if (accion === 'marcar-vigente') {
+      // RF-PM-041 RN1: el relevo va en una transacción. Cambiar el estado suelto
+      // dejaría dos vigentes —que el índice parcial rechaza— o ninguno.
+      const r2 = await this.planes.marcarVigenteRelevando(id);
+      actualizado = r2.plan;
+      relevado = r2.relevado;
+    } else if (accion === 'aprobar') {
+      // RF-PM-039. El instante lo pone la aplicación y no la base, para que la
+      // fecha de la columna y la del evento de bitácora sean la misma.
+      actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado, {
+        actorId: actor.id,
+        fecha: new Date(),
+      });
+    } else {
+      actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado);
+    }
+
+    const eventos = [
       new PlanMedicionTransicionado(
         actor,
         id,
@@ -203,7 +220,24 @@ export class GestionarPlanesMedicion {
         r.nuevoEstado,
         contexto.comentario,
       ),
-    ]);
+    ];
+
+    if (relevado) {
+      // Con el motivo, y no como un archivado suelto: quien lea la bitácora
+      // dentro de un año tiene que poder saber que nadie lo pidió a mano.
+      eventos.push(
+        new PlanMedicionTransicionado(
+          actor,
+          relevado.id,
+          relevado.codigo,
+          'Vigente',
+          'Histórico',
+          `Relevado por ${actualizado.codigo}.`,
+        ),
+      );
+    }
+
+    await this.eventos.publicar(eventos);
     return actualizado;
   }
 
