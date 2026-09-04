@@ -15,6 +15,7 @@ import type {
   ResultadoConsistencia,
   TipoMedicion,
   VistaMatriz,
+  EventoBitacora,
 } from '../domain/tipos';
 
 export interface FiltroPlanes {
@@ -123,4 +124,37 @@ export async function marcarMedicion(
   realizada: boolean,
 ): Promise<void> {
   await cliente.patch(`/planes-medicion/${id}/matriz/${competenciaId}/${periodoId}`, { realizada });
+}
+
+/* ── Versionado e historial ───────────────────────────────────────────────── */
+
+/** RF-PM-030: copia con vínculo al origen, conservando las marcas de medición. */
+export async function generarNuevaVersion(id: string): Promise<PlanMedicion> {
+  return cliente.post<PlanMedicion>(`/planes-medicion/${id}/versiones`);
+}
+
+/** RF-PM-034: copia independiente, sin vínculo y sin marcas. */
+export async function duplicarPlan(id: string): Promise<PlanMedicion> {
+  return cliente.post<PlanMedicion>(`/planes-medicion/${id}/duplicados`);
+}
+
+/** RF-PM-031: el linaje, de la versión más reciente a la más antigua. */
+export async function versionesDe(id: string): Promise<PlanMedicion[]> {
+  return cliente.get<PlanMedicion[]>(`/planes-medicion/${id}/versiones`);
+}
+
+/**
+ * RF-PM-032: el histórico de movimientos del plan.
+ *
+ * Contra `/bitacora` y no contra un endpoint de este módulo: el controlador de
+ * auditoría cuelga de la raíz a propósito —lo dice en su cabecera— y CLAUDE.md
+ * §3.2 prohíbe que un módulo consulte las tablas de otro. Aquí no hace falta
+ * construir nada nuevo: lo que faltaba era mirarlo.
+ */
+export async function historialDe(id: string): Promise<EventoBitacora[]> {
+  return cliente.get<EventoBitacora[]>('/bitacora', {
+    entidad: 'PlanMedicion',
+    entidadId: id,
+    limite: 50,
+  });
 }

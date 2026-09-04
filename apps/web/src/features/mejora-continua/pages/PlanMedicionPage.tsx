@@ -8,9 +8,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { SiPuede } from '@/features/auth/components/SiPuede';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
@@ -31,21 +32,28 @@ import {
   useConsistencia,
   useDeclararCompetencias,
   useDeclararPeriodos,
+  useDuplicarPlan,
   useEditarPlan,
+  useHistorial,
   useMarcarMedicion,
   useMatriz,
+  useNuevaVersion,
   usePeriodosPropuestos,
   usePlanMedicion,
   useProgramarMatriz,
   useTransicionar,
+  useVersiones,
 } from '../api/queries';
 import { EditorDePeriodos } from '../components/EditorDePeriodos';
 import { GrupoDeCompetencias } from '../components/GrupoDeCompetencias';
+import { HistorialDelPlan } from '../components/HistorialDelPlan';
+import { LineaDeVersiones } from '../components/LineaDeVersiones';
 import { PanelConsistencia } from '../components/PanelConsistencia';
 import { MatrizProgramacion } from '../components/MatrizProgramacion';
 import {
   describirTransicion,
   permiteEdicion,
+  permiteVersionado,
   transicionesDisponibles,
 } from '../domain/estado-medicion';
 import { porcentajeDeMeta, type AccionMedicion, type EstadoMedicion } from '../domain/tipos';
@@ -62,11 +70,16 @@ export function PlanMedicionPage() {
   const { id = '' } = useParams();
   const { publicar } = useEncabezado();
   const { puede } = useSesion();
+  const navegar = useNavigate();
 
   const { data: plan, isLoading } = usePlanMedicion(id);
   const { data: grupos } = useCompetenciasDisponibles(id);
   const { data: vista } = useMatriz(id);
   const { data: consistencia } = useConsistencia(id);
+  const { data: versiones } = useVersiones(id);
+  const { data: historial } = useHistorial(id);
+  const nuevaVersion = useNuevaVersion(id);
+  const duplicar = useDuplicarPlan(id);
   const { data: propuestos } = usePeriodosPropuestos(id);
 
   const editarMeta = useEditarPlan(id);
@@ -117,7 +130,43 @@ export function PlanMedicionPage() {
       <CabeceraSeccion
         titulo={plan.codigo}
         descripcion={`Medición ${plan.tipo === 'DIRECTA' ? 'directa' : 'indirecta'} · meta del ${porcentajeDeMeta(plan.meta)} %`}
-        acciones={<Badge tono={TONO[plan.estado]}>{plan.estado}</Badge>}
+        acciones={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tono={TONO[plan.estado]}>{plan.estado}</Badge>
+            <SiPuede permiso="medicion.crear">
+              {/* RF-PM-030: solo desde un plan ya cerrado. Un Borrador se edita. */}
+              {permiteVersionado(plan.estado) && (
+                <Boton
+                  variante="secundario"
+                  tamano="sm"
+                  disabled={nuevaVersion.isPending}
+                  onClick={() =>
+                    void ejecutar(async () => {
+                      const creado = await nuevaVersion.mutateAsync(undefined);
+                      void navegar(`/mejora-continua/medicion/${creado.id}`);
+                    })
+                  }
+                >
+                  Nueva versión
+                </Boton>
+              )}
+              {/* RF-PM-034: desde cualquier estado. */}
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                disabled={duplicar.isPending}
+                onClick={() =>
+                  void ejecutar(async () => {
+                    const creado = await duplicar.mutateAsync(undefined);
+                    void navegar(`/mejora-continua/medicion/${creado.id}`);
+                  })
+                }
+              >
+                Duplicar
+              </Boton>
+            </SiPuede>
+          </div>
+        }
       />
 
       {error && (
@@ -159,6 +208,13 @@ export function PlanMedicionPage() {
               </p>
             )}
           </div>
+
+          {/* RF-PM-039: quién aprobó y cuándo, junto al plan y no enterrado en la bitácora. */}
+          {plan.aprobadoEn && (
+            <p className="text-sm text-tinta-suave">
+              Aprobado el {new Date(plan.aprobadoEn).toLocaleDateString('es-PE')}.
+            </p>
+          )}
 
           {/* RF-PM-038: todos los hallazgos de una vez, para corregirlos juntos. */}
           {consistencia && <PanelConsistencia resultado={consistencia} />}
@@ -258,6 +314,23 @@ export function PlanMedicionPage() {
           }}
         />
       )}
+      {/* ── Versiones (RF-PM-031) ────────────────────────────────────── */}
+      {(versiones ?? []).length > 1 && (
+        <Tarjeta>
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-tinta">Versiones</h2>
+            <LineaDeVersiones versiones={versiones ?? []} actualId={plan.id} />
+          </div>
+        </Tarjeta>
+      )}
+
+      {/* ── Historial (RF-PM-032) ────────────────────────────────────── */}
+      <Tarjeta>
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-tinta">Historial</h2>
+          <HistorialDelPlan eventos={historial ?? []} />
+        </div>
+      </Tarjeta>
     </div>
   );
 }
