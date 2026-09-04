@@ -1,12 +1,19 @@
-import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
+import { defineConfig } from 'vitest/config';
 
 /**
  * Configuración de pruebas.
  *
- * Separada de `vite.config.ts` a propósito: aquí no hacen falta los plugins de
- * React ni de Tailwind, porque lo que se prueba es el dominio, que es código
- * puro sin JSX ni estilos. Cargarlos solo alargaría cada ejecución.
+ * Separada de `vite.config.ts` a propósito: aquí no hace falta Tailwind, porque
+ * las pruebas no miran estilos. El plugin de React sí, desde que hay pruebas de
+ * componente: sin él, el JSX de un `.test.tsx` no se transforma.
+ *
+ * El entorno por defecto sigue siendo `node`. Las pruebas de dominio son código
+ * puro y montarles un DOM solo las haría más lentas; las de componente piden
+ * `jsdom` con un docblock en su primera línea:
+ *
+ *     /** @vitest-environment jsdom *\/
  *
  * El umbral de cobertura es el RNF que CLAUDE.md §2 y §6.6 fijan en 80%, y se
  * aplica exclusivamente a `domain/`. Medir cobertura sobre componentes de UI
@@ -14,12 +21,14 @@ import { fileURLToPath, URL } from 'node:url';
  * estén cubiertas, no que un `<div>` se haya renderizado.
  */
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    setupFiles: ['./src/pruebas/preparar.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/features/*/domain/**/*.ts'],

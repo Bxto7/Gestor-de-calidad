@@ -10,6 +10,10 @@ import { CarrerasPage } from '@/features/plan-estudios/pages/CarrerasPage';
 import { CompetenciasPage } from '@/features/plan-estudios/pages/CompetenciasPage';
 import { FacultadesPage } from '@/features/plan-estudios/pages/FacultadesPage';
 import { MallaCurricularPage } from '@/features/plan-estudios/pages/MallaCurricularPage';
+import { PlanesMedicionPage } from '@/features/mejora-continua/pages/PlanesMedicionPage';
+import { PlanMedicionPage } from '@/features/mejora-continua/pages/PlanMedicionPage';
+import { AtributosPage } from '@/features/acreditacion/pages/AtributosPage';
+import { CriteriosPage } from '@/features/acreditacion/pages/CriteriosPage';
 import { ObjetivosPage } from '@/features/plan-estudios/pages/ObjetivosPage';
 import { PlanEstudiosPage } from '@/features/plan-estudios/pages/PlanEstudiosPage';
 import { ResumenPage } from '@/features/plan-estudios/pages/ResumenPage';
@@ -61,6 +65,10 @@ export function App() {
                   path="plan-estudios/planes/:planId/malla"
                   element={<MallaCurricularPage />}
                 />
+                <Route path="acreditacion/atributos" element={<AtributosPage />} />
+                <Route path="acreditacion/criterios" element={<CriteriosPage />} />
+                <Route path="mejora-continua/medicion" element={<PlanesMedicionPage />} />
+                <Route path="mejora-continua/medicion/:id" element={<PlanMedicionPage />} />
                 <Route path="reportes" element={<ReportesPage />} />
                 <Route path="reportes/planes/:planId" element={<ReportePlanPage />} />
                 <Route path="usuarios" element={<UsuariosPage />} />
