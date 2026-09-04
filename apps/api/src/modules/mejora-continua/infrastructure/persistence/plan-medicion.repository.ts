@@ -18,6 +18,7 @@ import type {
   TipoMedicion,
 } from '../../application/ports/plan-medicion.port.js';
 import type { EstadoMedicion } from '../../domain/value-objects/estado-plan-medicion.js';
+import type { CopiaDelPlan } from '../../domain/services/copia-de-plan.js';
 
 type EstadoBd = 'BORRADOR' | 'EN_REVISION' | 'APROBADO' | 'VIGENTE' | 'HISTORICO';
 
@@ -158,13 +159,223 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
     return aDatos(fila);
   }
 
-  async cambiarEstado(id: string, estado: EstadoMedicion): Promise<DatosPlanMedicion> {
+  async cambiarEstado(
+    id: string,
+    estado: EstadoMedicion,
+    aprobacion?: { actorId: string; fecha: Date },
+  ): Promise<DatosPlanMedicion> {
     const fila = await this.prisma.planMedicion.update({
       where: { id },
-      data: { estado: A_BD[estado] },
+      data: {
+        estado: A_BD[estado],
+        // RF-PM-039. Solo se escriben cuando llegan: una transicion posterior
+        // -archivar, por ejemplo- no debe borrar quien aprobo ni cuando.
+        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+      },
       select: SELECCION,
     });
     return aDatos(fila);
+  }
+
+  /**
+   * El contenido copiable del plan, con las celdas referidas por etiqueta.
+   *
+   * Por etiqueta y no por id porque quien reciba esto va a crear periodos
+   * nuevos: el id del origen no le sirve para nada.
+   */
+  async contenidoDe(id: string): Promise<CopiaDelPlan | null> {
+    const plan = await this.porId(id);
+    if (!plan) return null;
+
+    const etiquetaDe = new Map(plan.periodos.map((p) => [p.id, p.etiqueta]));
+    const celdas = await this.matriz(id);
+
+    return {
+      meta: plan.meta,
+      periodoInicio: plan.periodoInicio,
+      competenciaIds: plan.competenciaIds,
+      periodos: plan.periodos.map((p) => ({
+        etiqueta: p.etiqueta,
+        orden: p.orden,
+        fechaCierre: p.fechaCierre,
+      })),
+      celdas: celdas.flatMap((c) => {
+        const etiqueta = etiquetaDe.get(c.periodoId);
+        // Una celda cuyo periodo ya no existe no puede copiarse a ningun sitio.
+        if (!etiqueta) return [];
+        return [
+          {
+            competenciaId: c.competenciaId,
+            periodoEtiqueta: etiqueta,
+            realizada: c.realizada,
+            realizadaEn: c.realizadaEn,
+          },
+        ];
+      }),
+    };
+  }
+
+  /** RNF12: todo el contenido en una transaccion. Media copia es peor que ninguna. */
+  async copiar(datos: {
+    planEstudiosId: string;
+    tipo: TipoMedicion;
+    codigo: string;
+    version: number;
+    derivadoDeId: string | null;
+    contenido: CopiaDelPlan;
+  }): Promise<DatosPlanMedicion> {
+    const { contenido } = datos;
+
+    const id = await this.prisma.$transaction(async (tx) => {
+      const creado = await tx.planMedicion.create({
+        data: {
+          planEstudiosId: datos.planEstudiosId,
+          tipo: datos.tipo,
+          codigo: datos.codigo,
+          version: datos.version,
+          derivadoDeId: datos.derivadoDeId,
+          meta: contenido.meta,
+          periodoInicioAnio: contenido.periodoInicio?.anio ?? null,
+          periodoInicioMitad: contenido.periodoInicio?.mitad ?? null,
+        },
+      });
+
+      if (contenido.competenciaIds.length > 0) {
+        await tx.competenciaDelPlan.createMany({
+          data: contenido.competenciaIds.map((competenciaId) => ({
+            planMedicionId: creado.id,
+            competenciaId,
+          })),
+        });
+      }
+
+      if (contenido.periodos.length > 0) {
+        await tx.periodoMedicion.createMany({
+          data: contenido.periodos.map((p) => ({
+            planMedicionId: creado.id,
+            etiqueta: p.etiqueta,
+            orden: p.orden,
+            fechaCierre: p.fechaCierre,
+          })),
+        });
+      }
+
+      if (contenido.celdas.length > 0) {
+        // Los ids se leen DESPUES de crear los periodos: `createMany` no los
+        // devuelve, y las celdas del origen apuntan a periodos de otro plan.
+        const nuevos = await tx.periodoMedicion.findMany({
+          where: { planMedicionId: creado.id },
+          select: { id: true, etiqueta: true },
+        });
+        const idDe = new Map(nuevos.map((p) => [p.etiqueta, p.id]));
+
+        await tx.programacion.createMany({
+          data: contenido.celdas.flatMap((c) => {
+            const periodoId = idDe.get(c.periodoEtiqueta);
+            if (!periodoId) return [];
+            return [
+              {
+                planMedicionId: creado.id,
+                competenciaId: c.competenciaId,
+                periodoId,
+                realizada: c.realizada,
+                realizadaEn: c.realizadaEn,
+              },
+            ];
+          }),
+        });
+      }
+
+      return creado.id;
+    });
+
+    return this.exigir(id);
+  }
+
+  /**
+   * RF-PM-031: la cadena entera, se pida desde donde se pida.
+   *
+   * Se sube hasta la raiz por `derivadoDeId` y se baja recogiendo descendientes.
+   * En bucle y no con una CTE recursiva: las cadenas son de unos pocos planes y
+   * un SQL recursivo aqui seria mas dificil de leer que de ejecutar.
+   *
+   * El conjunto `vistos` no es paranoia gratuita: la clave foranea no impide un
+   * ciclo, y sin el una cadena mal formada colgaria el proceso.
+   */
+  async linajeDe(id: string): Promise<DatosPlanMedicion[]> {
+    let raiz = await this.prisma.planMedicion.findUnique({
+      where: { id },
+      select: { id: true, derivadoDeId: true },
+    });
+    if (!raiz) return [];
+
+    const vistos = new Set<string>([raiz.id]);
+    while (raiz?.derivadoDeId && !vistos.has(raiz.derivadoDeId)) {
+      vistos.add(raiz.derivadoDeId);
+      raiz = await this.prisma.planMedicion.findUnique({
+        where: { id: raiz.derivadoDeId },
+        select: { id: true, derivadoDeId: true },
+      });
+    }
+    if (!raiz) return [];
+
+    const cadena: string[] = [];
+    const pendientes = [raiz.id];
+    while (pendientes.length > 0) {
+      const actual = pendientes.shift()!;
+      cadena.push(actual);
+      const hijos = await this.prisma.planMedicion.findMany({
+        where: { derivadoDeId: actual },
+        select: { id: true },
+      });
+      pendientes.push(...hijos.map((h) => h.id));
+    }
+
+    const planes = await Promise.all(cadena.map((c) => this.porId(c)));
+    // RF-PM-031 RN1: de la mas reciente a la mas antigua.
+    return planes
+      .filter((p): p is DatosPlanMedicion => p !== null)
+      .sort((a, b) => b.version - a.version);
+  }
+
+  /**
+   * RF-PM-041 RN1: como mucho un Vigente por plan de estudios y tipo.
+   *
+   * Las dos escrituras van en una transaccion. Sueltas, un fallo entre medias
+   * dejaria el programa sin ningun plan vigente o con dos, y el indice parcial
+   * rechazaria la segunda dejando la primera a medias.
+   */
+  async marcarVigenteRelevando(
+    id: string,
+  ): Promise<{ plan: DatosPlanMedicion; relevado: DatosPlanMedicion | null }> {
+    const plan = await this.exigir(id);
+
+    const anterior = await this.prisma.planMedicion.findFirst({
+      where: {
+        planEstudiosId: plan.planEstudiosId,
+        tipo: plan.tipo,
+        estado: 'VIGENTE',
+        id: { not: id },
+      },
+      select: { id: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      // Primero archivar: al reves, el indice parcial rechazaria el segundo
+      // VIGENTE antes de que el primero dejara de serlo.
+      if (anterior) {
+        await tx.planMedicion.update({
+          where: { id: anterior.id },
+          data: { estado: 'HISTORICO' },
+        });
+      }
+      await tx.planMedicion.update({ where: { id }, data: { estado: 'VIGENTE' } });
+    });
+
+    return {
+      plan: await this.exigir(id),
+      relevado: anterior ? await this.exigir(anterior.id) : null,
+    };
   }
 
   async eliminar(id: string): Promise<void> {

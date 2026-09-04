@@ -82,6 +82,16 @@ function repo(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlan
       { competenciaId: 'cmp-1', periodoId: 'per-1', realizada: false, realizadaEn: null },
     ],
     programar: async () => [],
+    contenidoDe: async () => ({
+      meta: 0.7,
+      periodoInicio: null,
+      competenciaIds: [],
+      periodos: [],
+      celdas: [],
+    }),
+    copiar: async (d) => plan({ codigo: d.codigo, version: d.version }),
+    linajeDe: async () => [plan()],
+    marcarVigenteRelevando: async () => ({ plan: plan({ estado: 'Vigente' }), relevado: null }),
     marcarRealizada: async (_id, competenciaId, periodoId, realizada) => ({
       competenciaId,
       periodoId,

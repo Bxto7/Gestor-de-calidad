@@ -11,6 +11,7 @@
  */
 
 import type { EstadoMedicion } from '../../domain/value-objects/estado-plan-medicion.js';
+import type { CopiaDelPlan } from '../../domain/services/copia-de-plan.js';
 
 export type TipoMedicion = 'DIRECTA' | 'INDIRECTA';
 
@@ -73,7 +74,33 @@ export interface RepositorioPlanMedicionPort {
     periodoInicio: { anio: number; mitad: 1 | 2 } | null;
   }): Promise<DatosPlanMedicion>;
   actualizar(id: string, datos: { meta?: number }): Promise<DatosPlanMedicion>;
-  cambiarEstado(id: string, estado: EstadoMedicion): Promise<DatosPlanMedicion>;
+  cambiarEstado(
+    id: string,
+    estado: EstadoMedicion,
+    /** RF-PM-039. Solo al aprobar; una transición posterior no debe pisarlos. */
+    aprobacion?: { actorId: string; fecha: Date },
+  ): Promise<DatosPlanMedicion>;
+
+  /** El contenido copiable del plan, con las celdas referidas por etiqueta de periodo. */
+  contenidoDe(id: string): Promise<CopiaDelPlan | null>;
+
+  /** RF-PM-030 y RF-PM-034: crea el plan nuevo con todo su contenido, en una transacción. */
+  copiar(datos: {
+    planEstudiosId: string;
+    tipo: TipoMedicion;
+    codigo: string;
+    version: number;
+    derivadoDeId: string | null;
+    contenido: CopiaDelPlan;
+  }): Promise<DatosPlanMedicion>;
+
+  /** RF-PM-031 RN1: el linaje completo, de la versión más reciente a la más antigua. */
+  linajeDe(id: string): Promise<DatosPlanMedicion[]>;
+
+  /** RF-PM-041 RN1: marca vigente y archiva al anterior, en una transacción. */
+  marcarVigenteRelevando(
+    id: string,
+  ): Promise<{ plan: DatosPlanMedicion; relevado: DatosPlanMedicion | null }>;
   eliminar(id: string): Promise<void>;
 
   /** Reemplaza el conjunto completo, de forma atómica (RNF12). */
