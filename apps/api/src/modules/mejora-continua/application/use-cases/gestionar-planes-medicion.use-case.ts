@@ -206,11 +206,31 @@ export class GestionarPlanesMedicion {
     return actualizado;
   }
 
+  /**
+   * El plan guarda ids de competencia; los códigos viven en Plan de Estudios y
+   * se piden por el puerto, que es para esto que existe. Sin ellos el motor
+   * nombraría sus hallazgos con UUID, que no le dicen nada a quien los lee.
+   */
   private async evaluar(plan: DatosPlanMedicion): Promise<ResultadoConsistencia> {
-    const matriz = await this.planes.matriz(plan.id);
+    const [matriz, competencias] = await Promise.all([
+      this.planes.matriz(plan.id),
+      this.curricular.competenciasDelPlan(plan.planEstudiosId),
+    ]);
+
+    const porId = new Map(competencias.map((c) => [c.id, c]));
+
     return validarConsistencia({
       tipo: plan.tipo,
-      competenciaIds: plan.competenciaIds,
+      competencias: plan.competenciaIds.map((id) => {
+        const c = porId.get(id);
+        // Una competencia declarada aquí y retirada después del plan de
+        // estudios se queda sin código. Se dice eso en vez de dejarla fuera:
+        // sigue siendo una competencia sin programar, y un id a secas haría
+        // pensar en un fallo del sistema y no en un cambio del plan.
+        return c
+          ? { id, codigo: c.codigo, nombre: c.nombre }
+          : { id, codigo: id, nombre: 'ya no está en el plan de estudios' };
+      }),
       periodos: plan.periodos.map((p) => ({
         id: p.id,
         etiqueta: p.etiqueta,
