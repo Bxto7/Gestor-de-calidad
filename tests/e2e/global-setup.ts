@@ -87,8 +87,56 @@ export default async function globalSetup(): Promise<void> {
 
   await mkdir(DIRECTORIO_AUTH, { recursive: true });
 
+  let editor: Sesion | null = null;
   for (const [rol, cuenta] of Object.entries(CUENTAS)) {
     const sesion = await entrar(cuenta.email, password);
+    if (rol === 'editor') editor = sesion;
     await writeFile(join(DIRECTORIO_AUTH, `${rol}.json`), JSON.stringify(sesion), 'utf8');
+  }
+
+  if (editor) await asegurarUnPlan(editor.accessToken);
+}
+
+/**
+ * Garantiza que existe al menos un plan de medición antes de la primera prueba.
+ *
+ * `accesibilidad` y `permisos` necesitan abrir el detalle de alguno, y por orden
+ * alfabético corren antes que `flujo-medicion`, que es quien los crea. Contra una
+ * base con datos de ejecuciones anteriores eso no se nota; contra una recién
+ * creada —que es la de CI— fallan las dos.
+ *
+ * Se crea por la API y no recorriendo la interfaz: esto es preparación, no
+ * prueba. Lo que el alta hace por pantalla ya lo cubre `flujo-medicion`.
+ */
+async function asegurarUnPlan(token: string): Promise<void> {
+  const cabeceras = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+
+  const existentes = await fetch(`${API}/planes-medicion`, { headers: cabeceras });
+  if (!existentes.ok) throw new Error(`No se pudo listar los planes (${existentes.status}).`);
+  if (((await existentes.json()) as unknown[]).length > 0) return;
+
+  const planes = await fetch(`${API}/planes`, { headers: cabeceras });
+  if (!planes.ok)
+    throw new Error(`No se pudieron listar los planes de estudio (${planes.status}).`);
+  const elegible = ((await planes.json()) as { id: string; codigo: string }[]).find((p) =>
+    p.codigo.startsWith('PE-E2E'),
+  );
+  if (!elegible) {
+    throw new Error('No hay plan de estudios E2E. Ejecuta `npm run e2e:preparar` en apps/api.');
+  }
+
+  const creado = await fetch(`${API}/planes-medicion`, {
+    method: 'POST',
+    headers: cabeceras,
+    body: JSON.stringify({
+      planEstudiosId: elegible.id,
+      tipo: 'DIRECTA',
+      metaPorcentaje: 70,
+      periodoInicioAnio: 2026,
+      periodoInicioMitad: 1,
+    }),
+  });
+  if (!creado.ok) {
+    throw new Error(`No se pudo crear el plan de medición de partida (${creado.status}).`);
   }
 }
