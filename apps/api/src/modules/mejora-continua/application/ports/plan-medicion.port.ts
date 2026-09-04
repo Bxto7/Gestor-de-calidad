@@ -12,8 +12,9 @@
 
 import type { EstadoMedicion } from '../../domain/value-objects/estado-plan-medicion.js';
 import type { CopiaDelPlan } from '../../domain/services/copia-de-plan.js';
+import type { TipoMedicion } from '../../domain/value-objects/tipo-medicion.js';
 
-export type TipoMedicion = 'DIRECTA' | 'INDIRECTA';
+export type { TipoMedicion } from '../../domain/value-objects/tipo-medicion.js';
 
 export interface DatosPeriodo {
   readonly id: string;

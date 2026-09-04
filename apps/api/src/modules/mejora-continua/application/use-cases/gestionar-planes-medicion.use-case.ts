@@ -36,6 +36,7 @@ import {
   permiteEliminacion,
 } from '../../domain/value-objects/estado-plan-medicion.js';
 import { metaDesdePorcentaje, porcentajeDeMeta } from '../../domain/value-objects/meta.js';
+import { siguienteCodigo } from '../../domain/value-objects/codigo-medicion.js';
 import type {
   DatosPlanMedicion,
   FiltroPlanesMedicion,
@@ -264,29 +265,4 @@ export class GestionarPlanesMedicion {
     const decision = await this.autorizacion.puede(actor.id, permiso, null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
-}
-
-/**
- * RF-PM-004: código del plan de estudios, tipo y correlativo de versión.
- *
- * El formato exacto no lo fija el requerimiento; queda anotado en la spec §13
- * como punto a validar con la universidad. Se toma el mayor correlativo ya
- * usado y no la cantidad de planes: si alguno se eliminó, reutilizar su número
- * haría que dos planes distintos compartieran código en la bitácora.
- */
-function siguienteCodigo(
-  codigoPlanEstudios: string,
-  tipo: TipoMedicion,
-  yaUsados: readonly string[],
-): string {
-  const letra = tipo === 'DIRECTA' ? 'D' : 'I';
-  const prefijo = `PM-${codigoPlanEstudios}-${letra}-v`;
-
-  const correlativos = yaUsados
-    .filter((c) => c.startsWith(prefijo))
-    .map((c) => Number.parseInt(c.slice(prefijo.length), 10))
-    .filter((n) => Number.isFinite(n));
-
-  const siguiente = correlativos.length === 0 ? 1 : Math.max(...correlativos) + 1;
-  return `${prefijo}${siguiente}`;
 }
