@@ -7,7 +7,7 @@ Plomería transversal a nivel de framework. **No contiene reglas de negocio.**
 | `config/`   | Carga y validación tipada de variables de entorno                               |
 | `database/` | `PrismaModule` / `PrismaService` compartido por los repositorios de cada módulo |
 | `queue/`    | Configuración de BullMQ/Redis; cada módulo registra sus propias colas           |
-| `http/`     | Exception filters, interceptors, pipe de validación (`zod`/`class-validator`)   |
+| `http/`     | Exception filters, interceptors, pipe de validación (`class-validator`)         |
 | `logging/`  | Logger estructurado JSON a stdout (`CLAUDE.md` §5.8)                            |
 
 ## Diferencia con `shared-kernel/`
