@@ -179,7 +179,7 @@ export interface RecommendationPort {
 | Build tool | Vite | Arranque e HMR rápidos frente a webpack |
 | Estilos | Tailwind CSS | Consistencia visual sin CSS disperso; usable por perfiles no especializados en diseño |
 | Drag & drop | `@dnd-kit/core` | Cubre el RNF de interacción drag-and-drop para la malla curricular; más mantenido y accesible que `react-beautiful-dnd` |
-| Formularios | `react-hook-form` + `zod` | Validación tipada compartible con el backend |
+| Formularios | React state, con la validación en el propio componente | Se declararon `react-hook-form` + `zod` y se retiraron en septiembre de 2026 sin haberse usado nunca: ningún formulario los importó. Su razón declarada era compartir la validación tipada con el backend, y eso no llegó a ocurrir en ninguno de los dos lados — ver la fila «Validación de entrada» de §4.2. Los formularios que hay son cortos y la validación cabe donde se usa. Volver a añadirlos es un comando el día que un formulario lo pida; hasta entonces, no eran una decisión sino una intención sin cumplir. `zod` sigue apareciendo en `node_modules` porque lo arrastra `eslint-plugin-react-hooks`: está en el árbol, pero ya no es nuestro ni lo versionamos |
 | Fetching/estado servidor | `@tanstack/react-query` | Cache, reintentos y estados de carga sin reinventar |
 | Estado UI local | React state / Zustand si crece la complejidad | Evitar Redux salvo necesidad real |
 | Tablas/listas | `@tanstack/react-table` | Listados de asignaturas, histórico de versiones, etc. |
@@ -189,7 +189,7 @@ export interface RecommendationPort {
 | Elemento | Elección | Notas |
 |---|---|---|
 | Framework | NestJS (Node.js 20 LTS + TypeScript) | Módulos + DI nativos mapean directo a los bounded contexts; guards para RBAC |
-| Validación de entrada | `class-validator` / `zod` (vía pipe) | Consistente con la capa de aplicación |
+| Validación de entrada | `class-validator` | Los DTO validan con decoradores. `zod` figuró aquí como alternativa y nunca se instaló en el backend; se quita de la tabla para que no parezca una opción vigente |
 | API | REST (OpenAPI autogenerado con `@nestjs/swagger`) | Más simple de operar con equipo pequeño que GraphQL |
 | ORM | Prisma | Migraciones declarativas, tipado end-to-end, buen ajuste con PostgreSQL |
 | Autenticación | `@nestjs/jwt` + `passport-jwt`, `argon2` para hashing | Argon2 sobre bcrypt: mejor resistencia a ataques con hardware dedicado |

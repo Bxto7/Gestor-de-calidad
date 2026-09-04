@@ -7,7 +7,6 @@ frontend nunca importa desde otro feature; lo compartido sube a `shared/`.
 | ------------------------------- | ------------------------------------------------------------ |
 | `app/`                          | Router, providers (`QueryClient`, auth context), layout raíz |
 | `features/<modulo>/api/`        | Llamadas HTTP + hooks de `@tanstack/react-query`             |
-| `features/<modulo>/schemas/`    | Esquemas `zod`, compartidos con `react-hook-form`            |
 | `features/<modulo>/components/` | Componentes propios del feature                              |
 | `features/<modulo>/hooks/`      | Lógica de UI reutilizable dentro del feature                 |
 | `features/<modulo>/pages/`      | Componentes de ruta                                          |
