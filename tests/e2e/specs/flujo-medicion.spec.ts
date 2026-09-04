@@ -25,7 +25,12 @@ test('crear, configurar, programar y enviar a revisión un plan de medición', a
   await modal.getByRole('button', { name: 'Crear' }).click();
 
   await expect(modal).toBeHidden();
-  const enlace = page.getByRole('link', { name: /^PM-PE-E2E-v1-D-v/ });
+
+  // `.first()` y no el enlace a secas: el listado llega con el más reciente
+  // delante, y los planes de otras pruebas —o de una ejecución local anterior
+  // sin volver a preparar los datos— siguen ahí. Buscar por el código exacto no
+  // vale: lo genera el backend con un correlativo que no se conoce de antemano.
+  const enlace = page.getByRole('link', { name: /^PM-PE-E2E-v1-D-v/ }).first();
   await expect(enlace).toBeVisible();
   await enlace.click();
 
