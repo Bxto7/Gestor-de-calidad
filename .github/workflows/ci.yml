@@ -249,8 +249,28 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # Hace falta para arrancar la aplicación, aunque la suite no encole nada:
+      # `ColaDeDocumentosBullMq` es un proveedor del módulo raíz y su
+      # constructor exige `REDIS_URL`. Falla al arrancar a propósito —un
+      # servicio levantado sin Redis aceptaría «Generar PDF» y dejaría el
+      # trabajo en cola para siempre— así que sin este contenedor la API no
+      # levanta.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       DATABASE_URL: postgresql://sgc:sgc@localhost:5432/sgc_e2e
+      REDIS_URL: redis://localhost:6379
+      # 32 caracteres, que es el mínimo que `app.module.ts` exige. Como la
+      # contraseña de abajo, no es un secreto del repositorio: firma tokens para
+      # una base efímera que muere con el job, y no vale en ningún otro sitio.
+      JWT_SECRET: e2e-solo-para-ci-no-vale-en-nada-mas
       # No es un secreto del repositorio, y es deliberado: el usuario lo crea el
       # script en una base efímera que muere con el job y no existe en ningún
       # otro sitio. Convertirlo en secreto añadiría un paso manual de alta —y un
@@ -301,8 +321,12 @@ jobs:
       # de la suite lo dice para que nadie lea un verde aquí como que funciona.
       - name: Arrancar la API
         working-directory: apps/api
-        run: THROTTLE_LIMIT=10000 npm start &
+        run: THROTTLE_LIMIT=10000 npm start > /tmp/api.log 2>&1 &
 
+      # Si no responde, se imprime su log. La primera vez que este job corrió, el
+      # fallo fue «no arrancó en 2 minutos» y la causa —faltaba `JWT_SECRET`—
+      # estaba en la salida del paso anterior, que nadie mira porque salió en
+      # verde: el `&` hace que el paso termine bien aunque el proceso muera.
       - name: Esperar a que la API responda
         run: |
           for i in $(seq 1 60); do
@@ -311,7 +335,9 @@ jobs:
             fi
             sleep 2
           done
-          echo "La API no arrancó en 2 minutos"; exit 1
+          echo "La API no arrancó en 2 minutos. Su salida:"
+          cat /tmp/api.log
+          exit 1
 
       # ── Frontend: el bundle construido, no el servidor de desarrollo ──────
       - name: Instalar dependencias del frontend
@@ -361,7 +387,8 @@ jobs:
 #   El E2E no necesitaba nada de eso: maneja un navegador contra la API ya
 #   levantada, no la aplicación en proceso.
 #
-#   Falta también Redis efímero, que hoy no hace falta porque no hay colas.
+#   Redis efímero ya está en el job `e2e`: arrancar la aplicación lo exige,
+#   aunque ninguna prueba encole nada todavía.
 #
 # §5.4-5 y §5.4-6 — Imágenes Docker y ghcr.io
 #   Requiere apps/api con su Dockerfile. El frontend no lleva imagen propia:
