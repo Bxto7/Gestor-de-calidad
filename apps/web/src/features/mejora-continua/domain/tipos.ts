@@ -34,6 +34,25 @@ export interface PlanMedicion {
   readonly competenciaIds: readonly string[];
   readonly periodos: readonly Periodo[];
   readonly creadoEn: string;
+  /** RF-PM-030 RN1: de qué versión proviene. `null` en un alta o un duplicado. */
+  readonly derivadoDeId: string | null;
+  /** RF-PM-039: quién aprobó y cuándo. Nulos mientras no se haya aprobado. */
+  readonly aprobadoPorId: string | null;
+  readonly aprobadoEn: string | null;
+}
+
+/**
+ * Un movimiento del histórico del plan (RF-PM-032).
+ *
+ * Llega de `/bitacora`, que es un recurso de la raíz y no de este módulo: el
+ * controlador de auditoría cuelga de ahí a propósito.
+ */
+export interface EventoBitacora {
+  readonly id: string;
+  readonly accion: string;
+  readonly detalle: string;
+  readonly usuarioNombre: string;
+  readonly fecha: string;
 }
 
 /** RF-PM-014: un atributo del graduado y las competencias que lo desarrollan. */

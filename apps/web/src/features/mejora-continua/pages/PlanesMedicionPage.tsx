@@ -27,15 +27,8 @@ import {
 } from '@/shared/components/ui';
 
 import { useCrearPlan, usePlanesMedicion } from '../api/queries';
-import { porcentajeDeMeta, type EstadoMedicion, type TipoMedicion } from '../domain/tipos';
-
-const TONO: Record<EstadoMedicion, 'activo' | 'progreso' | 'inactivo' | 'aprobado' | 'neutro'> = {
-  Borrador: 'neutro',
-  'En revisión': 'progreso',
-  Aprobado: 'aprobado',
-  Vigente: 'activo',
-  Histórico: 'inactivo',
-};
+import { TONO_ESTADO } from '../domain/estado-medicion';
+import { porcentajeDeMeta, type TipoMedicion } from '../domain/tipos';
 
 export function PlanesMedicionPage() {
   const { publicar } = useEncabezado();
@@ -85,7 +78,7 @@ export function PlanesMedicionPage() {
           onChange={(e) => setEstado(e.target.value)}
         >
           <option value="">Todos los estados</option>
-          {Object.keys(TONO).map((e) => (
+          {Object.keys(TONO_ESTADO).map((e) => (
             <option key={e} value={e}>
               {e}
             </option>
@@ -142,7 +135,7 @@ export function PlanesMedicionPage() {
                   <td className="px-4 py-3">{p.competenciaIds.length}</td>
                   <td className="px-4 py-3">{p.periodos.length}</td>
                   <td className="px-4 py-3">
-                    <Badge tono={TONO[p.estado]}>{p.estado}</Badge>
+                    <Badge tono={TONO_ESTADO[p.estado]}>{p.estado}</Badge>
                   </td>
                 </tr>
               ))}

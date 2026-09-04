@@ -74,6 +74,9 @@ function plan(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
     competenciaIds: ['cmp-1'],
     periodos: [{ id: 'per-1', etiqueta: '2024-I', orden: 1, fechaCierre: null }],
     creadoEn: new Date('2026-01-01'),
+    derivadoDeId: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }
@@ -103,6 +106,16 @@ function repo(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlan
     declararPeriodos: async () => plan(),
     matriz: async () => [],
     programar: async () => [],
+    contenidoDe: async () => ({
+      meta: 0.7,
+      periodoInicio: null,
+      competenciaIds: [],
+      periodos: [],
+      celdas: [],
+    }),
+    copiar: async (d) => plan({ codigo: d.codigo, version: d.version }),
+    linajeDe: async () => [plan()],
+    marcarVigenteRelevando: async () => ({ plan: plan({ estado: 'Vigente' }), relevado: null }),
     marcarRealizada: async () => ({
       competenciaId: 'cmp-1',
       periodoId: 'per-1',

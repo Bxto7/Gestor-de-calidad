@@ -79,6 +79,7 @@ const PERMISOS = [
   // Transversales
   ['reporte.generar', 'Generar PDF y Excel del plan', 'plan-estudios'],
   ['auditoria.leer', 'Consultar el histórico de cambios', 'auditoria'],
+  ['auditoria.leer_entidad', 'Consultar el historial de una entidad concreta', 'auditoria'],
   ['usuario.gestionar', 'Administrar usuarios y sus roles', 'auth'],
   ['rol.gestionar', 'Administrar roles y permisos', 'auth'],
 ] as const satisfies readonly (readonly [string, string, string])[];
@@ -214,6 +215,10 @@ const ROLES: {
       'medicion.crear',
       'medicion.editar',
       'medicion.eliminar',
+      // Solo el historial de una entidad concreta, no la bitácora entera: quien
+      // edita un plan tiene que poder ver qué se hizo sobre él (RF-PM-032), y
+      // eso no exige darle acceso a los accesos de todos ni a los demás módulos.
+      'auditoria.leer_entidad',
       'reporte.generar',
     ],
   },

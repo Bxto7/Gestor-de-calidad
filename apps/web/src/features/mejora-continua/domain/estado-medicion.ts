@@ -78,3 +78,31 @@ export function permiteEdicion(estado: EstadoMedicion): boolean {
 export function permiteEliminacion(estado: EstadoMedicion): boolean {
   return estado === 'Borrador';
 }
+
+/**
+ * RF-PM-030: se versiona lo que ya no se puede editar.
+ *
+ * Desde Borrador o En revisión no tiene sentido: el primero se edita
+ * directamente y el segundo vuelve a Borrador al observarlo. Ofrecer «nueva
+ * versión» ahí crearía copias que nadie necesita.
+ */
+export function permiteVersionado(estado: EstadoMedicion): boolean {
+  return estado === 'Aprobado' || estado === 'Vigente' || estado === 'Histórico';
+}
+
+/**
+ * El tono del badge de cada estado.
+ *
+ * Vive aquí y no en una pantalla porque lo usan tres: el listado, el detalle y
+ * la línea de versiones. Mientras solo lo usaba una, ser local estaba bien.
+ */
+export const TONO_ESTADO: Record<
+  EstadoMedicion,
+  'activo' | 'progreso' | 'inactivo' | 'aprobado' | 'neutro'
+> = {
+  Borrador: 'neutro',
+  'En revisión': 'progreso',
+  Aprobado: 'aprobado',
+  Vigente: 'activo',
+  Histórico: 'inactivo',
+};

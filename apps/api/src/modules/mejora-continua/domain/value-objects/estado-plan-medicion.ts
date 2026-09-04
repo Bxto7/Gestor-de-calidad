@@ -156,3 +156,15 @@ export function permiteEdicion(estado: EstadoMedicion): boolean {
 export function permiteEliminacion(estado: EstadoMedicion): boolean {
   return estado === 'Borrador';
 }
+
+/**
+ * RF-PM-030: se versiona lo que ya no se puede editar.
+ *
+ * Desde Borrador o En revisión no tiene sentido: RF-PM-007 permite editar el
+ * primero directamente y el segundo vuelve a Borrador al observarlo. Ofrecer
+ * «nueva versión» ahí crearía copias que nadie necesita y ensuciaría el linaje
+ * que RF-PM-031 muestra.
+ */
+export function permiteVersionado(estado: EstadoMedicion): boolean {
+  return estado === 'Aprobado' || estado === 'Vigente' || estado === 'Histórico';
+}

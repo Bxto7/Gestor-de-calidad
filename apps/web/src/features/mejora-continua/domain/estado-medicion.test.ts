@@ -13,6 +13,7 @@ import {
   describirTransicion,
   permiteEdicion,
   permiteEliminacion,
+  permiteVersionado,
   transicionesDisponibles,
 } from './estado-medicion';
 
@@ -63,5 +64,17 @@ describe('RF-PM-009 — solo un Borrador puede eliminarse', () => {
     for (const e of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
       expect(permiteEliminacion(e)).toBe(false);
     }
+  });
+});
+
+describe('RF-PM-030 — desde qué estados se versiona', () => {
+  it('lo que ya no se puede editar sí; lo editable no hace falta versionarlo', () => {
+    // Las mismas que en el backend, a propósito: si las dos copias divergen,
+    // una de las dos suites lo dice.
+    expect(permiteVersionado('Aprobado')).toBe(true);
+    expect(permiteVersionado('Vigente')).toBe(true);
+    expect(permiteVersionado('Histórico')).toBe(true);
+    expect(permiteVersionado('Borrador')).toBe(false);
+    expect(permiteVersionado('En revisión')).toBe(false);
   });
 });

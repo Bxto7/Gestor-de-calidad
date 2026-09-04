@@ -105,6 +105,57 @@ No requieren decisión. El sistema hace más de lo que el requisito pedía, sin 
 
 ---
 
+## Versionado de planes de medición — decisiones tomadas sin que el requisito las cubra
+
+El ciclo de RF-PM-030 a RF-PM-034 obligó a decidir tres cosas que el documento no
+menciona. Ninguna contradice un requisito; las tres los completan donde callan, y por eso
+se anotan aquí en vez de en la lista de divergencias.
+
+**El correlativo lo comparten versiones y duplicados.** El código de un plan de medición
+lleva un número —`PM-PE-ISI-2026-v2-D-v3`— y el campo `version` lo repite. Tanto una
+versión nueva (RF-PM-030) como un duplicado (RF-PM-034) toman el siguiente número de la
+serie, así que `v1, v2, v3` puede mezclar versiones de un mismo linaje con copias
+independientes. El parentesco lo expresa otro dato, no el número.
+
+Se hizo así para que el código y el campo no se contradigan: si un duplicado empezara en
+`version: 1`, su código diría `v3` y su campo `1`, y la pantalla mostraría dos números
+distintos para lo mismo.
+
+*Qué hay que decidir:* si se espera que el número exprese linaje. Si es así, hay que
+separar código y versión, y conviene hacerlo **antes** de que haya planes reales: después
+significa migrar datos.
+
+**Marcar un plan como vigente archiva al anterior, sin preguntar.** RF-PM-041 RN1 admite
+un solo plan vigente por plan de estudios y tipo, pero ningún requisito dice qué pasa con
+el que estaba. Se archiva en la misma operación, y el motivo queda escrito en la bitácora
+—«relevado por…»— para que ese archivado no parezca una decisión que nadie tomó.
+
+La alternativa era exigir archivarlo a mano antes. Se descartó porque abre una ventana en
+la que el programa no tiene ningún plan de medición vigente, y si quien lo hace se
+distrae, esa ventana no se cierra.
+
+*Qué hay que decidir:* si la universidad quiere confirmar el relevo explícitamente.
+
+**Se permiten varias versiones en curso a la vez.** Nada impide versionar dos veces el
+mismo plan sin haber terminado la primera. Las dos nacen en borrador y no chocan con
+ninguna regla.
+
+La consecuencia es que dos personas pueden estar corrigiendo el mismo plan en paralelo sin
+enterarse. Se aceptó a sabiendas: prohibirlo añade un bloqueo que nadie ha pedido y que
+estorbaría el día que las dos correcciones sean independientes.
+
+*Qué hay que decidir:* si en la práctica eso genera trabajo perdido. La salida sería
+avisar al abrir la segunda, no impedirla.
+
+**Y una cuarta, sobre permisos.** Ver el historial de cambios de un plan exigía
+`auditoria.leer`, que abre la bitácora entera del sistema y solo tienen el administrador y
+la dirección de carrera. Eso dejaba al Coordinador académico —que es quien más modifica
+esos planes— sin poder ver sus propios cambios. Se añadió un permiso acotado que solo deja
+consultar el historial de **una** entidad concreta, sabiendo su identificador. No abre la
+bitácora de nadie más.
+
+---
+
 ## Resumen para quien tenga que priorizar
 
 De más urgente a menos:

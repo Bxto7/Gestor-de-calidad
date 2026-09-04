@@ -38,9 +38,12 @@ test('crear, configurar, programar y enviar a revisión un plan de medición', a
   // casara también en el listado daría por buena una navegación que no ocurrió.
   await expect(page).toHaveURL(/\/mejora-continua\/medicion\/[0-9a-f-]{36}$/);
 
-  // Dentro de la cabecera, no en toda la página: `getByText('Borrador')` casa
-  // además con la opción «Borrador» del filtro de estado del listado.
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  // Se espera a un encabezado que SOLO existe en el detalle. `toHaveURL` casa en
+  // el instante de navegar, cuando React todavía no ha cambiado el contenido, y
+  // `heading level 1` no sirve porque el listado también tiene el suyo. Sin esta
+  // espera, la aserción siguiente encuentra los diez «Borrador» del listado y
+  // falla al instante: una violación de modo estricto no reintenta.
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
   await expect(page.locator('main').getByText('Borrador', { exact: true })).toBeVisible();
 
   // ── Competencias, agrupadas por atributo del graduado (RF-PM-013) ───────
@@ -98,7 +101,10 @@ test('crear, configurar, programar y enviar a revisión un plan de medición', a
 
   // ── Transición (RF-PM-006) ─────────────────────────────────────────────
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
-  await expect(page.getByText('En revisión')).toBeVisible();
+
+  // `exact` y dentro de `main`: la tarjeta de Historial muestra «Borrador → En
+  // revisión», que contiene el mismo texto que el badge de estado.
+  await expect(page.locator('main').getByText('En revisión', { exact: true })).toBeVisible();
 
   // ── RF-PM-007 RN1: fuera de Borrador se cierra la edición ──────────────
   await expect(page.getByLabel('Cierre de 2026-I', { exact: true })).toHaveCount(0);

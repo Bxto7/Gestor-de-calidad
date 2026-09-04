@@ -27,6 +27,7 @@ import type { Actor } from '../../../../shared-kernel/domain-events/domain-event
 import { ActorActual } from '../../../auth/infrastructure/http/jwt.guard.js';
 import { ConfigurarPlanMedicion } from '../../application/use-cases/configurar-plan-medicion.use-case.js';
 import { GestionarPlanesMedicion } from '../../application/use-cases/gestionar-planes-medicion.use-case.js';
+import { VersionarPlanesMedicion } from '../../application/use-cases/versionar-planes-medicion.use-case.js';
 import { ProgramarMediciones } from '../../application/use-cases/programar-mediciones.use-case.js';
 import {
   CompetenciasDelPlanDto,
@@ -47,6 +48,7 @@ export class PlanesMedicionController {
     private readonly planes: GestionarPlanesMedicion,
     private readonly configurar: ConfigurarPlanMedicion,
     private readonly programar: ProgramarMediciones,
+    private readonly versionar: VersionarPlanesMedicion,
   ) {}
 
   /* ── El plan ───────────────────────────────────────────────────────────── */
@@ -88,6 +90,48 @@ export class PlanesMedicionController {
   @ApiResponse({ status: 404, description: 'El plan de medición no existe.' })
   async detalle(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.planes.porId(actor, id);
+  }
+
+  /* ── Versionado (RF-PM-030, RF-PM-031, RF-PM-034) ───────────────────────── */
+
+  @Post(':id/versiones')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Generar una nueva versión del plan de medición',
+    description:
+      'RF-PM-030: copia editable en Borrador, con vínculo a la versión de la que proviene. ' +
+      'Conserva las marcas de medición ya realizadas: son evidencia del mismo plan.',
+  })
+  @ApiResponse({ status: 404, description: 'El plan de medición no existe.' })
+  @ApiResponse({
+    status: 409,
+    description: 'El plan no está aprobado, vigente ni histórico. Un Borrador se edita.',
+  })
+  async nuevaVersion(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.versionar.generarNuevaVersion(actor, id);
+  }
+
+  @Post(':id/duplicados')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Duplicar el plan como base de un periodo nuevo',
+    description:
+      'RF-PM-034: copia independiente, sin vínculo de versión y con código nuevo. ' +
+      'NO hereda las marcas de medición: afirmarían mediciones que no han ocurrido.',
+  })
+  @ApiResponse({ status: 404, description: 'El plan de medición no existe.' })
+  async duplicar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.versionar.duplicarPlan(actor, id);
+  }
+
+  @Get(':id/versiones')
+  @ApiOperation({
+    summary: 'Consultar el linaje de versiones del plan',
+    description: 'RF-PM-031 RN1: de la versión más reciente a la más antigua.',
+  })
+  @ApiResponse({ status: 404, description: 'El plan de medición no existe.' })
+  async versiones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.planes.linaje(actor, id);
   }
 
   @Patch(':id')

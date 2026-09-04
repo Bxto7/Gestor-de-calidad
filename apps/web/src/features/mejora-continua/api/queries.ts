@@ -21,6 +21,8 @@ export const claves = {
   periodosPropuestos: (id: string) => ['medicion', id, 'periodos-propuestos'] as const,
   matriz: (id: string) => ['medicion', id, 'matriz'] as const,
   consistencia: (id: string) => ['medicion', id, 'consistencia'] as const,
+  versiones: (id: string) => ['medicion', id, 'versiones'] as const,
+  historial: (id: string) => ['medicion', id, 'historial'] as const,
 };
 
 /* ── Consultas ────────────────────────────────────────────────────────── */
@@ -138,4 +140,35 @@ export function useMarcarMedicion(id: string) {
     (v: { competenciaId: string; periodoId: string; realizada: boolean }) =>
       api.marcarMedicion(id, v.competenciaId, v.periodoId, v.realizada),
   );
+}
+
+/* ── Versionado e historial ───────────────────────────────────────────────── */
+
+export function useVersiones(id: string) {
+  return useQuery({
+    queryKey: claves.versiones(id),
+    queryFn: () => api.versionesDe(id),
+    enabled: !!id,
+  });
+}
+
+export function useHistorial(id: string) {
+  return useQuery({
+    queryKey: claves.historial(id),
+    queryFn: () => api.historialDe(id),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Versionar y duplicar crean un plan **nuevo**, así que además de la rama del
+ * plan de origen hay que invalidar el listado: si no, el plan recién creado no
+ * aparecería hasta recargar.
+ */
+export function useNuevaVersion(id: string) {
+  return useMutacionDelPlan(id, () => api.generarNuevaVersion(id), [['medicion', 'lista']]);
+}
+
+export function useDuplicarPlan(id: string) {
+  return useMutacionDelPlan(id, () => api.duplicarPlan(id), [['medicion', 'lista']]);
 }

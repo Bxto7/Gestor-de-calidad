@@ -159,3 +159,42 @@ export class MedicionMarcada extends EventoMedicion {
     this.detalle = `Plan ${codigo}: la medición de ${competenciaId} en ${etiquetaPeriodo} queda ${estado}.`;
   }
 }
+
+/**
+ * RF-PM-030. Acción propia y no un alta más: en el histórico, «se creó un plan»
+ * y «se corrigió aquel plan» son dos cosas distintas, y quien lea la bitácora
+ * dentro de un año necesita distinguirlas.
+ */
+export class PlanMedicionVersionado extends EventoMedicion {
+  readonly nombre = 'medicion.version';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    codigoOrigen: string,
+  ) {
+    super(actor);
+    this.detalle = `Nueva versión ${codigo}, derivada de ${codigoOrigen}.`;
+  }
+}
+
+/**
+ * RF-PM-034. Se distingue del versionado porque esta copia **no desciende de
+ * nadie**: nace para un periodo de acreditación nuevo y su linaje empieza aquí.
+ */
+export class PlanMedicionDuplicado extends EventoMedicion {
+  readonly nombre = 'medicion.duplicado';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    codigoOrigen: string,
+  ) {
+    super(actor);
+    this.detalle = `Duplicado ${codigo}, copiado de ${codigoOrigen} sin vínculo de versión.`;
+  }
+}

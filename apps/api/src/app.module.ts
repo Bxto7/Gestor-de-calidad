@@ -98,6 +98,7 @@ import {
 } from './modules/mejora-continua/application/ports/plan-medicion.port.js';
 import { ConfigurarPlanMedicion } from './modules/mejora-continua/application/use-cases/configurar-plan-medicion.use-case.js';
 import { GestionarPlanesMedicion } from './modules/mejora-continua/application/use-cases/gestionar-planes-medicion.use-case.js';
+import { VersionarPlanesMedicion } from './modules/mejora-continua/application/use-cases/versionar-planes-medicion.use-case.js';
 import { ProgramarMediciones } from './modules/mejora-continua/application/use-cases/programar-mediciones.use-case.js';
 import { PlanMedicionRepositoryPrisma } from './modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
 import { PlanesMedicionController } from './modules/mejora-continua/infrastructure/http/planes-medicion.controller.js';
@@ -397,6 +398,21 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarPlanesMedicion(planes, curricular, autorizacion, eventos),
+    },
+    {
+      provide: VersionarPlanesMedicion,
+      inject: [
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        planes: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new VersionarPlanesMedicion(planes, curricular, autorizacion, eventos),
     },
     {
       provide: ConfigurarPlanMedicion,

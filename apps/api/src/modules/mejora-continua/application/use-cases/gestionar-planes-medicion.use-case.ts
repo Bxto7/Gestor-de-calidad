@@ -36,6 +36,7 @@ import {
   permiteEliminacion,
 } from '../../domain/value-objects/estado-plan-medicion.js';
 import { metaDesdePorcentaje, porcentajeDeMeta } from '../../domain/value-objects/meta.js';
+import { siguienteCodigo } from '../../domain/value-objects/codigo-medicion.js';
 import type {
   DatosPlanMedicion,
   FiltroPlanesMedicion,
@@ -92,15 +93,14 @@ export class GestionarPlanesMedicion {
       );
     }
 
-    // RF-PM-002 RN2 y RF-PM-041 RN1. El índice único parcial lo respalda, pero
-    // comprobarlo antes permite dar el motivo concreto que pide RNF08 en lugar
-    // de dejar salir un error de restricción de PostgreSQL.
-    const vigente = await this.planes.vigenteDe(datos.planEstudiosId, datos.tipo);
-    if (vigente) {
-      throw new ReglaDeNegocioViolada(
-        `Ya existe un plan de medición ${datos.tipo} vigente para ${base.codigo} (${vigente.codigo}).`,
-      );
-    }
+    // Aquí NO se comprueba que exista un Vigente, y es deliberado. RF-PM-041 RN1
+    // prohíbe DOS VIGENTES, no crear: el plan nace en Borrador y el índice
+    // parcial solo restringe las filas VIGENTE. La comprobación que había antes
+    // era más estricta que el invariante que decía proteger, y con eso dejaba el
+    // módulo sin salida —una vez en vigor el primer plan, no se podía crear
+    // ninguno más— además de hacer imposible RF-PM-030, que exige partir de un
+    // plan Aprobado o Vigente. El relevo se resuelve al marcar vigente, en
+    // `transicionar`.
 
     const meta = metaDesdePorcentaje(datos.metaPorcentaje);
     const codigo = siguienteCodigo(
@@ -191,9 +191,27 @@ export class GestionarPlanesMedicion {
     });
     if (!r.ok) throw new ReglaDeNegocioViolada(r.motivo);
 
-    const actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado);
+    let actualizado: DatosPlanMedicion;
+    let relevado: DatosPlanMedicion | null = null;
 
-    await this.eventos.publicar([
+    if (accion === 'marcar-vigente') {
+      // RF-PM-041 RN1: el relevo va en una transacción. Cambiar el estado suelto
+      // dejaría dos vigentes —que el índice parcial rechaza— o ninguno.
+      const r2 = await this.planes.marcarVigenteRelevando(id);
+      actualizado = r2.plan;
+      relevado = r2.relevado;
+    } else if (accion === 'aprobar') {
+      // RF-PM-039. El instante lo pone la aplicación y no la base, para que la
+      // fecha de la columna y la del evento de bitácora sean la misma.
+      actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado, {
+        actorId: actor.id,
+        fecha: new Date(),
+      });
+    } else {
+      actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado);
+    }
+
+    const eventos = [
       new PlanMedicionTransicionado(
         actor,
         id,
@@ -202,8 +220,38 @@ export class GestionarPlanesMedicion {
         r.nuevoEstado,
         contexto.comentario,
       ),
-    ]);
+    ];
+
+    if (relevado) {
+      // Con el motivo, y no como un archivado suelto: quien lea la bitácora
+      // dentro de un año tiene que poder saber que nadie lo pidió a mano.
+      eventos.push(
+        new PlanMedicionTransicionado(
+          actor,
+          relevado.id,
+          relevado.codigo,
+          'Vigente',
+          'Histórico',
+          `Relevado por ${actualizado.codigo}.`,
+        ),
+      );
+    }
+
+    await this.eventos.publicar(eventos);
     return actualizado;
+  }
+
+  /**
+   * RF-PM-031: el linaje de versiones del plan.
+   *
+   * Exige solo `medicion.leer`: consultar cómo evolucionó un plan es lectura, y
+   * el requerimiento la ofrece también al Usuario consultor.
+   */
+  async linaje(actor: Actor, id: string): Promise<DatosPlanMedicion[]> {
+    await this.exigir(actor, 'medicion.leer');
+    // Que exista, para distinguir «sin linaje» de «no hay tal plan».
+    await this.exigirPlan(id);
+    return this.planes.linajeDe(id);
   }
 
   /**
@@ -264,29 +312,4 @@ export class GestionarPlanesMedicion {
     const decision = await this.autorizacion.puede(actor.id, permiso, null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
-}
-
-/**
- * RF-PM-004: código del plan de estudios, tipo y correlativo de versión.
- *
- * El formato exacto no lo fija el requerimiento; queda anotado en la spec §13
- * como punto a validar con la universidad. Se toma el mayor correlativo ya
- * usado y no la cantidad de planes: si alguno se eliminó, reutilizar su número
- * haría que dos planes distintos compartieran código en la bitácora.
- */
-function siguienteCodigo(
-  codigoPlanEstudios: string,
-  tipo: TipoMedicion,
-  yaUsados: readonly string[],
-): string {
-  const letra = tipo === 'DIRECTA' ? 'D' : 'I';
-  const prefijo = `PM-${codigoPlanEstudios}-${letra}-v`;
-
-  const correlativos = yaUsados
-    .filter((c) => c.startsWith(prefijo))
-    .map((c) => Number.parseInt(c.slice(prefijo.length), 10))
-    .filter((n) => Number.isFinite(n));
-
-  const siguiente = correlativos.length === 0 ? 1 : Math.max(...correlativos) + 1;
-  return `${prefijo}${siguiente}`;
 }

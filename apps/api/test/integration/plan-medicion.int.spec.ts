@@ -59,6 +59,22 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
+/**
+ * Un plan con sus competencias y periodos declarados, listo para programar.
+ *
+ * Vive en el ambito del archivo y no dentro de un `describe` porque lo usan
+ * tanto las pruebas de la matriz como las de copia.
+ */
+async function conMatriz(competencias: string[], etiquetas: string[]) {
+  const p = await crear();
+  await repo.declararCompetencias(p.id, competencias);
+  const tras = await repo.declararPeriodos(
+    p.id,
+    etiquetas.map((etiqueta, i) => ({ etiqueta, orden: i + 1, fechaCierre: null })),
+  );
+  return { planId: p.id, periodos: tras.periodos };
+}
+
 async function crear(tipo: 'DIRECTA' | 'INDIRECTA' = 'DIRECTA', codigo = 'PM-1', meta = 0.7) {
   return repo.crear({
     planEstudiosId,
@@ -217,16 +233,6 @@ describe('RF-PM-018 — periodos sin duplicados y renumerados', () => {
 });
 
 describe('RF-PM-022 — la matriz', () => {
-  async function conMatriz(competencias: string[], etiquetas: string[]) {
-    const p = await crear();
-    await repo.declararCompetencias(p.id, competencias);
-    const tras = await repo.declararPeriodos(
-      p.id,
-      etiquetas.map((etiqueta, i) => ({ etiqueta, orden: i + 1, fechaCierre: null })),
-    );
-    return { planId: p.id, periodos: tras.periodos };
-  }
-
   it('programar reemplaza el conjunto completo', async () => {
     const { planId, periodos } = await conMatriz([CMP1, CMP2], ['2024-I']);
     const periodoId = periodos[0]!.id;
@@ -339,6 +345,185 @@ describe('RF-PM-022 — la matriz', () => {
 
     expect(await repo.porId(planId)).toBeNull();
     expect(await prisma.programacion.count({ where: { planMedicionId: planId } })).toBe(0);
+  });
+});
+
+describe('RF-PM-030 RN1 — el linaje', () => {
+  it('borrar un plan intermedio no rompe el vínculo de sus descendientes', async () => {
+    // `SetNull` y no `Cascade`: el descendiente sobrevive a su origen. Con
+    // `Cascade` se borraría en silencio, y RF-PM-031 dejaría de poder mostrar
+    // la cadena que ese requerimiento existe para mostrar.
+    const v1 = await repo.crear({
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo: 'PM-LINAJE-D-v1',
+      meta: 0.7,
+      periodoInicio: null,
+    });
+    const v2 = await prisma.planMedicion.create({
+      data: {
+        planEstudiosId,
+        tipo: 'DIRECTA',
+        codigo: 'PM-LINAJE-D-v2',
+        version: 2,
+        meta: 0.7,
+        derivadoDeId: v1.id,
+      },
+    });
+
+    await repo.eliminar(v1.id);
+
+    const tras = await prisma.planMedicion.findUnique({ where: { id: v2.id } });
+    expect(tras).not.toBeNull();
+    expect(tras?.derivadoDeId).toBeNull();
+  });
+});
+
+describe('RF-PM-030 y RF-PM-034 — copiar un plan', () => {
+  it('la copia lleva competencias, periodos con fecha y celdas programadas', async () => {
+    const { planId, periodos } = await conMatriz([CMP1, CMP2], ['2026-I', '2026-II']);
+    await repo.programar(planId, [{ competenciaId: CMP1, periodoId: periodos[0]!.id }]);
+    const contenido = await repo.contenidoDe(planId);
+    expect(contenido).not.toBeNull();
+
+    const copia = await repo.copiar({
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo: 'PM-COPIA-D-v9',
+      version: 9,
+      derivadoDeId: planId,
+      contenido: contenido!,
+    });
+
+    expect(copia.competenciaIds).toHaveLength(2);
+    expect(copia.periodos.map((p) => p.etiqueta)).toEqual(['2026-I', '2026-II']);
+
+    // Las celdas se resolvieron contra los periodos NUEVOS, no los del origen:
+    // el id del periodo de partida no existe en la copia.
+    const matriz = await repo.matriz(copia.id);
+    const idsNuevos = new Set(copia.periodos.map((p) => p.id));
+    expect(matriz).toHaveLength(1);
+    expect(idsNuevos.has(matriz[0]!.periodoId)).toBe(true);
+  });
+
+  it('el origen no se toca (RF-PM-030 RN2)', async () => {
+    const { planId, periodos } = await conMatriz([CMP1], ['2026-I']);
+    await repo.programar(planId, [{ competenciaId: CMP1, periodoId: periodos[0]!.id }]);
+    const contenido = await repo.contenidoDe(planId);
+
+    await repo.copiar({
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo: 'PM-INTACTO-D-v9',
+      version: 9,
+      derivadoDeId: planId,
+      contenido: contenido!,
+    });
+
+    const original = await repo.porId(planId);
+    expect(original?.estado).toBe('Borrador');
+    expect(await repo.matriz(planId)).toHaveLength(1);
+  });
+});
+
+describe('RF-PM-041 RN1 — el relevo al entrar en vigor', () => {
+  it('marcar vigente archiva al anterior y deja exactamente uno', async () => {
+    const v1 = await crear('DIRECTA', 'PM-RELEVO-D-v1');
+    await repo.cambiarEstado(v1.id, 'Vigente');
+    const v2 = await crear('DIRECTA', 'PM-RELEVO-D-v2');
+
+    const r = await repo.marcarVigenteRelevando(v2.id);
+
+    expect(r.plan.estado).toBe('Vigente');
+    expect(r.relevado?.codigo).toBe('PM-RELEVO-D-v1');
+    expect((await repo.porId(v1.id))?.estado).toBe('Histórico');
+
+    const vigentes = await prisma.planMedicion.count({
+      where: { planEstudiosId, tipo: 'DIRECTA', estado: 'VIGENTE' },
+    });
+    expect(vigentes).toBe(1);
+  });
+
+  it('sin anterior vigente, no releva a nadie', async () => {
+    const solo = await crear('INDIRECTA', 'PM-SOLO-I-v1');
+
+    const r = await repo.marcarVigenteRelevando(solo.id);
+
+    expect(r.plan.estado).toBe('Vigente');
+    expect(r.relevado).toBeNull();
+  });
+
+  it('no releva al vigente del otro tipo', async () => {
+    const i = await crear('INDIRECTA', 'PM-OTRO-I-v1');
+    await repo.cambiarEstado(i.id, 'Vigente');
+    const d = await crear('DIRECTA', 'PM-OTRO-D-v1');
+
+    const r = await repo.marcarVigenteRelevando(d.id);
+
+    expect(r.relevado).toBeNull();
+    expect((await repo.porId(i.id))?.estado).toBe('Vigente');
+  });
+});
+
+describe('RF-PM-039 — responsable y fecha de aprobación', () => {
+  it('se guardan junto al plan al aprobar', async () => {
+    const p = await crear('DIRECTA', 'PM-APROB-D-v1');
+    const cuando = new Date('2026-09-04T10:00:00Z');
+
+    await repo.cambiarEstado(p.id, 'Aprobado', { actorId: ACTOR_ID, fecha: cuando });
+
+    const fila = await prisma.planMedicion.findUnique({ where: { id: p.id } });
+    expect(fila?.aprobadoPorId).toBe(ACTOR_ID);
+    expect(fila?.aprobadoEn).toEqual(cuando);
+  });
+
+  it('una transición posterior no los pisa', async () => {
+    const p = await crear('DIRECTA', 'PM-APROB2-D-v1');
+    const cuando = new Date('2026-09-04T10:00:00Z');
+    await repo.cambiarEstado(p.id, 'Aprobado', { actorId: ACTOR_ID, fecha: cuando });
+
+    await repo.cambiarEstado(p.id, 'Vigente');
+
+    const fila = await prisma.planMedicion.findUnique({ where: { id: p.id } });
+    expect(fila?.aprobadoPorId).toBe(ACTOR_ID);
+    expect(fila?.aprobadoEn).toEqual(cuando);
+  });
+});
+
+describe('RF-PM-031 — el linaje', () => {
+  it('devuelve la cadena de más reciente a más antigua, desde cualquier punto', async () => {
+    const v1 = await crear('DIRECTA', 'PM-CADENA-D-v1');
+    const contenido = await repo.contenidoDe(v1.id);
+    const v2 = await repo.copiar({
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo: 'PM-CADENA-D-v2',
+      version: 2,
+      derivadoDeId: v1.id,
+      contenido: contenido!,
+    });
+    const v3 = await repo.copiar({
+      planEstudiosId,
+      tipo: 'DIRECTA',
+      codigo: 'PM-CADENA-D-v3',
+      version: 3,
+      derivadoDeId: v2.id,
+      contenido: contenido!,
+    });
+
+    for (const desde of [v1.id, v2.id, v3.id]) {
+      expect((await repo.linajeDe(desde)).map((p) => p.codigo)).toEqual([
+        'PM-CADENA-D-v3',
+        'PM-CADENA-D-v2',
+        'PM-CADENA-D-v1',
+      ]);
+    }
+  });
+
+  it('un plan sin linaje se devuelve solo a sí mismo', async () => {
+    const solo = await crear('DIRECTA', 'PM-HUERFANO-D-v1');
+
+    expect((await repo.linajeDe(solo.id)).map((p) => p.codigo)).toEqual(['PM-HUERFANO-D-v1']);
   });
 });
 

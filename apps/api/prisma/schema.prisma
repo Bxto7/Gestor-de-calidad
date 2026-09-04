@@ -323,9 +323,9 @@ model PlanEstudios {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  carrera         Carrera            @relation(fields: [carreraId], references: [id], onDelete: Restrict)
-  derivadoDe      PlanEstudios?      @relation("Versiones", fields: [derivadoDeId], references: [id], onDelete: SetNull)
-  derivados       PlanEstudios[]     @relation("Versiones")
+  carrera         Carrera             @relation(fields: [carreraId], references: [id], onDelete: Restrict)
+  derivadoDe      PlanEstudios?       @relation("Versiones", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados       PlanEstudios[]      @relation("Versiones")
   objetivos       PlanObjetivo[]
   competencias    PlanCompetencia[]
   asignaturas     Asignatura[]
@@ -770,6 +770,17 @@ model PlanMedicion {
   meta           Decimal        @db.Decimal(4, 3)
   estado         EstadoMedicion @default(BORRADOR)
 
+  /// RF-PM-030 RN1: la versión nueva referencia a la que viene. `SetNull` y no
+  /// `Cascade`: borrar un borrador intermedio no puede llevarse por delante el
+  /// linaje de sus descendientes, que es justo lo que RF-PM-031 muestra.
+  derivadoDeId String? @map("derivado_de_id") @db.Uuid
+
+  /// RF-PM-039: quién aprobó y cuándo. Está también en la bitácora, pero ahí es
+  /// un registro entre miles; aquí es un dato que la pantalla muestra y que un
+  /// reporte cita sin recorrer un log.
+  aprobadoPorId String?   @map("aprobado_por_id") @db.Uuid
+  aprobadoEn    DateTime? @map("aprobado_en") @db.Timestamptz(6)
+
   /// Periodo desde el que se propusieron los periodos iniciales (RF-PM-016).
   /// Solo para la Directa; permite reproducir la propuesta.
   periodoInicioAnio  Int? @map("periodo_inicio_anio") @db.SmallInt
@@ -778,6 +789,8 @@ model PlanMedicion {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
+  derivadoDe   PlanMedicion?        @relation("VersionesMedicion", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados    PlanMedicion[]       @relation("VersionesMedicion")
   periodos     PeriodoMedicion[]
   competencias CompetenciaDelPlan[]
   programacion Programacion[]
