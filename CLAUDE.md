@@ -30,9 +30,26 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 4 de septiembre de 2026: **117 de 243 requisitos contables construidos**
-> —60 de Plan de Estudios documentados con ficha, más 183 de Mejora Continua—.
-> El detalle por submódulo está en el documento de Mejora Continua, §1.4.
+> Al 5 de septiembre de 2026: **120 de 243 requisitos contables construidos**,
+> un 49 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
+> 27 `RF-AC` + los 13 de `RF120`–`RF132`).
+>
+> | Bloque | Construido | Total |
+> |---|---|---|
+> | Plan de Estudios (fichas) | 60 | 60 |
+> | Atributos del Graduado y Criterios (`RF120`–`RF132`) | 13 | 13 |
+> | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
+> | Mejora Continua · Evaluación (`RF-PE`) | 0 | 49 |
+> | Mejora Continua · Planes de Mejora (`RF-PJ`) | 0 | 47 |
+> | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
+>
+> La cuenta sale de cruzar los `RF-` distintos del documento fuente con sus
+> citas en `apps/api/src` y `apps/web/src`. De los 47 `RF-PM` se citan 42 por su
+> número; los otros cinco —`003` alta, `035` envío a revisión, `036` aprobación,
+> `043` y `044` control de permisos— están construidos sin comentario que los
+> nombre. El cruce sirve además para detectar erratas: destapó una prueba que
+> decía cubrir un `RF-PM-080` que no existe en ningún documento.
 
 ### Fuera de alcance en MVP 1 (pero la arquitectura debe dejar espacio)
 

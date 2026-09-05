@@ -36,7 +36,7 @@ describe('RF-PM-045 — todos hablan de la misma entidad', () => {
     for (const e of eventos) expect(e.entidad).toBe('PlanMedicion');
   });
 
-  it('RF-PM-080: cada evento carga quién lo originó', () => {
+  it('RF-PM-045: cada evento carga quién lo originó', () => {
     const e = new PlanMedicionCreado(ACTOR, 'pm-1', 'PM-1', 'DIRECTA', 70);
 
     expect(e.usuarioId).toBe('u-1');
