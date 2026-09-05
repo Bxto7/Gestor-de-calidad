@@ -84,17 +84,12 @@ export interface RepositorioDocumentosPort {
   ubicacionDe(id: string): Promise<string | null>;
 }
 
-export interface ColaDeDocumentosPort {
-  encolar(trabajoId: string): Promise<void>;
-}
-
 /** Los datos del plan que necesita un documento, en una sola consulta. */
 export interface RepositorioDatosDocumentoPort {
   datosDe(planId: string): Promise<Omit<DatosParaDocumento, 'generadoEn'> | null>;
 }
 
 export const REPOSITORIO_DOCUMENTOS = Symbol('RepositorioDocumentosPort');
-export const COLA_DOCUMENTOS = Symbol('ColaDeDocumentosPort');
 export const REPOSITORIO_DATOS_DOCUMENTO = Symbol('RepositorioDatosDocumentoPort');
 
 /**
@@ -107,11 +102,13 @@ export const REPOSITORIO_DATOS_DOCUMENTO = Symbol('RepositorioDatosDocumentoPort
  */
 export type {
   AlmacenDeArchivosPort,
+  ColaDeDocumentosPort,
   RenderizadorPdfPort,
   RenderizadorHojaPort,
 } from '../../../../platform/documentos/puertos.js';
 export {
   ALMACEN_ARCHIVOS,
+  COLA_DOCUMENTOS,
   RENDERIZADOR_PDF,
   RENDERIZADOR_HOJA,
 } from '../../../../platform/documentos/puertos.js';

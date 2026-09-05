@@ -29,3 +29,39 @@ export interface RenderizadorHojaPort {
 export const ALMACEN_ARCHIVOS = Symbol('AlmacenDeArchivosPort');
 export const RENDERIZADOR_PDF = Symbol('RenderizadorPdfPort');
 export const RENDERIZADOR_HOJA = Symbol('RenderizadorHojaPort');
+
+/* ── La cola ────────────────────────────────────────────────────────────── */
+
+/**
+ * De qué módulo sale un trabajo.
+ *
+ * Hace falta desde que hay dos módulos generando documentos: los
+ * identificadores viven en tablas distintas y uno de `mejora-continua` no
+ * existe en la de `plan-estudios`. Sin este dato, el worker buscaría en la
+ * tabla equivocada y daría por inexistente un trabajo que sí está.
+ */
+export type ModuloDeDocumentos = 'plan-estudios' | 'mejora-continua';
+
+export interface ColaDeDocumentosPort {
+  encolar(trabajoId: string, modulo: ModuloDeDocumentos): Promise<void>;
+}
+
+/**
+ * Lo que el worker sabe hacer con un trabajo.
+ *
+ * Es el mínimo que permite que el worker no conozca ningún módulo: recibe un
+ * generador por módulo y despacha por clave. Si importara los casos de uso, la
+ * infraestructura compartida dependería de los dos módulos, y añadir un tercero
+ * obligaría a tocarla.
+ *
+ * Ninguna implementación lanza: el fallo se guarda como estado del trabajo,
+ * porque al otro lado no hay ninguna petición HTTP viva a la que devolvérselo.
+ */
+export interface GeneradorDeDocumentos {
+  ejecutar(trabajoId: string): Promise<void>;
+}
+
+export const COLA_DOCUMENTOS = Symbol('ColaDeDocumentosPort');
+export const GENERADORES_DE_DOCUMENTOS = Symbol(
+  'Record<ModuloDeDocumentos, GeneradorDeDocumentos>',
+);

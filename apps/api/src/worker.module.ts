@@ -14,7 +14,7 @@
 import { Module } from '@nestjs/common';
 
 import { AppModule } from './app.module.js';
-import { WorkerDeDocumentos } from './modules/plan-estudios/infrastructure/queue/documentos.worker.js';
+import { WorkerDeDocumentos } from './platform/documentos/worker.js';
 
 @Module({
   imports: [AppModule],

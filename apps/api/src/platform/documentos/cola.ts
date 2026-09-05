@@ -4,22 +4,29 @@
  * Lado productor: la API encola y responde. El consumidor vive en el proceso
  * `worker` (§5.2), que ejecuta el mismo código desde otro entrypoint.
  *
- * Es el único sitio del módulo que sabe que la cola existe. El caso de uso
- * depende de `ColaDeDocumentosPort`, así que probarlo no exige un Redis
- * levantado: en las pruebas se le pasa un doble que apunta lo que se encoló.
+ * Vive en `platform/` y no dentro de un módulo porque la usan dos —Plan de
+ * Estudios y Mejora Continua— y ninguno de los dos puede importar del otro.
+ *
+ * Es el único sitio que sabe que la cola existe. Los casos de uso dependen de
+ * `ColaDeDocumentosPort`, así que probarlos no exige un Redis levantado: se les
+ * pasa un doble que apunta lo que se encoló.
  */
 
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 
-import type { ColaDeDocumentosPort } from '../../application/ports/documentos.port.js';
+import type { ColaDeDocumentosPort, ModuloDeDocumentos } from './puertos.js';
 
 export const COLA_DOCUMENTOS_NOMBRE = 'documentos';
 
-/** El trabajo solo lleva el identificador; el resto está en la base. */
+/**
+ * El trabajo lleva el identificador y de qué módulo sale; el resto está en la
+ * base. Ver `ModuloDeDocumentos` para por qué el módulo viaja con él.
+ */
 export interface TrabajoEnCola {
   readonly trabajoId: string;
+  readonly modulo: ModuloDeDocumentos;
 }
 
 /**
@@ -76,12 +83,12 @@ export class ColaDeDocumentosBullMq implements ColaDeDocumentosPort, OnModuleDes
     });
   }
 
-  async encolar(trabajoId: string): Promise<void> {
+  async encolar(trabajoId: string, modulo: ModuloDeDocumentos): Promise<void> {
     // El identificador del trabajo es también el del job: si la misma solicitud
     // llegara dos veces, BullMQ descarta la repetida en vez de generar el mismo
     // documento dos veces.
-    await this.cola.add('generar', { trabajoId }, { jobId: trabajoId });
-    this.log.log(`Trabajo encolado: ${trabajoId}`);
+    await this.cola.add('generar', { trabajoId, modulo }, { jobId: trabajoId });
+    this.log.log(`Trabajo encolado (${modulo}): ${trabajoId}`);
   }
 
   async onModuleDestroy(): Promise<void> {

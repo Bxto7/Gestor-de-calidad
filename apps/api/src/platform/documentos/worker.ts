@@ -5,14 +5,29 @@
  * distinto). Si la API también consumiera, un PDF de un plan grande competiría
  * por CPU con las peticiones que se supone que no debe bloquear — que es
  * justo el motivo de tener una cola.
+ *
+ * No conoce ningún módulo: recibe un generador por cada uno y despacha por la
+ * clave que el trabajo trae. Importar los casos de uso haría que esta pieza
+ * compartida dependiera de los dos módulos a la vez, y sumar un tercero
+ * obligaría a modificarla.
  */
 
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
-import { GenerarDocumento } from '../../application/use-cases/generar-documentos.use-case.js';
-import { COLA_DOCUMENTOS_NOMBRE, conexionRedis, type TrabajoEnCola } from './documentos.cola.js';
+import { COLA_DOCUMENTOS_NOMBRE, conexionRedis, type TrabajoEnCola } from './cola.js';
+import {
+  GENERADORES_DE_DOCUMENTOS,
+  type GeneradorDeDocumentos,
+  type ModuloDeDocumentos,
+} from './puertos.js';
 
 /**
  * Cuántos documentos se generan a la vez.
@@ -30,22 +45,30 @@ export class WorkerDeDocumentos implements OnModuleInit, OnModuleDestroy {
   private worker?: Worker<TrabajoEnCola>;
   private conexion?: Redis;
 
-  constructor(private readonly generar: GenerarDocumento) {}
+  constructor(
+    @Inject(GENERADORES_DE_DOCUMENTOS)
+    private readonly generadores: Readonly<Record<ModuloDeDocumentos, GeneradorDeDocumentos>>,
+  ) {}
 
   onModuleInit(): void {
     this.worker = new Worker<TrabajoEnCola>(
       COLA_DOCUMENTOS_NOMBRE,
       async (job) => {
         const inicio = Date.now();
-        await this.generar.ejecutar(job.data.trabajoId);
+        // Los trabajos que ya estuvieran en Redis antes de que existiera el
+        // campo son de Plan de Estudios, que era el único módulo que generaba.
+        const modulo = job.data.modulo ?? 'plan-estudios';
+        await this.generadores[modulo].ejecutar(job.data.trabajoId);
         // Se mide siempre: el RNF de §3.4 habla de menos de 5 s, y sin este
         // registro no habría forma de saber si se cumple en producción.
-        this.log.log(`Documento ${job.data.trabajoId} procesado en ${Date.now() - inicio} ms.`);
+        this.log.log(
+          `Documento ${job.data.trabajoId} (${modulo}) procesado en ${Date.now() - inicio} ms.`,
+        );
       },
       { connection: (this.conexion = conexionRedis()), concurrency: SIMULTANEOS },
     );
 
-    // `GenerarDocumento` no lanza: guarda el fallo como estado. Si aun así algo
+    // Ningún generador lanza: guardan el fallo como estado. Si aun así algo
     // escapa, es un fallo de la infraestructura de la cola y tiene que verse en
     // el log en vez de morir en silencio.
     this.worker.on('failed', (job, error) => {

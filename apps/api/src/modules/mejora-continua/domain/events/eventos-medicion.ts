@@ -198,3 +198,29 @@ export class PlanMedicionDuplicado extends EventoMedicion {
     this.detalle = `Duplicado ${codigo}, copiado de ${codigoOrigen} sin vínculo de versión.`;
   }
 }
+
+/** Nombre legible de cada formato, para la bitácora y para los mensajes de error. */
+export const NOMBRE_DOCUMENTO_MEDICION: Readonly<Record<string, string>> = {
+  PLAN_MEDICION_PDF: 'PDF',
+  PLAN_MEDICION_EXCEL: 'Excel',
+};
+
+/**
+ * RF-PM-027. Se registra al pedirlo y no al terminarlo: lo que la acreditación
+ * pregunta es quién se llevó la evidencia, y eso se sabe aquí. Si la generación
+ * falla después, el estado del trabajo lo cuenta; la petición ocurrió igual.
+ */
+export class DocumentoMedicionSolicitado extends EventoMedicion {
+  readonly nombre = 'medicion.documento';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    tipo: string,
+  ) {
+    super(actor);
+    this.detalle = `Exportación de ${codigo} en ${NOMBRE_DOCUMENTO_MEDICION[tipo] ?? tipo}.`;
+  }
+}
