@@ -97,33 +97,33 @@ import { DirectorioDeUsuariosAdapter } from './modules/auth/infrastructure/direc
 import {
   DATOS_DOCUMENTO_MEDICION,
   REPOSITORIO_DOCUMENTOS_MEDICION,
-} from './modules/mejora-continua/application/ports/documentos-medicion.port.js';
+} from './modules/mejora-continua/medicion/application/ports/documentos-medicion.port.js';
 import {
   DatosDocumentoMedicionRepositoryPrisma,
   DocumentoMedicionRepositoryPrisma,
-} from './modules/mejora-continua/infrastructure/persistence/documentos-medicion.repository.js';
+} from './modules/mejora-continua/medicion/infrastructure/persistence/documentos-medicion.repository.js';
 import type {
   RepositorioDatosDocumentoMedicionPort,
   RepositorioDocumentosMedicionPort,
-} from './modules/mejora-continua/application/ports/documentos-medicion.port.js';
+} from './modules/mejora-continua/medicion/application/ports/documentos-medicion.port.js';
 import {
   ConsultarDocumentoMedicion,
   GenerarDocumentoMedicion,
-} from './modules/mejora-continua/application/use-cases/generar-documento-medicion.use-case.js';
+} from './modules/mejora-continua/medicion/application/use-cases/generar-documento-medicion.use-case.js';
 import {
   REPOSITORIO_PLAN_MEDICION,
   type RepositorioPlanMedicionPort,
-} from './modules/mejora-continua/application/ports/plan-medicion.port.js';
-import { ConfigurarPlanMedicion } from './modules/mejora-continua/application/use-cases/configurar-plan-medicion.use-case.js';
-import { GestionarPlanesMedicion } from './modules/mejora-continua/application/use-cases/gestionar-planes-medicion.use-case.js';
-import { VersionarPlanesMedicion } from './modules/mejora-continua/application/use-cases/versionar-planes-medicion.use-case.js';
-import { ProgramarMediciones } from './modules/mejora-continua/application/use-cases/programar-mediciones.use-case.js';
-import { PlanMedicionRepositoryPrisma } from './modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
-import { PlanesMedicionController } from './modules/mejora-continua/infrastructure/http/planes-medicion.controller.js';
+} from './modules/mejora-continua/medicion/application/ports/plan-medicion.port.js';
+import { ConfigurarPlanMedicion } from './modules/mejora-continua/medicion/application/use-cases/configurar-plan-medicion.use-case.js';
+import { GestionarPlanesMedicion } from './modules/mejora-continua/medicion/application/use-cases/gestionar-planes-medicion.use-case.js';
+import { VersionarPlanesMedicion } from './modules/mejora-continua/medicion/application/use-cases/versionar-planes-medicion.use-case.js';
+import { ProgramarMediciones } from './modules/mejora-continua/medicion/application/use-cases/programar-mediciones.use-case.js';
+import { PlanMedicionRepositoryPrisma } from './modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
+import { PlanesMedicionController } from './modules/mejora-continua/medicion/infrastructure/http/planes-medicion.controller.js';
 import {
   DocumentosDelPlanMedicionController,
   DocumentosMedicionController,
-} from './modules/mejora-continua/infrastructure/http/documentos-medicion.controller.js';
+} from './modules/mejora-continua/medicion/infrastructure/http/documentos-medicion.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,

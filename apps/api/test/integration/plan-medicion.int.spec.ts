@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
+import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
