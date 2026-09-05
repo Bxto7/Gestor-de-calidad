@@ -27,16 +27,23 @@ import {
   ordenarPeriodos,
   proponerPeriodos,
 } from '../../domain/value-objects/periodos.js';
+import {
+  agruparPorAtributo,
+  type GrupoDeCompetencias,
+} from '../../domain/services/agrupar-por-atributo.js';
 import type {
   DatosPlanMedicion,
   RepositorioPlanMedicionPort,
 } from '../ports/plan-medicion.port.js';
 
-/** RF-PM-014: un atributo y las competencias que lo desarrollan. */
-export interface GrupoDeCompetencias {
-  readonly atributo: { id: string; codigo: string; nombre: string } | null;
-  readonly competencias: readonly { id: string; codigo: string; nombre: string }[];
-}
+/**
+ * RF-PM-014: un atributo y las competencias que lo desarrollan.
+ *
+ * El tipo y la regla de agrupado bajaron a dominio, porque el documento
+ * exportable los necesita igual. Se reexporta para no cambiar a quien ya lo
+ * importaba de aquí.
+ */
+export type { GrupoDeCompetencias } from '../../domain/services/agrupar-por-atributo.js';
 
 export interface PeriodoADeclarar {
   readonly etiqueta: string;
@@ -58,40 +65,7 @@ export class ConfigurarPlanMedicion {
     const plan = await this.exigirPlan(id);
     const competencias = await this.curricular.competenciasDelPlan(plan.planEstudiosId);
 
-    const grupos = new Map<string, GrupoDeCompetencias>();
-    const sinAtributo: { id: string; codigo: string; nombre: string }[] = [];
-
-    for (const c of competencias) {
-      const resumen = { id: c.id, codigo: c.codigo, nombre: c.nombre };
-
-      if (c.atributos.length === 0) {
-        // No se descartan: que se vean es lo que delata que falta mapearlas, y
-        // es justo el hallazgo que una acreditación busca.
-        sinAtributo.push(resumen);
-        continue;
-      }
-
-      // Una competencia con dos atributos aparece en los dos grupos. Es la
-      // matriz real —«Aprendizaje autónomo» responde a AG-I06 y a AG-I08— y
-      // quedarse con uno perdería la mitad del mapeo.
-      for (const a of c.atributos) {
-        const grupo = grupos.get(a.id);
-        grupos.set(a.id, {
-          atributo: a,
-          competencias: [...(grupo?.competencias ?? []), resumen],
-        });
-      }
-    }
-
-    const ordenados = [...grupos.values()].sort((x, y) =>
-      (x.atributo?.codigo ?? '').localeCompare(y.atributo?.codigo ?? ''),
-    );
-
-    // El grupo sin mapear va al final: es una excepción a señalar, no el primer
-    // sitio donde alguien debería mirar.
-    return sinAtributo.length > 0
-      ? [...ordenados, { atributo: null, competencias: sinAtributo }]
-      : ordenados;
+    return agruparPorAtributo(competencias);
   }
 
   /** RF-PM-013 RN1 y RF-PM-015. */

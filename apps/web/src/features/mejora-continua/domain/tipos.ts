@@ -108,3 +108,19 @@ export interface ResultadoConsistencia {
 export function porcentajeDeMeta(fraccion: number): number {
   return Number((fraccion * 100).toFixed(1));
 }
+
+/* ── Documentos exportados (RF-PM-027 a RF-PM-029) ────────────────────── */
+
+export type TipoDocumentoMedicion = 'PLAN_MEDICION_PDF' | 'PLAN_MEDICION_EXCEL';
+export type EstadoTrabajo = 'En cola' | 'Generando' | 'Listo' | 'Fallido';
+
+export interface TrabajoDocumento {
+  readonly id: string;
+  readonly tipo: TipoDocumentoMedicion;
+  readonly estado: EstadoTrabajo;
+  readonly nombreArchivo: string | null;
+  readonly bytes: number | null;
+  /** Solo con estado Fallido. Redactado para quien lo pidió. */
+  readonly error: string | null;
+  readonly solicitadoEn: string;
+}

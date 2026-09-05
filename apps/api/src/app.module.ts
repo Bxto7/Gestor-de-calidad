@@ -92,6 +92,24 @@ import {
   type ContenidoCurricularPort,
 } from './modules/plan-estudios/application/ports/contenido-curricular.port.js';
 import { ContenidoCurricularAdapter } from './modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
+import { DIRECTORIO_USUARIOS } from './modules/auth/application/ports/directorio-usuarios.port.js';
+import { DirectorioDeUsuariosAdapter } from './modules/auth/infrastructure/directorio-usuarios.adapter.js';
+import {
+  DATOS_DOCUMENTO_MEDICION,
+  REPOSITORIO_DOCUMENTOS_MEDICION,
+} from './modules/mejora-continua/application/ports/documentos-medicion.port.js';
+import {
+  DatosDocumentoMedicionRepositoryPrisma,
+  DocumentoMedicionRepositoryPrisma,
+} from './modules/mejora-continua/infrastructure/persistence/documentos-medicion.repository.js';
+import type {
+  RepositorioDatosDocumentoMedicionPort,
+  RepositorioDocumentosMedicionPort,
+} from './modules/mejora-continua/application/ports/documentos-medicion.port.js';
+import {
+  ConsultarDocumentoMedicion,
+  GenerarDocumentoMedicion,
+} from './modules/mejora-continua/application/use-cases/generar-documento-medicion.use-case.js';
 import {
   REPOSITORIO_PLAN_MEDICION,
   type RepositorioPlanMedicionPort,
@@ -102,6 +120,10 @@ import { VersionarPlanesMedicion } from './modules/mejora-continua/application/u
 import { ProgramarMediciones } from './modules/mejora-continua/application/use-cases/programar-mediciones.use-case.js';
 import { PlanMedicionRepositoryPrisma } from './modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
 import { PlanesMedicionController } from './modules/mejora-continua/infrastructure/http/planes-medicion.controller.js';
+import {
+  DocumentosDelPlanMedicionController,
+  DocumentosMedicionController,
+} from './modules/mejora-continua/infrastructure/http/documentos-medicion.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
@@ -192,10 +214,11 @@ import {
 } from './modules/plan-estudios/application/use-cases/generar-documentos.use-case.js';
 import { DocumentoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/documentos.repository.js';
 import { DatosDocumentoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/datos-documento.repository.js';
-import { AlmacenEnDisco } from './modules/plan-estudios/infrastructure/documents/almacen-en-disco.js';
-import { RenderizadorPdfKit } from './modules/plan-estudios/infrastructure/documents/pdfkit.renderer.js';
-import { RenderizadorExcelJs } from './modules/plan-estudios/infrastructure/documents/exceljs.renderer.js';
-import { ColaDeDocumentosBullMq } from './modules/plan-estudios/infrastructure/queue/documentos.cola.js';
+import { AlmacenEnDisco } from './platform/documentos/almacen-en-disco.js';
+import { RenderizadorPdfKit } from './platform/documentos/pdfkit.renderer.js';
+import { RenderizadorExcelJs } from './platform/documentos/exceljs.renderer.js';
+import { ColaDeDocumentosBullMq } from './platform/documentos/cola.js';
+import { GENERADORES_DE_DOCUMENTOS } from './platform/documentos/puertos.js';
 import {
   DocumentosController,
   DocumentosDelPlanController,
@@ -244,6 +267,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     CriteriosDeCarreraController,
     CriteriosController,
     PlanesMedicionController,
+    DocumentosDelPlanMedicionController,
+    DocumentosMedicionController,
     DocumentosDelPlanController,
     DocumentosController,
     ReportesController,
@@ -283,6 +308,11 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
+    // La otra frontera: `auth` pone el nombre donde Mejora Continua solo tiene
+    // un identificador, sin que nadie consulte su tabla de usuarios (§3.2).
+    { provide: DIRECTORIO_USUARIOS, useClass: DirectorioDeUsuariosAdapter },
+    { provide: REPOSITORIO_DOCUMENTOS_MEDICION, useClass: DocumentoMedicionRepositoryPrisma },
+    { provide: DATOS_DOCUMENTO_MEDICION, useClass: DatosDocumentoMedicionRepositoryPrisma },
     {
       // Por fábrica y no por `useClass`: el constructor lleva un parámetro con
       // valor por defecto, y Nest intentaría inyectar un `string` que ningún
@@ -562,6 +592,59 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       ) => new GenerarDocumento(documentos, datos, almacen, pdf, hoja),
     },
     {
+      provide: GenerarDocumentoMedicion,
+      inject: [
+        REPOSITORIO_DOCUMENTOS_MEDICION,
+        DATOS_DOCUMENTO_MEDICION,
+        COLA_DOCUMENTOS,
+        ALMACEN_ARCHIVOS,
+        RENDERIZADOR_PDF,
+        RENDERIZADOR_HOJA,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        documentos: RepositorioDocumentosMedicionPort,
+        datos: RepositorioDatosDocumentoMedicionPort,
+        cola: ColaDeDocumentosPort,
+        almacen: AlmacenDeArchivosPort,
+        pdf: RenderizadorPdfPort,
+        hoja: RenderizadorHojaPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new GenerarDocumentoMedicion(
+          documentos,
+          datos,
+          cola,
+          almacen,
+          pdf,
+          hoja,
+          autorizacion,
+          eventos,
+        ),
+    },
+    {
+      provide: ConsultarDocumentoMedicion,
+      inject: [REPOSITORIO_DOCUMENTOS_MEDICION, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      useFactory: (
+        documentos: RepositorioDocumentosMedicionPort,
+        almacen: AlmacenDeArchivosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarDocumentoMedicion(documentos, almacen, autorizacion),
+    },
+    {
+      // El worker despacha por esta clave y no conoce ningún módulo. Añadir un
+      // tercero que genere documentos es una entrada más aquí, y nada en
+      // `platform/`.
+      provide: GENERADORES_DE_DOCUMENTOS,
+      inject: [GenerarDocumento, GenerarDocumentoMedicion],
+      useFactory: (planEstudios: GenerarDocumento, mejoraContinua: GenerarDocumentoMedicion) => ({
+        'plan-estudios': planEstudios,
+        'mejora-continua': mejoraContinua,
+      }),
+    },
+    {
       provide: ConsultarReportes,
       inject: [REPOSITORIO_REPORTES, AUTHORIZATION_PORT],
       useFactory: (reportes: RepositorioReportesPort, autorizacion: AuthorizationPort) =>
@@ -611,6 +694,9 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
   // Lo único que sale de aquí: el proceso worker importa este módulo y necesita
   // este caso de uso para atender la cola. El resto sigue siendo interno, para
   // que importar `AppModule` no se convierta en acceso a todo.
-  exports: [GenerarDocumento],
+  // Lo único que el proceso worker necesita de aquí: el registro de generadores
+  // por módulo. `GenerarDocumento` seguía exportado por sí mismo desde cuando
+  // el worker lo inyectaba directamente, y ya no hace falta.
+  exports: [GENERADORES_DE_DOCUMENTOS],
 })
 export class AppModule {}

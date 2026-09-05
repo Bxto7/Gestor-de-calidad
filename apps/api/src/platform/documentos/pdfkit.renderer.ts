@@ -21,8 +21,8 @@
 
 import PDFDocument from 'pdfkit';
 
-import type { Documento, Seccion, Tabla } from '../../domain/documentos/documento.js';
-import type { RenderizadorPdfPort } from '../../application/ports/documentos.port.js';
+import type { Documento, Seccion, Tabla } from './documento.js';
+import type { RenderizadorPdfPort } from './puertos.js';
 
 const MARGEN = 48;
 /** A4 en puntos. */

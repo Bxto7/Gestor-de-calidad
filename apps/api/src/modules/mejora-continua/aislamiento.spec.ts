@@ -48,6 +48,25 @@ describe('aislamiento de mejora-continua', () => {
     expect(infractores).toEqual([]);
   });
 
+  it('de auth solo importa los puertos que auth expone, no sus repositorios', () => {
+    // `auth` es transversal (§3.5) y se consume por puertos. Un import de su
+    // repositorio de usuarios sería la misma erosión, con otro nombre.
+    const permitidos = ['ports/authorization.port.js', 'ports/directorio-usuarios.port.js'];
+    const infractores: string[] = [];
+
+    for (const archivo of archivosTs(RAIZ)) {
+      const contenido = readFileSync(archivo, 'utf8');
+      for (const m of contenido.matchAll(/from '([^']*modules\/auth[^']*)'/g)) {
+        const importado = m[1] ?? '';
+        if (!permitidos.some((p) => importado.endsWith(p))) {
+          infractores.push(`${relativo(archivo)} → ${importado}`);
+        }
+      }
+    }
+
+    expect(infractores).toEqual([]);
+  });
+
   it('no importa nada del módulo de auditoría ni de sus tablas', () => {
     // La bitácora se alimenta de eventos de dominio, no de llamadas directas:
     // por eso `plan-estudios` y `auditoria` pueden ignorarse mutuamente.

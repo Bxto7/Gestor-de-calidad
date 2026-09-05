@@ -11,7 +11,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 
-import type { AlmacenDeArchivosPort } from '../../application/ports/documentos.port.js';
+import type { AlmacenDeArchivosPort } from './puertos.js';
 
 @Injectable()
 export class AlmacenEnDisco implements AlmacenDeArchivosPort {

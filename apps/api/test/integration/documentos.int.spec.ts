@@ -26,9 +26,9 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { GenerarDocumento } from '../../src/modules/plan-estudios/application/use-cases/generar-documentos.use-case.js';
-import { AlmacenEnDisco } from '../../src/modules/plan-estudios/infrastructure/documents/almacen-en-disco.js';
-import { RenderizadorExcelJs } from '../../src/modules/plan-estudios/infrastructure/documents/exceljs.renderer.js';
-import { RenderizadorPdfKit } from '../../src/modules/plan-estudios/infrastructure/documents/pdfkit.renderer.js';
+import { AlmacenEnDisco } from '../../src/platform/documentos/almacen-en-disco.js';
+import { RenderizadorExcelJs } from '../../src/platform/documentos/exceljs.renderer.js';
+import { RenderizadorPdfKit } from '../../src/platform/documentos/pdfkit.renderer.js';
 import { DatosDocumentoRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/datos-documento.repository.js';
 import { DocumentoRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/documentos.repository.js';
 

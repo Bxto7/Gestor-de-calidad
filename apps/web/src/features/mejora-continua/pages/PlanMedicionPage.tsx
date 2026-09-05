@@ -13,7 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
-import { ErrorDeNegocio } from '@/shared/api/cliente';
+import { ErrorDeNegocio, guardarArchivo } from '@/shared/api/cliente';
 import {
   AreaTexto,
   Badge,
@@ -35,6 +35,8 @@ import {
   useDuplicarPlan,
   useEditarPlan,
   useHistorial,
+  useDocumentos,
+  useGenerarDocumento,
   useMarcarMedicion,
   useMatriz,
   useNuevaVersion,
@@ -44,6 +46,8 @@ import {
   useTransicionar,
   useVersiones,
 } from '../api/queries';
+import { descargarDocumento } from '../api/medicion.api';
+import { DocumentosDelPlan } from '../components/DocumentosDelPlan';
 import { EditorDePeriodos } from '../components/EditorDePeriodos';
 import { GrupoDeCompetencias } from '../components/GrupoDeCompetencias';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
@@ -77,6 +81,8 @@ export function PlanMedicionPage() {
   const { data: vista } = useMatriz(id);
   const { data: consistencia } = useConsistencia(id);
   const { data: versiones } = useVersiones(id);
+  const { data: documentos } = useDocumentos(id);
+  const generarDocumento = useGenerarDocumento(id);
   const { data: historial, isError: historialDenegado } = useHistorial(id);
   const nuevaVersion = useNuevaVersion(id);
   const duplicar = useDuplicarPlan(id);
@@ -314,6 +320,21 @@ export function PlanMedicionPage() {
           }}
         />
       )}
+      {/* ── Documentos (RF-PM-027 a RF-PM-029) ───────────────────────── */}
+      <Tarjeta>
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-tinta">Documentos</h2>
+          <DocumentosDelPlan
+            trabajos={documentos ?? []}
+            generando={generarDocumento.isPending}
+            onGenerar={(tipo) => void ejecutar(() => generarDocumento.mutateAsync(tipo))}
+            onDescargar={(t) =>
+              void ejecutar(async () => guardarArchivo(await descargarDocumento(t.id)))
+            }
+          />
+        </div>
+      </Tarjeta>
+
       {/* ── Versiones (RF-PM-031) ────────────────────────────────────── */}
       {(versiones ?? []).length > 1 && (
         <Tarjeta>

@@ -252,3 +252,24 @@ async function leerArchivo(respuesta: Response): Promise<ArchivoDescargado> {
 export async function pedirSinSesion<T>(ruta: string, cuerpo: unknown): Promise<T> {
   return ejecutar(ruta, { metodo: 'POST', cuerpo }, false) as Promise<T>;
 }
+
+/**
+ * Provoca la descarga en el navegador.
+ *
+ * Hace falta el enlace sintético porque el archivo llega por `fetch` —con la
+ * cabecera de autorización— y no navegando a la URL. Un `<a href>` o un
+ * `window.open` sobre el endpoint no llevarían el token y devolverían un 401.
+ *
+ * Vive aquí y no dentro de un módulo porque no sabe qué archivo guarda: lo
+ * necesitan Plan de Estudios y Mejora Continua por igual.
+ */
+export function guardarArchivo(archivo: ArchivoDescargado): void {
+  const url = URL.createObjectURL(archivo.blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = archivo.nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  URL.revokeObjectURL(url);
+}

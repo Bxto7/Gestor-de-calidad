@@ -339,6 +339,26 @@ jobs:
           cat /tmp/api.log
           exit 1
 
+      # El recorrido de exportación encola un documento y espera a que aparezca
+      # descargable. Sin este proceso el trabajo se queda en «En cola» para
+      # siempre y esa prueba agota su tiempo — comprobado parándolo a propósito.
+      # Comparte el `dist` que la API ya construyó arriba.
+      - name: Arrancar el worker de documentos
+        working-directory: apps/api
+        run: npm run start:worker > /tmp/worker.log 2>&1 &
+
+      - name: Esperar a que el worker escuche
+        run: |
+          for i in $(seq 1 30); do
+            if grep -q 'Worker de documentos escuchando' /tmp/worker.log 2>/dev/null; then
+              echo "Worker listo"; exit 0
+            fi
+            sleep 2
+          done
+          echo "El worker no arrancó en 1 minuto. Su salida:"
+          cat /tmp/worker.log
+          exit 1
+
       # ── Frontend: el bundle construido, no el servidor de desarrollo ──────
       - name: Instalar dependencias del frontend
         working-directory: apps/web

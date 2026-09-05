@@ -18,7 +18,6 @@
  * distintos, ese cambio toca un adaptador y ninguno de los otros.
  */
 
-import type { Documento } from '../../domain/documentos/documento.js';
 import type { DatosParaDocumento } from '../../domain/documentos/armar-documentos.js';
 
 export const TIPOS_DOCUMENTO = [
@@ -85,32 +84,31 @@ export interface RepositorioDocumentosPort {
   ubicacionDe(id: string): Promise<string | null>;
 }
 
-export interface ColaDeDocumentosPort {
-  encolar(trabajoId: string): Promise<void>;
-}
-
-export interface AlmacenDeArchivosPort {
-  /** Devuelve la ubicación con la que después se recupera. */
-  guardar(clave: string, contenido: Buffer): Promise<string>;
-  leer(ubicacion: string): Promise<Buffer>;
-}
-
 /** Los datos del plan que necesita un documento, en una sola consulta. */
 export interface RepositorioDatosDocumentoPort {
   datosDe(planId: string): Promise<Omit<DatosParaDocumento, 'generadoEn'> | null>;
 }
 
-export interface RenderizadorPdfPort {
-  render(documento: Documento): Promise<Buffer>;
-}
-
-export interface RenderizadorHojaPort {
-  render(documento: Documento): Promise<Buffer>;
-}
-
 export const REPOSITORIO_DOCUMENTOS = Symbol('RepositorioDocumentosPort');
-export const COLA_DOCUMENTOS = Symbol('ColaDeDocumentosPort');
-export const ALMACEN_ARCHIVOS = Symbol('AlmacenDeArchivosPort');
 export const REPOSITORIO_DATOS_DOCUMENTO = Symbol('RepositorioDatosDocumentoPort');
-export const RENDERIZADOR_PDF = Symbol('RenderizadorPdfPort');
-export const RENDERIZADOR_HOJA = Symbol('RenderizadorHojaPort');
+
+/**
+ * Los contratos genéricos se reexportan desde `platform/documentos/puertos.js`.
+ *
+ * Subieron allí porque no son de este módulo —el almacén no sabe qué guarda y
+ * los renderizadores no saben qué dibujan— y ahora los usa también Mejora
+ * Continua. Se reexportan aquí para no obligar a cambiar cada sitio que ya los
+ * importaba de este archivo.
+ */
+export type {
+  AlmacenDeArchivosPort,
+  ColaDeDocumentosPort,
+  RenderizadorPdfPort,
+  RenderizadorHojaPort,
+} from '../../../../platform/documentos/puertos.js';
+export {
+  ALMACEN_ARCHIVOS,
+  COLA_DOCUMENTOS,
+  RENDERIZADOR_PDF,
+  RENDERIZADOR_HOJA,
+} from '../../../../platform/documentos/puertos.js';
