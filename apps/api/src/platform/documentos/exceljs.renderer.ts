@@ -14,8 +14,8 @@
 
 import ExcelJS from 'exceljs';
 
-import type { Documento, Seccion } from '../../domain/documentos/documento.js';
-import type { RenderizadorHojaPort } from '../../application/ports/documentos.port.js';
+import type { Documento, Seccion } from './documento.js';
+import type { RenderizadorHojaPort } from './puertos.js';
 
 /** Excel rechaza estos caracteres en el nombre de una hoja, y el límite es 31. */
 const PROHIBIDOS = /[[\]:*?/\\]/g;

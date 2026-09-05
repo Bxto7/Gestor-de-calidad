@@ -8,7 +8,7 @@ import {
   type AsignaturaParaDocumento,
   type DatosParaDocumento,
 } from './armar-documentos.js';
-import type { Seccion } from './documento.js';
+import type { Seccion } from '../../../../platform/documentos/documento.js';
 
 const GENERADO = new Date('2026-08-25T15:30:00Z');
 

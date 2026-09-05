@@ -192,9 +192,9 @@ import {
 } from './modules/plan-estudios/application/use-cases/generar-documentos.use-case.js';
 import { DocumentoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/documentos.repository.js';
 import { DatosDocumentoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/datos-documento.repository.js';
-import { AlmacenEnDisco } from './modules/plan-estudios/infrastructure/documents/almacen-en-disco.js';
-import { RenderizadorPdfKit } from './modules/plan-estudios/infrastructure/documents/pdfkit.renderer.js';
-import { RenderizadorExcelJs } from './modules/plan-estudios/infrastructure/documents/exceljs.renderer.js';
+import { AlmacenEnDisco } from './platform/documentos/almacen-en-disco.js';
+import { RenderizadorPdfKit } from './platform/documentos/pdfkit.renderer.js';
+import { RenderizadorExcelJs } from './platform/documentos/exceljs.renderer.js';
 import { ColaDeDocumentosBullMq } from './modules/plan-estudios/infrastructure/queue/documentos.cola.js';
 import {
   DocumentosController,

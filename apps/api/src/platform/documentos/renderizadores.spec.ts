@@ -15,7 +15,7 @@ import ExcelJS from 'exceljs';
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
-import type { Documento } from '../../domain/documentos/documento.js';
+import type { Documento } from './documento.js';
 import { RenderizadorExcelJs } from './exceljs.renderer.js';
 import { RenderizadorPdfKit } from './pdfkit.renderer.js';
 

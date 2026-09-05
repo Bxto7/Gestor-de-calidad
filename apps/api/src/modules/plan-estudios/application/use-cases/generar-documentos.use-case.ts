@@ -31,7 +31,7 @@ import {
   armarResumenDelPlan,
   type DatosParaDocumento,
 } from '../../domain/documentos/armar-documentos.js';
-import type { Documento } from '../../domain/documentos/documento.js';
+import type { Documento } from '../../../../platform/documentos/documento.js';
 import { DocumentoSolicitado, NOMBRE_DOCUMENTO } from '../../domain/events/eventos-documento.js';
 import type {
   AlmacenDeArchivosPort,
