@@ -20,7 +20,11 @@ import type {
   DomainEvent,
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
-import { AccesoDenegado } from '../../../../shared-kernel/errors/errores.js';
+import {
+  AccesoDenegado,
+  NoEncontrado,
+  ReglaDeNegocioViolada,
+} from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { DatosParaDocumentoMedicion } from '../../domain/documentos/armar-documento-medicion.js';
 import type {
@@ -29,7 +33,10 @@ import type {
   TrabajoDocumentoMedicion,
 } from '../ports/documentos-medicion.port.js';
 
-import { GenerarDocumentoMedicion } from './generar-documento-medicion.use-case.js';
+import {
+  ConsultarDocumentoMedicion,
+  GenerarDocumentoMedicion,
+} from './generar-documento-medicion.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 
@@ -278,5 +285,93 @@ describe('RF-PM-027 — generar', () => {
     await caso.ejecutar('t-1');
 
     expect(guardados).toEqual([]);
+  });
+});
+
+/* ── Consulta y descarga ────────────────────────────────────────────────── */
+
+function montarConsulta(dobles: {
+  repo?: Partial<RepositorioDocumentosMedicionPort>;
+  almacen?: Partial<AlmacenDeArchivosPort>;
+  autorizacion?: AuthorizationPort;
+}) {
+  const repo: RepositorioDocumentosMedicionPort = {
+    crear: async () => trabajo(),
+    porId: async () => trabajo(),
+    listarDePlan: async () => [],
+    marcarGenerando: async () => {},
+    marcarListo: async () => {},
+    marcarFallido: async () => {},
+    ubicacionDe: async () => '/documentos/t-1.pdf',
+    ...dobles.repo,
+  };
+
+  return new ConsultarDocumentoMedicion(
+    repo,
+    {
+      guardar: async () => '/x',
+      leer: async () => Buffer.from('contenido'),
+      ...dobles.almacen,
+    },
+    dobles.autorizacion ?? permitirTodo(),
+  );
+}
+
+describe('RF-PM-027 — consultar y descargar', () => {
+  it('descarga un trabajo listo con su nombre y su tipo', async () => {
+    const caso = montarConsulta({
+      repo: {
+        porId: async () =>
+          trabajo({ estado: 'Listo', nombreArchivo: 'plan.pdf', tipoMime: 'application/pdf' }),
+      },
+    });
+
+    const archivo = await caso.descargar(ACTOR, 't-1');
+
+    expect(archivo.nombreArchivo).toBe('plan.pdf');
+    expect(archivo.contenido.toString()).toBe('contenido');
+  });
+
+  it('descargar uno que falló devuelve su motivo, no un archivo vacío', async () => {
+    const caso = montarConsulta({
+      repo: {
+        porId: async () => trabajo({ estado: 'Fallido', error: 'El plan no tiene competencias.' }),
+      },
+    });
+
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow('El plan no tiene competencias.');
+  });
+
+  it('descargar uno que aún se genera dice en qué estado va', async () => {
+    const caso = montarConsulta({ repo: { porId: async () => trabajo({ estado: 'Generando' }) } });
+
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('un trabajo Listo al que le falta el archivo se nombra, no devuelve 0 bytes', async () => {
+    // Incoherencia de datos: la fila dice que está, el almacén dice que no.
+    const caso = montarConsulta({
+      repo: {
+        porId: async () =>
+          trabajo({ estado: 'Listo', nombreArchivo: 'p.pdf', tipoMime: 'application/pdf' }),
+        ubicacionDe: async () => null,
+      },
+    });
+
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow(NoEncontrado);
+  });
+
+  it('sin `medicion.leer` no se consulta ni se descarga', async () => {
+    const caso = montarConsulta({ autorizacion: denegar() });
+
+    await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
+    await expect(caso.listarDePlan(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
+  });
+
+  it('un trabajo que no existe es 404, no null', async () => {
+    const caso = montarConsulta({ repo: { porId: async () => null } });
+
+    await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(NoEncontrado);
   });
 });

@@ -106,7 +106,10 @@ import type {
   RepositorioDatosDocumentoMedicionPort,
   RepositorioDocumentosMedicionPort,
 } from './modules/mejora-continua/application/ports/documentos-medicion.port.js';
-import { GenerarDocumentoMedicion } from './modules/mejora-continua/application/use-cases/generar-documento-medicion.use-case.js';
+import {
+  ConsultarDocumentoMedicion,
+  GenerarDocumentoMedicion,
+} from './modules/mejora-continua/application/use-cases/generar-documento-medicion.use-case.js';
 import {
   REPOSITORIO_PLAN_MEDICION,
   type RepositorioPlanMedicionPort,
@@ -117,6 +120,10 @@ import { VersionarPlanesMedicion } from './modules/mejora-continua/application/u
 import { ProgramarMediciones } from './modules/mejora-continua/application/use-cases/programar-mediciones.use-case.js';
 import { PlanMedicionRepositoryPrisma } from './modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
 import { PlanesMedicionController } from './modules/mejora-continua/infrastructure/http/planes-medicion.controller.js';
+import {
+  DocumentosDelPlanMedicionController,
+  DocumentosMedicionController,
+} from './modules/mejora-continua/infrastructure/http/documentos-medicion.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
@@ -260,6 +267,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     CriteriosDeCarreraController,
     CriteriosController,
     PlanesMedicionController,
+    DocumentosDelPlanMedicionController,
+    DocumentosMedicionController,
     DocumentosDelPlanController,
     DocumentosController,
     ReportesController,
@@ -614,6 +623,15 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           autorizacion,
           eventos,
         ),
+    },
+    {
+      provide: ConsultarDocumentoMedicion,
+      inject: [REPOSITORIO_DOCUMENTOS_MEDICION, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      useFactory: (
+        documentos: RepositorioDocumentosMedicionPort,
+        almacen: AlmacenDeArchivosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarDocumentoMedicion(documentos, almacen, autorizacion),
     },
     {
       // El worker despacha por esta clave y no conoce ningún módulo. Añadir un

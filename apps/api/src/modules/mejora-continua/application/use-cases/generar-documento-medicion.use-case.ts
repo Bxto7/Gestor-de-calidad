@@ -26,7 +26,11 @@ import type {
   Actor,
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
-import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
+import {
+  AccesoDenegado,
+  NoEncontrado,
+  ReglaDeNegocioViolada,
+} from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import {
   armarDocumentoMedicion,
@@ -163,5 +167,75 @@ export class GenerarDocumentoMedicion {
       const motivo = error instanceof Error ? error.message : 'Error desconocido.';
       await this.documentos.marcarFallido(trabajoId, `No se pudo generar ${nombre}: ${motivo}`);
     }
+  }
+}
+
+/* ── Consulta y descarga ────────────────────────────────────────────────── */
+
+export interface ArchivoDescargado {
+  readonly nombreArchivo: string;
+  readonly tipoMime: string;
+  readonly contenido: Buffer;
+}
+
+/**
+ * Corre en la API. Estado, listado y descarga.
+ *
+ * Separado del generador porque no comparte ni una dependencia con él salvo el
+ * repositorio: no encola, no renderiza y no escribe en el almacén, solo lee.
+ */
+export class ConsultarDocumentoMedicion {
+  constructor(
+    private readonly documentos: RepositorioDocumentosMedicionPort,
+    private readonly almacen: AlmacenDeArchivosPort,
+    private readonly autorizacion: AuthorizationPort,
+  ) {}
+
+  async estado(actor: Actor, trabajoId: string): Promise<TrabajoDocumentoMedicion> {
+    await this.exigirLectura(actor);
+    const trabajo = await this.documentos.porId(trabajoId);
+    if (trabajo === null) throw new NoEncontrado('el documento', trabajoId);
+    return trabajo;
+  }
+
+  async listarDePlan(
+    actor: Actor,
+    planMedicionId: string,
+    limite = 20,
+  ): Promise<TrabajoDocumentoMedicion[]> {
+    await this.exigirLectura(actor);
+    return this.documentos.listarDePlan(planMedicionId, limite);
+  }
+
+  async descargar(actor: Actor, trabajoId: string): Promise<ArchivoDescargado> {
+    const trabajo = await this.estado(actor, trabajoId);
+
+    if (trabajo.estado !== 'Listo') {
+      // Un archivo vacío parecería un documento roto. Decir por qué no hay
+      // nada que descargar es lo único accionable.
+      throw new ReglaDeNegocioViolada(
+        trabajo.estado === 'Fallido'
+          ? (trabajo.error ?? 'La generación del documento falló.')
+          : `El documento todavía se está generando (${trabajo.estado}).`,
+      );
+    }
+
+    const ubicacion = await this.documentos.ubicacionDe(trabajoId);
+    if (ubicacion === null || trabajo.nombreArchivo === null || trabajo.tipoMime === null) {
+      // El trabajo dice estar listo pero le falta el archivo. Es incoherencia
+      // de datos, no un caso de uso: se nombra en vez de devolver 0 bytes.
+      throw new NoEncontrado('el archivo del documento', trabajoId);
+    }
+
+    return {
+      nombreArchivo: trabajo.nombreArchivo,
+      tipoMime: trabajo.tipoMime,
+      contenido: await this.almacen.leer(ubicacion),
+    };
+  }
+
+  private async exigirLectura(actor: Actor): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, 'medicion.leer');
+    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }
