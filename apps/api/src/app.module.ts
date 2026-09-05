@@ -92,6 +92,16 @@ import {
   type ContenidoCurricularPort,
 } from './modules/plan-estudios/application/ports/contenido-curricular.port.js';
 import { ContenidoCurricularAdapter } from './modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
+import { DIRECTORIO_USUARIOS } from './modules/auth/application/ports/directorio-usuarios.port.js';
+import { DirectorioDeUsuariosAdapter } from './modules/auth/infrastructure/directorio-usuarios.adapter.js';
+import {
+  DATOS_DOCUMENTO_MEDICION,
+  REPOSITORIO_DOCUMENTOS_MEDICION,
+} from './modules/mejora-continua/application/ports/documentos-medicion.port.js';
+import {
+  DatosDocumentoMedicionRepositoryPrisma,
+  DocumentoMedicionRepositoryPrisma,
+} from './modules/mejora-continua/infrastructure/persistence/documentos-medicion.repository.js';
 import {
   REPOSITORIO_PLAN_MEDICION,
   type RepositorioPlanMedicionPort,
@@ -283,6 +293,11 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
+    // La otra frontera: `auth` pone el nombre donde Mejora Continua solo tiene
+    // un identificador, sin que nadie consulte su tabla de usuarios (§3.2).
+    { provide: DIRECTORIO_USUARIOS, useClass: DirectorioDeUsuariosAdapter },
+    { provide: REPOSITORIO_DOCUMENTOS_MEDICION, useClass: DocumentoMedicionRepositoryPrisma },
+    { provide: DATOS_DOCUMENTO_MEDICION, useClass: DatosDocumentoMedicionRepositoryPrisma },
     {
       // Por fábrica y no por `useClass`: el constructor lleva un parámetro con
       // valor por defecto, y Nest intentaría inyectar un `string` que ningún
