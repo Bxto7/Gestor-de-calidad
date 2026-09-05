@@ -10,7 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { AccionMedicion, TipoDocumentoMedicion } from '../domain/tipos';
+import type { AccionMedicion, PlanMedicion, TipoDocumentoMedicion } from '../domain/tipos';
 import * as api from './medicion.api';
 
 export const claves = {
@@ -79,11 +79,47 @@ function useMutacionDelPlan<TVars, TDatos>(
   id: string,
   fn: (v: TVars) => Promise<TDatos>,
   ademas: readonly (readonly unknown[])[] = [],
+  /**
+   * Cómo se vería el plan si la mutación saliera bien, para adelantarlo en la
+   * caché sin esperar al servidor.
+   *
+   * Solo hace falta donde la pantalla deja encadenar acciones más rápido de lo
+   * que tarda el viaje de ida y vuelta: sin esto, la segunda lee el plan de
+   * antes de la primera y la pisa. Si la mutación falla, se restaura lo que
+   * había — que es por lo que se adelanta aquí y no guardando un estado
+   * paralelo en el componente, donde un fallo dejaría la pantalla mintiendo.
+   */
+  optimista?: (plan: PlanMedicion, v: TVars) => PlanMedicion,
 ) {
   const qc = useQueryClient();
   return useMutation({
+    // Las escrituras sobre un mismo plan van en fila, nunca en paralelo.
+    //
+    // Todas son lee-modifica-escribe sobre el plan entero, así que dos en vuelo
+    // a la vez se pisan según el orden en que aterricen —y ese orden no lo
+    // decide el cliente—. Con dos competencias marcadas seguidas se veía: los
+    // dos PUT salían bien, el viejo llegaba el último y dejaba el plan con una.
+    scope: { id: `plan-medicion:${id}` },
     mutationFn: fn,
-    onSuccess: async () => {
+    onMutate: async (v: TVars) => {
+      if (!optimista) return undefined;
+
+      // Sin esto, un refetch en vuelo puede aterrizar después y devolver el
+      // plan de antes, deshaciendo lo que acabamos de adelantar.
+      await qc.cancelQueries({ queryKey: claves.plan(id) });
+
+      const previo = qc.getQueryData<PlanMedicion>(claves.plan(id));
+      if (previo) qc.setQueryData(claves.plan(id), optimista(previo, v));
+      return { previo };
+    },
+    onError: (_e, _v, contexto) => {
+      const previo = (contexto as { previo?: PlanMedicion } | undefined)?.previo;
+      if (previo) qc.setQueryData(claves.plan(id), previo);
+    },
+    onSettled: async () => {
+      // En `onSettled` y no en `onSuccess`: tras un fallo la caché quedó con lo
+      // restaurado, y hay que volver a preguntar por si el servidor sí llegó a
+      // cambiar algo antes de romper.
       await qc.invalidateQueries({ queryKey: claves.plan(id) });
       for (const clave of ademas) await qc.invalidateQueries({ queryKey: clave });
     },
@@ -118,8 +154,13 @@ export function useTransicionar(id: string) {
 }
 
 export function useDeclararCompetencias(id: string) {
-  return useMutacionDelPlan(id, (competenciaIds: readonly string[]) =>
-    api.declararCompetencias(id, competenciaIds),
+  return useMutacionDelPlan(
+    id,
+    (competenciaIds: readonly string[]) => api.declararCompetencias(id, competenciaIds),
+    [],
+    // Marcar dos competencias seguidas es lo normal al configurar un plan, y
+    // sin adelantar la caché la segunda parte del plan de antes de la primera.
+    (plan, competenciaIds) => ({ ...plan, competenciaIds }),
   );
 }
 
