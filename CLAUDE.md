@@ -16,6 +16,24 @@ Se están construyendo **en paralelo**:
 1. **Módulo de Autenticación, Roles y Permisos** (transversal, del que dependen todos los demás módulos)
 2. **Módulo de Plan de Estudios** (131 RF + 24 RNF ya especificados) — Facultades, Carreras, Plan de Estudios versionado, Objetivos Educacionales, Competencias, Asignaturas, Malla Curricular, Aprobación, Validaciones de consistencia, Reportes.
 
+> **Cómo contar el avance sin equivocarse.** Los «131 RF» son el total del PDF
+> original, que no está en el repositorio. Lo que sí se puede contar es
+> `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, que transcribe **60
+> con ficha completa** y menciona **108 distintos**, hasta RF119. La diferencia
+> no es descuido: los bloques RF101–RF110 y RF111–RF119 el PDF «los resume en
+> una línea y no los detalla», así que no hay ficha que transcribir. Están
+> implementados igualmente.
+>
+> **Los dos módulos numeran por separado.** Plan de Estudios usa `RFxxx`;
+> Mejora Continua usa `RF-PM`, `RF-PE`, `RF-PJ` y `RF-AC` para lo suyo, y
+> reserva `RF120`–`RF132` para las extensiones que añade a Plan de Estudios
+> (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
+> documento de Plan de Estudios no menciona ningún RF120 o superior.
+>
+> Al 4 de septiembre de 2026: **117 de 243 requisitos contables construidos**
+> —60 de Plan de Estudios documentados con ficha, más 183 de Mejora Continua—.
+> El detalle por submódulo está en el documento de Mejora Continua, §1.4.
+
 ### Fuera de alcance en MVP 1 (pero la arquitectura debe dejar espacio)
 
 - Más módulos de gestión de calidad (no definidos aún en detalle)
