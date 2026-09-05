@@ -37,7 +37,15 @@ export interface TransicionMedicion {
   readonly exigeSinBloqueos: boolean;
   /** RF-PM-037 RN1: el rechazo u observación obliga a comentario. */
   readonly exigeComentario: boolean;
-  readonly permiso: string;
+  /**
+   * Sufijo del permiso, sin el submódulo: `editar` o `aprobar`.
+   *
+   * Lo antepone quien lo consume —`medicion.${permiso}`,
+   * `evaluacion.${permiso}`— porque esta máquina de estados la comparten los
+   * dos submódulos y el permiso no es el mismo. Escribirlo entero aquí dejaría
+   * que quien puede aprobar mediciones aprobara también evaluaciones.
+   */
+  readonly permiso: 'editar' | 'aprobar';
 }
 
 const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
@@ -50,7 +58,7 @@ const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
     // Quien configura el plan es quien lo da por listo, así que no hay un
     // permiso aparte para esto — a diferencia de la aprobación, donde la
     // separación entre quien construye y quien da el visto bueno sí importa.
-    permiso: 'medicion.editar',
+    permiso: 'editar',
   },
   aprobar: {
     desde: 'En revisión',
@@ -58,7 +66,7 @@ const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
     etiqueta: 'Aprobar',
     exigeSinBloqueos: true,
     exigeComentario: false,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
   observar: {
     desde: 'En revisión',
@@ -68,7 +76,7 @@ const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
     // tiene: exigir que esté limpio para observarlo sería contradictorio.
     exigeSinBloqueos: false,
     exigeComentario: true,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
   'marcar-vigente': {
     desde: 'Aprobado',
@@ -76,7 +84,7 @@ const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
     etiqueta: 'Marcar como vigente',
     exigeSinBloqueos: false,
     exigeComentario: false,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
   archivar: {
     desde: 'Vigente',
@@ -84,7 +92,7 @@ const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
     etiqueta: 'Archivar',
     exigeSinBloqueos: false,
     exigeComentario: false,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
 };
 

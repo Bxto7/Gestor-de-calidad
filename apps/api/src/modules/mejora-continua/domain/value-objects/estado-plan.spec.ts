@@ -101,12 +101,12 @@ describe('RF-PM-006 — transiciones válidas', () => {
   });
 
   it('cada transición declara el permiso que exige', () => {
-    expect(describirTransicion('aprobar').permiso).toBe('medicion.aprobar');
-    expect(describirTransicion('observar').permiso).toBe('medicion.aprobar');
-    expect(describirTransicion('marcar-vigente').permiso).toBe('medicion.aprobar');
-    expect(describirTransicion('archivar').permiso).toBe('medicion.aprobar');
+    expect(describirTransicion('aprobar').permiso).toBe('aprobar');
+    expect(describirTransicion('observar').permiso).toBe('aprobar');
+    expect(describirTransicion('marcar-vigente').permiso).toBe('aprobar');
+    expect(describirTransicion('archivar').permiso).toBe('aprobar');
     // Quien configura el plan es quien lo da por listo; no hay permiso aparte.
-    expect(describirTransicion('enviar-a-revision').permiso).toBe('medicion.editar');
+    expect(describirTransicion('enviar-a-revision').permiso).toBe('editar');
   });
 
   it('lista las acciones posibles desde cada estado', () => {
@@ -114,6 +114,32 @@ describe('RF-PM-006 — transiciones válidas', () => {
     expect([...transicionesDisponibles('En revisión')].sort()).toEqual(['aprobar', 'observar']);
     expect(transicionesDisponibles('Aprobado')).toEqual(['marcar-vigente']);
     expect(transicionesDisponibles('Vigente')).toEqual(['archivar']);
+  });
+});
+
+describe('el permiso es un sufijo, no un permiso entero', () => {
+  it('no trae módulo: lo pone quien lo consume', () => {
+    // La misma máquina la usan Planes de Medición y Planes de Evaluación. Si
+    // aquí volviera a escribirse `medicion.aprobar`, aprobar un plan de
+    // evaluación exigiría el permiso del submódulo equivocado — y quien tuviera
+    // `medicion.aprobar` podría aprobar evaluaciones sin `evaluacion.aprobar`.
+    for (const accion of [
+      'enviar-a-revision',
+      'aprobar',
+      'observar',
+      'marcar-vigente',
+      'archivar',
+    ] as const) {
+      expect(describirTransicion(accion).permiso).not.toContain('.');
+    }
+  });
+
+  it('enviar a revisión lo puede quien edita; el resto, quien aprueba', () => {
+    expect(describirTransicion('enviar-a-revision').permiso).toBe('editar');
+    expect(describirTransicion('aprobar').permiso).toBe('aprobar');
+    expect(describirTransicion('observar').permiso).toBe('aprobar');
+    expect(describirTransicion('marcar-vigente').permiso).toBe('aprobar');
+    expect(describirTransicion('archivar').permiso).toBe('aprobar');
   });
 });
 

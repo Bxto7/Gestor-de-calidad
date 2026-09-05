@@ -178,7 +178,7 @@ export class GestionarPlanesMedicion {
   ): Promise<DatosPlanMedicion> {
     const plan = await this.exigirPlan(id);
     const transicion = describirTransicion(accion);
-    await this.exigir(actor, transicion.permiso);
+    await this.exigir(actor, `medicion.${transicion.permiso}`);
 
     // RF-PM-038 RN1: la validación integral es requisito previo. Se evalúa solo
     // si la transición la exige: volver a pedirla al archivar dejaría planes

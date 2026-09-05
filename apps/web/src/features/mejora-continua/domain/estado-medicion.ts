@@ -17,7 +17,15 @@ export interface TransicionMedicion {
   readonly etiqueta: string;
   /** RF-PM-037 RN1: el rechazo u observación obliga a comentario. */
   readonly exigeComentario: boolean;
-  readonly permiso: string;
+  /**
+   * Sufijo del permiso, sin el submódulo: `editar` o `aprobar`.
+   *
+   * Lo antepone quien lo consume —`medicion.${permiso}`,
+   * `evaluacion.${permiso}`— porque esta máquina de estados la comparten los
+   * dos submódulos y el permiso no es el mismo. Escribirlo entero aquí dejaría
+   * que quien puede aprobar mediciones aprobara también evaluaciones.
+   */
+  readonly permiso: 'editar' | 'aprobar';
 }
 
 const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
@@ -27,35 +35,35 @@ const TRANSICIONES: Readonly<Record<AccionMedicion, TransicionMedicion>> = {
     etiqueta: 'Enviar a revisión',
     exigeComentario: false,
     // Quien configura el plan es quien lo da por listo; no hay permiso aparte.
-    permiso: 'medicion.editar',
+    permiso: 'editar',
   },
   aprobar: {
     desde: 'En revisión',
     hacia: 'Aprobado',
     etiqueta: 'Aprobar',
     exigeComentario: false,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
   observar: {
     desde: 'En revisión',
     hacia: 'Borrador',
     etiqueta: 'Observar',
     exigeComentario: true,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
   'marcar-vigente': {
     desde: 'Aprobado',
     hacia: 'Vigente',
     etiqueta: 'Marcar como vigente',
     exigeComentario: false,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
   archivar: {
     desde: 'Vigente',
     hacia: 'Histórico',
     etiqueta: 'Archivar',
     exigeComentario: false,
-    permiso: 'medicion.aprobar',
+    permiso: 'aprobar',
   },
 };
 

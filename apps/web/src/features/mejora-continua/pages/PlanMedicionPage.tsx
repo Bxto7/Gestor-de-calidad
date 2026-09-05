@@ -191,7 +191,7 @@ export function PlanMedicionPage() {
 
           <div className="flex flex-wrap gap-2">
             {transicionesDisponibles(plan.estado)
-              .filter((a) => puede(describirTransicion(a).permiso))
+              .filter((a) => puede(`medicion.${describirTransicion(a).permiso}`))
               .map((accion) => {
                 const t = describirTransicion(accion);
                 return (
