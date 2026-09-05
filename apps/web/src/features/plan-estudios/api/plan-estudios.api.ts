@@ -418,20 +418,5 @@ export async function descargarDocumento(id: string): Promise<ArchivoDescargado>
   return cliente.descargar(`/documentos/${id}/archivo`);
 }
 
-/**
- * Provoca la descarga en el navegador.
- *
- * Hace falta el enlace sintético porque el archivo llega por `fetch` —con la
- * cabecera de autorización— y no navegando a la URL. Un `window.open` sobre el
- * endpoint no llevaría el token y devolvería un 401.
- */
-export function guardarArchivo(archivo: ArchivoDescargado): void {
-  const url = URL.createObjectURL(archivo.blob);
-  const enlace = document.createElement('a');
-  enlace.href = url;
-  enlace.download = archivo.nombreArchivo;
-  document.body.appendChild(enlace);
-  enlace.click();
-  document.body.removeChild(enlace);
-  URL.revokeObjectURL(url);
-}
+/** Subió a `shared/api/cliente`: no sabe qué archivo guarda, y ya lo usan dos módulos. */
+export { guardarArchivo } from '@/shared/api/cliente';

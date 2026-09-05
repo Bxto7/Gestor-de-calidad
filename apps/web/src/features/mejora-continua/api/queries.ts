@@ -10,7 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { AccionMedicion } from '../domain/tipos';
+import type { AccionMedicion, TipoDocumentoMedicion } from '../domain/tipos';
 import * as api from './medicion.api';
 
 export const claves = {
@@ -23,6 +23,7 @@ export const claves = {
   consistencia: (id: string) => ['medicion', id, 'consistencia'] as const,
   versiones: (id: string) => ['medicion', id, 'versiones'] as const,
   historial: (id: string) => ['medicion', id, 'historial'] as const,
+  documentos: (id: string) => ['medicion', id, 'documentos'] as const,
 };
 
 /* ── Consultas ────────────────────────────────────────────────────────── */
@@ -152,6 +153,25 @@ export function useVersiones(id: string) {
   });
 }
 
+/**
+ * RF-PM-027: los documentos generados del plan.
+ *
+ * Mientras algo esté en curso se vuelve a preguntar sola. Sin esto la pantalla
+ * se queda en «En cola» hasta que alguien recargue, y parece que no funciona
+ * cuando en realidad el archivo ya está.
+ */
+export function useDocumentos(id: string) {
+  return useQuery({
+    queryKey: claves.documentos(id),
+    queryFn: () => api.documentosDe(id),
+    enabled: !!id,
+    refetchInterval: (consulta) =>
+      (consulta.state.data ?? []).some((t) => t.estado === 'En cola' || t.estado === 'Generando')
+        ? 2_000
+        : false,
+  });
+}
+
 export function useHistorial(id: string) {
   return useQuery({
     queryKey: claves.historial(id),
@@ -171,4 +191,21 @@ export function useNuevaVersion(id: string) {
 
 export function useDuplicarPlan(id: string) {
   return useMutacionDelPlan(id, () => api.duplicarPlan(id), [['medicion', 'lista']]);
+}
+
+/**
+ * RF-PM-027: pedir la exportación.
+ *
+ * Invalida solo la lista de documentos y no la rama entera del plan: generar
+ * un archivo no cambia el plan, y tirar de la matriz y la consistencia por un
+ * PDF haría trabajar al servidor para nada.
+ */
+export function useGenerarDocumento(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tipo: TipoDocumentoMedicion) => api.generarDocumento(id, tipo),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: claves.documentos(id) });
+    },
+  });
 }
