@@ -795,6 +795,7 @@ model PlanMedicion {
   competencias CompetenciaDelPlan[]
   programacion Programacion[]
   documentos   DocumentoMedicion[]
+  evaluaciones PlanEvaluacion[]
 
   @@index([planEstudiosId, tipo])
   @@map("planes_medicion")
@@ -913,5 +914,33 @@ model DocumentoMedicion {
   /// El listado va del más reciente al más antiguo, y siempre de un plan.
   @@index([planMedicionId, solicitadoEn])
   @@map("documentos_medicion")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-002: el plan de evaluación de un plan de medición.
+///
+/// No guarda tipo, ni meta, ni competencias, ni periodos: se leen del plan de
+/// medición base, que está congelado —RF-PE-001 RN3 solo admite bases Aprobado
+/// o Vigente, y esos estados no se editan—. Copiarlos sería sostener dos veces
+/// un dato inmutable, que es exactamente cómo el Excel del que sale este
+/// sistema acabó declarando 249 créditos en un sitio y 210 en otro.
+model PlanEvaluacion {
+  id             String         @id @default(uuid()) @db.Uuid
+  planMedicionId String         @map("plan_medicion_id") @db.Uuid
+  codigo         String         @unique @db.VarChar(80)
+  version        Int            @default(1)
+  estado         EstadoMedicion @default(BORRADOR)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  /// `Restrict` y no `Cascade`: un plan de medición Aprobado o Vigente no se
+  /// puede borrar, así que esto no llega a ejercerse nunca. Se declara igual
+  /// para que, si esa regla cambiara, el fallo sea un error de base de datos y
+  /// no un plan de evaluación apuntando al vacío.
+  plan PlanMedicion @relation(fields: [planMedicionId], references: [id], onDelete: Restrict)
+
+  @@index([planMedicionId])
+  @@map("planes_evaluacion")
   @@schema("mejora_continua")
 }
