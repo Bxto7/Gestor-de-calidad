@@ -76,6 +76,17 @@ const PERMISOS = [
   ['medicion.eliminar', 'Eliminar un plan de medición en Borrador', 'mejora-continua'],
   ['medicion.aprobar', 'Aprobar, observar y dar vigencia a un plan de medición', 'mejora-continua'],
 
+  // Mejora continua — Planes de Evaluación
+  ['evaluacion.leer', 'Consultar planes de evaluación', 'mejora-continua'],
+  ['evaluacion.crear', 'Crear un plan de evaluación', 'mejora-continua'],
+  ['evaluacion.editar', 'Editar un plan de evaluación en Borrador', 'mejora-continua'],
+  ['evaluacion.eliminar', 'Eliminar un plan de evaluación en Borrador', 'mejora-continua'],
+  [
+    'evaluacion.aprobar',
+    'Aprobar, observar y dar vigencia a un plan de evaluación',
+    'mejora-continua',
+  ],
+
   // Transversales
   ['reporte.generar', 'Generar PDF y Excel del plan', 'plan-estudios'],
   ['auditoria.leer', 'Consultar el histórico de cambios', 'auditoria'],
@@ -131,6 +142,7 @@ const ROLES: {
       // Solo lectura, como con el resto del contenido académico: decidir qué se
       // mide y aprobarlo es una responsabilidad académica, no de administración.
       'medicion.leer',
+      'evaluacion.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
@@ -176,6 +188,13 @@ const ROLES: {
       'medicion.editar',
       'medicion.eliminar',
       'medicion.aprobar',
+      // RF-PE-046: la misma separación que en medición. Quien construye no da
+      // el visto bueno, pero el Director sí hace ambas cosas.
+      'evaluacion.leer',
+      'evaluacion.crear',
+      'evaluacion.editar',
+      'evaluacion.eliminar',
+      'evaluacion.aprobar',
       'reporte.generar',
       'auditoria.leer',
     ],
@@ -215,6 +234,12 @@ const ROLES: {
       'medicion.crear',
       'medicion.editar',
       'medicion.eliminar',
+      // Igual que en medición y por la misma razón (RF-PE-046): sin
+      // `evaluacion.aprobar`.
+      'evaluacion.leer',
+      'evaluacion.crear',
+      'evaluacion.editar',
+      'evaluacion.eliminar',
       // Solo el historial de una entidad concreta, no la bitácora entera: quien
       // edita un plan tiene que poder ver qué se hizo sobre él (RF-PM-032), y
       // eso no exige darle acceso a los accesos de todos ni a los demás módulos.
@@ -241,6 +266,7 @@ const ROLES: {
       'asignatura.leer',
       // Ve en qué periodos se mide la competencia de la asignatura que dicta.
       'medicion.leer',
+      'evaluacion.leer',
       'reporte.generar',
     ],
   },
@@ -259,6 +285,7 @@ const ROLES: {
       'atributo.leer',
       'criterio.leer',
       'medicion.leer',
+      'evaluacion.leer',
     ],
   },
 ];
