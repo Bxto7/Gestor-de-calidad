@@ -81,11 +81,16 @@ describe('aislamiento de mejora-continua', () => {
   });
 
   it('el dominio no importa NestJS ni Prisma', () => {
-    // El dominio vive en dos sitios: lo compartido en `domain/` y lo propio
-    // de Medición en `medicion/domain/` (§ carpeta del submódulo).
+    // El dominio vive en tres sitios: lo compartido en `domain/` y lo propio de
+    // cada submódulo en `medicion/domain/` y `evaluacion/domain/` (§ carpeta del
+    // submódulo).
     const infractores: string[] = [];
 
-    for (const raiz of [join(RAIZ, 'domain'), join(RAIZ, 'medicion', 'domain')]) {
+    for (const raiz of [
+      join(RAIZ, 'domain'),
+      join(RAIZ, 'medicion', 'domain'),
+      join(RAIZ, 'evaluacion', 'domain'),
+    ]) {
       for (const archivo of archivosTs(raiz)) {
         const contenido = readFileSync(archivo, 'utf8');
         if (/from '@nestjs\/|from '@prisma\/|database\/generated/.test(contenido)) {
@@ -102,10 +107,15 @@ describe('aislamiento de mejora-continua', () => {
     // alguien se saltó el puerto para «una consulta rápida».
     const infractores: string[] = [];
 
-    for (const archivo of archivosTs(join(RAIZ, 'medicion', 'application'))) {
-      const contenido = readFileSync(archivo, 'utf8');
-      if (/from '@prisma\/|database\/generated|prisma\.service/.test(contenido)) {
-        infractores.push(relativo(archivo));
+    for (const raiz of [
+      join(RAIZ, 'medicion', 'application'),
+      join(RAIZ, 'evaluacion', 'application'),
+    ]) {
+      for (const archivo of archivosTs(raiz)) {
+        const contenido = readFileSync(archivo, 'utf8');
+        if (/from '@prisma\/|database\/generated|prisma\.service/.test(contenido)) {
+          infractores.push(relativo(archivo));
+        }
       }
     }
 

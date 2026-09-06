@@ -125,6 +125,16 @@ import {
   DocumentosMedicionController,
 } from './modules/mejora-continua/medicion/infrastructure/http/documentos-medicion.controller.js';
 import {
+  REPOSITORIO_PLAN_EVALUACION,
+  type RepositorioPlanEvaluacionPort,
+} from './modules/mejora-continua/evaluacion/application/ports/plan-evaluacion.port.js';
+import { GestionarPlanesEvaluacion } from './modules/mejora-continua/evaluacion/application/use-cases/gestionar-planes-evaluacion.use-case.js';
+import { PlanEvaluacionRepositoryPrisma } from './modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
+import {
+  EvaluacionVigenteController,
+  PlanesEvaluacionController,
+} from './modules/mejora-continua/evaluacion/infrastructure/http/planes-evaluacion.controller.js';
+import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
   type RepositorioCarreraPort,
@@ -267,6 +277,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     CriteriosDeCarreraController,
     CriteriosController,
     PlanesMedicionController,
+    PlanesEvaluacionController,
+    EvaluacionVigenteController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
     DocumentosDelPlanController,
@@ -305,6 +317,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // `mejora-continua`, que solo conoce la interfaz (§3.2).
     { provide: CONTENIDO_CURRICULAR, useClass: ContenidoCurricularAdapter },
     { provide: REPOSITORIO_PLAN_MEDICION, useClass: PlanMedicionRepositoryPrisma },
+    { provide: REPOSITORIO_PLAN_EVALUACION, useClass: PlanEvaluacionRepositoryPrisma },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
@@ -428,6 +441,24 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarPlanesMedicion(planes, curricular, autorizacion, eventos),
+    },
+    {
+      provide: GestionarPlanesEvaluacion,
+      inject: [
+        REPOSITORIO_PLAN_EVALUACION,
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        mediciones: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new GestionarPlanesEvaluacion(evaluaciones, mediciones, curricular, autorizacion, eventos),
     },
     {
       provide: VersionarPlanesMedicion,
