@@ -3,11 +3,17 @@
  * evaluación.
  *
  * Sigue el patrón de `gestionar-planes-medicion.spec.ts`: dobles de los
- * puertos, `permitirTodo()` / `denegar()` para la autorización, y un
- * `montar()` que arma el caso de uso con esos dobles. El foco está en lo que
- * este caso de uso decide y que ninguna pieza suelta puede saber: si la base
- * es elegible, qué se hereda de ella sin copiarlo, y si la transición pedida
- * exige el permiso correcto —de `evaluacion.*`, nunca de `medicion.*`—.
+ * puertos, `permitirTodo()` / `denegarRegistrando()` para la autorización, y
+ * un `montar()` que arma el caso de uso con esos dobles. El foco está en lo
+ * que este caso de uso decide y que ninguna pieza suelta puede saber: si la
+ * base es elegible, qué se hereda de ella sin copiarlo, y si la transición
+ * pedida exige el permiso correcto —de `evaluacion.*`, nunca de
+ * `medicion.*`—.
+ *
+ * La denegación de permisos siempre se prueba con `denegarRegistrando()`, que
+ * anota qué permiso se pidió antes de negarlo: un doble que deniega sin mirar
+ * el permiso dejaría en verde una prueba «exige `evaluacion.crear`» aunque el
+ * caso de uso pidiera por error `evaluacion.editar`.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -49,9 +55,21 @@ function permitirTodo(): AuthorizationPort {
   };
 }
 
-function denegar(): AuthorizationPort {
+/**
+ * Deniega cualquier permiso, pero registra en `pedidos` cuál se pidió antes de
+ * negarlo.
+ *
+ * Un doble que deniega sin mirar el permiso («denegar a secas») dejaría en
+ * verde una prueba «exige `evaluacion.crear`» aunque el caso de uso pidiera
+ * por error `evaluacion.editar`: lo único que comprobaría es que *algo* fue
+ * rechazado. Registrar el permiso pedido deja afirmar la cadena exacta.
+ */
+function denegarRegistrando(pedidos: string[]): AuthorizationPort {
   return {
-    puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
+    puede: async (_id, permiso) => {
+      pedidos.push(permiso);
+      return { permitido: false, motivo: 'Falta el permiso.' };
+    },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
   };
@@ -270,9 +288,11 @@ describe('RF-PE-001 y RF-PE-002 — el alta', () => {
   });
 
   it('exige `evaluacion.crear`', async () => {
-    const { caso } = montar({ autorizacion: denegar() });
+    const pedidos: string[] = [];
+    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
 
     await expect(caso.crear(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toEqual(['evaluacion.crear']);
   });
 
   it('deja constancia en la bitácora, nombrando la base', async () => {
@@ -306,9 +326,11 @@ describe('RF-PE-001 RN3 — las bases elegibles', () => {
   });
 
   it('exige `evaluacion.leer`', async () => {
-    const { caso } = montar({ autorizacion: denegar() });
+    const pedidos: string[] = [];
+    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
 
     await expect(caso.basesElegibles(ACTOR)).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toEqual(['evaluacion.leer']);
   });
 });
 
@@ -375,9 +397,21 @@ describe('RF-PE-008 — el borrado', () => {
   });
 
   it('exige `evaluacion.eliminar`', async () => {
-    const { caso } = montar({ autorizacion: denegar() });
+    const pedidos: string[] = [];
+    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
 
     await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toEqual(['evaluacion.eliminar']);
+  });
+
+  it('deja constancia en la bitácora, nombrando el plan', async () => {
+    const { caso, publicados } = montar();
+
+    await caso.eliminar(ACTOR, 'ev-1');
+
+    expect(publicados).toHaveLength(1);
+    expect(publicados[0]?.nombre).toBe('evaluacion.eliminado');
+    expect(publicados[0]?.detalle).toContain('EV-PE-ISI-2026-v2-D-v1');
   });
 });
 

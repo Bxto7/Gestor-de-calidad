@@ -40,7 +40,7 @@ test('el detalle enseña lo heredado, y no deja tocarlo', async ({ page }) => {
   await expect(page.locator('main').getByRole('checkbox')).toHaveCount(0);
 });
 
-test('el ciclo de vida avanza y queda en la bitácora', async ({ page }) => {
+test('enviar a revisión cambia el estado que se ve en pantalla', async ({ page }) => {
   await page.goto('/mejora-continua/evaluacion');
   await page.getByRole('link', { name: /^EV-/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();

@@ -920,10 +920,14 @@ model DocumentoMedicion {
 /// RF-PE-002: el plan de evaluación de un plan de medición.
 ///
 /// No guarda tipo, ni meta, ni competencias, ni periodos: se leen del plan de
-/// medición base, que está congelado —RF-PE-001 RN3 solo admite bases Aprobado
-/// o Vigente, y esos estados no se editan—. Copiarlos sería sostener dos veces
-/// un dato inmutable, que es exactamente cómo el Excel del que sale este
-/// sistema acabó declarando 249 créditos en un sitio y 210 en otro.
+/// medición base —RF-PE-001 RN3 solo admite bases Aprobado o Vigente—, cuyo
+/// *conjunto* de competencias, periodos y celdas programadas está congelado:
+/// no se añaden, no se quitan, no se reprograman. Lo que no está congelado es
+/// la marca de `realizada` sobre esas celdas (RF-PM-026, ajena a este estado).
+/// Copiar el conjunto sería sostener dos veces un dato inmutable —exactamente
+/// cómo el Excel del que sale este sistema acabó declarando 249 créditos en un
+/// sitio y 210 en otro—, y copiar además las celdas se habría desincronizado
+/// justo en `realizada`, que sigue cambiando después de Aprobado o Vigente.
 model PlanEvaluacion {
   id             String         @id @default(uuid()) @db.Uuid
   planMedicionId String         @map("plan_medicion_id") @db.Uuid

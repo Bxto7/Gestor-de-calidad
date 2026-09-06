@@ -60,13 +60,25 @@ para los periodos, añadiendo que **«no se editan desde el plan de evaluación�
 
 Copiar y «siempre las mismas» solo coinciden mientras el original no cambie.
 
-**No puede cambiar.** RF-PE-001 RN3 solo admite como base planes de medición en
-estado **Aprobado o Vigente**, y en el código construido `permiteEdicion`
-devuelve `true` únicamente para `Borrador`
+**No puede cambiar — el conjunto, no cada celda.** RF-PE-001 RN3 solo admite
+como base planes de medición en estado **Aprobado o Vigente**, y en el código
+construido `permiteEdicion` devuelve `true` únicamente para `Borrador`
 (`domain/value-objects/estado-plan-medicion.ts`). Un plan de medición elegible
-está congelado: sus competencias, sus periodos y su matriz no admiten ninguna
-escritura. Desde ahí solo puede pasar a Histórico —al ser relevado por otro
-Vigente—, que tampoco altera su contenido.
+tiene congelado el *conjunto* de competencias, de periodos y de celdas
+programadas: no se añaden, no se quitan, no se reprograman. Lo que no está
+congelado es la marca de `realizada` sobre esas celdas —
+`ProgramarMediciones.marcarRealizada` (RF-PM-026) la escribe a propósito sobre
+un plan Aprobado o Vigente, porque registrar que una medición ocurrió es
+seguimiento del plan que ya rige, no edición de su definición—. Desde ahí solo
+puede pasar a Histórico —al ser relevado por otro Vigente—, que tampoco altera
+ni el conjunto ni las marcas ya escritas.
+
+Esto no debilita la decisión de no copiar: la refuerza. Si el plan de
+evaluación hubiera copiado las celdas en vez de referenciarlas, esa copia se
+habría desincronizado exactamente ahí, en `realizada` — el único campo de la
+matriz que sigue cambiando después de que el plan llega a Aprobado o Vigente.
+Leer en vivo a través del puerto evita ese problema por construcción; copiar lo
+habría reproducido tal cual.
 
 **Decisión: el plan de evaluación no copia nada. Referencia a su plan de
 medición y lee competencias, periodos y matriz a través del puerto que ya

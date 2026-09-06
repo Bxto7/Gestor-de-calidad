@@ -17,7 +17,14 @@ import type { FiltroEvaluaciones } from './evaluacion.api';
 
 export const claves = {
   planes: (filtro?: api.FiltroPlanes) =>
-    ['medicion', 'lista', filtro?.planEstudiosId ?? 'todos', filtro?.estado ?? 'todos'] as const,
+    [
+      'medicion',
+      'lista',
+      filtro?.planEstudiosId ?? 'todos',
+      filtro?.estado ?? 'todos',
+      filtro?.tipo ?? 'todos',
+      filtro?.texto ?? '',
+    ] as const,
   plan: (id: string) => ['medicion', id] as const,
   competenciasDisponibles: (id: string) => ['medicion', id, 'competencias-disponibles'] as const,
   periodosPropuestos: (id: string) => ['medicion', id, 'periodos-propuestos'] as const,
@@ -257,7 +264,14 @@ export function useGenerarDocumento(id: string) {
 
 export const clavesEval = {
   lista: (f?: FiltroEvaluaciones) =>
-    ['evaluacion', 'lista', f?.planMedicionId ?? 'todos', f?.estado ?? 'todos'] as const,
+    [
+      'evaluacion',
+      'lista',
+      f?.planMedicionId ?? 'todos',
+      f?.estado ?? 'todos',
+      f?.tipo ?? 'todos',
+      f?.texto ?? '',
+    ] as const,
   plan: (id: string) => ['evaluacion', id] as const,
 };
 
