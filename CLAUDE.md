@@ -30,8 +30,8 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 5 de septiembre de 2026: **120 de 243 requisitos contables construidos**,
-> un 49 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> Al 6 de septiembre de 2026: **137 de 243 requisitos contables construidos**,
+> un 56 %. El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
 >
@@ -40,7 +40,7 @@ Se están construyendo **en paralelo**:
 > | Plan de Estudios (fichas) | 60 | 60 |
 > | Atributos del Graduado y Criterios (`RF120`–`RF132`) | 13 | 13 |
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
-> | Mejora Continua · Evaluación (`RF-PE`) | 0 | 49 |
+> | Mejora Continua · Evaluación (`RF-PE`) | 17 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 0 | 47 |
 > | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
 >

@@ -72,6 +72,23 @@ async function main(): Promise<void> {
     select: { id: true },
   });
   if (planesPrevios.length > 0) {
+    const medicionesPrevias = await prisma.planMedicion.findMany({
+      where: { planEstudiosId: { in: planesPrevios.map((p) => p.id) } },
+      select: { id: true },
+    });
+
+    if (medicionesPrevias.length > 0) {
+      // `PlanEvaluacion.plan` es `onDelete: Restrict` a propósito (ver el
+      // comentario junto al modelo en `schema.prisma`): sin este borrado
+      // explícito primero, `planMedicion.deleteMany` de abajo revienta con una
+      // violación de clave foránea en cuanto la suite E2E ha creado al menos
+      // un plan de evaluación sobre uno de estos planes de medición —es decir,
+      // desde la segunda ejecución en adelante.
+      await prisma.planEvaluacion.deleteMany({
+        where: { planMedicionId: { in: medicionesPrevias.map((m) => m.id) } },
+      });
+    }
+
     await prisma.planMedicion.deleteMany({
       where: { planEstudiosId: { in: planesPrevios.map((p) => p.id) } },
     });
