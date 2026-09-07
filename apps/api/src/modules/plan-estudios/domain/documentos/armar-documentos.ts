@@ -15,7 +15,7 @@ import {
   type Documento,
   type Seccion,
   type Tabla,
-} from './documento.js';
+} from '../../../../platform/documentos/documento.js';
 import { calcularTotalCreditos, creditosPorCiclo } from '../services/motor-de-validaciones.js';
 import type { EstadoPlan } from '../value-objects/estado-plan.js';
 

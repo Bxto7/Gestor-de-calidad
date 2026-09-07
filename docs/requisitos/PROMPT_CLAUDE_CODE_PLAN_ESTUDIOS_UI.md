@@ -1276,6 +1276,8 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-8 | RF073 | `.xlsx` real con tipos, no CSV | Ratificada |
 | D-9 | RF055 · RF047 | Datos del plan ISI 2018 cargados incompletos: horas teóricas en 0 y sumillas en «pendiente» | **PENDIENTE** |
 | D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | Aprobada (2026-09-04) |
+| D-11 | RF127 (Mejora Continua) | Una competencia sin atributo del graduado se muestra y se puede incluir en un plan de medición; el requisito dice excluirla | **PENDIENTE** |
+| D-12 | RF-PE-020 (Mejora Continua) | La evidencia del entregable se registra como enlace; el requisito admite «archivos o enlaces» y no hay subida de archivos | **PENDIENTE** |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1394,6 +1396,78 @@ La alternativa era desactivar la regla `color-contrast` en las pruebas, y con el
 Comparadas las dos versiones en el navegador, la diferencia es **sutil**: los colores se oscurecieron lo mínimo para cruzar el umbral, conservando tono y saturación. No es un rediseño.
 
 Pendiente menor: si esta decisión tiene que constar con nombre en el expediente de acreditación, añadir aquí quién la tomó.
+
+---
+
+
+### D-11 · RF127 — la competencia sin atributo del graduado no se excluye
+
+Primera divergencia de esta lista que no es del documento de Plan de Estudios sino del de
+Mejora Continua. Se anota aquí porque el registro de divergencias es uno solo, y tener dos
+listas es la forma más segura de que una se quede sin mirar.
+
+**Pide:** «Si la competencia no tiene ningún atributo asociado, el sistema **la excluye de
+la lista de selección** y sugiere completar la asociación primero.» Resultado esperado:
+«Todo plan de medición queda construido únicamente con competencias trazables a un
+atributo del graduado.»
+
+**Hace:** las muestra, agrupadas al final bajo «Sin atributo del graduado asignado», y
+**permite seleccionarlas**. Tampoco la API lo impide: `declararCompetencias` comprueba que
+la competencia pertenezca al plan de estudios base, y nada más.
+
+**Por qué se hizo así.** Esconder una competencia sin mapear la hace invisible justo para
+quien podría arreglarla. Quien configura el plan vería una lista más corta sin saber que
+lo es, y el mapeo que falta —que es un hallazgo de acreditación en sí mismo— no aparecería
+en ninguna pantalla.
+
+**Qué se pierde.** Lo que RF127 protege: hoy un plan de medición **puede** contener
+competencias que no se trazan a ningún atributo del graduado, que es exactamente lo que la
+evaluación ICACIT necesita poder seguir. El requisito tiene razón en el resultado; la
+discrepancia está en el medio para conseguirlo.
+
+**Salida intermedia, si se aprueba.** Mostrarlas, pero con la casilla deshabilitada y el
+motivo escrito al lado. Cumple el resultado esperado de RF127 —ningún plan las incluye— y
+conserva la razón por la que hoy se ven. Son unas pocas líneas en
+`GrupoDeCompetencias.tsx` más la validación equivalente en el caso de uso, que es donde
+tiene que estar para que no dependa de la pantalla.
+
+**Qué hay que decidir.** Si se aplica RF127 tal como está escrito, si se adopta la salida
+intermedia, o si el requisito se corrige para admitir que se vean. Mientras no se decida,
+el sistema y el requisito discrepan en algo que afecta a la trazabilidad del expediente.
+
+---
+
+
+### D-12 · RF-PE-020 — la evidencia es un enlace, no un archivo subido
+
+**Pide:** «Permite adjuntar uno o varios **archivos o enlaces** de evidencia por
+cada asignatura asociada a una competencia en un periodo.»
+
+**Hará:** solo enlaces. Un campo de URL por evidencia, sin subida de archivos.
+
+**Por qué.** Subir archivos no es un campo más: son multipart, límite de tamaño,
+validación de tipo, almacenamiento, servido con permisos y —según §5.6 de
+CLAUDE.md— un bucket de Backblaze B2 que todavía no está aprovisionado. Nada de
+eso existe hoy en el proyecto: el sistema **genera** documentos, no los recibe.
+Empezar por enlaces cuesta un campo de texto y cubre el caso real que la
+universidad ya tiene: los entregables viven en Drive o SharePoint y aquí se
+apunta dónde. RF-PE-029, la evidencia de la medición **indirecta**, ya está
+redactado con enlaces y solo enlaces, así que los dos lados quedan iguales.
+
+**Qué se pierde.** Si un docente entrega un archivo suelto que no está en ningún
+sitio compartido, no hay dónde ponerlo: alguien tiene que subirlo antes a un
+almacenamiento propio y pegar el enlace. Y un enlace se puede romper —una carpeta
+que se mueve, un permiso que cambia— mientras que un archivo guardado por el
+sistema, no. Para un expediente de acreditación esa diferencia puede importar.
+
+**Qué hay que decidir.** Si con enlaces basta, o si la evidencia debe quedar
+guardada dentro del sistema. Si es lo segundo, conviene decirlo **antes** de que
+haya planes de evaluación con evidencias registradas: añadir la subida después
+significa además migrar lo ya cargado.
+
+**Decidido el 7 de septiembre de 2026:** empezar por enlaces, a la espera de que
+la universidad confirme. La decisión es reversible —añadir archivos es aditivo,
+no deshace los enlaces— y por eso se toma en esta dirección y no en la contraria.
 
 ---
 

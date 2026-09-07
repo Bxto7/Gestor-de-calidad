@@ -41,6 +41,32 @@ export interface PlanMedicion {
   readonly aprobadoEn: string | null;
 }
 
+/* ── Plan de Evaluación (RF-PE-001 y siguientes) ──────────────────────── */
+
+/**
+ * Un plan de evaluación no tiene casi datos propios: su tipo, su meta, sus
+ * competencias y sus periodos vienen del plan de medición del que nace
+ * (RF-PE-001 RN2). Lo que sí es suyo es el ciclo de vida y el código.
+ */
+export interface PlanEvaluacion {
+  readonly id: string;
+  readonly planMedicionId: string;
+  readonly codigo: string;
+  readonly version: number;
+  readonly estado: EstadoMedicion;
+  readonly creadoEn: string;
+}
+
+/** RF-PE-010 a RF-PE-012: todo lo que un plan de evaluación hereda de su base. */
+export interface VistaPlanEvaluacion {
+  readonly plan: PlanEvaluacion;
+  readonly base: { id: string; codigo: string; tipo: TipoMedicion; metaPorcentaje: number };
+  readonly grupos: readonly GrupoCompetencias[];
+  readonly periodos: readonly { id: string; etiqueta: string; orden: number }[];
+  /** «competenciaId|periodoId» de las combinaciones programadas (RF-PE-012). */
+  readonly programadas: readonly string[];
+}
+
 /**
  * Un movimiento del histórico del plan (RF-PM-032).
  *
@@ -107,4 +133,20 @@ export interface ResultadoConsistencia {
  */
 export function porcentajeDeMeta(fraccion: number): number {
   return Number((fraccion * 100).toFixed(1));
+}
+
+/* ── Documentos exportados (RF-PM-027 a RF-PM-029) ────────────────────── */
+
+export type TipoDocumentoMedicion = 'PLAN_MEDICION_PDF' | 'PLAN_MEDICION_EXCEL';
+export type EstadoTrabajo = 'En cola' | 'Generando' | 'Listo' | 'Fallido';
+
+export interface TrabajoDocumento {
+  readonly id: string;
+  readonly tipo: TipoDocumentoMedicion;
+  readonly estado: EstadoTrabajo;
+  readonly nombreArchivo: string | null;
+  readonly bytes: number | null;
+  /** Solo con estado Fallido. Redactado para quien lo pidió. */
+  readonly error: string | null;
+  readonly solicitadoEn: string;
 }

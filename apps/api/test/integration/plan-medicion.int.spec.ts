@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/infrastructure/persistence/plan-medicion.repository.js';
+import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
@@ -27,7 +27,8 @@ let CMP2: string;
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE mejora_continua.programacion_medicion, mejora_continua.competencias_del_plan,
+    TRUNCATE mejora_continua.documentos_medicion, mejora_continua.programacion_medicion,
+             mejora_continua.competencias_del_plan,
              mejora_continua.periodos_medicion, mejora_continua.planes_medicion
     RESTART IDENTITY CASCADE`);
   await prisma.$executeRawUnsafe(`
@@ -524,6 +525,25 @@ describe('RF-PM-031 — el linaje', () => {
     const solo = await crear('DIRECTA', 'PM-HUERFANO-D-v1');
 
     expect((await repo.linajeDe(solo.id)).map((p) => p.codigo)).toEqual(['PM-HUERFANO-D-v1']);
+  });
+});
+
+describe('RF-PM-027 — los documentos del plan', () => {
+  it('borrar el plan se lleva sus documentos', async () => {
+    // `Cascade` y no `SetNull`: un documento sin plan no le sirve a nadie, y
+    // dejaría archivos en disco que ninguna pantalla puede volver a pedir.
+    const p = await crear('DIRECTA', 'PM-DOCS-D-v1');
+    await prisma.documentoMedicion.create({
+      data: {
+        planMedicionId: p.id,
+        tipo: 'PLAN_MEDICION_PDF',
+        solicitadoPor: ACTOR_ID,
+      },
+    });
+
+    await repo.eliminar(p.id);
+
+    expect(await prisma.documentoMedicion.count({ where: { planMedicionId: p.id } })).toBe(0);
   });
 });
 

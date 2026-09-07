@@ -6,14 +6,16 @@
  * el transporte sin tocar una sola pantalla.
  */
 
-import { cliente } from '@/shared/api/cliente';
+import { cliente, type ArchivoDescargado } from '@/shared/api/cliente';
 
 import type {
   AccionMedicion,
   GrupoCompetencias,
   PlanMedicion,
   ResultadoConsistencia,
+  TipoDocumentoMedicion,
   TipoMedicion,
+  TrabajoDocumento,
   VistaMatriz,
   EventoBitacora,
 } from '../domain/tipos';
@@ -161,4 +163,30 @@ export async function historialDe(id: string): Promise<EventoBitacora[]> {
     entidadId: id,
     limite: 50,
   });
+}
+
+/* ── Documentos exportados ────────────────────────────────────────────── */
+
+/** RF-PM-028 y RF-PM-029. Devuelve 202: el archivo aún no existe. */
+export async function generarDocumento(
+  id: string,
+  tipo: TipoDocumentoMedicion,
+): Promise<TrabajoDocumento> {
+  return cliente.post<TrabajoDocumento>(`/planes-medicion/${id}/documentos`, { tipo });
+}
+
+/** Del más reciente al más antiguo, para poder volver a descargar uno de ayer. */
+export async function documentosDe(id: string): Promise<TrabajoDocumento[]> {
+  return cliente.get<TrabajoDocumento[]>(`/planes-medicion/${id}/documentos`);
+}
+
+/**
+ * Baja el archivo ya generado.
+ *
+ * Por `fetch` y no por un enlace directo al endpoint: el token vive en
+ * `sessionStorage`, no en una cookie, así que una navegación normal a la URL
+ * llegaría sin autorización y devolvería 401.
+ */
+export async function descargarDocumento(id: string): Promise<ArchivoDescargado> {
+  return cliente.descargar(`/documentos-medicion/${id}/archivo`);
 }

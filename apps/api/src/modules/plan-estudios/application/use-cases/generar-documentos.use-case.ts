@@ -31,7 +31,7 @@ import {
   armarResumenDelPlan,
   type DatosParaDocumento,
 } from '../../domain/documentos/armar-documentos.js';
-import type { Documento } from '../../domain/documentos/documento.js';
+import type { Documento } from '../../../../platform/documentos/documento.js';
 import { DocumentoSolicitado, NOMBRE_DOCUMENTO } from '../../domain/events/eventos-documento.js';
 import type {
   AlmacenDeArchivosPort,
@@ -93,7 +93,7 @@ export class SolicitarDocumento {
 
     // Se encola después de persistir el trabajo, no antes: si el worker lo
     // recogiera primero, buscaría en la base una fila que todavía no existe.
-    await this.cola.encolar(trabajo.id);
+    await this.cola.encolar(trabajo.id, 'plan-estudios');
 
     await this.eventos.publicar([new DocumentoSolicitado(actor, planId, plan.codigo, tipo)]);
     return trabajo;

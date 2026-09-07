@@ -80,9 +80,14 @@ test('versionar un plan vigente deja la copia enlazada a su origen', async ({ pa
   await expect(page.locator('main').getByText('Borrador', { exact: true }).first()).toBeVisible();
 
   // RF-PM-031: ahora sí hay linaje, y desde la copia se llega al origen.
+  //
+  // `exact` no es adorno: el nombre accesible se busca por subcadena, así que
+  // «…-D-v1» casaba también con «…-D-v11» y «…-D-v16». La prueba pasaba hasta
+  // que el correlativo llegó a dos cifras, y entonces fallaba por ambigüedad en
+  // vez de por el linaje, que es lo que mira.
   const versiones = page.getByRole('list', { name: 'Versiones del plan' });
   await expect(versiones).toBeVisible();
-  await expect(versiones.getByRole('link', { name: codigoOrigen })).toBeVisible();
+  await expect(versiones.getByRole('link', { name: codigoOrigen, exact: true })).toBeVisible();
 });
 
 test('el historial muestra lo que se hizo, con quién y cuándo', async ({ page }) => {

@@ -1,12 +1,12 @@
 # Cambios que necesita el documento fuente
 
-Dirigido a quien mantiene *«Módulo de Plan de Estudios — Especificación de Requerimientos»* (Huancayo, 15 de agosto de 2026).
+Dirigido a quien mantiene *«Módulo de Plan de Estudios — Especificación de Requerimientos»* (Huancayo, 15 de agosto de 2026) y *«Módulo de Mejora Continua — Requerimientos»*.
 
-Al construir el módulo aparecieron nueve puntos en los que el sistema y el documento no coinciden. **Siete necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
+Al construir los módulos aparecieron once puntos en los que el sistema y el documento no coinciden. **Nueve necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
 
-Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-9** que se usan aquí.
+Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-12** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
 
-Fecha de este informe: **25 de agosto de 2026**.
+Fecha de este informe: **7 de septiembre de 2026** (la primera versión es del 25 de agosto).
 
 ---
 
@@ -93,6 +93,44 @@ El plan ISI 2018 está cargado con **todas las horas teóricas en cero** y **tod
 
 ---
 
+### D-11 · RF127 · Una competencia sin atributo del graduado se puede incluir en un plan de medición
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+RF127 dice que una competencia sin ningún Atributo del Graduado asociado **se excluya de la lista de selección** al configurar un plan de medición, para que «todo plan de medición quede construido únicamente con competencias trazables a un atributo del graduado».
+
+**El sistema hace lo contrario:** las muestra —agrupadas al final, bajo «Sin atributo del graduado asignado»— y deja incluirlas. La API tampoco lo impide.
+
+**Por qué.** Esconder una competencia sin mapear la vuelve invisible justo para quien podría arreglarla: quien configura el plan vería una lista más corta sin saber que lo es, y el mapeo que falta —que es un hallazgo de acreditación en sí mismo— no aparecería en ninguna pantalla.
+
+**Qué se pierde mientras tanto.** Justo lo que RF127 protege: hoy un plan de medición puede contener competencias que no se trazan a ningún atributo, que es precisamente lo que la evaluación ICACIT necesita poder seguir.
+
+**Qué hay que decidir.** Tres salidas:
+
+1. Aplicar RF127 tal como está escrito: se ocultan.
+2. Una intermedia: se muestran, pero no se pueden marcar, con el motivo escrito al lado. Cumple el resultado que RF127 busca y conserva la razón por la que hoy se ven.
+3. Corregir el requisito para admitir que se vean y se incluyan.
+
+La segunda es la que recomendamos, y es poco trabajo. Pero es una decisión de la universidad, no de quien programa.
+
+---
+
+### D-12 · RF-PE-020 · La evidencia del entregable se guarda como enlace, no como archivo
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+RF-PE-020 dice que se puedan adjuntar «**archivos o enlaces**» de evidencia por cada asignatura asociada a una competencia. El sistema hará **solo enlaces**: un campo donde se pega la dirección del entregable.
+
+**Por qué.** Recibir archivos no es un campo más. Implica subida, límite de tamaño, validación de tipo, almacenamiento, servido con permisos y un bucket de Backblaze B2 que todavía no está contratado. Hoy el sistema **genera** documentos, no los recibe. Con enlaces se cubre el caso que la universidad ya vive —los entregables están en Drive o SharePoint y aquí se apunta dónde— y se puede empezar ya. Además, RF-PE-029, la evidencia de la medición indirecta, está redactado con enlaces y solo enlaces: así los dos lados funcionan igual.
+
+**Qué se pierde.** Un enlace se puede romper: una carpeta que se mueve, un permiso que cambia, alguien que se va de la universidad. Un archivo guardado dentro del sistema, no. En un expediente de acreditación que se revisa años después, esa diferencia puede pesar.
+
+**Qué hay que decidir.** Si con enlaces basta, o si la evidencia debe quedar guardada dentro del sistema. Conviene decirlo **antes** de que haya evidencias registradas: añadir la subida después obliga también a migrar lo ya cargado.
+
+La decisión que hemos tomado es reversible —añadir archivos más adelante no deshace los enlaces ya guardados—, y por eso se empieza por aquí y no al revés.
+
+---
+
 ## Parte 2 — Solo para constancia
 
 No requieren decisión. El sistema hace más de lo que el requisito pedía, sin contradecirlo. Se anotan por si el documento quiere reflejar el nivel de detalle alcanzado.
@@ -163,6 +201,8 @@ De más urgente a menos:
 | Punto | Impacto si no se resuelve |
 |---|---|
 | **D-2** · Grupos de electivos | El sistema publica una cifra de créditos que no coincide con el documento oficial de la carrera |
+| **D-11** · RF127 · Competencias sin atributo | Un plan de medición puede quedar con competencias no trazables a ningún atributo del graduado — lo que la evaluación ICACIT sigue |
+| **D-12** · RF-PE-020 · Evidencias como enlace | Un enlace roto deja sin respaldo una evidencia de acreditación, y no se nota hasta que alguien la busca |
 | **D-4** · Numeración RF101–110 | No se puede construir una tabla de trazabilidad fiable para ese bloque |
 | **D-6** · Prerrequisitos | Faltan 16 requisitos reales del plan vigente; hay un RF sin redactar |
 | **D-9** · Horas y sumillas | Los documentos que salgan del sistema van incompletos |

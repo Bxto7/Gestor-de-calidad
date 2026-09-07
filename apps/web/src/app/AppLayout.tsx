@@ -54,6 +54,13 @@ const ENLACES: {
     permiso: 'medicion.leer',
   },
   {
+    a: '/mejora-continua/evaluacion',
+    etiqueta: 'Planes de Evaluación',
+    icono: IconoPlan,
+    exacto: false,
+    permiso: 'evaluacion.leer',
+  },
+  {
     a: '/reportes',
     etiqueta: 'Reportes',
     icono: IconoReportes,

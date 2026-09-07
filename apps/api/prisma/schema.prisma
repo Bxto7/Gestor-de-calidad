@@ -794,6 +794,8 @@ model PlanMedicion {
   periodos     PeriodoMedicion[]
   competencias CompetenciaDelPlan[]
   programacion Programacion[]
+  documentos   DocumentoMedicion[]
+  evaluaciones PlanEvaluacion[]
 
   @@index([planEstudiosId, tipo])
   @@map("planes_medicion")
@@ -856,5 +858,93 @@ model Programacion {
   @@id([planMedicionId, competenciaId, periodoId])
   @@index([periodoId])
   @@map("programacion_medicion")
+  @@schema("mejora_continua")
+}
+
+/// RF-PM-028 y RF-PM-029: los dos formatos en que sale un plan de medición.
+enum TipoDocumentoMedicion {
+  PLAN_MEDICION_PDF
+  PLAN_MEDICION_EXCEL
+
+  @@schema("mejora_continua")
+}
+
+/// Mismos valores que `EstadoDocumento` de `plan_estudios`, y duplicado porque
+/// un enum de PostgreSQL no cruza esquemas. Si alguna vez divergen, el worker
+/// enrutará bien pero la pantalla mostrará un estado que no existe.
+enum EstadoDocumentoMedicion {
+  EN_COLA
+  GENERANDO
+  LISTO
+  FALLIDO
+
+  @@schema("mejora_continua")
+}
+
+/// RF-PM-027: el plan de medición generado como archivo.
+///
+/// Tabla propia y no la de Plan de Estudios: aquella tiene clave foránea a
+/// `PlanEstudios`, y CLAUDE.md §3.2 prohíbe que dos módulos compartan tabla.
+/// Generalizarla a «apunta a cualquier entidad» la dejaría sin clave foránea, y
+/// con ella se perdería el borrado en cascada que impide dejar archivos
+/// huérfanos de un plan que ya no existe.
+model DocumentoMedicion {
+  id             String                  @id @default(uuid()) @db.Uuid
+  planMedicionId String                  @map("plan_medicion_id") @db.Uuid
+  tipo           TipoDocumentoMedicion
+  estado         EstadoDocumentoMedicion @default(EN_COLA)
+
+  nombreArchivo String? @map("nombre_archivo") @db.VarChar(200)
+  tipoMime      String? @map("tipo_mime") @db.VarChar(120)
+  bytes         Int?
+  /// Opaca a propósito: hoy una ruta en disco, mañana una clave de Backblaze B2
+  /// (§5.6), sin que cambie nada más.
+  ubicacion     String? @db.VarChar(500)
+  /// Solo con estado FALLIDO. Redactado para una persona, no una traza.
+  error         String? @db.Text
+
+  /// Sin clave foránea a usuarios, igual que el resto de la evidencia: el
+  /// registro debe seguir siendo legible aunque la cuenta desaparezca.
+  solicitadoPor String    @map("solicitado_por") @db.Uuid
+  solicitadoEn  DateTime  @default(now()) @map("solicitado_en") @db.Timestamptz(6)
+  terminadoEn   DateTime? @map("terminado_en") @db.Timestamptz(6)
+
+  plan PlanMedicion @relation(fields: [planMedicionId], references: [id], onDelete: Cascade)
+
+  /// El listado va del más reciente al más antiguo, y siempre de un plan.
+  @@index([planMedicionId, solicitadoEn])
+  @@map("documentos_medicion")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-002: el plan de evaluación de un plan de medición.
+///
+/// No guarda tipo, ni meta, ni competencias, ni periodos: se leen del plan de
+/// medición base —RF-PE-001 RN3 solo admite bases Aprobado o Vigente—, cuyo
+/// *conjunto* de competencias, periodos y celdas programadas está congelado:
+/// no se añaden, no se quitan, no se reprograman. Lo que no está congelado es
+/// la marca de `realizada` sobre esas celdas (RF-PM-026, ajena a este estado).
+/// Copiar el conjunto sería sostener dos veces un dato inmutable —exactamente
+/// cómo el Excel del que sale este sistema acabó declarando 249 créditos en un
+/// sitio y 210 en otro—, y copiar además las celdas se habría desincronizado
+/// justo en `realizada`, que sigue cambiando después de Aprobado o Vigente.
+model PlanEvaluacion {
+  id             String         @id @default(uuid()) @db.Uuid
+  planMedicionId String         @map("plan_medicion_id") @db.Uuid
+  codigo         String         @unique @db.VarChar(80)
+  version        Int            @default(1)
+  estado         EstadoMedicion @default(BORRADOR)
+
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  /// `Restrict` y no `Cascade`: un plan de medición Aprobado o Vigente no se
+  /// puede borrar, así que esto no llega a ejercerse nunca. Se declara igual
+  /// para que, si esa regla cambiara, el fallo sea un error de base de datos y
+  /// no un plan de evaluación apuntando al vacío.
+  plan PlanMedicion @relation(fields: [planMedicionId], references: [id], onDelete: Restrict)
+
+  @@index([planMedicionId])
+  @@map("planes_evaluacion")
   @@schema("mejora_continua")
 }

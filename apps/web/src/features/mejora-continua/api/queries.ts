@@ -10,12 +10,21 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { AccionMedicion } from '../domain/tipos';
+import type { AccionMedicion, PlanMedicion, TipoDocumentoMedicion } from '../domain/tipos';
 import * as api from './medicion.api';
+import * as evaluacionApi from './evaluacion.api';
+import type { FiltroEvaluaciones } from './evaluacion.api';
 
 export const claves = {
   planes: (filtro?: api.FiltroPlanes) =>
-    ['medicion', 'lista', filtro?.planEstudiosId ?? 'todos', filtro?.estado ?? 'todos'] as const,
+    [
+      'medicion',
+      'lista',
+      filtro?.planEstudiosId ?? 'todos',
+      filtro?.estado ?? 'todos',
+      filtro?.tipo ?? 'todos',
+      filtro?.texto ?? '',
+    ] as const,
   plan: (id: string) => ['medicion', id] as const,
   competenciasDisponibles: (id: string) => ['medicion', id, 'competencias-disponibles'] as const,
   periodosPropuestos: (id: string) => ['medicion', id, 'periodos-propuestos'] as const,
@@ -23,6 +32,7 @@ export const claves = {
   consistencia: (id: string) => ['medicion', id, 'consistencia'] as const,
   versiones: (id: string) => ['medicion', id, 'versiones'] as const,
   historial: (id: string) => ['medicion', id, 'historial'] as const,
+  documentos: (id: string) => ['medicion', id, 'documentos'] as const,
 };
 
 /* ── Consultas ────────────────────────────────────────────────────────── */
@@ -78,11 +88,47 @@ function useMutacionDelPlan<TVars, TDatos>(
   id: string,
   fn: (v: TVars) => Promise<TDatos>,
   ademas: readonly (readonly unknown[])[] = [],
+  /**
+   * Cómo se vería el plan si la mutación saliera bien, para adelantarlo en la
+   * caché sin esperar al servidor.
+   *
+   * Solo hace falta donde la pantalla deja encadenar acciones más rápido de lo
+   * que tarda el viaje de ida y vuelta: sin esto, la segunda lee el plan de
+   * antes de la primera y la pisa. Si la mutación falla, se restaura lo que
+   * había — que es por lo que se adelanta aquí y no guardando un estado
+   * paralelo en el componente, donde un fallo dejaría la pantalla mintiendo.
+   */
+  optimista?: (plan: PlanMedicion, v: TVars) => PlanMedicion,
 ) {
   const qc = useQueryClient();
   return useMutation({
+    // Las escrituras sobre un mismo plan van en fila, nunca en paralelo.
+    //
+    // Todas son lee-modifica-escribe sobre el plan entero, así que dos en vuelo
+    // a la vez se pisan según el orden en que aterricen —y ese orden no lo
+    // decide el cliente—. Con dos competencias marcadas seguidas se veía: los
+    // dos PUT salían bien, el viejo llegaba el último y dejaba el plan con una.
+    scope: { id: `plan-medicion:${id}` },
     mutationFn: fn,
-    onSuccess: async () => {
+    onMutate: async (v: TVars) => {
+      if (!optimista) return undefined;
+
+      // Sin esto, un refetch en vuelo puede aterrizar después y devolver el
+      // plan de antes, deshaciendo lo que acabamos de adelantar.
+      await qc.cancelQueries({ queryKey: claves.plan(id) });
+
+      const previo = qc.getQueryData<PlanMedicion>(claves.plan(id));
+      if (previo) qc.setQueryData(claves.plan(id), optimista(previo, v));
+      return { previo };
+    },
+    onError: (_e, _v, contexto) => {
+      const previo = (contexto as { previo?: PlanMedicion } | undefined)?.previo;
+      if (previo) qc.setQueryData(claves.plan(id), previo);
+    },
+    onSettled: async () => {
+      // En `onSettled` y no en `onSuccess`: tras un fallo la caché quedó con lo
+      // restaurado, y hay que volver a preguntar por si el servidor sí llegó a
+      // cambiar algo antes de romper.
       await qc.invalidateQueries({ queryKey: claves.plan(id) });
       for (const clave of ademas) await qc.invalidateQueries({ queryKey: clave });
     },
@@ -117,8 +163,13 @@ export function useTransicionar(id: string) {
 }
 
 export function useDeclararCompetencias(id: string) {
-  return useMutacionDelPlan(id, (competenciaIds: readonly string[]) =>
-    api.declararCompetencias(id, competenciaIds),
+  return useMutacionDelPlan(
+    id,
+    (competenciaIds: readonly string[]) => api.declararCompetencias(id, competenciaIds),
+    [],
+    // Marcar dos competencias seguidas es lo normal al configurar un plan, y
+    // sin adelantar la caché la segunda parte del plan de antes de la primera.
+    (plan, competenciaIds) => ({ ...plan, competenciaIds }),
   );
 }
 
@@ -152,6 +203,25 @@ export function useVersiones(id: string) {
   });
 }
 
+/**
+ * RF-PM-027: los documentos generados del plan.
+ *
+ * Mientras algo esté en curso se vuelve a preguntar sola. Sin esto la pantalla
+ * se queda en «En cola» hasta que alguien recargue, y parece que no funciona
+ * cuando en realidad el archivo ya está.
+ */
+export function useDocumentos(id: string) {
+  return useQuery({
+    queryKey: claves.documentos(id),
+    queryFn: () => api.documentosDe(id),
+    enabled: !!id,
+    refetchInterval: (consulta) =>
+      (consulta.state.data ?? []).some((t) => t.estado === 'En cola' || t.estado === 'Generando')
+        ? 2_000
+        : false,
+  });
+}
+
 export function useHistorial(id: string) {
   return useQuery({
     queryKey: claves.historial(id),
@@ -171,4 +241,103 @@ export function useNuevaVersion(id: string) {
 
 export function useDuplicarPlan(id: string) {
   return useMutacionDelPlan(id, () => api.duplicarPlan(id), [['medicion', 'lista']]);
+}
+
+/**
+ * RF-PM-027: pedir la exportación.
+ *
+ * Invalida solo la lista de documentos y no la rama entera del plan: generar
+ * un archivo no cambia el plan, y tirar de la matriz y la consistencia por un
+ * PDF haría trabajar al servidor para nada.
+ */
+export function useGenerarDocumento(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tipo: TipoDocumentoMedicion) => api.generarDocumento(id, tipo),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: claves.documentos(id) });
+    },
+  });
+}
+
+/* ── Planes de evaluación ─────────────────────────────────────────────────── */
+
+export const clavesEval = {
+  lista: (f?: FiltroEvaluaciones) =>
+    [
+      'evaluacion',
+      'lista',
+      f?.planMedicionId ?? 'todos',
+      f?.estado ?? 'todos',
+      f?.tipo ?? 'todos',
+      f?.texto ?? '',
+    ] as const,
+  plan: (id: string) => ['evaluacion', id] as const,
+};
+
+/**
+ * Igual que `useMutacionDelPlan`, sin optimismo: en 2c-A un plan de evaluación
+ * no tiene ningún campo propio editable, así que no hay nada que adelantar en
+ * la caché antes de que responda el servidor (a diferencia del plan de
+ * medición, que sí lo necesita para encadenar acciones sobre su matriz).
+ */
+function useMutacionDeEvaluacion<TVars, TDatos>(id: string, fn: (v: TVars) => Promise<TDatos>) {
+  const qc = useQueryClient();
+  return useMutation({
+    // Las escrituras sobre un mismo plan van en fila, nunca en paralelo: todas
+    // son lee-modifica-escribe sobre el plan entero, y dos en vuelo a la vez se
+    // resuelven por orden de llegada, que no lo decide el cliente.
+    scope: { id: `plan-evaluacion:${id}` },
+    mutationFn: fn,
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: clavesEval.plan(id) });
+      await qc.invalidateQueries({ queryKey: ['evaluacion', 'lista'] });
+    },
+  });
+}
+
+export function useBasesElegibles() {
+  return useQuery({
+    queryKey: ['evaluacion', 'bases-elegibles'] as const,
+    queryFn: () => evaluacionApi.basesElegibles(),
+  });
+}
+
+export function usePlanesEvaluacion(filtro?: FiltroEvaluaciones) {
+  return useQuery({
+    queryKey: clavesEval.lista(filtro),
+    queryFn: () => evaluacionApi.listarEvaluaciones(filtro),
+  });
+}
+
+export function usePlanEvaluacion(id: string) {
+  return useQuery({
+    queryKey: clavesEval.plan(id),
+    queryFn: () => evaluacionApi.obtenerEvaluacion(id),
+    enabled: !!id,
+  });
+}
+
+export function useCrearEvaluacion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (planMedicionId: string) => evaluacionApi.crearEvaluacion(planMedicionId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['evaluacion', 'lista'] }),
+  });
+}
+
+/**
+ * RF-PE-008. No la consume ninguna pantalla de esta tarea, igual que
+ * `useEliminarPlan` de medición: el hook existe porque el puerto lo pide,
+ * pero borrar un plan de evaluación no forma parte de las dos pantallas de
+ * 2c-A (RF-PE-009).
+ */
+export function useEliminarEvaluacion(id: string) {
+  return useMutacionDeEvaluacion(id, () => evaluacionApi.eliminarEvaluacion(id));
+}
+
+export function useTransicionarEvaluacion(id: string) {
+  return useMutacionDeEvaluacion(id, (v: { accion: AccionMedicion; comentario?: string }) =>
+    evaluacionApi.transicionarEvaluacion(id, v.accion, v.comentario),
+  );
 }

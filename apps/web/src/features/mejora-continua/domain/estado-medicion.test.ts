@@ -27,12 +27,12 @@ describe('RF-PM-006 — transiciones disponibles por estado', () => {
   });
 
   it('cada transición declara el permiso que exige', () => {
-    expect(describirTransicion('aprobar').permiso).toBe('medicion.aprobar');
-    expect(describirTransicion('observar').permiso).toBe('medicion.aprobar');
-    expect(describirTransicion('marcar-vigente').permiso).toBe('medicion.aprobar');
-    expect(describirTransicion('archivar').permiso).toBe('medicion.aprobar');
+    expect(describirTransicion('aprobar').permiso).toBe('aprobar');
+    expect(describirTransicion('observar').permiso).toBe('aprobar');
+    expect(describirTransicion('marcar-vigente').permiso).toBe('aprobar');
+    expect(describirTransicion('archivar').permiso).toBe('aprobar');
     // Quien configura el plan es quien lo da por listo; no hay permiso aparte.
-    expect(describirTransicion('enviar-a-revision').permiso).toBe('medicion.editar');
+    expect(describirTransicion('enviar-a-revision').permiso).toBe('editar');
   });
 
   it('RF-PM-037 RN1: observar es la única que exige comentario', () => {

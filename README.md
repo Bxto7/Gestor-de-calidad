@@ -215,16 +215,35 @@ artefactos de compilación viven fuera del control de versiones.
 - Generación de PDF y Excel (RF072/RF073) encolada en BullMQ y ejecutada por el
   worker, fuera del request HTTP.
 - Reportes y panel estadístico (RF101–RF110).
+- Módulo de Mejora Continua, submódulo **Planes de Medición completo, 47 de
+  47**: alta y ciclo de vida del plan, competencias agrupadas por atributo del
+  graduado, periodos, matriz de programación, marcado de mediciones
+  realizadas, motor de consistencia, versionado y duplicado con su linaje,
+  historial, y exportación a PDF y Excel (RF-PM-027 a RF-PM-029) por la misma
+  cola de BullMQ, con el worker enrutando cada trabajo a su módulo.
+- Submódulo **Planes de Evaluación, 17 de 49 (RF-PE-001 a RF-PE-012)**: alta de
+  un plan de evaluación a partir de un plan de medición Aprobado o Vigente, que
+  hereda el tipo y la meta (nunca se repiten a mano); tarjeta de lo heredado
+  —competencias y periodos del plan de medición base, en solo lectura, sin
+  casillas ni campos editables porque RF-PE-010 y RF-PE-011 no dejan añadir ni
+  quitar desde aquí—; y el mismo ciclo de vida de estados que Planes de
+  Medición, con permisos propios (`evaluacion.*`) y su propia entrada en la
+  bitácora.
+- Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
+  aviso de impacto al editar un atributo que ya usan competencias o planes
+  (RF120–RF123, RF128–RF132).
 - Gestión de cuentas de usuario y bitácora de accesos, sobre la auditoría
   append-only que registra cada mutación relevante (RF078, RF080).
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
-  estudios, reportes y usuarios trabajan contra la API. Ya no queda ningún
-  almacén en memoria.
-- Pruebas en verde: 504 unitarias en la API, 107 en el frontend y 160 de
-  integración en siete suites contra un PostgreSQL real y desechable. Los
-  guiones de carga k6 viven en `tests/carga/`.
+  estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
+  queda ningún almacén en memoria.
+- Pruebas en verde: 742 unitarias en la API, 187 en el frontend, 246 de
+  integración en trece suites contra un PostgreSQL real y desechable, y 27
+  recorridos E2E con Playwright —cuatro de ellos con `axe-core` sobre WCAG 2.1
+  AA—. Los guiones de carga k6 viven en `tests/carga/`.
 - CI en GitHub Actions con los quality gates de §6.6: typecheck, lint, formato,
-  cobertura, `npm audit` y Semgrep.
+  cobertura, `npm audit` y Semgrep, más un job de E2E que levanta PostgreSQL,
+  Redis, la API y el worker.
 
 **Todavía no:**
 
@@ -232,9 +251,12 @@ artefactos de compilación viven fuera del control de versiones.
   de la API, el compose de producción, el `Caddyfile` y los guiones de backup.
 - No existe Staging (§5.3): las cifras de carga salen de una máquina de
   desarrollo, no del VPS. Son orientativas hasta medirlas allí.
-- E2E de frontend con Playwright: no hay configuración y `apps/api/test/e2e`
-  está vacío.
-- Accesibilidad automatizada con `axe-core` (§4.7), pendiente pese a que el
-  objetivo declarado es WCAG 2.1 AA.
-- Recarga en caliente del backend: `npm run start:dev` sigue sin funcionar hasta
-  migrar a `unplugin-swc`.
+- E2E y accesibilidad cubren el flujo de Mejora Continua, no el resto de
+  pantallas. La revisión manual de accesibilidad que §6.4 pide en Staging sigue
+  pendiente.
+- Recarga en caliente del backend: `npm run start:dev` no funciona. La causa es
+  que `tsx` (esbuild) no emite `emitDecoratorMetadata`, así que Nest cree que
+  las clases con `@Injectable()` no tienen dependencias y las construye vacías
+  —sin error al arrancar, reventando al primer uso—. El arreglo es migrar a
+  `unplugin-swc`; mientras tanto, para probar contra la API real hay que
+  compilar (`npm run build`) y ejecutar `dist/`.

@@ -48,6 +48,25 @@ describe('aislamiento de mejora-continua', () => {
     expect(infractores).toEqual([]);
   });
 
+  it('de auth solo importa los puertos que auth expone, no sus repositorios', () => {
+    // `auth` es transversal (§3.5) y se consume por puertos. Un import de su
+    // repositorio de usuarios sería la misma erosión, con otro nombre.
+    const permitidos = ['ports/authorization.port.js', 'ports/directorio-usuarios.port.js'];
+    const infractores: string[] = [];
+
+    for (const archivo of archivosTs(RAIZ)) {
+      const contenido = readFileSync(archivo, 'utf8');
+      for (const m of contenido.matchAll(/from '([^']*modules\/auth[^']*)'/g)) {
+        const importado = m[1] ?? '';
+        if (!permitidos.some((p) => importado.endsWith(p))) {
+          infractores.push(`${relativo(archivo)} → ${importado}`);
+        }
+      }
+    }
+
+    expect(infractores).toEqual([]);
+  });
+
   it('no importa nada del módulo de auditoría ni de sus tablas', () => {
     // La bitácora se alimenta de eventos de dominio, no de llamadas directas:
     // por eso `plan-estudios` y `auditoria` pueden ignorarse mutuamente.
@@ -62,12 +81,21 @@ describe('aislamiento de mejora-continua', () => {
   });
 
   it('el dominio no importa NestJS ni Prisma', () => {
+    // El dominio vive en tres sitios: lo compartido en `domain/` y lo propio de
+    // cada submódulo en `medicion/domain/` y `evaluacion/domain/` (§ carpeta del
+    // submódulo).
     const infractores: string[] = [];
 
-    for (const archivo of archivosTs(join(RAIZ, 'domain'))) {
-      const contenido = readFileSync(archivo, 'utf8');
-      if (/from '@nestjs\/|from '@prisma\/|database\/generated/.test(contenido)) {
-        infractores.push(relativo(archivo));
+    for (const raiz of [
+      join(RAIZ, 'domain'),
+      join(RAIZ, 'medicion', 'domain'),
+      join(RAIZ, 'evaluacion', 'domain'),
+    ]) {
+      for (const archivo of archivosTs(raiz)) {
+        const contenido = readFileSync(archivo, 'utf8');
+        if (/from '@nestjs\/|from '@prisma\/|database\/generated/.test(contenido)) {
+          infractores.push(relativo(archivo));
+        }
       }
     }
 
@@ -79,10 +107,15 @@ describe('aislamiento de mejora-continua', () => {
     // alguien se saltó el puerto para «una consulta rápida».
     const infractores: string[] = [];
 
-    for (const archivo of archivosTs(join(RAIZ, 'application'))) {
-      const contenido = readFileSync(archivo, 'utf8');
-      if (/from '@prisma\/|database\/generated|prisma\.service/.test(contenido)) {
-        infractores.push(relativo(archivo));
+    for (const raiz of [
+      join(RAIZ, 'medicion', 'application'),
+      join(RAIZ, 'evaluacion', 'application'),
+    ]) {
+      for (const archivo of archivosTs(raiz)) {
+        const contenido = readFileSync(archivo, 'utf8');
+        if (/from '@prisma\/|database\/generated|prisma\.service/.test(contenido)) {
+          infractores.push(relativo(archivo));
+        }
       }
     }
 
