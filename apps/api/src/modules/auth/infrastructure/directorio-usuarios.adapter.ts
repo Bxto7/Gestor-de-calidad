@@ -26,4 +26,13 @@ export class DirectorioDeUsuariosAdapter implements DirectorioDeUsuariosPort {
 
     return new Map(filas.map((f) => [f.id, f.nombreCompleto]));
   }
+
+  async porRol(codigoRol: string): Promise<{ id: string; nombre: string }[]> {
+    const filas = await this.prisma.usuario.findMany({
+      where: { estado: 'ACTIVO', roles: { some: { rol: { codigo: codigoRol } } } },
+      select: { id: true, nombreCompleto: true },
+      orderBy: { nombreCompleto: 'asc' },
+    });
+    return filas.map((f) => ({ id: f.id, nombre: f.nombreCompleto }));
+  }
 }

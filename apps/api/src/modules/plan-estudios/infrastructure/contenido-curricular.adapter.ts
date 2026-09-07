@@ -11,6 +11,7 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../platform/database/prisma.service.js';
 import type {
+  AsignaturaBase,
   CompetenciaConAtributos,
   ContenidoCurricularPort,
   PlanBase,
@@ -114,6 +115,28 @@ export class ContenidoCurricularAdapter implements ContenidoCurricularPort {
       nombre: f.competencia.nombre,
       activa: f.competencia.estado === 'ACTIVO',
       atributos: f.competencia.atributos.map((a) => a.atributo),
+    }));
+  }
+
+  async asignaturasDelPlan(planEstudiosId: string): Promise<AsignaturaBase[]> {
+    const filas = await this.prisma.asignatura.findMany({
+      where: { planId: planEstudiosId },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        estado: true,
+        ciclo: { select: { numero: true } },
+      },
+      orderBy: [{ ciclo: { numero: 'asc' } }, { codigo: 'asc' }],
+    });
+
+    return filas.map((f) => ({
+      id: f.id,
+      codigo: f.codigo,
+      nombre: f.nombre,
+      cicloNumero: f.ciclo?.numero ?? null,
+      activa: f.estado === 'ACTIVO',
     }));
   }
 }

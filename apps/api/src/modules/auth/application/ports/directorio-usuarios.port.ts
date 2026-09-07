@@ -21,6 +21,16 @@ export interface DirectorioDeUsuariosPort {
    * ocurrieron: el registro de la aprobación sobrevive a la cuenta que la hizo.
    */
   nombresDe(ids: readonly string[]): Promise<Map<string, string>>;
+
+  /**
+   * Cuentas **activas** con ese rol, para elegir un responsable.
+   *
+   * Las inactivas no salen: no se puede responsabilizar de una evaluación a una
+   * cuenta apagada. Las que ya estén guardadas como responsables siguen
+   * resolviéndose por `nombresDe`, que no filtra por estado — el registro
+   * histórico se conserva aunque la persona ya no esté.
+   */
+  porRol(codigoRol: string): Promise<{ id: string; nombre: string }[]>;
 }
 
 export const DIRECTORIO_USUARIOS = Symbol('DirectorioDeUsuariosPort');

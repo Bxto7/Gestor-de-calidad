@@ -89,6 +89,7 @@ function contenido(sobre: Partial<ContenidoCurricularPort> = {}): ContenidoCurri
     competenciasDelPlan: async () => [
       { id: 'cmp-1', codigo: 'CPE-01', nombre: 'Una', activa: true, atributos: [] },
     ],
+    asignaturasDelPlan: async () => [],
     ...sobre,
   };
 }

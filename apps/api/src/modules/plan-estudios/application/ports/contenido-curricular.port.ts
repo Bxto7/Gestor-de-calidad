@@ -34,6 +34,24 @@ export interface CompetenciaConAtributos {
   readonly atributos: readonly { id: string; codigo: string; nombre: string }[];
 }
 
+/** Asignatura del plan, tal como la necesita quien evalúa (RF-PE-016). */
+export interface AsignaturaBase {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nombre: string;
+  /**
+   * Para agrupar el desplegable. Con 74 asignaturas, una lista plana obliga a
+   * buscar por nombre; agrupada por ciclo se encuentra a la primera.
+   */
+  readonly cicloNumero: number | null;
+  /**
+   * Las inactivas se devuelven marcadas y no escondidas: una asignatura ya
+   * asociada a una competencia que de pronto desapareciera del listado no
+   * tendría explicación en pantalla.
+   */
+  readonly activa: boolean;
+}
+
 export interface ContenidoCurricularPort {
   /** RF-PM-001 RN2: los planes en estado Aprobado o Vigente. */
   planesElegibles(): Promise<PlanBase[]>;
@@ -41,6 +59,8 @@ export interface ContenidoCurricularPort {
   planPorId(planEstudiosId: string): Promise<PlanBase | null>;
   /** RF-PM-013 y RF-PM-014: las competencias del plan, con sus atributos. */
   competenciasDelPlan(planEstudiosId: string): Promise<CompetenciaConAtributos[]>;
+  /** RF-PE-016: las asignaturas sobre las que se puede evaluar. */
+  asignaturasDelPlan(planEstudiosId: string): Promise<AsignaturaBase[]>;
 }
 
 export const CONTENIDO_CURRICULAR = Symbol('ContenidoCurricularPort');
