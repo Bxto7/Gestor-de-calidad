@@ -59,3 +59,25 @@ export class PlanEvaluacionTransicionado extends EventoEvaluacion {
       (comentario ? `. Comentario: ${comentario}` : '.');
   }
 }
+
+/**
+ * RF-PE-048. Uno solo para toda la configuración, y no cuatro.
+ *
+ * La bitácora la lee alguien que pregunta «qué se tocó de este plan y cuándo»,
+ * no «qué columna cambió». Cuatro eventos por cada guardado de un periodo
+ * enterrarían las transiciones de estado, que es lo que de verdad se busca.
+ */
+export class ConfiguracionEvaluacionCambiada extends EventoEvaluacion {
+  readonly nombre = 'evaluacion.configurada';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    que: string,
+  ) {
+    super(actor);
+    this.detalle = `Plan de evaluación ${codigo}: ${que}.`;
+  }
+}
