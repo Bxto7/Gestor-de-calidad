@@ -27,6 +27,26 @@ test('el detalle, con su matriz', async ({ page }) => {
   await analizar(page, 'el detalle del plan de medición');
 });
 
+test('el listado de planes de evaluación', async ({ page }) => {
+  await page.goto('/mejora-continua/evaluacion');
+  await expect(page.getByRole('heading', { name: 'Planes de evaluación' })).toBeVisible();
+
+  await analizar(page, 'el listado de planes de evaluación');
+});
+
+test('el detalle de evaluación, con la cuadrícula de lo heredado', async ({ page }) => {
+  // La tabla por atributo con `caption`, `scope="row"` y columna fija es
+  // estructura nueva: el resto de la pantalla calca la de medición, pero esa
+  // cuadrícula no existía en ninguna otra parte.
+  await page.goto('/mejora-continua/evaluacion');
+  const primero = page.getByRole('link', { name: /^EV-/ }).first();
+  await expect(primero).toBeVisible();
+  await primero.click();
+
+  await expect(page.getByRole('heading', { name: 'Heredado del plan de medición' })).toBeVisible();
+  await analizar(page, 'el detalle del plan de evaluación');
+});
+
 test('los atributos del graduado', async ({ page }) => {
   await page.goto('/acreditacion/atributos');
   await expect(page.getByRole('heading', { name: 'Atributos del Graduado' })).toBeVisible();

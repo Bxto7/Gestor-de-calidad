@@ -45,11 +45,21 @@ Se están construyendo **en paralelo**:
 > | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
 >
 > La cuenta sale de cruzar los `RF-` distintos del documento fuente con sus
-> citas en `apps/api/src` y `apps/web/src`. De los 47 `RF-PM` se citan 42 por su
-> número; los otros cinco —`003` alta, `035` envío a revisión, `036` aprobación,
-> `043` y `044` control de permisos— están construidos sin comentario que los
-> nombre. El cruce sirve además para detectar erratas: destapó una prueba que
-> decía cubrir un `RF-PM-080` que no existe en ningún documento.
+> citas en `apps/api/src` y `apps/web/src`, **pero el cruce no basta por sí
+> solo**: falla en las dos direcciones y hay que mirar ambas.
+>
+> - **Construido sin cita.** De los 47 `RF-PM` se citan 42 por su número; los
+>   otros cinco —`003` alta, `035` envío a revisión, `036` aprobación, `043` y
+>   `044` control de permisos— están construidos sin comentario que los nombre.
+>   De los 17 `RF-PE` de 2c-A pasa lo mismo con cinco: `000`, `004`, `045`,
+>   `046` y `047`.
+> - **Citado sin construir.** `RF-PE-041` aparece en el código y **no está
+>   hecho**: es una referencia hacia adelante — el comentario de `transicionar`
+>   dice que la validación integral de consistencia llega en el ciclo 2c-D.
+>   Quien cuente citaciones a secas lo dará por construido.
+>
+> El cruce sirve además para detectar erratas: destapó una prueba que decía
+> cubrir un `RF-PM-080` que no existe en ningún documento.
 
 ### Fuera de alcance en MVP 1 (pero la arquitectura debe dejar espacio)
 
