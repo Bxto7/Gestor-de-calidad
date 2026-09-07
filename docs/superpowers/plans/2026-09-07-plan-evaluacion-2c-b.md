@@ -1819,11 +1819,35 @@ mudo hace pensar en un fallo."
 - Consumes: todo lo anterior; el fixture `test` de `tests/e2e/fixtures/sesion.ts`.
 - Produces: nada.
 
-- [ ] **Step 1: Dejar un docente en los datos de prueba**
+- [ ] **Step 1: Dos cuentas nuevas para las pruebas**
 
-`preparar-e2e.ts` no crea ningún usuario con rol `DOCENTE`, así que el desplegable saldría vacío y el recorrido no podría elegir responsable. Añade uno con el mismo patrón que las cuentas que ya crea, con rol `DOCENTE` y la misma contraseña.
+**Las cuentas E2E no se crean en `preparar-e2e.ts`** —ese guion solo prepara la carrera, el plan de estudios y los planes de medición—: se crean con `apps/api/scripts/crear-usuario.ts`, invocado desde el paso «Crear las cuentas de prueba» de `.github/workflows/ci.yml` (líneas ~310-313). Hacen falta dos más:
 
-**Comprueba también la limpieza:** el guion borra planes de medición, y ahora cuelgan de ellos planes de evaluación con su configuración. El `Cascade` de 2c-B se lleva la configuración, pero el `Restrict` de 2c-A sigue exigiendo borrar los planes de evaluación **antes** que los de medición. Si ya lo hace —se arregló en 2c-A—, no toques nada.
+```yaml
+          SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-docente@sgc.local --nombre "E2E Docente"             --rol DOCENTE --carrera E2E
+          SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-director@sgc.local --nombre "E2E Director"             --rol DIRECTOR_CARRERA --carrera E2E
+```
+
+Y en local, los mismos dos comandos antes de correr la suite.
+
+**Por qué cada una:**
+
+- **El docente**, porque el desplegable de responsables saldría vacío —el seed crea el rol pero ningún usuario con él, anotado en §11 de la spec— y el recorrido no podría elegir a nadie.
+- **El director**, porque `e2e-editor` es **`COORDINADOR_ACADEMICO`**, y ese rol **no tiene `evaluacion.aprobar`**: quien construye no da el visto bueno (RF-PE-046). Sin una cuenta que apruebe, el segundo recorrido no puede llevar el plan a Vigente.
+
+Añade el director a `CUENTAS` en `tests/e2e/global-setup.ts`, junto a `editor` y `lector`:
+
+```ts
+export const CUENTAS = {
+  editor: { email: 'e2e-editor@sgc.local' },
+  lector: { email: 'e2e-lector@sgc.local' },
+  director: { email: 'e2e-director@sgc.local' },
+};
+```
+
+`Rol` se deriva de ahí (`keyof typeof CUENTAS`), así que `test.use({ rol: 'director' })` funcionará sin tocar nada más. **Ojo con el límite de login:** son cinco por minuto y `global-setup` gasta uno por cuenta; con tres cuentas la suite gasta tres por ejecución, así que dos ejecuciones seguidas rozan el límite. Si ves un 429, espera un minuto.
+
+**La limpieza del guion no hay que tocarla:** ya borra los planes de evaluación antes que los de medición —se arregló en 2c-A por el `Restrict`— y el `Cascade` de 2c-B se lleva la configuración con ellos.
 
 - [ ] **Step 2: Escribir el recorrido**
 
@@ -1890,11 +1914,19 @@ test('un plan Vigente deja registrar lo alcanzado, no cambiar la definición', a
 });
 ```
 
-**Si «Aprobar» no aparece**, es que el rol de la cuenta E2E no tiene
-`evaluacion.aprobar`. El fixture usa `e2e-editor`, que es Coordinador académico
-y **no aprueba** por diseño (RF-PE-046). Usa `test.use({ rol: 'director' })` si
-ese rol existe en `global-setup`; si no existe, crea la cuenta en
-`preparar-e2e.ts` con rol `DIRECTOR_CARRERA` y añádela al `global-setup`.
+**Ese recorrido necesita la cuenta de director del Step 1.** El fixture usa
+`e2e-editor` por defecto, que es Coordinador académico y **no tiene
+`evaluacion.aprobar`** —quien construye no da el visto bueno, RF-PE-046—, así
+que los botones «Aprobar» y «Marcar como vigente» ni siquiera se pintan.
+Declara al principio del archivo, antes de ese `test`:
+
+```ts
+test.describe('con la cuenta que aprueba', () => {
+  test.use({ rol: 'director' });
+
+  // …el test de arriba va aquí dentro…
+});
+```
 
 - [ ] **Step 3: Añadir la pantalla a la suite de accesibilidad**
 
