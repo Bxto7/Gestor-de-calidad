@@ -944,7 +944,88 @@ model PlanEvaluacion {
   /// no un plan de evaluación apuntando al vacío.
   plan PlanMedicion @relation(fields: [planMedicionId], references: [id], onDelete: Restrict)
 
+  configuracion ConfiguracionCompetencia[]
+  mediciones    MedicionAlcanzada[]
+
   @@index([planMedicionId])
   @@map("planes_evaluacion")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-013 y RF-PE-014: instrumento y frecuencia, una vez por competencia.
+model ConfiguracionCompetencia {
+  id               String @id @default(uuid()) @db.Uuid
+  planEvaluacionId String @map("plan_evaluacion_id") @db.Uuid
+  /// UUID sin clave foránea: la competencia vive en el esquema de Plan de
+  /// Estudios y §3.2 prohíbe la FK entre módulos.
+  competenciaId    String @map("competencia_id") @db.Uuid
+
+  instrumento String? @db.VarChar(300)
+  frecuencia  String? @db.VarChar(120)
+
+  plan PlanEvaluacion @relation(fields: [planEvaluacionId], references: [id], onDelete: Cascade)
+
+  /// RF-PE-013 RN1: una sola fila por competencia. El índice hace imposible
+  /// que dos instrumentos distintos convivan para la misma.
+  @@unique([planEvaluacionId, competenciaId])
+  @@map("configuracion_competencia")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-019: el porcentaje alcanzado de una competencia en un periodo.
+model MedicionAlcanzada {
+  id               String @id @default(uuid()) @db.Uuid
+  planEvaluacionId String @map("plan_evaluacion_id") @db.Uuid
+  competenciaId    String @map("competencia_id") @db.Uuid
+  /// El periodo también es un UUID del plan de medición base, sin FK.
+  periodoId        String @map("periodo_id") @db.Uuid
+
+  /// RF-PE-019 RN2: entre 0 y 100. El CHECK se añade en la migración; el DTO
+  /// protege la puerta HTTP, el CHECK protege el dato.
+  porcentajeAlcanzado Int? @map("porcentaje_alcanzado") @db.SmallInt
+
+  plan        PlanEvaluacion       @relation(fields: [planEvaluacionId], references: [id], onDelete: Cascade)
+  asignaturas AsignaturaEvaluada[]
+
+  @@unique([planEvaluacionId, competenciaId, periodoId])
+  @@map("medicion_alcanzada")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-016 a RF-PE-018: una asignatura que evalúa esa competencia en ese periodo.
+model AsignaturaEvaluada {
+  id                  String @id @default(uuid()) @db.Uuid
+  medicionAlcanzadaId String @map("medicion_alcanzada_id") @db.Uuid
+  asignaturaId        String @map("asignatura_id") @db.Uuid
+
+  /// RF-PE-017 RN1: obligatorio. NOT NULL, no «obligatorio en el formulario».
+  entregable String  @db.VarChar(300)
+  /// RF-PE-018. UUID de una cuenta de usuario con rol DOCENTE, sin clave
+  /// foránea: el registro debe seguir siendo legible aunque la cuenta
+  /// desaparezca, igual que `solicitadoPor` en los documentos generados.
+  docenteId  String? @map("docente_id") @db.Uuid
+
+  medicion   MedicionAlcanzada @relation(fields: [medicionAlcanzadaId], references: [id], onDelete: Cascade)
+  evidencias Evidencia[]
+
+  /// RF-PE-016: la misma asignatura no se asocia dos veces al mismo cruce.
+  @@unique([medicionAlcanzadaId, asignaturaId])
+  @@map("asignatura_evaluada")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-020: dónde está la evidencia del entregable.
+model Evidencia {
+  id                   String @id @default(uuid()) @db.Uuid
+  asignaturaEvaluadaId String @map("asignatura_evaluada_id") @db.Uuid
+
+  enlace      String @db.VarChar(2000)
+  /// Sin ella, cinco enlaces en un expediente son cinco URLs indistinguibles.
+  descripcion String @db.VarChar(200)
+  orden       Int    @default(0) @db.SmallInt
+
+  asignatura AsignaturaEvaluada @relation(fields: [asignaturaEvaluadaId], references: [id], onDelete: Cascade)
+
+  @@map("evidencia")
   @@schema("mejora_continua")
 }
