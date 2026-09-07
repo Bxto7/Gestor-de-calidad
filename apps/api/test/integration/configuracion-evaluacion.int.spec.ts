@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { ConfiguracionEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
@@ -21,6 +22,7 @@ const CMP1 = randomUUID();
 const CMP2 = randomUUID();
 const PER1 = randomUUID();
 const ASIG1 = randomUUID();
+const ASIG2 = randomUUID();
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
@@ -207,5 +209,159 @@ describe('el borrado en cascada', () => {
     expect(await prisma.medicionAlcanzada.count()).toBe(0);
     expect(await prisma.asignaturaEvaluada.count()).toBe(0);
     expect(await prisma.evidencia.count()).toBe(0);
+  });
+});
+
+describe('el repositorio', () => {
+  const repo = new ConfiguracionEvaluacionRepositoryPrisma(prisma);
+
+  it('guardar la competencia dos veces actualiza, no duplica', async () => {
+    const plan = await crearEvaluacion();
+
+    await repo.guardarCompetencia({
+      planEvaluacionId: plan.id,
+      competenciaId: CMP1,
+      instrumento: 'Rúbrica',
+      frecuencia: 'Semestral',
+    });
+    await repo.guardarCompetencia({
+      planEvaluacionId: plan.id,
+      competenciaId: CMP1,
+      instrumento: 'Rúbrica analítica',
+      frecuencia: 'Anual',
+    });
+
+    const { competencias } = await repo.del(plan.id);
+    expect(competencias).toHaveLength(1);
+    expect(competencias[0]?.instrumento).toBe('Rúbrica analítica');
+  });
+
+  it('reemplazar asignaturas crea la fila del cruce si no existía', async () => {
+    // `AsignaturaEvaluada` cuelga de `MedicionAlcanzada`: sin esto, asociar una
+    // asignatura a un cruce virgen fallaría por clave foránea.
+    const plan = await crearEvaluacion();
+
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto final', docenteId: null },
+    ]);
+
+    const { mediciones } = await repo.del(plan.id);
+    expect(mediciones).toHaveLength(1);
+    expect(mediciones[0]?.asignaturas.map((a) => a.entregable)).toEqual(['Proyecto final']);
+  });
+
+  it('reemplazar quita las que ya no vienen, con sus evidencias', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+      { asignaturaId: ASIG2, entregable: 'Informe', docenteId: null },
+    ]);
+    const antes = await repo.del(plan.id);
+    const aBorrar = antes.mediciones[0]!.asignaturas.find((a) => a.asignaturaId === ASIG2)!;
+    await repo.reemplazarEvidencias(aBorrar.id, [{ enlace: 'https://x', descripcion: 'Acta' }]);
+
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+
+    const { mediciones } = await repo.del(plan.id);
+    expect(mediciones[0]?.asignaturas.map((a) => a.asignaturaId)).toEqual([ASIG1]);
+    // La evidencia de la que se fue no queda huérfana en la base.
+    expect(await prisma.evidencia.count()).toBe(0);
+  });
+
+  it('reemplazar asignaturas NO borra el porcentaje ya registrado', async () => {
+    // Son dos cosas distintas del mismo cruce: cambiar qué asignaturas lo
+    // evalúan no puede borrar lo que ya se midió.
+    const plan = await crearEvaluacion();
+    await repo.guardarPorcentaje(plan.id, CMP1, PER1, 80);
+
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+
+    const { mediciones } = await repo.del(plan.id);
+    expect(mediciones[0]?.porcentajeAlcanzado).toBe(80);
+  });
+
+  it('guardar el porcentaje NO borra las asignaturas del cruce', async () => {
+    // La inversa de la anterior, y hace falta: son dos escrituras sobre la
+    // misma fila, y un `update` descuidado en cualquiera de las dos direcciones
+    // se lleva por delante lo que la otra guardó.
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+
+    await repo.guardarPorcentaje(plan.id, CMP1, PER1, 80);
+
+    const { mediciones } = await repo.del(plan.id);
+    expect(mediciones[0]?.asignaturas).toHaveLength(1);
+    expect(mediciones[0]?.porcentajeAlcanzado).toBe(80);
+  });
+
+  it('una evidencia sobrevive a que se reemplacen las asignaturas si la suya sigue', async () => {
+    // Borrar todas las del cruce y recrearlas —en vez de borrar solo las que no
+    // vienen— se llevaría por cascada las evidencias de las que se conservan.
+    // Desde fuera parece lo mismo; el usuario pierde su trabajo.
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+    const antes = await repo.del(plan.id);
+    await repo.reemplazarEvidencias(antes.mediciones[0]!.asignaturas[0]!.id, [
+      { enlace: 'https://a', descripcion: 'Rúbrica firmada' },
+    ]);
+
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto corregido', docenteId: null },
+      { asignaturaId: ASIG2, entregable: 'Informe', docenteId: null },
+    ]);
+
+    const tras = await repo.del(plan.id);
+    const conservada = tras.mediciones[0]!.asignaturas.find((a) => a.asignaturaId === ASIG1)!;
+    expect(conservada.evidencias.map((e) => e.descripcion)).toEqual(['Rúbrica firmada']);
+    expect(conservada.entregable).toBe('Proyecto corregido');
+  });
+
+  it('guardar el porcentaje crea la fila del cruce si no existía', async () => {
+    const plan = await crearEvaluacion();
+
+    await repo.guardarPorcentaje(plan.id, CMP1, PER1, 65);
+
+    const { mediciones } = await repo.del(plan.id);
+    expect(mediciones[0]?.porcentajeAlcanzado).toBe(65);
+  });
+
+  it('las evidencias conservan el orden en que llegaron', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+    const { mediciones } = await repo.del(plan.id);
+    const ae = mediciones[0]!.asignaturas[0]!;
+
+    await repo.reemplazarEvidencias(ae.id, [
+      { enlace: 'https://a', descripcion: 'Rúbrica firmada' },
+      { enlace: 'https://b', descripcion: 'Acta de la reunión' },
+    ]);
+
+    const tras = await repo.del(plan.id);
+    expect(tras.mediciones[0]?.asignaturas[0]?.evidencias.map((e) => e.descripcion)).toEqual([
+      'Rúbrica firmada',
+      'Acta de la reunión',
+    ]);
+  });
+
+  it('planDeAsignaturaEvaluada dice de qué plan es, y null si no existe', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+    const { mediciones } = await repo.del(plan.id);
+    const ae = mediciones[0]!.asignaturas[0]!;
+
+    expect(await repo.planDeAsignaturaEvaluada(ae.id)).toBe(plan.id);
+    expect(await repo.planDeAsignaturaEvaluada(randomUUID())).toBeNull();
   });
 });
