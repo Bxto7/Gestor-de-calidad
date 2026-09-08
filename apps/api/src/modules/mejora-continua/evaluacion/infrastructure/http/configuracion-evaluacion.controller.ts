@@ -2,10 +2,13 @@
  * Endpoints de la configuración de evaluación (RF-PE-013 a RF-PE-021).
  *
  * La frontera de estados está **en la forma de esta API**, no en una
- * comparación dentro del caso de uso: los tres primeros `PUT` exigen Borrador;
- * los dos últimos aceptan también un plan Vigente, porque RF-PE-006 RN2
- * exceptúa el registro progresivo de mediciones. Quien lea este archivo ve la
- * regla sin abrir nada más.
+ * comparación dentro del caso de uso. Son cuatro `PUT` repartidos en dos
+ * mitades: los de definición —el instrumento de una competencia y las
+ * asignaturas de un cruce— exigen Borrador; los de seguimiento —el porcentaje
+ * alcanzado y las evidencias, este último en `EvidenciasController`— aceptan
+ * también un plan Vigente, porque RF-PE-006 RN2 exceptúa el registro
+ * progresivo de mediciones. Quien lea este archivo ve la regla sin abrir nada
+ * más.
  *
  * Cada `PUT` reemplaza su conjunto entero. Eso satisface RF-PE-021 —guardar el
  * avance de un periodo sin tocar los demás— con una petición por guardado, y
