@@ -20,6 +20,17 @@ test('configurar un periodo deja los demás intactos', async ({ page }) => {
     .getByRole('textbox', { name: /instrumento/i })
     .first()
     .fill('Rúbrica analítica');
+  // El porcentaje se escribe **antes** de cambiar de periodo, y ese es el punto
+  // del recorrido: sin escribir ninguno, la aserción final sobre 2026-II no
+  // distinguiría «el porcentaje es por periodo» (RF-PE-019 RN1, RF-PE-021) de
+  // «nunca se guardó ninguno en ningún sitio». Tal como estaba, esto solo
+  // demostraba lo contrario —que el instrumento sí es común a todos los
+  // periodos, RF-PE-013 RN1—, que es la afirmación opuesta a la que da nombre
+  // al recorrido.
+  await page
+    .getByRole('spinbutton', { name: /porcentaje/i })
+    .first()
+    .fill('75');
   await page.getByRole('button', { name: 'Guardar el periodo' }).click();
 
   // Se espera a la respuesta y no a que la pantalla se vea bien: la pantalla
@@ -27,12 +38,19 @@ test('configurar un periodo deja los demás intactos', async ({ page }) => {
   // se hubiera guardado nada.
   await expect(page.getByText(/guardado/i)).toBeVisible();
 
-  // RF-PE-021: el otro periodo sigue vacío.
+  // RF-PE-021: el otro periodo sigue vacío. El instrumento sí viaja —es dato de
+  // competencia, no de periodo—; el porcentaje no.
   await page.getByLabel('Periodo a configurar').selectOption({ label: '2026-II' });
   await expect(page.getByRole('textbox', { name: /instrumento/i }).first()).toHaveValue(
     'Rúbrica analítica',
   );
   await expect(page.getByRole('spinbutton', { name: /porcentaje/i }).first()).toHaveValue('');
+
+  // Y al volver, el 75 sigue donde se escribió: si el porcentaje se guardara
+  // por competencia y no por cruce, esta aserción y la de arriba no podrían
+  // pasar las dos.
+  await page.getByLabel('Periodo a configurar').selectOption({ label: '2026-I' });
+  await expect(page.getByRole('spinbutton', { name: /porcentaje/i }).first()).toHaveValue('75');
 });
 
 test.describe('con la cuenta que aprueba', () => {

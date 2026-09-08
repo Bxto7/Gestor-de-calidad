@@ -136,14 +136,26 @@ describe('RF-PE-016 — las asignaturas del plan de estudios', () => {
     expect(a?.cicloNumero).toBeNull();
   });
 
-  it('las inactivas se devuelven marcadas, no escondidas', async () => {
+  it('las inactivas se devuelven marcadas, y las activas también', async () => {
     // Esconderlas dejaría sin explicación una asignatura que ya está asociada
     // a una competencia y de pronto desaparece del listado.
+    //
+    // Las dos, y no solo la inactiva: con una sola fila, fijar `activa: false`
+    // a pelo en el adaptador dejaba la prueba en verde, y la pantalla usa ese
+    // campo para escribir «(inactiva)» junto al nombre. Un desplegable que
+    // marca como retiradas las 74 asignaturas de la carrera es peor que uno
+    // que no marca ninguna.
     await crearAsignatura(planEstudiosId, 'ASUC004', 'Retirada', null, 'INACTIVO');
+    await crearAsignatura(planEstudiosId, 'ASUC005', 'En curso', null, 'ACTIVO');
 
-    const [a] = await curricular.asignaturasDelPlan(planEstudiosId);
+    const encontradas = await curricular.asignaturasDelPlan(planEstudiosId);
 
-    expect(a?.activa).toBe(false);
+    expect(new Map(encontradas.map((a) => [a.codigo, a.activa]))).toEqual(
+      new Map([
+        ['ASUC004', false],
+        ['ASUC005', true],
+      ]),
+    );
   });
 });
 
