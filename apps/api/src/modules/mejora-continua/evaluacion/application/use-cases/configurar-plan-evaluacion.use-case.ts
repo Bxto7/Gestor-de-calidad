@@ -103,12 +103,14 @@ export class ConfigurarPlanEvaluacion {
    * RF-PE-013, RF-PE-014 y RF-PE-024: instrumento, frecuencia y responsable de
    * una competencia.
    *
-   * `responsableId` es opcional en el puerto (2c-C lo dejó así para que un
-   * `update` sin ese dato no borre el que ya estaba), pero aquí es
-   * obligatorio: este caso de uso es el único que llama al puerto, y un campo
-   * ausente en la llamada no da error, se escribe como `undefined` y Prisma
-   * simplemente no toca la columna — un fallo silencioso. Exigirlo aquí hace
-   * que quien llama decida siempre, aunque decida `null`.
+   * `responsableId` es obligatorio aquí y también en la firma de escritura del
+   * puerto: el `PUT` de esta competencia reemplaza la configuración entera, no
+   * la actualiza parcialmente (igual que `instrumento` y `frecuencia`), así
+   * que omitirlo la borra. Dejarlo opcional en cualquiera de las dos firmas
+   * sería la trampa que RF-PE-024 vino a cerrar: el repositorio conserva el
+   * responsable existente cuando el campo llega `undefined`, pero lo **borra**
+   * cuando llega `null`, y un campo opcional convierte un olvido en ese
+   * borrado silencioso.
    */
   async guardarCompetencia(
     actor: Actor,

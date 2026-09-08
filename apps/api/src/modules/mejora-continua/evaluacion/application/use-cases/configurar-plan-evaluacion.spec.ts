@@ -412,11 +412,11 @@ describe('RF-PE-013 — la competencia tiene que estar declarada', () => {
 
 describe('RF-PE-024 — el responsable de una competencia', () => {
   it('el responsable se guarda tal cual llega', async () => {
-    // 2c-C dejó `responsableId` opcional en el puerto para que un `update`
-    // sin ese dato no borre el que ya estaba — pero eso es una razón del
-    // puerto, no una excusa para que este caso de uso lo omita: si no lo
-    // reenvía siempre, el campo llega como `undefined` y Prisma no toca la
-    // columna, un fallo silencioso que ningún tipo detecta.
+    // `responsableId` es obligatorio tanto aquí como en la firma de escritura
+    // del puerto (2c-C, Task 5): el `PUT` de la competencia reemplaza la
+    // configuración entera, así que omitirlo la borra. Este caso de uso lo
+    // reenvía siempre, decida lo que decida quien llama, para que el campo
+    // nunca llegue como `undefined` y Prisma no toque la columna en silencio.
     const { caso, guardado } = montar();
 
     await caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
