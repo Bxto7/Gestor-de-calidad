@@ -127,19 +127,7 @@ export class ConfigurarPlanEvaluacion {
     this.exigirDefinicionEditable(plan);
 
     const base = await this.exigirBase(plan.planMedicionId);
-
-    // RF-PE-012: solo donde la matriz del plan de medición base programó la
-    // medición. Sin esto, el plan de evaluación podría registrar donde el
-    // plan de medición nunca dijo que se mediría.
-    const matriz = await this.mediciones.matriz(base.id);
-    const programado = matriz.some(
-      (c) => c.competenciaId === competenciaId && c.periodoId === periodoId,
-    );
-    if (!programado) {
-      throw new ReglaDeNegocioViolada(
-        `El plan de medición base no programó la competencia ${competenciaId} en el periodo ${periodoId}; no se puede configurar un cruce que no está en la matriz.`,
-      );
-    }
+    await this.exigirCruceProgramado(base, competenciaId, periodoId);
 
     // RF-PE-016: cada asignatura tiene que ser del plan de estudios base, no
     // de cualquier otro.
@@ -175,6 +163,14 @@ export class ConfigurarPlanEvaluacion {
     const plan = await this.exigirPlan(planEvaluacionId);
     this.exigirSeguimientoEditable(plan);
 
+    // La misma comprobación que `guardarAsignaturas`, y por el mismo motivo:
+    // el repositorio hace `upsert`, así que sin ella un cruce inventado no da
+    // error, **crea la fila**. Un porcentaje alcanzado colgado de una
+    // competencia que el plan base no declara o de un periodo que no existe
+    // no es un dato incompleto: es un dato que ningún reporte podrá cuadrar.
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigirCruceProgramado(base, competenciaId, periodoId);
+
     await this.configuraciones.guardarPorcentaje(
       planEvaluacionId,
       competenciaId,
@@ -189,9 +185,19 @@ export class ConfigurarPlanEvaluacion {
    * RF-PE-020: las evidencias de una asignatura evaluada.
    *
    * `asignaturaEvaluadaId` llega suelto en la ruta, sin el plan del que
-   * depende. Sin resolver de qué plan es y comprobarlo, cualquiera con
-   * permiso podría escribir evidencias en el plan de otra carrera con solo
-   * conocer un identificador.
+   * depende. Resolverlo desde la propia asignatura evaluada —y no aceptarlo
+   * como un parámetro más— es lo que hace que la frontera de estados se
+   * aplique **al plan que de verdad la contiene**: no hay un
+   * `planEvaluacionId` en la ruta que pueda contradecirlo, así que no se puede
+   * escribir sobre una asignatura de un plan Histórico apoyándose en un
+   * Borrador propio.
+   *
+   * Lo que esto **no** cierra, y conviene no confundir: el alcance por
+   * carrera. `exigir()` llama a `puede(actor.id, permiso, null)` y
+   * `evaluacion.editar` no está en `PERMISOS_ACOTADOS_A_CARRERA`, de modo que
+   * hoy ningún caso de uso de `mejora-continua` limita por carrera, tenga el
+   * plan en la ruta o no. Es un asunto del módulo entero y anterior a esta
+   * rama; se decide en el diseño del ciclo 2c-C.
    */
   async guardarEvidencias(
     actor: Actor,
@@ -234,6 +240,32 @@ export class ConfigurarPlanEvaluacion {
     const base = await this.mediciones.porId(planMedicionId);
     if (!base) throw new NoEncontrado('el plan de medición', planMedicionId);
     return base;
+  }
+
+  /**
+   * RF-PE-012: solo donde la matriz del plan de medición base programó la
+   * medición. Sin esto, el plan de evaluación podría registrar donde el plan
+   * de medición nunca dijo que se mediría.
+   *
+   * La comprobación es una sola porque el error tiene que ser uno solo: los
+   * dos guardados por cruce —asignaturas y porcentaje— responden a la misma
+   * regla, y dos textos distintos para la misma prohibición se acaban
+   * separando.
+   */
+  private async exigirCruceProgramado(
+    base: DatosPlanMedicion,
+    competenciaId: string,
+    periodoId: string,
+  ): Promise<void> {
+    const matriz = await this.mediciones.matriz(base.id);
+    const programado = matriz.some(
+      (c) => c.competenciaId === competenciaId && c.periodoId === periodoId,
+    );
+    if (!programado) {
+      throw new ReglaDeNegocioViolada(
+        `El plan de medición base no programó la competencia ${competenciaId} en el periodo ${periodoId}; no se puede configurar un cruce que no está en la matriz.`,
+      );
+    }
   }
 
   /**

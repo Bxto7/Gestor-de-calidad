@@ -309,6 +309,29 @@ describe('RF-PE-012 — solo donde la matriz base programó', () => {
 
     expect(guardado.asignaturas).toHaveLength(1);
   });
+
+  it('rechaza también el porcentaje de un cruce sin programar, nombrando los dos', async () => {
+    // El repositorio guarda el porcentaje con `upsert`, así que un cruce
+    // inventado no falla: **crea la fila**. Un porcentaje alcanzado colgado de
+    // una competencia que el plan base no declara y de un periodo que no
+    // existe no es un dato incompleto, es uno que ningún reporte podrá
+    // cuadrar. §8 del diseño pide 409 «nombrando la competencia y el
+    // periodo», y `ReglaDeNegocioViolada` es 409 en el filtro de errores.
+    const { caso, guardado } = montar({ programadas: ['c-1|p-1'] });
+
+    await expect(caso.guardarPorcentaje(ACTOR, 'ev-1', 'c-1', 'p-2', 80)).rejects.toThrow(
+      /no programó la competencia c-1 en el periodo p-2/,
+    );
+    expect(guardado.porcentaje).toBeUndefined();
+  });
+
+  it('y acepta el porcentaje del cruce que sí lo está', async () => {
+    const { caso, guardado } = montar({ programadas: ['c-1|p-1'] });
+
+    await caso.guardarPorcentaje(ACTOR, 'ev-1', 'c-1', 'p-1', 80);
+
+    expect(guardado.porcentaje).toBe(80);
+  });
 });
 
 describe('RF-PE-016 — solo asignaturas del plan de estudios base', () => {
@@ -384,16 +407,27 @@ describe('RF-PE-006 y RF-PE-007 — la frontera de estados', () => {
   });
 });
 
-describe('las evidencias de otro plan', () => {
-  it('no se pueden tocar desde este', async () => {
-    // `asignaturaEvaluadaId` llega suelto en la ruta: sin comprobar de qué plan
-    // es, cualquiera con permiso podría escribir evidencias en el plan de otra
-    // carrera sabiendo un identificador.
-    const { caso } = montar({ planDeAsignaturaEvaluada: 'ev-OTRO' });
+describe('el plan de unas evidencias sale de la asignatura evaluada', () => {
+  it('si de ahí no sale ningún plan, no se escribe nada', async () => {
+    // Lo que la resolución cierra —y es lo único que cierra— es que la
+    // frontera de estados se aplique al plan que de verdad contiene la
+    // asignatura evaluada: no hay `planEvaluacionId` en la ruta que pueda
+    // contradecirla, así que nadie escribe sobre una asignatura de un plan
+    // Histórico apoyándose en un Borrador propio.
+    //
+    // Lo que NO cierra, y el nombre anterior de esta prueba daba a entender
+    // que sí: el alcance por carrera. `exigir()` llama a
+    // `puede(actor.id, permiso, null)` y `evaluacion.editar` no está en
+    // `PERMISOS_ACOTADOS_A_CARRERA`, de modo que hoy ningún caso de uso de
+    // `mejora-continua` limita por carrera, con plan en la ruta o sin él. Es
+    // un asunto del módulo entero y anterior a esta rama; se decide en el
+    // diseño del ciclo 2c-C.
+    const { caso, guardado } = montar({ planDeAsignaturaEvaluada: 'ev-OTRO' });
 
     await expect(
       caso.guardarEvidencias(ACTOR, 'ae-1', [{ enlace: 'https://x', descripcion: 'R' }]),
-    ).rejects.toThrow();
+    ).rejects.toThrow(NoEncontrado);
+    expect(guardado.evidencias).toBeUndefined();
   });
 });
 
@@ -416,13 +450,60 @@ describe('permisos y bitácora', () => {
     expect(pedidos).toEqual(['evaluacion.leer']);
   });
 
-  it('cada guardado deja constancia, diciendo qué se tocó', async () => {
+  /**
+   * Los cuatro guardados, uno por uno.
+   *
+   * Antes solo estaba el del porcentaje, y quitar las otras tres llamadas a
+   * `dejarConstancia` dejaba la suite entera en verde. CLAUDE.md §2 llama a la
+   * auditoría «no opcional» y §6.6 exige el evento «emitido **y cubierto por
+   * una prueba»**: cubierto quiere decir uno por guardado, porque una sola
+   * prueba no puede caerse por tres motivos distintos.
+   *
+   * Cada una afirma también el `detalle`, no solo que se publicó algo: una
+   * bitácora que registra cuatro cambios indistinguibles no sirve para
+   * reconstruir qué pasó, que es para lo que existe.
+   */
+  it('guardar instrumento y frecuencia deja constancia', async () => {
+    const { caso, publicados } = montar();
+
+    await caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+      instrumento: 'Rúbrica',
+      frecuencia: 'Semestral',
+    });
+
+    expect(publicados[0]?.nombre).toBe('evaluacion.configurada');
+    expect(publicados[0]?.detalle).toMatch(/instrumento y frecuencia/i);
+  });
+
+  it('guardar las asignaturas de un cruce deja constancia', async () => {
+    const { caso, publicados } = montar();
+
+    await caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+      { asignaturaId: 'a-1', entregable: 'Proyecto', docenteId: null },
+    ]);
+
+    expect(publicados[0]?.nombre).toBe('evaluacion.configurada');
+    expect(publicados[0]?.detalle).toMatch(/asignaturas/i);
+  });
+
+  it('guardar el porcentaje deja constancia', async () => {
     const { caso, publicados } = montar();
 
     await caso.guardarPorcentaje(ACTOR, 'ev-1', 'c-1', 'p-1', 80);
 
     expect(publicados[0]?.nombre).toBe('evaluacion.configurada');
     expect(publicados[0]?.detalle).toMatch(/porcentaje/i);
+  });
+
+  it('guardar las evidencias deja constancia', async () => {
+    const { caso, publicados } = montar();
+
+    await caso.guardarEvidencias(ACTOR, 'ae-1', [
+      { enlace: 'https://x', descripcion: 'Rúbrica firmada' },
+    ]);
+
+    expect(publicados[0]?.nombre).toBe('evaluacion.configurada');
+    expect(publicados[0]?.detalle).toMatch(/evidencias/i);
   });
 });
 

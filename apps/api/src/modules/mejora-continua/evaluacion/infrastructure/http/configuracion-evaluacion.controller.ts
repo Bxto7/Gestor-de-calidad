@@ -132,11 +132,18 @@ export class ConfiguracionEvaluacionController {
  * ruta para llegar a algo que ya tiene identificador propio.
  *
  * Sin `planEvaluacionId` en la ruta a propósito: el caso de uso resuelve el
- * plan real a partir de `asignaturaEvaluadaId` con `planDeAsignaturaEvaluada`,
- * lo que cierra por construcción el vector de manipular la ruta para escribir
- * en el plan de otra carrera. Añadir el id del plan aquí y pasarlo al caso de
- * uso reabriría ese agujero, aunque parezca más simétrico con los otros
- * endpoints.
+ * plan real a partir de `asignaturaEvaluadaId` con `planDeAsignaturaEvaluada`.
+ * Lo que eso cierra por construcción es que la frontera de estados se aplique
+ * al plan que de verdad contiene la asignatura evaluada: no hay en la ruta un
+ * id de plan que pueda contradecirla, así que nadie escribe sobre una
+ * asignatura de un plan Histórico apoyándose en un Borrador propio. Añadir el
+ * id del plan aquí y pasarlo al caso de uso reabriría ese agujero, aunque
+ * parezca más simétrico con los otros endpoints.
+ *
+ * Lo que **no** cierra —ni esta ruta ni ninguna otra del módulo— es el alcance
+ * por carrera: `evaluacion.editar` no está en `PERMISOS_ACOTADOS_A_CARRERA` y
+ * la autorización se pide con `carreraId` a `null`. Es un asunto del módulo
+ * entero, anterior a esta rama, y se decide en el diseño del ciclo 2c-C.
  */
 @ApiTags('Planes de evaluación')
 @ApiBearerAuth()
