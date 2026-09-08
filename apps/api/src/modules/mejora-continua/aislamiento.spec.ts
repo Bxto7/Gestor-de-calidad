@@ -83,12 +83,18 @@ describe('aislamiento de mejora-continua', () => {
     const permitidos = [
       'ports/authorization.port.js',
       'ports/directorio-usuarios.port.js',
-      // `ActorActual` no es una excepción de conveniencia: es la convención de
-      // transporte de todo el proyecto —lo importan igual los ocho
-      // controladores de `plan-estudios` y el de `auditoria`—. Es un decorador
-      // de parámetro que lee lo que el guard ya dejó en la petición; no toca
-      // las tablas de `auth` ni su repositorio, así que no abre la vía que
-      // esta regla vigila.
+      // Lo que se permite es la **ruta del fichero**, no un símbolo: por aquí
+      // pasan también `JwtGuard`, `PUBLICO` y `Publico`, que es lo demás que
+      // ese módulo exporta. Se deja así a propósito —los cuatro son plomería
+      // de transporte y ninguno toca las tablas de `auth`—, pero conviene
+      // saber que la regla no distingue cuál de ellos se importa.
+      //
+      // Hoy lo que se importa es `ActorActual`, y no es una excepción de
+      // conveniencia: es la convención de transporte de todo el proyecto —lo
+      // importan igual los ocho controladores de `plan-estudios` y el de
+      // `auditoria`—. Es un decorador de parámetro que lee lo que el guard ya
+      // dejó en la petición; no toca el repositorio de `auth`, así que no abre
+      // la vía que esta regla vigila.
       'infrastructure/http/jwt.guard.js',
     ];
 
