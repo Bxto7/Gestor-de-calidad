@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import type { GrupoObjetivo } from '../../src/platform/database/generated/client.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
@@ -73,12 +74,12 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-async function crear(overrides?: Partial<{ grupoObjetivo: string; periodoId: string }>) {
+async function crear(overrides?: Partial<{ grupoObjetivo: GrupoObjetivo; periodoId: string }>) {
   return prisma.indicacionDeMedicion.create({
     data: {
       planEvaluacionId: planId,
       periodoId: overrides?.periodoId ?? anio2026,
-      grupoObjetivo: (overrides?.grupoObjetivo ?? 'EGRESADOS') as any,
+      grupoObjetivo: overrides?.grupoObjetivo ?? 'EGRESADOS',
       instruccion: 'Encuesta a egresados',
       enlaceInstrumento: 'https://forms.example.com',
     },
@@ -96,6 +97,16 @@ describe('RF-PE-028 RN1 — una indicación por grupo y año', () => {
     await expect(crear({ grupoObjetivo: 'EGRESADOS', periodoId: anio2027 })).resolves.toBeDefined();
   });
 
+  it('dos grupos distintos conviven en el mismo año', async () => {
+    // La que hace que el único signifique algo. Sin ella, un índice sobre solo
+    // (plan, periodo) pasa las demás: la de duplicados repite el grupo *y* el
+    // par plan+periodo, así que un único de dos columnas la rechaza igual y
+    // nadie se entera de que falta la tercera.
+    await crear({ grupoObjetivo: 'EGRESADOS' });
+    await expect(crear({ grupoObjetivo: 'EMPLEADORES' })).resolves.toBeDefined();
+    expect(await prisma.indicacionDeMedicion.count()).toBe(2);
+  });
+
   it('borrar el plan se lleva sus indicaciones', async () => {
     await crear({ grupoObjetivo: 'DOCENTES' });
     await prisma.planEvaluacion.delete({ where: { id: planId } });
@@ -103,8 +114,12 @@ describe('RF-PE-028 RN1 — una indicación por grupo y año', () => {
   });
 
   it('borrar una indicación no toca el porcentaje del año', async () => {
-    // RF-PE-030 RN1, y la razón de que las indicaciones cuelguen del año y no
-    // del cruce: si colgaran de MedicionAlcanzada, borrarlas lo arrastraría.
+    // Guardia, no verificación de una conducta viva: hoy IndicacionDeMedicion
+    // y MedicionAlcanzada son tablas hermanas colgadas de PlanEvaluacion, sin
+    // FK entre sí, así que nada puede hacer caer esta prueba tal como está el
+    // esquema. Sirve para el día en que alguien añada esa FK —justo lo que
+    // RF-PE-030 RN1 prohíbe, y la razón de que las indicaciones cuelguen del
+    // año y no del cruce— y quiera que borrarlas arrastre el porcentaje.
     await prisma.medicionAlcanzada.create({
       data: { planEvaluacionId: planId, competenciaId: comp, periodoId: anio2026, porcentajeAlcanzado: 80 },
     });
