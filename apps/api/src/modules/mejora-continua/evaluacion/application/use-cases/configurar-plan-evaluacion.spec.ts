@@ -561,6 +561,20 @@ describe('RF-PE-028 a RF-PE-030 — indicaciones de medición y su enlace a resu
     ).rejects.toThrow(ReglaDeNegocioViolada);
   });
 
+  it('guarda el periodo y la lista de indicaciones que llegan', async () => {
+    // Sin esta prueba, `guardado.indicaciones` se asignaba en el doble del
+    // puerto pero nadie lo leía: comentar la llamada a
+    // `reemplazarIndicaciones` en el caso de uso dejaba las 33 pruebas del
+    // fichero en verde. La forma —comparar el objeto entero que llegó al
+    // repositorio— es la misma que usa la prueba del enlace a resultados de
+    // más abajo, para que las dos escrituras se verifiquen igual.
+    const { caso, guardado } = montar({ base: baseIndirecta() });
+
+    await caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION]);
+
+    expect(guardado.indicaciones).toEqual({ periodoId: 'anio-1', lista: [INDICACION] });
+  });
+
   it('cada guardado deja constancia', async () => {
     const { caso, publicados } = montar({ base: baseIndirecta() });
 
