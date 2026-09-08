@@ -147,6 +147,7 @@ import {
   ConfiguracionEvaluacionController,
   DocentesController,
   EvidenciasController,
+  ResultadosController,
 } from './modules/mejora-continua/evaluacion/infrastructure/http/configuracion-evaluacion.controller.js';
 import {
   REPOSITORIO_CARRERA,
@@ -295,6 +296,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     EvaluacionVigenteController,
     ConfiguracionEvaluacionController,
     EvidenciasController,
+    ResultadosController,
     DocentesController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,

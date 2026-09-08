@@ -1,14 +1,16 @@
 /**
- * Endpoints de la configuración de evaluación (RF-PE-013 a RF-PE-021).
+ * Endpoints de la configuración de evaluación (RF-PE-013 a RF-PE-021, RF-PE-024,
+ * RF-PE-028 a RF-PE-030).
  *
  * La frontera de estados está **en la forma de esta API**, no en una
- * comparación dentro del caso de uso. Son cuatro `PUT` repartidos en dos
- * mitades: los de definición —el instrumento de una competencia y las
- * asignaturas de un cruce— exigen Borrador; los de seguimiento —el porcentaje
- * alcanzado y las evidencias, este último en `EvidenciasController`— aceptan
- * también un plan Vigente, porque RF-PE-006 RN2 exceptúa el registro
- * progresivo de mediciones. Quien lea este archivo ve la regla sin abrir nada
- * más.
+ * comparación dentro del caso de uso. Son seis `PUT` repartidos en dos
+ * mitades de tres: los de definición —el instrumento/frecuencia/responsable de
+ * una competencia, las asignaturas de un cruce y las indicaciones de un año—
+ * exigen Borrador; los de seguimiento —el porcentaje alcanzado, las evidencias
+ * (en `EvidenciasController`) y el enlace a resultados de una indicación (en
+ * `ResultadosController`)— aceptan también un plan Vigente, porque RF-PE-006
+ * RN2 exceptúa el registro progresivo de mediciones. Quien lea este archivo ve
+ * la regla sin abrir nada más.
  *
  * Cada `PUT` reemplaza su conjunto entero. Eso satisface RF-PE-021 —guardar el
  * avance de un periodo sin tocar los demás— con una petición por guardado, y
@@ -26,7 +28,9 @@ import {
   AsignaturasDelCruceDto,
   ConfiguracionCompetenciaDto,
   EvidenciasDto,
+  IndicacionesDelAnioDto,
   PorcentajeDto,
+  ResultadosDto,
 } from './dto/configuracion-evaluacion.dto.js';
 
 @ApiTags('Planes de evaluación')
@@ -52,8 +56,10 @@ export class ConfiguracionEvaluacionController {
 
   @Put('competencias/:competenciaId')
   @ApiOperation({
-    summary: 'Instrumento y frecuencia de una competencia (RF-PE-013, RF-PE-014)',
-    description: 'Valen para todos los periodos: RF-PE-013 RN1. Solo en Borrador.',
+    summary: 'Instrumento, frecuencia y responsable de una competencia (RF-PE-013, RF-PE-014, RF-PE-024)',
+    description:
+      'Valen para todos los periodos: RF-PE-013 RN1. Solo en Borrador. Reemplazo ' +
+      'total: cada campo omitido se borra, igual que `instrumento` y `frecuencia`.',
   })
   @ApiResponse({
     status: 409,
@@ -68,13 +74,7 @@ export class ConfiguracionEvaluacionController {
     await this.casos.guardarCompetencia(actor, planId, competenciaId, {
       instrumento: dto.instrumento ?? null,
       frecuencia: dto.frecuencia ?? null,
-      // RF-PE-024 (el responsable) todavía no tiene campo en este DTO — lo
-      // añade el endpoint de la siguiente tarea. El caso de uso ahora exige
-      // el dato para no reenviarlo `undefined` al puerto en silencio, así que
-      // aquí se manda `null` explícito. Es seguro solo porque, hasta que ese
-      // endpoint exista, ningún camino de producción ha llegado a escribir un
-      // responsable que este PUT pudiera borrar sin querer.
-      responsableId: null,
+      responsableId: dto.responsableId ?? null,
     });
   }
 
@@ -131,6 +131,18 @@ export class ConfiguracionEvaluacionController {
       dto.porcentajeAlcanzado ?? null,
     );
   }
+
+  @Put('periodos/:periodoId/indicaciones')
+  @ApiOperation({ summary: 'Las indicaciones de un año (RF-PE-028 a RF-PE-030)' })
+  @ApiResponse({ status: 409, description: 'El plan no es Indirecta, o el año no está en la matriz' })
+  async indicaciones(
+    @Param('planId', ParseUUIDPipe) planId: string,
+    @Param('periodoId', ParseUUIDPipe) periodoId: string,
+    @Body() dto: IndicacionesDelAnioDto,
+    @ActorActual() actor: Actor,
+  ) {
+    return this.casos.guardarIndicaciones(actor, planId, periodoId, dto.indicaciones);
+  }
 }
 
 /**
@@ -172,6 +184,31 @@ export class EvidenciasController {
     @Body() dto: EvidenciasDto,
   ) {
     await this.casos.guardarEvidencias(actor, id, dto.evidencias);
+  }
+}
+
+/**
+ * Cuelga de la indicación y **no lleva `planEvaluacionId`**: el caso de uso lo
+ * resuelve con `planDeIndicacion`. Lo que eso cierra por construcción es que no
+ * se pueda aplicar el estado de otro plan al que se manda en la ruta —pasar un
+ * Borrador propio para escribir sobre una indicación de un plan Histórico—.
+ * El control por carrera lo da la política de autorización, no esta forma.
+ */
+@ApiTags('Planes de evaluación')
+@ApiBearerAuth()
+@Controller('indicaciones/:id')
+export class ResultadosController {
+  constructor(private readonly casos: ConfigurarPlanEvaluacion) {}
+
+  @Put('resultados')
+  @ApiOperation({ summary: 'El enlace a los resultados de una indicación (RF-PE-029)' })
+  @ApiResponse({ status: 404, description: 'La indicación no existe.' })
+  async resultados(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ResultadosDto,
+    @ActorActual() actor: Actor,
+  ) {
+    return this.casos.guardarResultados(actor, id, dto.enlaceResultados ?? null);
   }
 }
 

@@ -176,7 +176,7 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
     competenciaId: string;
     instrumento: string | null;
     frecuencia: string | null;
-    responsableId?: string | null;
+    responsableId: string | null;
   }): Promise<void> {
     await this.prisma.configuracionCompetencia.upsert({
       where: {
@@ -186,9 +186,9 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
         },
       },
       create: datos,
-      // `responsableId` va tal cual, incluso `undefined`: Prisma no toca un
-      // campo que no viene en el `update`, así que quien llama sin conocer el
-      // responsable no borra el que ya estaba (ver el comentario del puerto).
+      // `responsableId` va tal cual, `null` incluido: el puerto ahora lo exige
+      // en toda llamada (ver su comentario), así que aquí nunca llega
+      // `undefined` desde el único caso de uso que invoca este método.
       update: {
         instrumento: datos.instrumento,
         frecuencia: datos.frecuencia,

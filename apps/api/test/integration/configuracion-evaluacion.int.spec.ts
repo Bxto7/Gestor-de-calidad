@@ -228,12 +228,14 @@ describe('el repositorio', () => {
       competenciaId: CMP1,
       instrumento: 'Rúbrica',
       frecuencia: 'Semestral',
+      responsableId: null,
     });
     await repo.guardarCompetencia({
       planEvaluacionId: plan.id,
       competenciaId: CMP1,
       instrumento: 'Rúbrica analítica',
       frecuencia: 'Anual',
+      responsableId: null,
     });
 
     const { competencias } = await repo.del(plan.id);

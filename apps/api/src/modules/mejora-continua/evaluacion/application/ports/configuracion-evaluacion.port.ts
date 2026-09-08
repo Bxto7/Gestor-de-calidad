@@ -74,10 +74,16 @@ export interface RepositorioConfiguracionEvaluacionPort {
     instrumento: string | null;
     frecuencia: string | null;
     /**
-     * RF-PE-024. Opcional: quien llama sin conocer el responsable (el resto
-     * de las llamadas de hoy) no debe borrar el que ya estaba guardado.
+     * RF-PE-024. Obligatorio: el `PUT` de competencia reemplaza la
+     * configuración entera (instrumento y frecuencia ya se comportan así, vía
+     * `?? null` en el controlador), así que quien llama decide siempre, aunque
+     * decida `null`. Era opcional mientras esta tarea no existía, para que el
+     * caso de uso no tuviera que tocar el controlador viejo; esa razón ya no
+     * aplica y dejarla era una trampa: el repositorio conserva el responsable
+     * existente cuando el campo llega `undefined`, pero lo borra cuando llega
+     * `null` — un campo opcional convertía un olvido en un borrado silencioso.
      */
-    responsableId?: string | null;
+    responsableId: string | null;
   }): Promise<void>;
 
   /**

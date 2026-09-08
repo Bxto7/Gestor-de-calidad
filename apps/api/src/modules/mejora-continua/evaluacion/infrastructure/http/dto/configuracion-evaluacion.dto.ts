@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -16,10 +17,17 @@ import {
 } from 'class-validator';
 
 import { Recortado } from '../../../../../../platform/http/recortado.js';
+import type { GrupoObjetivo } from '../../../application/ports/configuracion-evaluacion.port.js';
 
+/**
+ * `PUT` de reemplazo total (RF-PE-024): igual que `instrumento` y
+ * `frecuencia`, que ya se envían con `?? null` en el controlador, omitir
+ * `responsableId` lo borra. No es una actualización parcial.
+ */
 export class ConfiguracionCompetenciaDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(300) instrumento?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) frecuencia?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() responsableId?: string;
 }
 
 export class AsignaturaEvaluadaDto {
@@ -71,4 +79,40 @@ export class EvidenciasDto {
   @ValidateNested({ each: true })
   @Type(() => EvidenciaDto)
   evidencias!: EvidenciaDto[];
+}
+
+export class IndicacionDto {
+  @ApiProperty({ enum: ['EGRESADOS', 'EMPLEADORES', 'DOCENTES', 'ESTUDIANTES'] })
+  @IsIn(['EGRESADOS', 'EMPLEADORES', 'DOCENTES', 'ESTUDIANTES'])
+  grupoObjetivo!: GrupoObjetivo;
+
+  /** `@Recortado()` antes de medir: sin él, `"   "` supera el mínimo. */
+  @ApiProperty()
+  @Recortado()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  instruccion!: string;
+
+  /** RF-PE-029 RN1: obligatorio, y un enlace que no es un enlace no sirve. */
+  @ApiProperty() @IsUrl({ require_protocol: true }) @MaxLength(500) enlaceInstrumento!: string;
+}
+
+export class IndicacionesDelAnioDto {
+  @ApiProperty({ type: [IndicacionDto] })
+  @IsArray()
+  // Son cuatro grupos objetivo: más de cuatro entradas es un error de carga.
+  @ArrayMaxSize(4)
+  @ValidateNested({ each: true })
+  @Type(() => IndicacionDto)
+  indicaciones!: IndicacionDto[];
+}
+
+export class ResultadosDto {
+  /** Opcional: RF-PE-029 RN1 permite completarlo después, o vaciarlo. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  @MaxLength(500)
+  enlaceResultados?: string;
 }
