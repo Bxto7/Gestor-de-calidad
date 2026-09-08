@@ -14,7 +14,9 @@ import type {
   DatosAsignaturaEvaluada,
   DatosConfiguracionCompetencia,
   DatosEvidencia,
+  DatosIndicacion,
   DatosMedicion,
+  GrupoObjetivo,
   RepositorioConfiguracionEvaluacionPort,
 } from '../../application/ports/configuracion-evaluacion.port.js';
 
@@ -49,6 +51,16 @@ const SELECCION_COMPETENCIA = {
   competenciaId: true,
   instrumento: true,
   frecuencia: true,
+  responsableId: true,
+} as const;
+
+const SELECCION_INDICACION = {
+  id: true,
+  periodoId: true,
+  grupoObjetivo: true,
+  instruccion: true,
+  enlaceInstrumento: true,
+  enlaceResultados: true,
 } as const;
 
 interface FilaEvidencia {
@@ -76,6 +88,16 @@ interface FilaCompetencia {
   competenciaId: string;
   instrumento: string | null;
   frecuencia: string | null;
+  responsableId: string | null;
+}
+
+interface FilaIndicacion {
+  id: string;
+  periodoId: string;
+  grupoObjetivo: GrupoObjetivo;
+  instruccion: string;
+  enlaceInstrumento: string;
+  enlaceResultados: string | null;
 }
 
 function aEvidencia(fila: FilaEvidencia): DatosEvidencia {
@@ -106,6 +128,18 @@ function aCompetencia(fila: FilaCompetencia): DatosConfiguracionCompetencia {
     competenciaId: fila.competenciaId,
     instrumento: fila.instrumento,
     frecuencia: fila.frecuencia,
+    responsableId: fila.responsableId,
+  };
+}
+
+function aIndicacion(fila: FilaIndicacion): DatosIndicacion {
+  return {
+    id: fila.id,
+    periodoId: fila.periodoId,
+    grupoObjetivo: fila.grupoObjetivo,
+    instruccion: fila.instruccion,
+    enlaceInstrumento: fila.enlaceInstrumento,
+    enlaceResultados: fila.enlaceResultados,
   };
 }
 
@@ -114,7 +148,7 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
   constructor(private readonly prisma: PrismaService) {}
 
   async del(planEvaluacionId: string): Promise<ConfiguracionDelPlan> {
-    const [competencias, mediciones] = await Promise.all([
+    const [competencias, mediciones, indicaciones] = await Promise.all([
       this.prisma.configuracionCompetencia.findMany({
         where: { planEvaluacionId },
         select: SELECCION_COMPETENCIA,
@@ -123,11 +157,17 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
         where: { planEvaluacionId },
         select: SELECCION_MEDICION,
       }),
+      this.prisma.indicacionDeMedicion.findMany({
+        where: { planEvaluacionId },
+        select: SELECCION_INDICACION,
+        orderBy: [{ periodoId: 'asc' }, { grupoObjetivo: 'asc' }],
+      }),
     ]);
 
     return {
       competencias: competencias.map(aCompetencia),
       mediciones: mediciones.map(aMedicion),
+      indicaciones: indicaciones.map(aIndicacion),
     };
   }
 
@@ -136,6 +176,7 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
     competenciaId: string;
     instrumento: string | null;
     frecuencia: string | null;
+    responsableId?: string | null;
   }): Promise<void> {
     await this.prisma.configuracionCompetencia.upsert({
       where: {
@@ -145,7 +186,14 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
         },
       },
       create: datos,
-      update: { instrumento: datos.instrumento, frecuencia: datos.frecuencia },
+      // `responsableId` va tal cual, incluso `undefined`: Prisma no toca un
+      // campo que no viene en el `update`, así que quien llama sin conocer el
+      // responsable no borra el que ya estaba (ver el comentario del puerto).
+      update: {
+        instrumento: datos.instrumento,
+        frecuencia: datos.frecuencia,
+        responsableId: datos.responsableId,
+      },
     });
   }
 
@@ -236,5 +284,63 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
       select: { medicion: { select: { planEvaluacionId: true } } },
     });
     return fila?.medicion.planEvaluacionId ?? null;
+  }
+
+  async reemplazarIndicaciones(
+    planEvaluacionId: string,
+    periodoId: string,
+    indicaciones: readonly {
+      grupoObjetivo: GrupoObjetivo;
+      instruccion: string;
+      enlaceInstrumento: string;
+    }[],
+  ): Promise<void> {
+    const grupos = indicaciones.map((i) => i.grupoObjetivo);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Solo las que ya no vienen. Borrarlas todas y recrearlas daría el mismo
+      // resultado visible pero se llevaría el `enlaceResultados` de las que se
+      // conservan: es seguimiento, y lo escribe otro endpoint (RF-PE-029), no
+      // la definición que este método reemplaza.
+      await tx.indicacionDeMedicion.deleteMany({
+        where: { planEvaluacionId, periodoId, grupoObjetivo: { notIn: grupos } },
+      });
+
+      for (const i of indicaciones) {
+        await tx.indicacionDeMedicion.upsert({
+          where: {
+            planEvaluacionId_periodoId_grupoObjetivo: {
+              planEvaluacionId,
+              periodoId,
+              grupoObjetivo: i.grupoObjetivo,
+            },
+          },
+          create: {
+            planEvaluacionId,
+            periodoId,
+            grupoObjetivo: i.grupoObjetivo,
+            instruccion: i.instruccion,
+            enlaceInstrumento: i.enlaceInstrumento,
+          },
+          // El `update` no menciona `enlaceResultados`: por eso sobrevive.
+          update: { instruccion: i.instruccion, enlaceInstrumento: i.enlaceInstrumento },
+        });
+      }
+    });
+  }
+
+  async guardarResultados(indicacionId: string, enlaceResultados: string | null): Promise<void> {
+    await this.prisma.indicacionDeMedicion.update({
+      where: { id: indicacionId },
+      data: { enlaceResultados },
+    });
+  }
+
+  async planDeIndicacion(indicacionId: string): Promise<string | null> {
+    const fila = await this.prisma.indicacionDeMedicion.findUnique({
+      where: { id: indicacionId },
+      select: { planEvaluacionId: true },
+    });
+    return fila?.planEvaluacionId ?? null;
   }
 }

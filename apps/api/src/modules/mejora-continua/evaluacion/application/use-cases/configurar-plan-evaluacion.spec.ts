@@ -203,12 +203,17 @@ function repoConfiguracion(
   sobre: Partial<RepositorioConfiguracionEvaluacionPort> = {},
 ): RepositorioConfiguracionEvaluacionPort {
   return {
-    del: async () => ({ competencias: [], mediciones: [] }),
+    del: async () => ({ competencias: [], mediciones: [], indicaciones: [] }),
     guardarCompetencia: async () => undefined,
     reemplazarAsignaturas: async () => undefined,
     guardarPorcentaje: async () => undefined,
     reemplazarEvidencias: async () => undefined,
     planDeAsignaturaEvaluada: async () => 'ev-1',
+    // Este caso de uso todavía no orquesta indicaciones (llega en otra tarea):
+    // dobles mínimos, solo para que el tipo del puerto quede satisfecho.
+    reemplazarIndicaciones: async () => undefined,
+    guardarResultados: async () => undefined,
+    planDeIndicacion: async () => null,
     ...sobre,
   };
 }

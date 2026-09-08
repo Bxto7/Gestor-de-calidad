@@ -23,10 +23,15 @@ const CMP2 = randomUUID();
 const PER1 = randomUUID();
 const ASIG1 = randomUUID();
 const ASIG2 = randomUUID();
+const RESPONSABLE = randomUUID();
+const ANIO1 = randomUUID();
+const ANIO2026 = randomUUID();
+const ANIO2027 = randomUUID();
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE mejora_continua.evidencia, mejora_continua.asignatura_evaluada,
+    TRUNCATE mejora_continua.indicacion_medicion, mejora_continua.evidencia,
+             mejora_continua.asignatura_evaluada,
              mejora_continua.medicion_alcanzada, mejora_continua.configuracion_competencia,
              mejora_continua.planes_evaluacion, mejora_continua.documentos_medicion,
              mejora_continua.programacion_medicion, mejora_continua.competencias_del_plan,
@@ -363,5 +368,66 @@ describe('el repositorio', () => {
 
     expect(await repo.planDeAsignaturaEvaluada(ae.id)).toBe(plan.id);
     expect(await repo.planDeAsignaturaEvaluada(randomUUID())).toBeNull();
+  });
+
+  it('reemplazar las indicaciones conserva el enlace a resultados de las que siguen', async () => {
+    // El enlace a resultados es seguimiento y lo escribe otro endpoint. Si
+    // reemplazar la definición lo tirara, alguien perdería el enlace al pulsar
+    // «Guardar» sin haber tocado esa fila.
+    const plan = await crearEvaluacion();
+    await repo.reemplazarIndicaciones(plan.id, ANIO1, [
+      { grupoObjetivo: 'EGRESADOS', instruccion: 'Encuesta anual', enlaceInstrumento: 'https://e.test/f' },
+    ]);
+    const [i] = (await repo.del(plan.id)).indicaciones;
+    await repo.guardarResultados(i!.id, 'https://e.test/r');
+
+    await repo.reemplazarIndicaciones(plan.id, ANIO1, [
+      {
+        grupoObjetivo: 'EGRESADOS',
+        instruccion: 'Encuesta anual v2',
+        enlaceInstrumento: 'https://e.test/f',
+      },
+    ]);
+
+    const [tras] = (await repo.del(plan.id)).indicaciones;
+    expect(tras!.instruccion).toBe('Encuesta anual v2');
+    expect(tras!.enlaceResultados).toBe('https://e.test/r');
+  });
+
+  it('reemplazar borra las que no vienen', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarIndicaciones(plan.id, ANIO1, [
+      { grupoObjetivo: 'EGRESADOS', instruccion: 'A', enlaceInstrumento: 'https://e.test/a' },
+      { grupoObjetivo: 'DOCENTES', instruccion: 'B', enlaceInstrumento: 'https://e.test/b' },
+    ]);
+    await repo.reemplazarIndicaciones(plan.id, ANIO1, [
+      { grupoObjetivo: 'EGRESADOS', instruccion: 'A', enlaceInstrumento: 'https://e.test/a' },
+    ]);
+
+    const grupos = (await repo.del(plan.id)).indicaciones.map((i) => i.grupoObjetivo);
+    expect(grupos).toEqual(['EGRESADOS']);
+  });
+
+  it('reemplazar un año no toca los otros años', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarIndicaciones(plan.id, ANIO2026, [
+      { grupoObjetivo: 'EGRESADOS', instruccion: 'A', enlaceInstrumento: 'https://e.test/a' },
+    ]);
+    await repo.reemplazarIndicaciones(plan.id, ANIO2027, []);
+
+    expect((await repo.del(plan.id)).indicaciones).toHaveLength(1);
+  });
+
+  it('el responsable viaja de ida y vuelta', async () => {
+    const plan = await crearEvaluacion();
+    await repo.guardarCompetencia({
+      planEvaluacionId: plan.id,
+      competenciaId: CMP1,
+      instrumento: 'Encuesta',
+      frecuencia: 'Anual',
+      responsableId: RESPONSABLE,
+    });
+
+    expect((await repo.del(plan.id)).competencias[0]!.responsableId).toBe(RESPONSABLE);
   });
 });
