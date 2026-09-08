@@ -24,7 +24,14 @@ export default defineConfig({
       provider: 'v8',
       // §2 y §6.6: el umbral del 80% aplica a dominio y aplicación, que es
       // donde viven las reglas de negocio.
-      include: ['src/modules/*/domain/**/*.ts', 'src/modules/*/application/**/*.ts'],
+      //
+      // `**` y no `*` entre `modules` y `domain`: `*` casa un solo segmento y
+      // `mejora-continua` guarda su código un nivel más adentro
+      // (`mejora-continua/evaluacion/application/…`). Con el glob de un solo
+      // segmento el gate medía 28 ficheros y **ninguno** de `evaluacion/` ni
+      // de `medicion/` — el porcentaje que publicaba CI no describía el mayor
+      // cuerpo de código del proyecto.
+      include: ['src/modules/**/domain/**/*.ts', 'src/modules/**/application/**/*.ts'],
       exclude: ['**/*.spec.ts', '**/ports/**', '**/*.types.ts'],
       reporter: ['text', 'html'],
       thresholds: { statements: 80, branches: 80, functions: 80, lines: 80 },
