@@ -241,9 +241,9 @@ export function ConfiguracionDelPeriodo({
   //
   // Los `aeId` nuevos entran también en `base`, y no solo en el estado
   // visible: la comparación de evidencias empareja las filas por `aeId`
-  // (`base.filas.find(f => f.aeId === fila.aeId)`), así que una base con
-  // `aeId: null` no encontraría nunca su pareja y las evidencias de una fila
-  // recién creada no se llegarían a enviar.
+  // (`anterior.filas.find(f => f.aeId === fila.aeId)`, más abajo), así que una
+  // base con `aeId: null` no encontraría nunca su pareja y las evidencias de
+  // una fila recién creada no se llegarían a enviar.
   const [configuracionVista, setConfiguracionVista] = useState(configuracion);
   if (configuracion !== configuracionVista) {
     setConfiguracionVista(configuracion);
