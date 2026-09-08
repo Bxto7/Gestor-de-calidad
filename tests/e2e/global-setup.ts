@@ -23,6 +23,8 @@ export const DIRECTORIO_AUTH = join(AQUI, '.auth');
 export const CUENTAS = {
   editor: { email: 'e2e-editor@sgc.local' },
   lector: { email: 'e2e-lector@sgc.local' },
+  director: { email: 'e2e-director@sgc.local' },
+  docente: { email: 'e2e-docente@sgc.local' },
 } as const;
 
 export type Rol = keyof typeof CUENTAS;
@@ -49,7 +51,7 @@ async function entrar(email: string, password: string): Promise<Sesion> {
     if (login.status === 429) {
       throw new Error(
         'Demasiados intentos de acceso: el login admite cinco por minuto y esta ' +
-          'suite gasta dos por ejecución. Espera un minuto y vuelve a lanzarla.',
+          'suite gasta cuatro por ejecución. Espera un minuto y vuelve a lanzarla.',
       );
     }
 
@@ -105,7 +107,10 @@ export default async function globalSetup(): Promise<void> {
     await writeFile(join(DIRECTORIO_AUTH, `${rol}.json`), JSON.stringify(sesion), 'utf8');
   }
 
-  if (editor) await asegurarUnPlan(editor.accessToken);
+  if (editor) {
+    await asegurarUnPlan(editor.accessToken);
+    await asegurarUnPlanEvaluacion(editor.accessToken);
+  }
 }
 
 /**
@@ -149,5 +154,46 @@ async function asegurarUnPlan(token: string): Promise<void> {
   });
   if (!creado.ok) {
     throw new Error(`No se pudo crear el plan de medición de partida (${creado.status}).`);
+  }
+}
+
+/**
+ * Garantiza que existe al menos un plan de evaluación antes de la primera prueba.
+ *
+ * El mismo problema que resuelve `asegurarUnPlan`, un nivel más adentro:
+ * `accesibilidad` y `configuracion-evaluacion` abren el detalle de un plan de
+ * evaluación, y por orden alfabético corren antes que `evaluacion`, que es
+ * quien lo crea por la interfaz. `preparar-e2e` además reinicia los planes de
+ * evaluación de la carrera E2E en cada ejecución, así que contra una base recién
+ * preparada —local o de CI— las dos empezarían sin ninguno.
+ *
+ * Se crea por la API y no recorriendo la interfaz, por la misma razón que
+ * `asegurarUnPlan`: esto es preparación, no prueba.
+ */
+async function asegurarUnPlanEvaluacion(token: string): Promise<void> {
+  const cabeceras = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+
+  const existentes = await fetch(`${API}/planes-evaluacion`, { headers: cabeceras });
+  if (!existentes.ok)
+    throw new Error(`No se pudo listar los planes de evaluación (${existentes.status}).`);
+  if (((await existentes.json()) as unknown[]).length > 0) return;
+
+  const bases = await fetch(`${API}/planes-evaluacion/bases-elegibles`, { headers: cabeceras });
+  if (!bases.ok) throw new Error(`No se pudieron listar las bases elegibles (${bases.status}).`);
+  const base = ((await bases.json()) as { id: string }[])[0];
+  if (!base) {
+    throw new Error(
+      'No hay ningún plan de medición Aprobado o Vigente sobre el que evaluar. ' +
+        'Ejecuta `npm run e2e:preparar` en apps/api.',
+    );
+  }
+
+  const creado = await fetch(`${API}/planes-evaluacion`, {
+    method: 'POST',
+    headers: cabeceras,
+    body: JSON.stringify({ planMedicionId: base.id }),
+  });
+  if (!creado.ok) {
+    throw new Error(`No se pudo crear el plan de evaluación de partida (${creado.status}).`);
   }
 }

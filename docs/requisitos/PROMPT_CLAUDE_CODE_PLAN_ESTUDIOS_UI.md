@@ -1278,6 +1278,7 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | Aprobada (2026-09-04) |
 | D-11 | RF127 (Mejora Continua) | Una competencia sin atributo del graduado se muestra y se puede incluir en un plan de medición; el requisito dice excluirla | **PENDIENTE** |
 | D-12 | RF-PE-020 (Mejora Continua) | La evidencia del entregable se registra como enlace; el requisito admite «archivos o enlaces» y no hay subida de archivos | **PENDIENTE** |
+| D-13 | RF-PE-006 RN2 (Mejora Continua) | La excepción del registro progresivo remite a RF-PE-022 y RF-PE-028 (medición Indirecta, ninguno registra un porcentaje); los que sí lo describen son RF-PE-019 y RF-PE-026 | **PENDIENTE** |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1468,6 +1469,46 @@ significa además migrar lo ya cargado.
 **Decidido el 7 de septiembre de 2026:** empezar por enlaces, a la espera de que
 la universidad confirme. La decisión es reversible —añadir archivos es aditivo,
 no deshace los enlaces— y por eso se toma en esta dirección y no en la contraria.
+
+---
+
+### D-13 · RF-PE-006 RN2 — la excepción del registro progresivo cita los requisitos equivocados
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+**Pide:** RN2, completo: «Se exceptúa el registro progresivo de mediciones por
+periodo o año (ver RF-PE-022 y RF-PE-028), el cual sí se permite en estado
+Vigente.»
+
+**El problema:** RF-PE-022 («Establecer el instrumento de evaluación de cada
+competencia», Indirecta) y RF-PE-028 («Registrar una o varias indicaciones
+asociadas a la medición de un año, por grupo objetivo», Indirecta) no describen
+ningún registro progresivo de porcentaje. Los dos son de la medición
+**Indirecta**, así que ni siquiera cubren el «o periodo» de la propia frase.
+Leída literal, RN2 no le concede ninguna excepción al plan **Directo** —el que
+este ciclo (2c-B) construye—, y sin excepción un plan Directo Vigente nunca
+podría registrar el porcentaje alcanzado de un periodo que ya cerró: justo lo
+que la propia regla dice permitir.
+
+**Los que sí lo describen:** **RF-PE-019** («Registrar el porcentaje de
+medición alcanzado por competencia en el periodo», Directa) y **RF-PE-026**
+(«Registrar el porcentaje de cumplimiento de la medición por competencia en el
+año seleccionado», Indirecta) — uno por cada mitad de «por periodo o año», y
+los dos con el mismo verbo, «registrar el porcentaje», que es lo que RN2 dice
+exceptuar.
+
+**Qué hace el sistema:** `ConfigurarPlanEvaluacion.exigirSeguimientoEditable`
+(`configurar-plan-evaluacion.use-case.ts`) ya sigue la lectura corregida: acepta
+Borrador y Vigente para el porcentaje alcanzado y las evidencias, sin distinguir
+el tipo de plan. La implementación nunca dependió de los números entre
+paréntesis —se escribió a partir de la regla en general—, así que no hay ningún
+cambio de comportamiento pendiente, solo una referencia cruzada que corregir en
+el documento fuente.
+
+**Qué hay que decidir:** confirmar la corrección (RF-PE-019 y RF-PE-026 en vez
+de RF-PE-022 y RF-PE-028) y actualizar RN2 en el documento de Mejora Continua.
+Mientras tanto, quien lea RN2 junto a los dos números que cita hoy llega a la
+conclusión contraria a lo que la propia regla quiere decir.
 
 ---
 

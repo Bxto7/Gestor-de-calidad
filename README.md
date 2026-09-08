@@ -221,14 +221,20 @@ artefactos de compilación viven fuera del control de versiones.
   realizadas, motor de consistencia, versionado y duplicado con su linaje,
   historial, y exportación a PDF y Excel (RF-PM-027 a RF-PM-029) por la misma
   cola de BullMQ, con el worker enrutando cada trabajo a su módulo.
-- Submódulo **Planes de Evaluación, 17 de 49 (RF-PE-001 a RF-PE-012)**: alta de
+- Submódulo **Planes de Evaluación, 28 de 49 (RF-PE-001 a RF-PE-021)**: alta de
   un plan de evaluación a partir de un plan de medición Aprobado o Vigente, que
   hereda el tipo y la meta (nunca se repiten a mano); tarjeta de lo heredado
   —competencias y periodos del plan de medición base, en solo lectura, sin
   casillas ni campos editables porque RF-PE-010 y RF-PE-011 no dejan añadir ni
-  quitar desde aquí—; y el mismo ciclo de vida de estados que Planes de
+  quitar desde aquí—; el mismo ciclo de vida de estados que Planes de
   Medición, con permisos propios (`evaluacion.*`) y su propia entrada en la
-  bitácora.
+  bitácora; y la **configuración directa por competencia y periodo**
+  (RF-PE-013 a RF-PE-021): instrumento y frecuencia —uno por competencia, vale
+  para todos los periodos—, las asignaturas y el docente responsable de cada
+  cruce competencia×periodo que la matriz del plan de medición base programó,
+  y el porcentaje alcanzado, que RF-PE-006 RN2 deja registrar también con el
+  plan ya Vigente aunque su definición —instrumento, frecuencia, asignaturas—
+  se cierre al aprobarlo.
 - Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
   aviso de impacto al editar un atributo que ya usan competencias o planes
   (RF120–RF123, RF128–RF132).
@@ -237,9 +243,9 @@ artefactos de compilación viven fuera del control de versiones.
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
   estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
   queda ningún almacén en memoria.
-- Pruebas en verde: 742 unitarias en la API, 187 en el frontend, 246 de
-  integración en trece suites contra un PostgreSQL real y desechable, y 27
-  recorridos E2E con Playwright —cuatro de ellos con `axe-core` sobre WCAG 2.1
+- Pruebas en verde: 758 unitarias en la API, 202 en el frontend, 269 de
+  integración en quince suites contra un PostgreSQL real y desechable, y 31
+  recorridos E2E con Playwright —seis de ellos con `axe-core` sobre WCAG 2.1
   AA—. Los guiones de carga k6 viven en `tests/carga/`.
 - CI en GitHub Actions con los quality gates de §6.6: typecheck, lint, formato,
   cobertura, `npm audit` y Semgrep, más un job de E2E que levanta PostgreSQL,

@@ -2,9 +2,9 @@
 
 Dirigido a quien mantiene *«Módulo de Plan de Estudios — Especificación de Requerimientos»* (Huancayo, 15 de agosto de 2026) y *«Módulo de Mejora Continua — Requerimientos»*.
 
-Al construir los módulos aparecieron once puntos en los que el sistema y el documento no coinciden. **Nueve necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
+Al construir los módulos aparecieron doce puntos en los que el sistema y el documento no coinciden. **Diez necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
 
-Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-12** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
+Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-13** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
 
 Fecha de este informe: **7 de septiembre de 2026** (la primera versión es del 25 de agosto).
 
@@ -131,6 +131,22 @@ La decisión que hemos tomado es reversible —añadir archivos más adelante no
 
 ---
 
+### D-13 · RF-PE-006 RN2 · La excepción de «registro progresivo» cita los requisitos equivocados
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+RN2 dice que se exceptúa «el registro progresivo de mediciones por periodo o año», y remite a RF-PE-022 y RF-PE-028 como los requisitos que lo describen.
+
+**El problema.** Ninguno de los dos lo describe. Los dos son de la medición Indirecta —instrumento de evaluación (022) e indicaciones por grupo objetivo (028)— y ninguno registra un porcentaje. Leída tal cual, la excepción no alcanza al plan Directo, que es el que se acaba de construir: sin ella, un plan Directo Vigente no podría registrar nunca el porcentaje alcanzado de un periodo ya cerrado — justo lo que la propia regla dice permitir.
+
+**Los que sí corresponden.** RF-PE-019 (Directa, registra el porcentaje por periodo) y RF-PE-026 (Indirecta, registra el porcentaje por año) — uno por cada mitad de «periodo o año».
+
+**Qué hace el sistema hoy.** Ya implementa la lectura correcta: el porcentaje alcanzado se puede registrar en Borrador y en Vigente, sin condicionarlo al tipo de plan. La cita rota no llegó a afectar el comportamiento, porque el código nunca dependió de esos dos números.
+
+**Qué hay que decidir.** Confirmar el cambio y corregir RN2 en el documento de Mejora Continua, cambiando «RF-PE-022 y RF-PE-028» por «RF-PE-019 y RF-PE-026».
+
+---
+
 ## Parte 2 — Solo para constancia
 
 No requieren decisión. El sistema hace más de lo que el requisito pedía, sin contradecirlo. Se anotan por si el documento quiere reflejar el nivel de detalle alcanzado.
@@ -208,6 +224,7 @@ De más urgente a menos:
 | **D-9** · Horas y sumillas | Los documentos que salgan del sistema van incompletos |
 | **D-1** · RF092 | Discrepancia entre código y requisito, sin efecto práctico negativo hoy |
 | **D-5** · Carga de planes históricos | Discrepancia sobre el papel; la práctica es la correcta |
+| **D-13** · RF-PE-006 RN2 · Cita cruzada equivocada | Discrepancia sobre el papel; el sistema ya sigue la lectura correcta |
 | **D-3** · RF084 en Excel | Ninguno, salvo que alguien lo pida |
 
 Los dos puntos de constancia (**D-7** y **D-8**) no aparecen aquí porque no hay nada que resolver.

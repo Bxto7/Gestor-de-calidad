@@ -34,13 +34,19 @@ npx prisma migrate deploy
 npx tsx prisma/seed.ts
 npm run e2e:preparar
 
-# 3. Las dos cuentas
+# 3. Las cuatro cuentas
 export SGC_E2E_PASSWORD='E2E.Pruebas.2026!'
 SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts \
   --email e2e-editor@sgc.local --nombre "E2E Editor" \
   --rol COORDINADOR_ACADEMICO --carrera E2E
 SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts \
   --email e2e-lector@sgc.local --nombre "E2E Lector" --rol USUARIO_CONSULTOR
+SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts \
+  --email e2e-docente@sgc.local --nombre "E2E Docente" \
+  --rol DOCENTE --carrera E2E
+SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts \
+  --email e2e-director@sgc.local --nombre "E2E Director" \
+  --rol DIRECTOR_CARRERA --carrera E2E
 
 # 4. La API, con el limitador alto
 npm run build && THROTTLE_LIMIT=10000 npm start
