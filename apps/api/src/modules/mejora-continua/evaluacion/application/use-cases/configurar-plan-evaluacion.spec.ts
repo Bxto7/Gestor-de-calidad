@@ -39,7 +39,10 @@ import type {
   DatosPlanMedicion,
   RepositorioPlanMedicionPort,
 } from '../../../medicion/application/ports/plan-medicion.port.js';
-import type { RepositorioConfiguracionEvaluacionPort } from '../ports/configuracion-evaluacion.port.js';
+import type {
+  GrupoObjetivo,
+  RepositorioConfiguracionEvaluacionPort,
+} from '../ports/configuracion-evaluacion.port.js';
 import type {
   DatosPlanEvaluacion,
   RepositorioPlanEvaluacionPort,
@@ -209,8 +212,6 @@ function repoConfiguracion(
     guardarPorcentaje: async () => undefined,
     reemplazarEvidencias: async () => undefined,
     planDeAsignaturaEvaluada: async () => 'ev-1',
-    // Este caso de uso todavía no orquesta indicaciones (llega en otra tarea):
-    // dobles mínimos, solo para que el tipo del puerto quede satisfecho.
     reemplazarIndicaciones: async () => undefined,
     guardarResultados: async () => undefined,
     planDeIndicacion: async () => null,
@@ -226,6 +227,7 @@ function montar(
     asignaturas?: AsignaturaBase[];
     competenciasDelPlan?: readonly string[];
     planDeAsignaturaEvaluada?: string | null;
+    planDeIndicacion?: string | null;
     contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
     registrarRolPedido?: (rol: string) => void;
@@ -239,10 +241,19 @@ function montar(
   };
 
   const guardado: {
-    competencia?: { instrumento: string | null; frecuencia: string | null };
+    competencia?: {
+      instrumento: string | null;
+      frecuencia: string | null;
+      responsableId?: string | null;
+    };
     asignaturas?: readonly { asignaturaId: string; entregable: string; docenteId: string | null }[];
     porcentaje?: number | null;
     evidencias?: readonly { enlace: string; descripcion: string }[];
+    indicaciones?: {
+      periodoId: string;
+      lista: readonly { grupoObjetivo: GrupoObjetivo; instruccion: string; enlaceInstrumento: string }[];
+    };
+    resultados?: { indicacionId: string; enlaceResultados: string | null };
   } = {};
 
   const evaluacionActual = opciones.evaluacion ?? evaluacion();
@@ -281,7 +292,11 @@ function montar(
 
   const configuracion = repoConfiguracion({
     guardarCompetencia: async (datos) => {
-      guardado.competencia = { instrumento: datos.instrumento, frecuencia: datos.frecuencia };
+      guardado.competencia = {
+        instrumento: datos.instrumento,
+        frecuencia: datos.frecuencia,
+        responsableId: datos.responsableId,
+      };
     },
     reemplazarAsignaturas: async (_planEvaluacionId, _competenciaId, _periodoId, asignaturas) => {
       guardado.asignaturas = asignaturas;
@@ -296,6 +311,17 @@ function montar(
       opciones.planDeAsignaturaEvaluada === undefined
         ? evaluacionActual.id
         : opciones.planDeAsignaturaEvaluada,
+    // Dobles de verdad, no los stubs no-op que dejó la tarea anterior: sin
+    // registrar lo que reciben, las pruebas nuevas de indicaciones y
+    // resultados pasarían sin comprobar nada.
+    reemplazarIndicaciones: async (_planEvaluacionId, periodoId, indicaciones) => {
+      guardado.indicaciones = { periodoId, lista: indicaciones };
+    },
+    guardarResultados: async (indicacionId, enlaceResultados) => {
+      guardado.resultados = { indicacionId, enlaceResultados };
+    },
+    planDeIndicacion: async () =>
+      opciones.planDeIndicacion === undefined ? evaluacionActual.id : opciones.planDeIndicacion,
   });
 
   const caso = new ConfigurarPlanEvaluacion(
@@ -378,8 +404,28 @@ describe('RF-PE-013 — la competencia tiene que estar declarada', () => {
       caso.guardarCompetencia(ACTOR, 'ev-1', 'c-ajena', {
         instrumento: 'Rúbrica',
         frecuencia: 'Semestral',
+        responsableId: null,
       }),
     ).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+});
+
+describe('RF-PE-024 — el responsable de una competencia', () => {
+  it('el responsable se guarda tal cual llega', async () => {
+    // 2c-C dejó `responsableId` opcional en el puerto para que un `update`
+    // sin ese dato no borre el que ya estaba — pero eso es una razón del
+    // puerto, no una excusa para que este caso de uso lo omita: si no lo
+    // reenvía siempre, el campo llega como `undefined` y Prisma no toca la
+    // columna, un fallo silencioso que ningún tipo detecta.
+    const { caso, guardado } = montar();
+
+    await caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+      instrumento: 'Encuesta',
+      frecuencia: 'Anual',
+      responsableId: 'u-9',
+    });
+
+    expect(guardado.competencia?.responsableId).toBe('u-9');
   });
 });
 
@@ -389,7 +435,11 @@ describe('RF-PE-006 y RF-PE-007 — la frontera de estados', () => {
       const { caso } = montar({ evaluacion: evaluacion({ estado }) });
 
       await expect(
-        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', { instrumento: 'R', frecuencia: 'S' }),
+        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+          instrumento: 'R',
+          frecuencia: 'S',
+          responsableId: null,
+        }),
       ).rejects.toThrow(ReglaDeNegocioViolada);
       await expect(caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [])).rejects.toThrow(
         ReglaDeNegocioViolada,
@@ -431,6 +481,103 @@ describe('RF-PE-006 y RF-PE-007 — la frontera de estados', () => {
   });
 });
 
+/** Un plan de medición base declarado INDIRECTA, con un único periodo 'anio-1'. */
+function baseIndirecta(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
+  return planMedicion({
+    tipo: 'INDIRECTA',
+    periodos: [{ id: 'anio-1', etiqueta: '2026', orden: 1, fechaCierre: null }],
+    ...sobre,
+  });
+}
+
+const INDICACION = {
+  grupoObjetivo: 'EGRESADOS' as const,
+  instruccion: 'Responder la encuesta de seguimiento de egresados.',
+  enlaceInstrumento: 'https://forms.test/egresados',
+};
+
+describe('RF-PE-002 RN2 — el tipo del plan de medición limita qué se configura', () => {
+  it('un plan directo no acepta indicaciones', async () => {
+    // Por defecto `planMedicion()` es DIRECTA (ver el fixture), así que basta
+    // con no pedir una base INDIRECTA.
+    const { caso } = montar();
+
+    await expect(
+      caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION]),
+    ).rejects.toThrow(/DIRECTA/);
+  });
+
+  it('un plan indirecto no acepta asignaturas', async () => {
+    const { caso } = montar({ base: baseIndirecta() });
+
+    await expect(
+      caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'anio-1', []),
+    ).rejects.toThrow(/INDIRECTA/);
+  });
+});
+
+describe('RF-PE-028 a RF-PE-030 — indicaciones de medición y su enlace a resultados', () => {
+  it('las indicaciones son definición: solo en Borrador', async () => {
+    for (const estado of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+      const { caso } = montar({ evaluacion: evaluacion({ estado }), base: baseIndirecta() });
+
+      // Si esto cayera ya en la primera vuelta ('En revisión') aunque el
+      // bucle no recorriera el resto, el `for` no estaría probando nada más
+      // que ese primer estado — por eso cada iteración monta su propio caso.
+      await expect(
+        caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION]),
+      ).rejects.toThrow(ReglaDeNegocioViolada);
+    }
+  });
+
+  it('el enlace a resultados es seguimiento: Borrador y Vigente', async () => {
+    // RF-PE-029 RN1: «puede completarse después». Sin esta excepción, el
+    // resultado de una encuesta cerrada no podría registrarse nunca.
+    for (const estado of ['Borrador', 'Vigente'] as const) {
+      const { caso, guardado } = montar({ evaluacion: evaluacion({ estado }) });
+
+      await caso.guardarResultados(ACTOR, 'ind-1', 'https://e.test/r');
+
+      expect(guardado.resultados?.enlaceResultados).toBe('https://e.test/r');
+    }
+    for (const estado of ['En revisión', 'Aprobado', 'Histórico'] as const) {
+      const { caso } = montar({ evaluacion: evaluacion({ estado }) });
+
+      await expect(caso.guardarResultados(ACTOR, 'ind-1', 'https://e.test/r')).rejects.toThrow(
+        ReglaDeNegocioViolada,
+      );
+    }
+  });
+
+  it('las indicaciones solo caben en un año que la base declaró', async () => {
+    // El pliego llama a esto «la matriz programó», pero aquí no hay matriz
+    // competencia×periodo que consultar —una indicación no cuelga de una
+    // competencia— así que la comprobación real es contra los periodos de la
+    // base (`exigirPeriodoDeLaBase`), no contra `exigirCruceProgramado`.
+    const { caso } = montar({ base: baseIndirecta() });
+
+    await expect(
+      caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-inventado', [INDICACION]),
+    ).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('cada guardado deja constancia', async () => {
+    const { caso, publicados } = montar({ base: baseIndirecta() });
+
+    await caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION]);
+
+    expect(publicados.at(-1)?.nombre).toBe('evaluacion.configurada');
+  });
+
+  it('y el enlace a resultados también', async () => {
+    const { caso, publicados } = montar();
+
+    await caso.guardarResultados(ACTOR, 'ind-1', 'https://e.test/r');
+
+    expect(publicados.at(-1)?.nombre).toBe('evaluacion.configurada');
+  });
+});
+
 describe('el plan de unas evidencias sale de la asignatura evaluada', () => {
   it('si de ahí no sale ningún plan, no se escribe nada', async () => {
     // Lo que esta resolución cierra es que la frontera de estados se aplique
@@ -458,7 +605,11 @@ describe('permisos y bitácora', () => {
     const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
 
     await expect(
-      caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', { instrumento: 'R', frecuencia: 'S' }),
+      caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+          instrumento: 'R',
+          frecuencia: 'S',
+          responsableId: null,
+        }),
     ).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toEqual(['evaluacion.editar']);
   });
@@ -490,6 +641,7 @@ describe('permisos y bitácora', () => {
     await caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
       instrumento: 'Rúbrica',
       frecuencia: 'Semestral',
+      responsableId: null,
     });
 
     expect(publicados[0]?.nombre).toBe('evaluacion.configurada');
@@ -568,7 +720,11 @@ describe('el alcance por carrera (2c-C)', () => {
     });
 
     await expect(
-      caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', { instrumento: 'Rúbrica', frecuencia: null }),
+      caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+        instrumento: 'Rúbrica',
+        frecuencia: null,
+        responsableId: null,
+      }),
     ).rejects.toThrow(AccesoDenegado);
 
     // Y la carrera que se pasó es la del plan, no una inventada.
@@ -585,7 +741,11 @@ describe('el alcance por carrera (2c-C)', () => {
     [
       'guardarCompetencia',
       (caso: ConfigurarPlanEvaluacion) =>
-        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', { instrumento: 'R', frecuencia: null }),
+        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+          instrumento: 'R',
+          frecuencia: null,
+          responsableId: null,
+        }),
     ],
     [
       'guardarAsignaturas',
@@ -623,6 +783,7 @@ describe('NoEncontrado', () => {
       caso.guardarCompetencia(ACTOR, 'ev-desconocido', 'c-1', {
         instrumento: 'R',
         frecuencia: 'S',
+        responsableId: null,
       }),
     ).rejects.toThrow(NoEncontrado);
   });

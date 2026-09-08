@@ -68,6 +68,13 @@ export class ConfiguracionEvaluacionController {
     await this.casos.guardarCompetencia(actor, planId, competenciaId, {
       instrumento: dto.instrumento ?? null,
       frecuencia: dto.frecuencia ?? null,
+      // RF-PE-024 (el responsable) todavía no tiene campo en este DTO — lo
+      // añade el endpoint de la siguiente tarea. El caso de uso ahora exige
+      // el dato para no reenviarlo `undefined` al puerto en silencio, así que
+      // aquí se manda `null` explícito. Es seguro solo porque, hasta que ese
+      // endpoint exista, ningún camino de producción ha llegado a escribir un
+      // responsable que este PUT pudiera borrar sin querer.
+      responsableId: null,
     });
   }
 
