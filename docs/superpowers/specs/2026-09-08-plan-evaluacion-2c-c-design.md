@@ -188,8 +188,14 @@ guardianes que ya existen —`exigirDefinicionEditable` y
 | El grupo objetivo es uno de los cuatro | DTO y base | `@IsEnum` en el DTO, `enum` en PostgreSQL |
 | Instrucción y enlace al instrumento obligatorios | DTO y base | `@Recortado()` + `@MinLength(1)`, `NOT NULL` |
 | Los enlaces son URL con protocolo | DTO | `@IsUrl({ require_protocol: true })`, como las evidencias |
-| El responsable existe | Caso de uso | El puerto de directorio, ya ampliado en 2c-B |
+| El responsable **no** se valida | Ninguna | Ver abajo |
 | Las indicaciones son opcionales | Ninguna | RF-PE-028 RN2: cero es válido |
+
+**El responsable se guarda tal cual llega**, sin comprobar que la cuenta existe
+ni qué rol tiene. Es el precedente que 2c-B fijó para el docente y su razón vale
+igual aquí: validarlo convertiría un cambio de rol futuro en un dato histórico
+inválido, y la pantalla ya ofrece solo cuentas reales. El registro debe
+conservar a quien fuera responsable entonces, aunque después deje de serlo.
 
 `@Recortado()` es el decorador compartido de `platform/http`, no una copia:
 sin él, `"   "` supera el `@MinLength(1)` y una instrucción en blanco satisface
