@@ -12,6 +12,8 @@ import { describe, expect, it } from 'vitest';
 import {
   describirTransicion,
   permiteEdicion,
+  permiteEdicionDefinicionEvaluacion,
+  permiteEdicionSeguimientoEvaluacion,
   permiteEliminacion,
   permiteVersionado,
   transicionesDisponibles,
@@ -76,5 +78,45 @@ describe('RF-PM-030 — desde qué estados se versiona', () => {
     expect(permiteVersionado('Histórico')).toBe(true);
     expect(permiteVersionado('Borrador')).toBe(false);
     expect(permiteVersionado('En revisión')).toBe(false);
+  });
+});
+
+describe('RF-PE-006 — la definición y el seguimiento de una evaluación exigen permiso', () => {
+  // Regresión: `PlanEvaluacionPage` calculaba `editable`/`seguimientoEditable`
+  // solo a partir del estado, sin el permiso `evaluacion.editar`. Un docente
+  // con solo `evaluacion.leer` veía todos los campos habilitados y solo se
+  // enteraba de que no podía guardar al recibir el 403 del backend — trabajo
+  // perdido, no un agujero de seguridad, porque el backend ya lo rechazaba
+  // igual (`ConfigurarPlanEvaluacion.exigir`). `PlanMedicionPage` ya hacía
+  // esta comprobación para su propio permiso; aquí faltaba la mitad.
+  describe('permiteEdicionDefinicionEvaluacion', () => {
+    it('en Borrador, depende exclusivamente del permiso', () => {
+      expect(permiteEdicionDefinicionEvaluacion('Borrador', true)).toBe(true);
+      expect(permiteEdicionDefinicionEvaluacion('Borrador', false)).toBe(false);
+    });
+
+    it('fuera de Borrador es siempre falso, tenga o no el permiso', () => {
+      for (const estado of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+        expect(permiteEdicionDefinicionEvaluacion(estado, true)).toBe(false);
+        expect(permiteEdicionDefinicionEvaluacion(estado, false)).toBe(false);
+      }
+    });
+  });
+
+  describe('permiteEdicionSeguimientoEvaluacion', () => {
+    it('RN2: también Vigente, no solo Borrador, siempre que haya permiso', () => {
+      expect(permiteEdicionSeguimientoEvaluacion('Borrador', true)).toBe(true);
+      expect(permiteEdicionSeguimientoEvaluacion('Vigente', true)).toBe(true);
+    });
+
+    it('sin el permiso, ni Borrador ni Vigente lo admiten', () => {
+      expect(permiteEdicionSeguimientoEvaluacion('Borrador', false)).toBe(false);
+      expect(permiteEdicionSeguimientoEvaluacion('Vigente', false)).toBe(false);
+    });
+
+    it('Aprobado e Histórico quedan fuera aunque haya permiso', () => {
+      expect(permiteEdicionSeguimientoEvaluacion('Aprobado', true)).toBe(false);
+      expect(permiteEdicionSeguimientoEvaluacion('Histórico', true)).toBe(false);
+    });
   });
 });

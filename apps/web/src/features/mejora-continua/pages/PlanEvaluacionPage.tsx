@@ -48,7 +48,8 @@ import { ConfiguracionDelPeriodo } from '../components/ConfiguracionDelPeriodo';
 import { HeredadoDelPlanBase } from '../components/HeredadoDelPlanBase';
 import {
   describirTransicion,
-  permiteEdicion,
+  permiteEdicionDefinicionEvaluacion,
+  permiteEdicionSeguimientoEvaluacion,
   TONO_ESTADO,
   transicionesDisponibles,
 } from '../domain/estado-medicion';
@@ -104,9 +105,14 @@ export function PlanEvaluacionPage() {
   const periodoSeleccionado = vista.periodos.find((p) => p.id === periodoId) ?? vista.periodos[0];
   // RF-PE-006: la definición (instrumento, frecuencia, asignaturas del cruce)
   // solo se toca en Borrador; el seguimiento (porcentaje, evidencias) también
-  // en Vigente, RN2.
-  const editable = permiteEdicion(plan.estado);
-  const seguimientoEditable = plan.estado === 'Borrador' || plan.estado === 'Vigente';
+  // en Vigente, RN2. El permiso se suma al estado igual que en
+  // `PlanMedicionPage`: sin él, un docente con solo `evaluacion.leer` vería
+  // los campos habilitados y descubriría el 403 recién al guardar.
+  const editable = permiteEdicionDefinicionEvaluacion(plan.estado, puede('evaluacion.editar'));
+  const seguimientoEditable = permiteEdicionSeguimientoEvaluacion(
+    plan.estado,
+    puede('evaluacion.editar'),
+  );
 
   async function ejecutar(fn: () => Promise<unknown>) {
     setError(null);
