@@ -7,7 +7,12 @@
 
 import { cliente } from '@/shared/api/cliente';
 
-import type { AsignaturaElegible, ConfiguracionDelPlan, Docente } from '../domain/tipos';
+import type {
+  AsignaturaElegible,
+  ConfiguracionDelPlan,
+  Docente,
+  IndicacionAGuardar,
+} from '../domain/tipos';
 
 /** Todo lo configurado del plan, en una sola lectura. */
 export async function obtenerConfiguracion(planId: string): Promise<ConfiguracionDelPlan> {
@@ -24,11 +29,19 @@ export async function docentes(): Promise<Docente[]> {
   return cliente.get<Docente[]>('/docentes');
 }
 
-/** RF-PE-013 y RF-PE-014. Valen para todos los periodos del plan (RN1). */
+/**
+ * RF-PE-013, RF-PE-014 y RF-PE-024. Valen para todos los periodos del plan (RN1).
+ *
+ * `responsableId` es obligatorio en la firma, no opcional: el `PUT` reemplaza
+ * la configuración entera de la competencia, así que omitirlo del cuerpo la
+ * borra. El backend lo dejó obligatorio en su DTO y en su puerto por lo mismo
+ * —un campo opcional convierte un olvido en un borrado silencioso—, y este
+ * lado no puede ser más laxo que aquel.
+ */
 export async function guardarCompetencia(
   planId: string,
   competenciaId: string,
-  datos: { instrumento: string | null; frecuencia: string | null },
+  datos: { instrumento: string | null; frecuencia: string | null; responsableId: string | null },
 ): Promise<void> {
   await cliente.put(`/planes-evaluacion/${planId}/competencias/${competenciaId}`, datos);
 }
@@ -72,4 +85,41 @@ export async function guardarEvidencias(
   evidencias: readonly { enlace: string; descripcion: string }[],
 ): Promise<void> {
   await cliente.put(`/asignaturas-evaluadas/${asignaturaEvaluadaId}/evidencias`, { evidencias });
+}
+
+/**
+ * RF-PE-028 y RF-PE-030. **Reemplaza el conjunto entero del año**: editar es
+ * mandar la lista con el texto cambiado; eliminar, mandarla sin esa entrada.
+ *
+ * El `enlaceResultados` de las que sobreviven no viaja aquí y el servidor lo
+ * conserva emparejando por grupo objetivo: es seguimiento, y lo escribe
+ * `guardarResultados`.
+ */
+export async function guardarIndicaciones(
+  planId: string,
+  periodoId: string,
+  indicaciones: readonly IndicacionAGuardar[],
+): Promise<void> {
+  await cliente.put(`/planes-evaluacion/${planId}/periodos/${periodoId}/indicaciones`, {
+    indicaciones,
+  });
+}
+
+/**
+ * RF-PE-029: solo el enlace a los resultados de una indicación ya registrada.
+ *
+ * Sin el id del plan en la ruta, igual que las evidencias: el servidor lo
+ * resuelve a partir de la indicación. Inventar uno aquí dejaría que el estado
+ * de un plan propio decidiera sobre la indicación de otro.
+ *
+ * Vaciarlo se manda como `undefined` y no como `null` porque el DTO lo declara
+ * `@IsOptional()`: un `null` explícito no supera `@IsUrl`.
+ */
+export async function guardarResultados(
+  indicacionId: string,
+  enlaceResultados: string | null,
+): Promise<void> {
+  await cliente.put(`/indicaciones/${indicacionId}/resultados`, {
+    enlaceResultados: enlaceResultados ?? undefined,
+  });
 }

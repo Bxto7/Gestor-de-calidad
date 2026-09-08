@@ -98,14 +98,48 @@ export interface MedicionDeCruce {
   readonly asignaturas: readonly AsignaturaEvaluada[];
 }
 
+/**
+ * RF-PE-028: a quién se dirige una indicación.
+ *
+ * Son cuatro y no hay «otro», aunque el texto del requisito diga «por ejemplo,
+ * Docentes, Egresados u otro»: el enum de la base y el DTO del backend fijan
+ * estos cuatro, y una quinta opción en la pantalla acabaría en un 400.
+ */
+export type GrupoObjetivo = 'EGRESADOS' | 'EMPLEADORES' | 'DOCENTES' | 'ESTUDIANTES';
+
+/** Lo que se envía de una indicación: sin `id`, que lo asigna el servidor. */
+export interface IndicacionAGuardar {
+  readonly grupoObjetivo: GrupoObjetivo;
+  readonly instruccion: string;
+  readonly enlaceInstrumento: string;
+}
+
+/** RF-PE-028 y RF-PE-029: una indicación tal como la devuelve la lectura. */
+export interface Indicacion extends IndicacionAGuardar {
+  readonly id: string;
+  readonly periodoId: string;
+  /**
+   * RF-PE-029 RN1: opcional y de *seguimiento*, no de definición. Lo escribe
+   * un endpoint propio, y por eso el `PUT` de reemplazo del año lo conserva.
+   */
+  readonly enlaceResultados: string | null;
+}
+
+/** RF-PE-013, RF-PE-014 y RF-PE-024, que se guardan juntos por competencia. */
+export interface ConfiguracionCompetencia {
+  readonly competenciaId: string;
+  readonly instrumento: string | null;
+  readonly frecuencia: string | null;
+  /** RF-PE-024, solo en los planes Indirecta. `null` cuando no se ha elegido. */
+  readonly responsableId: string | null;
+}
+
 /** Todo lo configurado de un plan de evaluación, en una sola lectura. */
 export interface ConfiguracionDelPlan {
-  readonly competencias: readonly {
-    readonly competenciaId: string;
-    readonly instrumento: string | null;
-    readonly frecuencia: string | null;
-  }[];
+  readonly competencias: readonly ConfiguracionCompetencia[];
   readonly mediciones: readonly MedicionDeCruce[];
+  /** RF-PE-028: vacío en un plan Directa, que no admite indicaciones. */
+  readonly indicaciones: readonly Indicacion[];
 }
 
 /** RF-PE-010 a RF-PE-012: todo lo que un plan de evaluación hereda de su base. */

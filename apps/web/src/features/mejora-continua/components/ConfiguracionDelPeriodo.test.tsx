@@ -27,7 +27,7 @@ function montar(sobre: Partial<Parameters<typeof ConfiguracionDelPeriodo>[0]> = 
     competencias: COMPETENCIAS,
     periodo: { id: 'p-1', etiqueta: '2026-I', orden: 1 },
     programadas: ['c-1|p-1'],
-    configuracion: { competencias: [], mediciones: [] },
+    configuracion: { competencias: [], mediciones: [], indicaciones: [] },
     asignaturas: [
       { id: 'a-1', codigo: 'ASUC001', nombre: 'Cálculo I', cicloNumero: 1, activa: true },
     ],
@@ -82,6 +82,7 @@ describe('lo que el requisito exige que se vea', () => {
     montar({
       configuracion: {
         competencias: [],
+        indicaciones: [],
         mediciones: [
           {
             competenciaId: 'c-1',
@@ -176,6 +177,7 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
    */
   const CON_LA_FILA_YA_GUARDADA: ConfiguracionDelPlan = {
     competencias: [],
+    indicaciones: [],
     mediciones: [
       {
         competenciaId: 'c-1',
@@ -389,7 +391,15 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
  */
 describe('guardar el periodo', () => {
   const CONFIGURADO: ConfiguracionDelPlan = {
-    competencias: [{ competenciaId: 'c-1', instrumento: 'Rúbrica', frecuencia: 'Semestral' }],
+    competencias: [
+      {
+        competenciaId: 'c-1',
+        instrumento: 'Rúbrica',
+        frecuencia: 'Semestral',
+        responsableId: null,
+      },
+    ],
+    indicaciones: [],
     mediciones: [
       {
         competenciaId: 'c-1',

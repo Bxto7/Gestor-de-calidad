@@ -10,7 +10,12 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { AccionMedicion, PlanMedicion, TipoDocumentoMedicion } from '../domain/tipos';
+import type {
+  AccionMedicion,
+  IndicacionAGuardar,
+  PlanMedicion,
+  TipoDocumentoMedicion,
+} from '../domain/tipos';
 import * as api from './medicion.api';
 import * as evaluacionApi from './evaluacion.api';
 import type { FiltroEvaluaciones } from './evaluacion.api';
@@ -375,11 +380,22 @@ export function useConfiguracionDelPlan(id: string) {
   });
 }
 
-export function useAsignaturasElegibles(id: string) {
+/**
+ * RF-PE-016: las asignaturas del plan de estudios base, para el desplegable
+ * del cruce.
+ *
+ * `habilitado` existe porque solo los planes **Directa** tienen cruce: el
+ * endpoint responde igual para uno Indirecta, pero pedirlo sería una petición
+ * que nadie mira. Y, sobre todo, la pantalla no puede esperar a esa respuesta
+ * para pintar la tarjeta de un plan Indirecta —esperarla la dejaría cargando
+ * para siempre si la consulta queda deshabilitada—, así que la condición vive
+ * aquí y no en el `if` de la página.
+ */
+export function useAsignaturasElegibles(id: string, opciones: { habilitado?: boolean } = {}) {
   return useQuery({
     queryKey: clavesConfig.asignaturas(id),
     queryFn: () => configuracionApi.asignaturasElegibles(id),
-    enabled: !!id,
+    enabled: !!id && (opciones.habilitado ?? true),
   });
 }
 
@@ -393,10 +409,17 @@ export function useDocentes() {
 export function useGuardarCompetencia(planId: string) {
   return useMutacionDeConfiguracion(
     planId,
-    (v: { competenciaId: string; instrumento: string | null; frecuencia: string | null }) =>
+    (v: {
+      competenciaId: string;
+      instrumento: string | null;
+      frecuencia: string | null;
+      /** RF-PE-024. Obligatorio: el `PUT` reemplaza, así que omitirlo borra. */
+      responsableId: string | null;
+    }) =>
       configuracionApi.guardarCompetencia(planId, v.competenciaId, {
         instrumento: v.instrumento,
         frecuencia: v.frecuencia,
+        responsableId: v.responsableId,
       }),
   );
 }
@@ -436,5 +459,23 @@ export function useGuardarEvidencias(planId: string) {
       asignaturaEvaluadaId: string;
       evidencias: readonly { enlace: string; descripcion: string }[];
     }) => configuracionApi.guardarEvidencias(v.asignaturaEvaluadaId, v.evidencias),
+  );
+}
+
+/** RF-PE-028 y RF-PE-030: el conjunto entero de indicaciones de un año. */
+export function useGuardarIndicaciones(planId: string) {
+  return useMutacionDeConfiguracion(
+    planId,
+    (v: { periodoId: string; indicaciones: readonly IndicacionAGuardar[] }) =>
+      configuracionApi.guardarIndicaciones(planId, v.periodoId, v.indicaciones),
+  );
+}
+
+/** RF-PE-029: el enlace a los resultados de una indicación. */
+export function useGuardarResultados(planId: string) {
+  return useMutacionDeConfiguracion(
+    planId,
+    (v: { indicacionId: string; enlaceResultados: string | null }) =>
+      configuracionApi.guardarResultados(v.indicacionId, v.enlaceResultados),
   );
 }

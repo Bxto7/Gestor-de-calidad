@@ -6,6 +6,14 @@
  * un selector elige el periodo y `ConfiguracionDelPeriodo` pinta solo las
  * competencias que la matriz base programó en él.
  *
+ * Con un plan **indirecta** (RF-PE-022 a RF-PE-030) el selector elige un año y
+ * la tarjeta es `ConfiguracionDelAnio`, su hermana. Se ramifica y no se
+ * parametriza porque el tipo lo fija el plan de medición base y no cambia
+ * (RF-PE-001 RN2): ninguna sesión necesita las dos formas, y lo que difiere no
+ * es un campo sino la mitad del contenido — el cruce con asignaturas solo
+ * existe en la directa y las indicaciones solo en la indirecta, y el backend
+ * rechaza cada una en el tipo contrario.
+ *
  * `editable` y `seguimientoEditable` reproducen exactamente la frontera de
  * estados del backend (`ConfigurarPlanEvaluacion.exigirDefinicionEditable` /
  * `exigirSeguimientoEditable`): la primera es más estricta —solo Borrador—
@@ -40,10 +48,13 @@ import {
   useGuardarAsignaturas,
   useGuardarCompetencia,
   useGuardarEvidencias,
+  useGuardarIndicaciones,
   useGuardarPorcentaje,
+  useGuardarResultados,
   usePlanEvaluacion,
   useTransicionarEvaluacion,
 } from '../api/queries';
+import { ConfiguracionDelAnio } from '../components/ConfiguracionDelAnio';
 import { ConfiguracionDelPeriodo } from '../components/ConfiguracionDelPeriodo';
 import { HeredadoDelPlanBase } from '../components/HeredadoDelPlanBase';
 import {
@@ -63,13 +74,26 @@ export function PlanEvaluacionPage() {
   const { data: vista, isLoading } = usePlanEvaluacion(id);
   const transicionar = useTransicionarEvaluacion(id);
 
+  // El tipo del plan lo fija su base y no cambia (RF-PE-001 RN2), así que la
+  // pantalla enseña una tarjeta o la otra, nunca las dos.
+  const esIndirecta = vista?.base.tipo === 'INDIRECTA';
+
   const { data: configuracion } = useConfiguracionDelPlan(id);
-  const { data: asignaturas } = useAsignaturasElegibles(id);
+  // Solo la tarjeta directa cruza competencias con asignaturas: pedirlas para
+  // un plan indirecto sería una petición que nadie mira, y —peor— exigir su
+  // respuesta para pintar dejaría esa pantalla cargando para siempre. La
+  // condición se escribe en positivo sobre DIRECTA para que, mientras el plan
+  // aún no ha llegado, tampoco se pida.
+  const { data: asignaturas } = useAsignaturasElegibles(id, {
+    habilitado: vista?.base.tipo === 'DIRECTA',
+  });
   const { data: docentes } = useDocentes();
   const guardarCompetencia = useGuardarCompetencia(id);
   const guardarAsignaturas = useGuardarAsignaturas(id);
   const guardarPorcentaje = useGuardarPorcentaje(id);
   const guardarEvidencias = useGuardarEvidencias(id);
+  const guardarIndicaciones = useGuardarIndicaciones(id);
+  const guardarResultados = useGuardarResultados(id);
 
   const [enTransicion, setEnTransicion] = useState<AccionMedicion | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +206,7 @@ export function PlanEvaluacionPage() {
       {/* ── Configuración por competencia (RF-PE-013 a RF-PE-021) ───────── */}
       {vista.periodos.length > 0 && (
         <div className="space-y-4">
-          <Campo etiqueta="Periodo a configurar">
+          <Campo etiqueta={esIndirecta ? 'Año a configurar' : 'Periodo a configurar'}>
             {(props) => (
               <Selector
                 {...props}
@@ -199,7 +223,44 @@ export function PlanEvaluacionPage() {
             )}
           </Campo>
 
-          {periodoSeleccionado && configuracion && asignaturas && docentes ? (
+          {!periodoSeleccionado || !configuracion || !docentes ? (
+            <Cargando
+              etiqueta={
+                esIndirecta
+                  ? 'Cargando la configuración del año…'
+                  : 'Cargando la configuración del periodo…'
+              }
+            />
+          ) : esIndirecta ? (
+            <ConfiguracionDelAnio
+              key={periodoSeleccionado.id}
+              competencias={competencias}
+              periodo={periodoSeleccionado}
+              programadas={vista.programadas}
+              configuracion={configuracion}
+              docentes={docentes}
+              editable={editable}
+              seguimientoEditable={seguimientoEditable}
+              onGuardarCompetencia={(competenciaId, datos) =>
+                guardarCompetencia.mutateAsync({ competenciaId, ...datos })
+              }
+              onGuardarPorcentaje={(competenciaId, porcentaje) =>
+                guardarPorcentaje.mutateAsync({
+                  competenciaId,
+                  periodoId: periodoSeleccionado.id,
+                  porcentajeAlcanzado: porcentaje,
+                })
+              }
+              onGuardarIndicaciones={(periodoDelAnio, indicaciones) =>
+                guardarIndicaciones.mutateAsync({ periodoId: periodoDelAnio, indicaciones })
+              }
+              onGuardarResultados={(indicacionId, enlaceResultados) =>
+                guardarResultados.mutateAsync({ indicacionId, enlaceResultados })
+              }
+            />
+          ) : !asignaturas ? (
+            <Cargando etiqueta="Cargando la configuración del periodo…" />
+          ) : (
             <ConfiguracionDelPeriodo
               key={periodoSeleccionado.id}
               competencias={competencias}
@@ -211,7 +272,12 @@ export function PlanEvaluacionPage() {
               editable={editable}
               seguimientoEditable={seguimientoEditable}
               onGuardarCompetencia={(competenciaId, datos) =>
-                guardarCompetencia.mutateAsync({ competenciaId, ...datos })
+                // RF-PE-024 es de los planes Indirecta, así que aquí no hay
+                // responsable que elegir. Va explícito y no omitido porque el
+                // `PUT` reemplaza la configuración entera: omitirlo sería
+                // borrar un dato sin decirlo, aunque en un plan directo ese
+                // dato no llegue nunca a existir.
+                guardarCompetencia.mutateAsync({ competenciaId, ...datos, responsableId: null })
               }
               onGuardarAsignaturas={(competenciaId, asignaturasDelCruce) =>
                 guardarAsignaturas.mutateAsync({
@@ -231,8 +297,6 @@ export function PlanEvaluacionPage() {
                 guardarEvidencias.mutateAsync({ asignaturaEvaluadaId, evidencias })
               }
             />
-          ) : (
-            <Cargando etiqueta="Cargando la configuración del periodo…" />
           )}
         </div>
       )}
