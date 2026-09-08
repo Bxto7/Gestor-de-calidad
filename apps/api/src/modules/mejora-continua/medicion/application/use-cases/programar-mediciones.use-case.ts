@@ -7,9 +7,12 @@
  * dice que la celda solo admite programada o no programada — la ausencia de
  * fila expresa el segundo valor sin ocupar nada.
  *
- * A diferencia de los otros dos casos de uso, este no necesita el
- * `ContenidoCurricularPort`: todo lo que valida —que la competencia esté en el
- * plan, que el periodo le pertenezca— sale del propio plan de medición.
+ * Todo lo que este caso de uso valida sobre el contenido —que la competencia
+ * esté en el plan, que el periodo le pertenezca— sale del propio plan de
+ * medición, sin tocar el `ContenidoCurricularPort`. Ese puerto entra solo por
+ * el alcance por carrera (2c-C): `carreraDe` lo necesita para resolver de qué
+ * carrera es el plan de estudios base, un dato que el plan de medición no
+ * guarda.
  */
 
 import type {
@@ -22,6 +25,7 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import { MatrizProgramada, MedicionMarcada } from '../../domain/events/eventos-medicion.js';
 import { permiteEdicion } from '../../../domain/value-objects/estado-plan.js';
 import type {
@@ -55,6 +59,7 @@ export interface VistaMatriz {
 export class ProgramarMediciones {
   constructor(
     private readonly planes: RepositorioPlanMedicionPort,
+    private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
   ) {}
@@ -68,7 +73,7 @@ export class ProgramarMediciones {
    * pasara la fecha, si nadie la recalculara.
    */
   async matriz(actor: Actor, id: string, ahora: Date = new Date()): Promise<VistaMatriz> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(id);
     const celdas = await this.planes.matriz(id);
 
@@ -112,8 +117,9 @@ export class ProgramarMediciones {
     id: string,
     celdas: readonly { competenciaId: string; periodoId: string }[],
   ): Promise<CeldaMatriz[]> {
-    await this.exigir(actor, 'medicion.editar');
-    const plan = await this.exigirEditable(id);
+    const plan = await this.exigirPlan(id);
+    await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
+    this.verificarEditable(plan);
 
     const competencias = new Set(plan.competenciaIds);
     const periodos = new Set(plan.periodos.map((p) => p.id));
@@ -161,8 +167,8 @@ export class ProgramarMediciones {
     periodoId: string,
     realizada: boolean,
   ): Promise<CeldaMatriz> {
-    await this.exigir(actor, 'medicion.editar');
     const plan = await this.exigirPlan(id);
+    await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
 
     // RN1: solo una celda programada puede marcarse.
     const celdas = await this.planes.matriz(id);
@@ -204,18 +210,31 @@ export class ProgramarMediciones {
   }
 
   /** RF-PM-007 RN1. */
-  private async exigirEditable(id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.exigirPlan(id);
+  private verificarEditable(plan: DatosPlanMedicion): void {
     if (!permiteEdicion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
         `El plan de medición ${plan.codigo} está en ${plan.estado}; solo se programa en Borrador.`,
       );
     }
-    return plan;
   }
 
-  private async exigir(actor: Actor, permiso: string): Promise<void> {
-    const decision = await this.autorizacion.puede(actor.id, permiso, null);
+  /**
+   * La carrera del plan, para acotar el permiso.
+   *
+   * Sale de la cadena que ya existe —medición → plan de estudios— y no de una
+   * columna propia: desnormalizarla es una migración que se añade el día que
+   * el número lo justifique, y hoy no hay número.
+   */
+  private async carreraDe(planEstudiosId: string): Promise<string> {
+    const plan = await this.curricular.planPorId(planEstudiosId);
+    if (!plan) {
+      throw new NoEncontrado('el plan de estudios', planEstudiosId);
+    }
+    return plan.carreraId;
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }

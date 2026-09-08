@@ -67,7 +67,7 @@ export class ConfigurarPlanEvaluacion {
 
   /** RF-PE-016: las asignaturas del plan de estudios base, para el desplegable. */
   async asignaturasElegibles(actor: Actor, planEvaluacionId: string): Promise<AsignaturaBase[]> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     return this.curricular.asignaturasDelPlan(base.planEstudiosId);
@@ -75,13 +75,13 @@ export class ConfigurarPlanEvaluacion {
 
   /** Usuarios con rol DOCENTE, para asignar responsable a una asignatura evaluada. */
   async docentes(actor: Actor): Promise<{ id: string; nombre: string }[]> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     return this.directorio.porRol('DOCENTE');
   }
 
   /** Todo lo configurado del plan, en una sola lectura. */
   async configuracion(actor: Actor, planEvaluacionId: string): Promise<ConfiguracionDelPlan> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     await this.exigirPlan(planEvaluacionId);
     return this.configuraciones.del(planEvaluacionId);
   }
@@ -93,11 +93,11 @@ export class ConfigurarPlanEvaluacion {
     competenciaId: string,
     datos: { instrumento: string | null; frecuencia: string | null },
   ): Promise<void> {
-    await this.exigir(actor, 'evaluacion.editar');
     const plan = await this.exigirPlan(planEvaluacionId);
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirDefinicionEditable(plan);
 
-    const base = await this.exigirBase(plan.planMedicionId);
     if (!base.competenciaIds.includes(competenciaId)) {
       throw new ReglaDeNegocioViolada(
         `La competencia ${competenciaId} no está declarada en el plan de medición base; RF-PE-013 solo permite configurar lo que la base mide.`,
@@ -122,11 +122,11 @@ export class ConfigurarPlanEvaluacion {
     periodoId: string,
     asignaturas: readonly { asignaturaId: string; entregable: string; docenteId: string | null }[],
   ): Promise<void> {
-    await this.exigir(actor, 'evaluacion.editar');
     const plan = await this.exigirPlan(planEvaluacionId);
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirDefinicionEditable(plan);
 
-    const base = await this.exigirBase(plan.planMedicionId);
     await this.exigirCruceProgramado(base, competenciaId, periodoId);
 
     // RF-PE-016: cada asignatura tiene que ser del plan de estudios base, no
@@ -159,16 +159,16 @@ export class ConfigurarPlanEvaluacion {
     periodoId: string,
     porcentaje: number | null,
   ): Promise<void> {
-    await this.exigir(actor, 'evaluacion.editar');
     const plan = await this.exigirPlan(planEvaluacionId);
-    this.exigirSeguimientoEditable(plan);
-
     // La misma comprobación que `guardarAsignaturas`, y por el mismo motivo:
     // el repositorio hace `upsert`, así que sin ella un cruce inventado no da
     // error, **crea la fila**. Un porcentaje alcanzado colgado de una
     // competencia que el plan base no declara o de un periodo que no existe
     // no es un dato incompleto: es un dato que ningún reporte podrá cuadrar.
     const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
+    this.exigirSeguimientoEditable(plan);
+
     await this.exigirCruceProgramado(base, competenciaId, periodoId);
 
     await this.configuraciones.guardarPorcentaje(
@@ -192,20 +192,15 @@ export class ConfigurarPlanEvaluacion {
    * escribir sobre una asignatura de un plan Histórico apoyándose en un
    * Borrador propio.
    *
-   * Lo que esto **no** cierra, y conviene no confundir: el alcance por
-   * carrera. `exigir()` llama a `puede(actor.id, permiso, null)` y
-   * `evaluacion.editar` no está en `PERMISOS_ACOTADOS_A_CARRERA`, de modo que
-   * hoy ningún caso de uso de `mejora-continua` limita por carrera, tenga el
-   * plan en la ruta o no. Es un asunto del módulo entero y anterior a esta
-   * rama; se decide en el diseño del ciclo 2c-C.
+   * La misma resolución sirve para el alcance por carrera (2c-C): el plan y su
+   * base se buscan antes de exigir el permiso, porque la carrera sale de ahí
+   * y no de un parámetro que alguien podría inventar.
    */
   async guardarEvidencias(
     actor: Actor,
     asignaturaEvaluadaId: string,
     evidencias: readonly { enlace: string; descripcion: string }[],
   ): Promise<void> {
-    await this.exigir(actor, 'evaluacion.editar');
-
     const planEvaluacionId =
       await this.configuraciones.planDeAsignaturaEvaluada(asignaturaEvaluadaId);
     if (!planEvaluacionId) {
@@ -213,6 +208,8 @@ export class ConfigurarPlanEvaluacion {
     }
 
     const plan = await this.exigirPlan(planEvaluacionId);
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirSeguimientoEditable(plan);
 
     await this.configuraciones.reemplazarEvidencias(asignaturaEvaluadaId, evidencias);
@@ -296,8 +293,23 @@ export class ConfigurarPlanEvaluacion {
     }
   }
 
-  private async exigir(actor: Actor, permiso: string): Promise<void> {
-    const decision = await this.autorizacion.puede(actor.id, permiso, null);
+  /**
+   * La carrera del plan, para acotar el permiso.
+   *
+   * Sale de la cadena que ya existe —evaluación → medición → plan de estudios—
+   * y no de una columna propia: desnormalizarla es una migración que se añade
+   * el día que el número lo justifique, y hoy no hay número.
+   */
+  private async carreraDe(planEstudiosId: string): Promise<string> {
+    const plan = await this.curricular.planPorId(planEstudiosId);
+    if (!plan) {
+      throw new NoEncontrado('el plan de estudios', planEstudiosId);
+    }
+    return plan.carreraId;
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }

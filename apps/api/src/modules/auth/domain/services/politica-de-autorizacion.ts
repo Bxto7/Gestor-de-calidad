@@ -44,6 +44,18 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
   'plan.justificar',
   'asignatura.gestionar',
   'malla.editar',
+
+  // Mejora Continua, por la misma razón que los de arriba: el rol dice
+  // «de su carrera». Los dos `.leer` quedan fuera a propósito, como los de
+  // Plan de Estudios — consultar un plan ajeno se permite, modificarlo no.
+  'medicion.crear',
+  'medicion.editar',
+  'medicion.eliminar',
+  'medicion.aprobar',
+  'evaluacion.crear',
+  'evaluacion.editar',
+  'evaluacion.eliminar',
+  'evaluacion.aprobar',
 ]);
 
 export type Decision =

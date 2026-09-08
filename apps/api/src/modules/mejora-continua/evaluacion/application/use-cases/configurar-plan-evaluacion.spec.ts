@@ -16,7 +16,7 @@
  * repositorio real.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   Actor,
@@ -33,6 +33,7 @@ import type { DirectorioDeUsuariosPort } from '../../../../auth/application/port
 import type {
   AsignaturaBase,
   ContenidoCurricularPort,
+  PlanBase,
 } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type {
   DatosPlanMedicion,
@@ -120,10 +121,26 @@ function asignatura(sobre: Partial<AsignaturaBase> = {}): AsignaturaBase {
   };
 }
 
+function planBase(sobre: Partial<PlanBase> = {}): PlanBase {
+  return {
+    id: 'pe-1',
+    codigo: 'PE-ISI-2026-v2',
+    carreraId: 'carrera-propia',
+    carreraNombre: 'Sistemas',
+    version: 2,
+    elegible: true,
+    duracionAnios: 5,
+    ...sobre,
+  };
+}
+
 function contenido(sobre: Partial<ContenidoCurricularPort> = {}): ContenidoCurricularPort {
   return {
     planesElegibles: async () => [],
-    planPorId: async () => null,
+    // Con `carreraId`, no `null`: desde 2c-C, guardar cualquier configuración
+    // resuelve la carrera del plan base para acotar el permiso (`carreraDe`),
+    // así que el doble por defecto tiene que devolver un plan real.
+    planPorId: async () => planBase(),
     competenciasDelPlan: async () => [],
     asignaturasDelPlan: async () => [asignatura()],
     ...sobre,
@@ -204,6 +221,7 @@ function montar(
     asignaturas?: AsignaturaBase[];
     competenciasDelPlan?: readonly string[];
     planDeAsignaturaEvaluada?: string | null;
+    contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
     registrarRolPedido?: (rol: string) => void;
   } = {},
@@ -245,6 +263,7 @@ function montar(
 
   const curricular = contenido({
     asignaturasDelPlan: async () => opciones.asignaturas ?? [asignatura()],
+    ...opciones.contenido,
   });
 
   const directorio: DirectorioDeUsuariosPort = {
@@ -409,19 +428,16 @@ describe('RF-PE-006 y RF-PE-007 — la frontera de estados', () => {
 
 describe('el plan de unas evidencias sale de la asignatura evaluada', () => {
   it('si de ahí no sale ningún plan, no se escribe nada', async () => {
-    // Lo que la resolución cierra —y es lo único que cierra— es que la
-    // frontera de estados se aplique al plan que de verdad contiene la
-    // asignatura evaluada: no hay `planEvaluacionId` en la ruta que pueda
-    // contradecirla, así que nadie escribe sobre una asignatura de un plan
-    // Histórico apoyándose en un Borrador propio.
+    // Lo que esta resolución cierra es que la frontera de estados se aplique
+    // al plan que de verdad contiene la asignatura evaluada: no hay
+    // `planEvaluacionId` en la ruta que pueda contradecirla, así que nadie
+    // escribe sobre una asignatura de un plan Histórico apoyándose en un
+    // Borrador propio.
     //
-    // Lo que NO cierra, y el nombre anterior de esta prueba daba a entender
-    // que sí: el alcance por carrera. `exigir()` llama a
-    // `puede(actor.id, permiso, null)` y `evaluacion.editar` no está en
-    // `PERMISOS_ACOTADOS_A_CARRERA`, de modo que hoy ningún caso de uso de
-    // `mejora-continua` limita por carrera, con plan en la ruta o sin él. Es
-    // un asunto del módulo entero y anterior a esta rama; se decide en el
-    // diseño del ciclo 2c-C.
+    // El alcance por carrera es una decisión aparte —y ya está cerrada, ver
+    // el describe «el alcance por carrera (2c-C)» más abajo—: aquí no hay
+    // ninguna carrera que resolver, porque `configuraciones.planDeAsignaturaEvaluada`
+    // no encuentra ningún plan del que colgar una.
     const { caso, guardado } = montar({ planDeAsignaturaEvaluada: 'ev-OTRO' });
 
     await expect(
@@ -523,6 +539,74 @@ describe('los catálogos', () => {
     await caso.docentes(ACTOR);
 
     expect(pedidos).toEqual(['DOCENTE']);
+  });
+});
+
+/**
+ * El alcance por carrera (2c-C): `mejora-continua` no comprobaba la carrera en
+ * ninguno de sus casos de uso, así que alguien con permiso de edición en una
+ * carrera podía escribir en el plan de otra. Estas pruebas cierran justo eso,
+ * y por la propiedad de `puede()` que lo hace seguro —un permiso acotado con
+ * `carreraId === null` se deniega— cualquiera de los cuatro guardados que
+ * llegara a pedir el permiso sin la carrera resuelta caería aquí.
+ */
+describe('el alcance por carrera (2c-C)', () => {
+  it('un editor de otra carrera no puede tocar la configuración', async () => {
+    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
+      carreraId === 'carrera-propia'
+        ? ({ permitido: true } as const)
+        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
+    );
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await expect(
+      caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', { instrumento: 'Rúbrica', frecuencia: null }),
+    ).rejects.toThrow(AccesoDenegado);
+
+    // Y la carrera que se pasó es la del plan, no una inventada.
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'evaluacion.editar', 'carrera-ajena');
+  });
+
+  /**
+   * Los cuatro guardados, uno por uno: la propiedad que se comprueba es la
+   * misma en los cuatro —que la carrera que llega a `puede()` es la del plan
+   * sobre el que se opera, y no `null`— y una tabla evita que una prueba que
+   * solo cubre `guardarCompetencia` deje a las otras tres sin cubrir.
+   */
+  it.each([
+    [
+      'guardarCompetencia',
+      (caso: ConfigurarPlanEvaluacion) =>
+        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', { instrumento: 'R', frecuencia: null }),
+    ],
+    [
+      'guardarAsignaturas',
+      (caso: ConfigurarPlanEvaluacion) => caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', []),
+    ],
+    [
+      'guardarPorcentaje',
+      (caso: ConfigurarPlanEvaluacion) => caso.guardarPorcentaje(ACTOR, 'ev-1', 'c-1', 'p-1', 50),
+    ],
+    [
+      'guardarEvidencias',
+      (caso: ConfigurarPlanEvaluacion) => caso.guardarEvidencias(ACTOR, 'ae-1', []),
+    ],
+  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
+    const puede = vi.fn(async () => ({ permitido: true }) as const);
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    // No importa si la operación en sí falla más adelante (p. ej. porque el
+    // cruce no está programado): lo único que esta prueba vigila es con qué
+    // carrera se llamó a `puede`.
+    await ejecutar(caso).catch(() => undefined);
+
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
   });
 });
 

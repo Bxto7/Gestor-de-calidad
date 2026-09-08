@@ -7,7 +7,7 @@
  * camino: ni las competencias sin mapear, ni las que responden a dos atributos.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   Actor,
@@ -423,5 +423,51 @@ describe('RF-PM-018 a RF-PM-021 — declarar periodos', () => {
     ]);
 
     expect(recibidos[0]?.fechaCierre).toBe(cierre);
+  });
+});
+
+/**
+ * El alcance por carrera (2c-C): `mejora-continua` no comprobaba la carrera en
+ * ninguno de sus casos de uso. Aquí la carrera sale directo del propio plan de
+ * medición (`plan.planEstudiosId`), sin saltar por evaluación.
+ */
+describe('el alcance por carrera (2c-C)', () => {
+  it('declarar competencias en la carrera de otro se deniega', async () => {
+    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
+      carreraId === 'carrera-propia'
+        ? ({ permitido: true } as const)
+        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
+    );
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1'])).rejects.toThrow(
+      AccesoDenegado,
+    );
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'medicion.editar', 'carrera-ajena');
+  });
+
+  it.each([
+    [
+      'declararCompetencias',
+      (caso: ConfigurarPlanMedicion) => caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1']),
+    ],
+    [
+      'declararPeriodos',
+      (caso: ConfigurarPlanMedicion) =>
+        caso.declararPeriodos(ACTOR, 'pm-1', [{ etiqueta: '2024-I', orden: 1, fechaCierre: null }]),
+    ],
+  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
+    const puede = vi.fn(async () => ({ permitido: true }) as const);
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await ejecutar(caso).catch(() => undefined);
+
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
   });
 });

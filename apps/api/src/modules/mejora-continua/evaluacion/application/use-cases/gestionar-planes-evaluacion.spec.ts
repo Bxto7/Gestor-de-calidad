@@ -16,7 +16,7 @@
  * caso de uso pidiera por error `evaluacion.editar`.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   Actor,
@@ -209,6 +209,7 @@ function montar(
     competencias?: CompetenciaConAtributos[];
     evaluacion?: DatosPlanEvaluacion;
     vigente?: DatosPlanEvaluacion | null;
+    contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
   } = {},
 ) {
@@ -243,6 +244,7 @@ function montar(
 
   const curricular = contenido({
     competenciasDelPlan: async () => opciones.competencias ?? [competencia()],
+    ...opciones.contenido,
   });
 
   const caso = new GestionarPlanesEvaluacion(
@@ -462,5 +464,53 @@ describe('RF-PE-044 — el vigente', () => {
     const { caso } = montar({ vigente: null });
 
     expect(await caso.vigenteDe(ACTOR, 'pm-1')).toBeNull();
+  });
+});
+
+/**
+ * El alcance por carrera (2c-C): `mejora-continua` no comprobaba la carrera en
+ * ninguno de sus casos de uso. `crear` la saca del plan de medición base que
+ * llega en la petición; `eliminar` y `transicionar` la sacan del propio plan
+ * de evaluación, saltando por su base.
+ */
+describe('el alcance por carrera (2c-C)', () => {
+  it('crear un plan de evaluación en la carrera de otro se deniega', async () => {
+    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
+      carreraId === 'carrera-propia'
+        ? ({ permitido: true } as const)
+        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
+    );
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await expect(caso.crear(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'evaluacion.crear', 'carrera-ajena');
+  });
+
+  /**
+   * Las tres operaciones que escriben, una por una: la propiedad que se
+   * comprueba es la misma en las tres —que la carrera que llega a `puede()`
+   * es la del plan, y no `null`—.
+   */
+  it.each([
+    ['crear', (caso: GestionarPlanesEvaluacion) => caso.crear(ACTOR, 'pm-1')],
+    ['eliminar', (caso: GestionarPlanesEvaluacion) => caso.eliminar(ACTOR, 'ev-1')],
+    [
+      'transicionar',
+      (caso: GestionarPlanesEvaluacion) =>
+        caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {}),
+    ],
+  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
+    const puede = vi.fn(async () => ({ permitido: true }) as const);
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await ejecutar(caso).catch(() => undefined);
+
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
   });
 });

@@ -8,7 +8,7 @@
  * obsoleta en cuanto eso ocurriera.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   Actor,
@@ -21,6 +21,10 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import type {
+  ContenidoCurricularPort,
+  PlanBase,
+} from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type {
   DatosPlanMedicion,
   RepositorioPlanMedicionPort,
@@ -69,6 +73,30 @@ function plan(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
   };
 }
 
+function planBase(sobre: Partial<PlanBase> = {}): PlanBase {
+  return {
+    id: 'pe-1',
+    codigo: 'PE-ISI-2026-v1',
+    carreraId: 'car-1',
+    carreraNombre: 'Sistemas',
+    version: 1,
+    elegible: true,
+    duracionAnios: 5,
+    ...sobre,
+  };
+}
+
+/** Solo lo usa `carreraDe`, para el alcance por carrera (2c-C). */
+function contenido(sobre: Partial<ContenidoCurricularPort> = {}): ContenidoCurricularPort {
+  return {
+    planesElegibles: async () => [planBase()],
+    planPorId: async () => planBase(),
+    competenciasDelPlan: async () => [],
+    asignaturasDelPlan: async () => [],
+    ...sobre,
+  };
+}
+
 function repo(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlanMedicionPort {
   return {
     listar: async () => [plan()],
@@ -106,7 +134,11 @@ function repo(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlan
 }
 
 function montar(
-  opciones: { repo?: Partial<RepositorioPlanMedicionPort>; autorizacion?: AuthorizationPort } = {},
+  opciones: {
+    repo?: Partial<RepositorioPlanMedicionPort>;
+    contenido?: Partial<ContenidoCurricularPort>;
+    autorizacion?: AuthorizationPort;
+  } = {},
 ) {
   const vistos: DomainEvent[] = [];
   const publicador: PublicadorDeEventos = {
@@ -116,6 +148,7 @@ function montar(
   };
   const caso = new ProgramarMediciones(
     repo(opciones.repo),
+    contenido(opciones.contenido),
     opciones.autorizacion ?? permitirTodo(),
     publicador,
   );
@@ -386,5 +419,52 @@ describe('RF-PM-026 — marcar como realizada', () => {
     await caso.marcarRealizada(ACTOR, 'pm-1', 'cmp-1', 'per-1', false);
 
     expect(vistos[0]?.detalle).toContain('pendiente');
+  });
+});
+
+/**
+ * El alcance por carrera (2c-C): este caso de uso no traía el puerto
+ * curricular —todo lo que valida sale del propio plan de medición— y ahora lo
+ * necesita solo para esto: `carreraDe` resuelve de qué carrera es el plan de
+ * estudios base, un dato que el plan de medición no guarda.
+ */
+describe('el alcance por carrera (2c-C)', () => {
+  it('programar en la carrera de otro se deniega', async () => {
+    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
+      carreraId === 'carrera-propia'
+        ? ({ permitido: true } as const)
+        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
+    );
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await expect(
+      caso.programar(ACTOR, 'pm-1', [{ competenciaId: 'cmp-1', periodoId: 'per-1' }]),
+    ).rejects.toThrow(AccesoDenegado);
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'medicion.editar', 'carrera-ajena');
+  });
+
+  it.each([
+    [
+      'programar',
+      (caso: ProgramarMediciones) =>
+        caso.programar(ACTOR, 'pm-1', [{ competenciaId: 'cmp-1', periodoId: 'per-1' }]),
+    ],
+    [
+      'marcarRealizada',
+      (caso: ProgramarMediciones) => caso.marcarRealizada(ACTOR, 'pm-1', 'cmp-1', 'per-1', true),
+    ],
+  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
+    const puede = vi.fn(async () => ({ permitido: true }) as const);
+    const { caso } = montar({
+      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await ejecutar(caso).catch(() => undefined);
+
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
   });
 });

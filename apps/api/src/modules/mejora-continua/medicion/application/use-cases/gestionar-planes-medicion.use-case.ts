@@ -61,21 +61,27 @@ export class GestionarPlanesMedicion {
 
   /** RF-PM-010: consulta por plan de estudios, tipo y estado. */
   async listar(actor: Actor, filtro?: FiltroPlanesMedicion): Promise<DatosPlanMedicion[]> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     return this.planes.listar(filtro);
   }
 
   async porId(actor: Actor, id: string): Promise<DatosPlanMedicion> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     return this.exigirPlan(id);
   }
 
-  /** RF-PM-001 a RF-PM-004. */
+  /**
+   * RF-PM-001 a RF-PM-004.
+   *
+   * La carrera sale directamente de `base`, el `PlanBase` que ya hay que traer
+   * para el resto de esta validación: no hace falta el salto por `carreraDe`
+   * porque el dato ya está en la mano.
+   */
   async crear(actor: Actor, datos: DatosNuevoPlan): Promise<DatosPlanMedicion> {
-    await this.exigir(actor, 'medicion.crear');
-
     const base = await this.curricular.planPorId(datos.planEstudiosId);
     if (!base) throw new NoEncontrado('el plan de estudios', datos.planEstudiosId);
+
+    await this.exigir(actor, 'medicion.crear', base.carreraId);
 
     // RF-PM-001 RN2.
     if (!base.elegible) {
@@ -129,8 +135,9 @@ export class GestionarPlanesMedicion {
     id: string,
     datos: { metaPorcentaje?: number },
   ): Promise<DatosPlanMedicion> {
-    await this.exigir(actor, 'medicion.editar');
-    const previo = await this.exigirEditable(id);
+    const previo = await this.exigirPlan(id);
+    await this.exigir(actor, 'medicion.editar', await this.carreraDe(previo.planEstudiosId));
+    this.verificarEditable(previo);
 
     const cambios: string[] = [];
     let meta: number | undefined;
@@ -150,8 +157,8 @@ export class GestionarPlanesMedicion {
 
   /** RF-PM-009: solo un Borrador se elimina. */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    await this.exigir(actor, 'medicion.eliminar');
     const plan = await this.exigirPlan(id);
+    await this.exigir(actor, 'medicion.eliminar', await this.carreraDe(plan.planEstudiosId));
 
     if (!permiteEliminacion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
@@ -165,7 +172,7 @@ export class GestionarPlanesMedicion {
 
   /** RF-PM-038: la validación integral, consultable sin transicionar. */
   async consistencia(actor: Actor, id: string): Promise<ResultadoConsistencia> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     return this.evaluar(await this.exigirPlan(id));
   }
 
@@ -178,7 +185,11 @@ export class GestionarPlanesMedicion {
   ): Promise<DatosPlanMedicion> {
     const plan = await this.exigirPlan(id);
     const transicion = describirTransicion(accion);
-    await this.exigir(actor, `medicion.${transicion.permiso}`);
+    await this.exigir(
+      actor,
+      `medicion.${transicion.permiso}`,
+      await this.carreraDe(plan.planEstudiosId),
+    );
 
     // RF-PM-038 RN1: la validación integral es requisito previo. Se evalúa solo
     // si la transición la exige: volver a pedirla al archivar dejaría planes
@@ -248,7 +259,7 @@ export class GestionarPlanesMedicion {
    * el requerimiento la ofrece también al Usuario consultor.
    */
   async linaje(actor: Actor, id: string): Promise<DatosPlanMedicion[]> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     // Que exista, para distinguir «sin linaje» de «no hay tal plan».
     await this.exigirPlan(id);
     return this.planes.linajeDe(id);
@@ -298,18 +309,31 @@ export class GestionarPlanesMedicion {
   }
 
   /** RF-PM-007 RN1. */
-  private async exigirEditable(id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.exigirPlan(id);
+  private verificarEditable(plan: DatosPlanMedicion): void {
     if (!permiteEdicion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
         `El plan de medición ${plan.codigo} está en ${plan.estado}; solo se edita en Borrador.`,
       );
     }
-    return plan;
   }
 
-  private async exigir(actor: Actor, permiso: string): Promise<void> {
-    const decision = await this.autorizacion.puede(actor.id, permiso, null);
+  /**
+   * La carrera del plan, para acotar el permiso.
+   *
+   * Sale de la cadena que ya existe —medición → plan de estudios— y no de una
+   * columna propia: desnormalizarla es una migración que se añade el día que
+   * el número lo justifique, y hoy no hay número.
+   */
+  private async carreraDe(planEstudiosId: string): Promise<string> {
+    const plan = await this.curricular.planPorId(planEstudiosId);
+    if (!plan) {
+      throw new NoEncontrado('el plan de estudios', planEstudiosId);
+    }
+    return plan.carreraId;
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }
