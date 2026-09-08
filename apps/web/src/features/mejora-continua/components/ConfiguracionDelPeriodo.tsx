@@ -26,7 +26,7 @@
  * compone contra sus mutaciones.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Boton, Campo, Entrada, EstadoVacio, Selector, Tarjeta } from '@/shared/components/ui';
 
@@ -123,6 +123,59 @@ function estadoInicial(
   };
 }
 
+/**
+ * Adopta del servidor lo único que el servidor sabe y la pantalla no: el `aeId`
+ * que una fila recién guardada acaba de recibir.
+ *
+ * Hace falta porque el estado local se deriva de `configuracion` **una sola vez
+ * al montar**, y el componente solo se remonta al cambiar de periodo. Tras
+ * guardar, la consulta se refresca y trae los `aeId` nuevos, pero sin esto la
+ * fila seguía con `aeId: null` y la sección de evidencias no aparecía hasta
+ * recargar la página: RF-PE-020 quedaba inalcanzable en la misma visita, con la
+ * interfaz diciendo justo que guardar es lo que lo desbloquea.
+ *
+ * Lo que **no** hace es traerse el resto de la fila. Quien acaba de guardar
+ * puede haber seguido escribiendo, y pisar su entregable con el del servidor
+ * sería perder trabajo para arreglar un campo invisible. Por eso la
+ * conciliación es una adopción de identidad, no una recarga.
+ *
+ * Devuelve `null` cuando no hay nada que adoptar, para no provocar un
+ * renderizado por cada refresco de la consulta.
+ */
+function conciliarConElServidor(
+  estados: Record<string, EstadoCompetencia>,
+  periodoId: string,
+  configuracion: ConfiguracionDelPlan,
+): Record<string, EstadoCompetencia> | null {
+  let algoCambio = false;
+  const conciliados: Record<string, EstadoCompetencia> = {};
+
+  for (const [competenciaId, estado] of Object.entries(estados)) {
+    const delServidor = estadoInicial(competenciaId, periodoId, configuracion);
+    // Un `aeId` que ya tiene otra fila no se reparte dos veces: dos filas de la
+    // misma asignatura en el mismo cruce no existen (índice único), pero una
+    // pantalla a medio editar sí puede tenerlas un instante.
+    const tomados = new Set(estado.filas.map((f) => f.aeId).filter((id): id is string => !!id));
+    let adoptoAlguno = false;
+
+    const filas = estado.filas.map((fila) => {
+      if (fila.aeId) return fila;
+      const gemela = delServidor.filas.find(
+        (f) => f.aeId && !tomados.has(f.aeId) && f.asignaturaId === fila.asignaturaId,
+      );
+      if (!gemela?.aeId) return fila;
+      tomados.add(gemela.aeId);
+      adoptoAlguno = true;
+      return { ...fila, aeId: gemela.aeId, evidencias: gemela.evidencias };
+    });
+
+    conciliados[competenciaId] = adoptoAlguno ? { ...estado, filas } : estado;
+    algoCambio ||= adoptoAlguno;
+  }
+
+  return algoCambio ? conciliados : null;
+}
+
 function claveFila(f: FilaAsignatura): string {
   return JSON.stringify([f.asignaturaId, f.entregable, f.docenteId]);
 }
@@ -172,7 +225,31 @@ export function ConfiguracionDelPeriodo({
   // Punto de comparación para saber qué cambió al pulsar "Guardar el
   // periodo". Se actualiza tras cada guardado con éxito para no reenviar lo
   // mismo dos veces.
-  const baseRef = useRef(estados);
+  //
+  // En estado y no en un `useRef` como antes: la conciliación de más abajo
+  // también tiene que alcanzarlo, y leer o escribir un ref durante el
+  // renderizado es justo lo que `react-hooks/refs` prohíbe. El coste es un
+  // renderizado más por guardado, que no se nota.
+  const [base, setBase] = useState(estados);
+
+  // Conciliación con lo que la consulta acaba de devolver. Va en el
+  // renderizado y no en un `useEffect` a propósito: es un ajuste de estado
+  // ante un cambio de props, el caso que la documentación de React resuelve
+  // así, y `react-hooks/set-state-in-effect` rechaza la otra forma. Como
+  // `conciliarConElServidor` devuelve `null` cuando no hay nada que adoptar,
+  // el ajuste converge en un renderizado y no encadena más.
+  //
+  // Los `aeId` nuevos entran también en `base`, y no solo en el estado
+  // visible: la comparación de evidencias empareja las filas por `aeId`
+  // (`base.filas.find(f => f.aeId === fila.aeId)`), así que una base con
+  // `aeId: null` no encontraría nunca su pareja y las evidencias de una fila
+  // recién creada no se llegarían a enviar.
+  const [configuracionVista, setConfiguracionVista] = useState(configuracion);
+  if (configuracion !== configuracionVista) {
+    setConfiguracionVista(configuracion);
+    setEstados((previos) => conciliarConElServidor(previos, periodo.id, configuracion) ?? previos);
+    setBase((previa) => conciliarConElServidor(previa, periodo.id, configuracion) ?? previa);
+  }
 
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -258,12 +335,12 @@ export function ConfiguracionDelPeriodo({
     try {
       for (const competencia of competenciasProgramadas) {
         const actual = estados[competencia.id];
-        const base = baseRef.current[competencia.id];
-        if (!actual || !base) continue;
+        const anterior = base[competencia.id];
+        if (!actual || !anterior) continue;
 
         if (
           editable &&
-          (actual.instrumento !== base.instrumento || actual.frecuencia !== base.frecuencia)
+          (actual.instrumento !== anterior.instrumento || actual.frecuencia !== anterior.frecuencia)
         ) {
           await onGuardarCompetencia(competencia.id, {
             instrumento: actual.instrumento.trim() === '' ? null : actual.instrumento.trim(),
@@ -271,20 +348,23 @@ export function ConfiguracionDelPeriodo({
           });
         }
 
-        if (editable && !filasIguales(actual.filas, base.filas)) {
+        if (editable && !filasIguales(actual.filas, anterior.filas)) {
           await onGuardarAsignaturas(
             competencia.id,
             actual.filas
               .filter((f) => f.asignaturaId !== '')
               .map((f) => ({
                 asignaturaId: f.asignaturaId,
-                entregable: f.entregable,
+                // Recortado como el instrumento y la frecuencia de arriba: el
+                // DTO lo recorta también, y enviarlo sin recortar hacía que
+                // dos entregables escritos igual no se parecieran.
+                entregable: f.entregable.trim(),
                 docenteId: f.docenteId,
               })),
           );
         }
 
-        if (seguimientoEditable && actual.porcentaje !== base.porcentaje) {
+        if (seguimientoEditable && actual.porcentaje !== anterior.porcentaje) {
           await onGuardarPorcentaje(
             competencia.id,
             actual.porcentaje === '' ? null : Number(actual.porcentaje),
@@ -294,7 +374,7 @@ export function ConfiguracionDelPeriodo({
         if (seguimientoEditable) {
           for (const fila of actual.filas) {
             if (!fila.aeId) continue; // Nada que asociar hasta que la fila misma se guarde.
-            const filaBase = base.filas.find((f) => f.aeId === fila.aeId);
+            const filaBase = anterior.filas.find((f) => f.aeId === fila.aeId);
             if (filaBase && !evidenciasIguales(fila.evidencias, filaBase.evidencias)) {
               await onGuardarEvidencias(
                 fila.aeId,
@@ -305,7 +385,7 @@ export function ConfiguracionDelPeriodo({
         }
       }
 
-      baseRef.current = estados;
+      setBase(estados);
       setMensaje('Guardado.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el periodo.');
@@ -351,7 +431,7 @@ export function ConfiguracionDelPeriodo({
                   </p>
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Campo etiqueta="Instrumento">
+                    <Campo etiqueta={`Instrumento de ${competencia.codigo}`}>
                       {(props) => (
                         <Entrada
                           {...props}
@@ -364,7 +444,7 @@ export function ConfiguracionDelPeriodo({
                       )}
                     </Campo>
 
-                    <Campo etiqueta="Frecuencia">
+                    <Campo etiqueta={`Frecuencia de ${competencia.codigo}`}>
                       {(props) => (
                         <Entrada
                           {...props}
@@ -379,7 +459,7 @@ export function ConfiguracionDelPeriodo({
                   </div>
 
                   <Campo
-                    etiqueta="Porcentaje alcanzado"
+                    etiqueta={`Porcentaje alcanzado de ${competencia.codigo}`}
                     ayuda="De 0 a 100. Se registra también con el plan Vigente."
                   >
                     {(props) => (
