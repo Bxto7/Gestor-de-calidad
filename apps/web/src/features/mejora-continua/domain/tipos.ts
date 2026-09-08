@@ -57,6 +57,57 @@ export interface PlanEvaluacion {
   readonly creadoEn: string;
 }
 
+/* ── Configuración por competencia (RF-PE-013 a RF-PE-021) ────────────── */
+
+/** RF-PE-016: asignatura del plan de estudios base, para el desplegable. */
+export interface AsignaturaElegible {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly cicloNumero: number | null;
+  readonly activa: boolean;
+}
+
+/** RF-PE-018: responsable elegible de una asignatura evaluada. */
+export interface Docente {
+  readonly id: string;
+  readonly nombre: string;
+}
+
+/** RF-PE-020: un enlace de evidencia del entregable. */
+export interface EvidenciaRegistrada {
+  readonly id: string;
+  readonly enlace: string;
+  readonly descripcion: string;
+}
+
+/** RF-PE-016 a RF-PE-018: una asignatura dentro de un cruce competencia×periodo. */
+export interface AsignaturaEvaluada {
+  readonly id: string;
+  readonly asignaturaId: string;
+  readonly entregable: string;
+  readonly docenteId: string | null;
+  readonly evidencias: readonly EvidenciaRegistrada[];
+}
+
+/** RF-PE-019: el porcentaje alcanzado de una competencia en un periodo. */
+export interface MedicionDeCruce {
+  readonly competenciaId: string;
+  readonly periodoId: string;
+  readonly porcentajeAlcanzado: number | null;
+  readonly asignaturas: readonly AsignaturaEvaluada[];
+}
+
+/** Todo lo configurado de un plan de evaluación, en una sola lectura. */
+export interface ConfiguracionDelPlan {
+  readonly competencias: readonly {
+    readonly competenciaId: string;
+    readonly instrumento: string | null;
+    readonly frecuencia: string | null;
+  }[];
+  readonly mediciones: readonly MedicionDeCruce[];
+}
+
 /** RF-PE-010 a RF-PE-012: todo lo que un plan de evaluación hereda de su base. */
 export interface VistaPlanEvaluacion {
   readonly plan: PlanEvaluacion;

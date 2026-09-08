@@ -92,7 +92,10 @@ import {
   type ContenidoCurricularPort,
 } from './modules/plan-estudios/application/ports/contenido-curricular.port.js';
 import { ContenidoCurricularAdapter } from './modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
-import { DIRECTORIO_USUARIOS } from './modules/auth/application/ports/directorio-usuarios.port.js';
+import {
+  DIRECTORIO_USUARIOS,
+  type DirectorioDeUsuariosPort,
+} from './modules/auth/application/ports/directorio-usuarios.port.js';
 import { DirectorioDeUsuariosAdapter } from './modules/auth/infrastructure/directorio-usuarios.adapter.js';
 import {
   DATOS_DOCUMENTO_MEDICION,
@@ -134,6 +137,17 @@ import {
   EvaluacionVigenteController,
   PlanesEvaluacionController,
 } from './modules/mejora-continua/evaluacion/infrastructure/http/planes-evaluacion.controller.js';
+import {
+  REPOSITORIO_CONFIGURACION_EVALUACION,
+  type RepositorioConfiguracionEvaluacionPort,
+} from './modules/mejora-continua/evaluacion/application/ports/configuracion-evaluacion.port.js';
+import { ConfigurarPlanEvaluacion } from './modules/mejora-continua/evaluacion/application/use-cases/configurar-plan-evaluacion.use-case.js';
+import { ConfiguracionEvaluacionRepositoryPrisma } from './modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
+import {
+  ConfiguracionEvaluacionController,
+  DocentesController,
+  EvidenciasController,
+} from './modules/mejora-continua/evaluacion/infrastructure/http/configuracion-evaluacion.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
@@ -279,6 +293,9 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     PlanesMedicionController,
     PlanesEvaluacionController,
     EvaluacionVigenteController,
+    ConfiguracionEvaluacionController,
+    EvidenciasController,
+    DocentesController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
     DocumentosDelPlanController,
@@ -318,6 +335,10 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: CONTENIDO_CURRICULAR, useClass: ContenidoCurricularAdapter },
     { provide: REPOSITORIO_PLAN_MEDICION, useClass: PlanMedicionRepositoryPrisma },
     { provide: REPOSITORIO_PLAN_EVALUACION, useClass: PlanEvaluacionRepositoryPrisma },
+    {
+      provide: REPOSITORIO_CONFIGURACION_EVALUACION,
+      useClass: ConfiguracionEvaluacionRepositoryPrisma,
+    },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
@@ -459,6 +480,36 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         eventos: PublicadorDeEventos,
       ) =>
         new GestionarPlanesEvaluacion(evaluaciones, mediciones, curricular, autorizacion, eventos),
+    },
+    {
+      provide: ConfigurarPlanEvaluacion,
+      inject: [
+        REPOSITORIO_PLAN_EVALUACION,
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        REPOSITORIO_CONFIGURACION_EVALUACION,
+        DIRECTORIO_USUARIOS,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        mediciones: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        configuraciones: RepositorioConfiguracionEvaluacionPort,
+        directorio: DirectorioDeUsuariosPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new ConfigurarPlanEvaluacion(
+          evaluaciones,
+          mediciones,
+          curricular,
+          configuraciones,
+          directorio,
+          autorizacion,
+          eventos,
+        ),
     },
     {
       provide: VersionarPlanesMedicion,

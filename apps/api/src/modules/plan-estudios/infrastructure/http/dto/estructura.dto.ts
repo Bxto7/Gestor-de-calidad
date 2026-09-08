@@ -1,17 +1,6 @@
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
-
-/**
- * Recorta el texto **antes** de validar su longitud.
- *
- * Sin esto, `"   "` mide tres caracteres y supera el mínimo: la petición pasa
- * la validación y el nombre vacío lo acaba rechazando el dominio, que responde
- * 409 —un conflicto con el estado actual— cuando lo que ocurrió es que la
- * petición venía mal formada y merece un 400. La longitud tiene que medirse
- * sobre lo que se va a guardar, no sobre lo que se escribió.
- */
-const Recortado = (): PropertyDecorator =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+import { Recortado } from '../../../../../platform/http/recortado.js';
 
 export class CrearFacultadDto {
   @Recortado()

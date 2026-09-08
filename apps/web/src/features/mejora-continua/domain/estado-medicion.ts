@@ -99,6 +99,33 @@ export function permiteVersionado(estado: EstadoMedicion): boolean {
 }
 
 /**
+ * RF-PE-006: la *definición* de un plan de evaluación (instrumento,
+ * frecuencia, asignaturas del cruce, entregable, docente) solo se toca en
+ * Borrador — y solo con el permiso `evaluacion.editar`. Sin la segunda
+ * mitad, la pantalla habilitaría campos que el backend rechazaría igual al
+ * guardar (`ConfigurarPlanEvaluacion.exigir`): no es un agujero de
+ * seguridad, pero sí trabajo perdido para quien solo tiene `evaluacion.leer`.
+ */
+export function permiteEdicionDefinicionEvaluacion(
+  estado: EstadoMedicion,
+  puedeEditar: boolean,
+): boolean {
+  return permiteEdicion(estado) && puedeEditar;
+}
+
+/**
+ * RF-PE-006 RN2: el *seguimiento* (porcentaje alcanzado, evidencias) se
+ * admite también con el plan Vigente —RN2 lo exceptúa expresamente—, siempre
+ * bajo el mismo permiso `evaluacion.editar`.
+ */
+export function permiteEdicionSeguimientoEvaluacion(
+  estado: EstadoMedicion,
+  puedeEditar: boolean,
+): boolean {
+  return (estado === 'Borrador' || estado === 'Vigente') && puedeEditar;
+}
+
+/**
  * El tono del badge de cada estado.
  *
  * Vive aquí y no en una pantalla porque lo usan tres: el listado, el detalle y

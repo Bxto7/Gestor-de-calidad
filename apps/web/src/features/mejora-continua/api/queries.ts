@@ -14,6 +14,7 @@ import type { AccionMedicion, PlanMedicion, TipoDocumentoMedicion } from '../dom
 import * as api from './medicion.api';
 import * as evaluacionApi from './evaluacion.api';
 import type { FiltroEvaluaciones } from './evaluacion.api';
+import * as configuracionApi from './configuracion-evaluacion.api';
 
 export const claves = {
   planes: (filtro?: api.FiltroPlanes) =>
@@ -339,5 +340,101 @@ export function useEliminarEvaluacion(id: string) {
 export function useTransicionarEvaluacion(id: string) {
   return useMutacionDeEvaluacion(id, (v: { accion: AccionMedicion; comentario?: string }) =>
     evaluacionApi.transicionarEvaluacion(id, v.accion, v.comentario),
+  );
+}
+
+/* ── Configuración por competencia (RF-PE-013 a RF-PE-021) ────────────── */
+
+export const clavesConfig = {
+  configuracion: (id: string) => ['evaluacion', id, 'configuracion'] as const,
+  asignaturas: (id: string) => ['evaluacion', id, 'asignaturas-elegibles'] as const,
+  docentes: () => ['docentes'] as const,
+};
+
+/**
+ * Las escrituras sobre un mismo plan van en fila. Son lee-modifica-escribe
+ * sobre conjuntos del mismo plan, y dos en vuelo se resolverían por orden de
+ * llegada — que no lo decide el cliente.
+ */
+function useMutacionDeConfiguracion<TVars>(planId: string, fn: (v: TVars) => Promise<void>) {
+  const qc = useQueryClient();
+  return useMutation({
+    scope: { id: `plan-evaluacion:${planId}` },
+    mutationFn: fn,
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: clavesConfig.configuracion(planId) });
+    },
+  });
+}
+
+export function useConfiguracionDelPlan(id: string) {
+  return useQuery({
+    queryKey: clavesConfig.configuracion(id),
+    queryFn: () => configuracionApi.obtenerConfiguracion(id),
+    enabled: !!id,
+  });
+}
+
+export function useAsignaturasElegibles(id: string) {
+  return useQuery({
+    queryKey: clavesConfig.asignaturas(id),
+    queryFn: () => configuracionApi.asignaturasElegibles(id),
+    enabled: !!id,
+  });
+}
+
+export function useDocentes() {
+  return useQuery({
+    queryKey: clavesConfig.docentes(),
+    queryFn: () => configuracionApi.docentes(),
+  });
+}
+
+export function useGuardarCompetencia(planId: string) {
+  return useMutacionDeConfiguracion(
+    planId,
+    (v: { competenciaId: string; instrumento: string | null; frecuencia: string | null }) =>
+      configuracionApi.guardarCompetencia(planId, v.competenciaId, {
+        instrumento: v.instrumento,
+        frecuencia: v.frecuencia,
+      }),
+  );
+}
+
+export function useGuardarAsignaturas(planId: string) {
+  return useMutacionDeConfiguracion(
+    planId,
+    (v: {
+      competenciaId: string;
+      periodoId: string;
+      asignaturas: readonly {
+        asignaturaId: string;
+        entregable: string;
+        docenteId: string | null;
+      }[];
+    }) => configuracionApi.guardarAsignaturas(planId, v.competenciaId, v.periodoId, v.asignaturas),
+  );
+}
+
+export function useGuardarPorcentaje(planId: string) {
+  return useMutacionDeConfiguracion(
+    planId,
+    (v: { competenciaId: string; periodoId: string; porcentajeAlcanzado: number | null }) =>
+      configuracionApi.guardarPorcentaje(
+        planId,
+        v.competenciaId,
+        v.periodoId,
+        v.porcentajeAlcanzado,
+      ),
+  );
+}
+
+export function useGuardarEvidencias(planId: string) {
+  return useMutacionDeConfiguracion(
+    planId,
+    (v: {
+      asignaturaEvaluadaId: string;
+      evidencias: readonly { enlace: string; descripcion: string }[];
+    }) => configuracionApi.guardarEvidencias(v.asignaturaEvaluadaId, v.evidencias),
   );
 }

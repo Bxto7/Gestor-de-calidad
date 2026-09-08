@@ -311,6 +311,8 @@ jobs:
         run: |
           SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-editor@sgc.local --nombre "E2E Editor"             --rol COORDINADOR_ACADEMICO --carrera E2E
           SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-lector@sgc.local --nombre "E2E Lector"             --rol USUARIO_CONSULTOR
+          SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-docente@sgc.local --nombre "E2E Docente"             --rol DOCENTE --carrera E2E
+          SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts             --email e2e-director@sgc.local --nombre "E2E Director"             --rol DIRECTOR_CARRERA --carrera E2E
 
       - name: Construir la API
         working-directory: apps/api

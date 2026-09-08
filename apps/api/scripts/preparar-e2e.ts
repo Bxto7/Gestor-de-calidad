@@ -41,6 +41,16 @@ const COMPETENCIAS = [
   { codigo: 'CPE-E2E04', nombre: 'Ética de prueba', atributo: 'AG-I02' },
 ];
 
+/**
+ * RF-PE-016: la configuración de un cruce asocia asignaturas del plan base, y
+ * el desplegable las necesita reales para no salir vacío. Dos y no una: para
+ * enseñar el `<optgroup>` con más de una fila hace falta más de una asignatura.
+ */
+const ASIGNATURAS = [
+  { codigo: 'AS-E2E01', nombre: 'Asignatura de pruebas I', creditos: 4, horasTeoricas: 3 },
+  { codigo: 'AS-E2E02', nombre: 'Asignatura de pruebas II', creditos: 3, horasTeoricas: 2 },
+] as const;
+
 async function main(): Promise<void> {
   const facultad = await prisma.facultad.upsert({
     where: { nombre: 'Facultad de Pruebas' },
@@ -142,11 +152,29 @@ async function main(): Promise<void> {
     });
   }
 
+  for (const a of ASIGNATURAS) {
+    await prisma.asignatura.upsert({
+      where: { planId_codigo: { planId: plan.id, codigo: a.codigo } },
+      update: { nombre: a.nombre },
+      create: {
+        planId: plan.id,
+        codigo: a.codigo,
+        nombre: a.nombre,
+        descripcion: 'Asignatura sembrada para la suite E2E.',
+        tipo: 'ESPECIALIDAD',
+        condicion: 'OBLIGATORIA',
+        creditos: a.creditos,
+        horasTeoricas: a.horasTeoricas,
+      },
+    });
+  }
+
   await planDeMedicionVigente(plan.id);
 
   console.log(
-    `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias, ` +
-      'y un plan de medición vigente de partida.',
+    `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias y ` +
+      `${ASIGNATURAS.length} asignaturas, y un plan de medición vigente de partida con una ` +
+      'competencia programada en ambos periodos.',
   );
 }
 
@@ -171,6 +199,7 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
     where: { codigo: { in: COMPETENCIAS.map((c) => c.codigo) } },
     select: { id: true },
   });
+  const competenciasDelPlan = competencias.slice(0, 2);
 
   const creado = await prisma.planMedicion.create({
     data: {
@@ -186,7 +215,7 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
   });
 
   await prisma.competenciaDelPlan.createMany({
-    data: competencias.slice(0, 2).map((c) => ({
+    data: competenciasDelPlan.map((c) => ({
       planMedicionId: creado.id,
       competenciaId: c.id,
     })),
@@ -208,6 +237,29 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
       },
     ],
   });
+
+  // RF-PM-022: al menos un cruce programado en la matriz — y en los DOS
+  // periodos, no solo uno. RF-PE-013 a RF-PE-021 (evaluación) configura la
+  // primera competencia en 2026-I y comprueba en 2026-II que el instrumento se
+  // conservó (RF-PE-013 RN1, único por competencia) mientras el porcentaje no
+  // (RF-PE-021): sin programar la misma competencia en ambos periodos, 2026-II
+  // no tendría ninguna tarjeta que enseñar y esa comprobación no tendría nada
+  // que negar. Sin ningún cruce programado, la tarjeta de configuración no
+  // enseña ninguna competencia en absoluto (RF-PE-012).
+  const periodos = await prisma.periodoMedicion.findMany({
+    where: { planMedicionId: creado.id },
+    select: { id: true },
+  });
+  const primeraCompetencia = competenciasDelPlan[0];
+  if (primeraCompetencia) {
+    await prisma.programacion.createMany({
+      data: periodos.map((periodo) => ({
+        planMedicionId: creado.id,
+        competenciaId: primeraCompetencia.id,
+        periodoId: periodo.id,
+      })),
+    });
+  }
 }
 
 main()

@@ -44,6 +44,16 @@ test('el detalle de evaluación, con la cuadrícula de lo heredado', async ({ pa
   await primero.click();
 
   await expect(page.getByRole('heading', { name: 'Heredado del plan de medición' })).toBeVisible();
+
+  // RF-PE-013 a RF-PE-021: en 2c-A la matriz base no programaba ningún cruce,
+  // así que esta tarjeta solo mostraba su estado vacío y axe nunca llegó a ver
+  // un campo de verdad. Con al menos una competencia programada (§ fixture
+  // E2E), se despliega una fila real —con su propio selector de asignatura y
+  // de docente— antes de analizar.
+  await expect(page.getByRole('heading', { name: 'Configuración por competencia' })).toBeVisible();
+  await page.getByLabel('Periodo a configurar').selectOption({ label: '2026-I' });
+  await page.getByRole('button', { name: 'Añadir asignatura' }).click();
+
   await analizar(page, 'el detalle del plan de evaluación');
 });
 

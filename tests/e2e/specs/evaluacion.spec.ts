@@ -34,7 +34,11 @@ test('el detalle enseña lo heredado, y no deja tocarlo', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
 
   await expect(page.getByRole('heading', { name: 'Heredado del plan de medición' })).toBeVisible();
-  await expect(page.getByText(/CPE-E2E01/)).toBeVisible();
+  // La cuadrícula, no la página entera: desde que el fixture E2E programa un
+  // cruce en la matriz, la tarjeta de configuración de más abajo también
+  // enseña el código de la competencia en su propio encabezado, y buscarlo sin
+  // acotar viola el modo estricto de Playwright con dos coincidencias.
+  await expect(page.getByRole('table').getByText(/CPE-E2E01/)).toBeVisible();
 
   // RF-PE-010 RN1 y RF-PE-011 RN1: desde aquí no se añaden ni se quitan.
   await expect(page.locator('main').getByRole('checkbox')).toHaveCount(0);

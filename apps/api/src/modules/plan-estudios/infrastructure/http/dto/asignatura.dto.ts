@@ -13,16 +13,13 @@ import {
   Min,
 } from 'class-validator';
 
+import { Recortado } from '../../../../../platform/http/recortado.js';
 import {
   CONDICIONES,
   TIPOS,
   type CondicionAsignatura,
   type TipoAsignatura,
 } from '../../../application/ports/asignatura.port.js';
-
-/** Recorta antes de medir la longitud; si no, `"   "` pasa un `@Length(3, …)`. */
-const Recortado = (): PropertyDecorator =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 export class DatosAsignaturaDto {
   @Recortado()
