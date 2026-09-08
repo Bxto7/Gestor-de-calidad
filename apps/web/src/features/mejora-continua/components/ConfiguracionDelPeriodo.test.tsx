@@ -10,7 +10,7 @@
  * y las evidencias acepten cambios.
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -144,9 +144,56 @@ describe('WCAG 2.4.6 — cada campo dice de qué competencia es', () => {
       ).toBeInTheDocument();
     }
   });
+
+  it('y con dos filas en el cruce, tampoco lo comparten el entregable ni el docente', async () => {
+    // Los dos campos que se quedaron fuera de la convención: llevaban etiqueta
+    // pelada, repetida una vez por fila, mientras sus vecinas de la misma fila
+    // —el selector de asignatura y el botón de quitar— sí desambiguaban.
+    // `getByRole` falla si hay más de una coincidencia, así que esto también
+    // afirma que los nombres son únicos.
+    montar();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir asignatura' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir asignatura' }));
+
+    for (const fila of [1, 2]) {
+      expect(
+        screen.getByRole('textbox', { name: `Entregable de la asignatura ${fila} de CPE-01` }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('combobox', {
+          name: `Docente responsable de la asignatura ${fila} de CPE-01`,
+        }),
+      ).toBeInTheDocument();
+    }
+  });
 });
 
 describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
+  /**
+   * Lo que devuelve la consulta refrescada tras el `PUT` de asignaturas: la
+   * misma fila que se acaba de crear, ya con identificador propio.
+   */
+  const CON_LA_FILA_YA_GUARDADA: ConfiguracionDelPlan = {
+    competencias: [],
+    mediciones: [
+      {
+        competenciaId: 'c-1',
+        periodoId: 'p-1',
+        porcentajeAlcanzado: null,
+        asignaturas: [
+          {
+            id: 'ae-1',
+            asignaturaId: 'a-1',
+            entregable: 'Proyecto',
+            docenteId: null,
+            evidencias: [],
+          },
+        ],
+      },
+    ],
+  };
+
   it('una fila recién guardada acepta evidencias en cuanto la consulta la devuelve', async () => {
     // El camino que lo rompía: plan en Borrador, «Añadir asignatura», elegirla,
     // escribir el entregable, «Guardar el periodo». Salía «Guardado.» y debajo
@@ -160,30 +207,13 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
       screen.getByRole('combobox', { name: 'Asignatura 1 de CPE-01' }),
       'a-1',
     );
-    await userEvent.type(screen.getByRole('textbox', { name: 'Entregable' }), 'Proyecto');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+      'Proyecto',
+    );
     expect(screen.getByText(/Guarda el periodo para poder adjuntar/)).toBeInTheDocument();
 
-    // Lo que devuelve la consulta refrescada tras el `PUT`: la misma fila, ya
-    // con identificador propio.
-    conConfiguracion({
-      competencias: [],
-      mediciones: [
-        {
-          competenciaId: 'c-1',
-          periodoId: 'p-1',
-          porcentajeAlcanzado: null,
-          asignaturas: [
-            {
-              id: 'ae-1',
-              asignaturaId: 'a-1',
-              entregable: 'Proyecto',
-              docenteId: null,
-              evidencias: [],
-            },
-          ],
-        },
-      ],
-    });
+    conConfiguracion(CON_LA_FILA_YA_GUARDADA);
 
     expect(screen.getByRole('button', { name: 'Añadir evidencia' })).toBeInTheDocument();
     expect(screen.queryByText(/Guarda el periodo para poder adjuntar/)).not.toBeInTheDocument();
@@ -191,7 +221,9 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
 
   it('y sus evidencias sí se envían en el guardado siguiente', async () => {
     // El recorrido entero de RF-PE-020 en una sola visita: añadir la fila,
-    // guardarla, adjuntarle una evidencia y volver a guardar.
+    // guardarla, adjuntarle una evidencia y volver a guardar. La consulta se
+    // refresca **después** de que el guardado resuelva; el orden contrario
+    // —el que ocurre de verdad— lo cubre la prueba siguiente.
     //
     // La comparación de evidencias empareja las filas por `aeId`
     // (`anterior.filas.find(f => f.aeId === fila.aeId)`), así que el `aeId`
@@ -207,28 +239,13 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
       screen.getByRole('combobox', { name: 'Asignatura 1 de CPE-01' }),
       'a-1',
     );
-    await userEvent.type(screen.getByRole('textbox', { name: 'Entregable' }), 'Proyecto');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+      'Proyecto',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Guardar el periodo' }));
 
-    props.conConfiguracion({
-      competencias: [],
-      mediciones: [
-        {
-          competenciaId: 'c-1',
-          periodoId: 'p-1',
-          porcentajeAlcanzado: null,
-          asignaturas: [
-            {
-              id: 'ae-1',
-              asignaturaId: 'a-1',
-              entregable: 'Proyecto',
-              docenteId: null,
-              evidencias: [],
-            },
-          ],
-        },
-      ],
-    });
+    props.conConfiguracion(CON_LA_FILA_YA_GUARDADA);
 
     await userEvent.click(screen.getByRole('button', { name: 'Añadir evidencia' }));
     await userEvent.type(
@@ -246,6 +263,97 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
     ]);
   });
 
+  it('aunque la consulta se refresque antes de que el guardado resuelva', async () => {
+    // El orden real, que la prueba de arriba no reproduce.
+    // `useMutacionDeConfiguracion` declara `onSettled` como `async` y espera
+    // dentro al `invalidateQueries`, y React Query no resuelve `mutateAsync`
+    // hasta que `onSettled` termina. Cuando `await onGuardarAsignaturas(…)`
+    // regresa, la consulta **ya** se refrescó y la conciliación durante el
+    // renderizado ya adoptó el `aeId` en el estado visible.
+    //
+    // Escribir entonces el punto de comparación con la instantánea del cierre
+    // —capturada antes de esa conciliación, con `aeId: null`— lo deja sin la
+    // identidad que el estado visible sí tiene, y en el guardado siguiente la
+    // fila no encuentra su pareja: se ve «Guardado.» y la evidencia no sale
+    // hacia el servidor. Es peor que el bloqueo visible que vino a sustituir,
+    // porque no avisa.
+    let refrescar: (configuracion: ConfiguracionDelPlan) => void = () => {
+      throw new Error('El guardado se disparó antes de tener el componente montado.');
+    };
+    const onGuardarAsignaturas = vi.fn(async () => {
+      // Entre el `PUT` y la resolución de la promesa, como hace `onSettled`.
+      await Promise.resolve();
+      refrescar(CON_LA_FILA_YA_GUARDADA);
+    });
+
+    const props = montar({ onGuardarAsignaturas });
+    refrescar = props.conConfiguracion;
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir asignatura' }));
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Asignatura 1 de CPE-01' }),
+      'a-1',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+      'Proyecto',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar el periodo' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir evidencia' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Enlace de la evidencia 1/ }),
+      'https://drive.example/acta',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Descripción de la evidencia 1/ }),
+      'Acta de sustentación',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar el periodo' }));
+
+    expect(props.onGuardarEvidencias).toHaveBeenCalledWith('ae-1', [
+      { enlace: 'https://drive.example/acta', descripcion: 'Acta de sustentación' },
+    ]);
+  });
+
+  it('y lo escrito mientras el guardado viajaba no queda dado por guardado', async () => {
+    // La otra mitad del punto de comparación: toma la **identidad** del estado
+    // visible del momento —los `aeId` que la conciliación acaba de adoptar—,
+    // pero el **contenido** de lo que de verdad se envió. Si tomara también el
+    // contenido, lo que se escribió mientras el `PUT` viajaba quedaría marcado
+    // como guardado sin haber salido nunca, y el guardado siguiente no lo
+    // enviaría: la misma clase de pérdida silenciosa, por el otro extremo.
+    const onGuardarAsignaturas = vi.fn(async () => {
+      await Promise.resolve();
+      // El usuario sigue escribiendo con el guardado en vuelo: el campo no se
+      // desactiva, solo el botón.
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+        { target: { value: 'Proyecto corregido' } },
+      );
+    });
+
+    montar({ onGuardarAsignaturas });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir asignatura' }));
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Asignatura 1 de CPE-01' }),
+      'a-1',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+      'Proyecto',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar el periodo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar el periodo' }));
+
+    expect(onGuardarAsignaturas).toHaveBeenCalledTimes(2);
+    expect(onGuardarAsignaturas.mock.calls[1]).toEqual([
+      'c-1',
+      [{ asignaturaId: 'a-1', entregable: 'Proyecto corregido', docenteId: null }],
+    ]);
+  });
+
   it('y lo que el usuario escribió después de guardar no se pisa', async () => {
     // La conciliación adopta el `aeId`, no recarga la fila. Pisar el entregable
     // con el del servidor sería perder trabajo para arreglar un campo que ni
@@ -257,29 +365,16 @@ describe('RF-PE-020 — adjuntar evidencias sin recargar la página', () => {
       screen.getByRole('combobox', { name: 'Asignatura 1 de CPE-01' }),
       'a-1',
     );
-    await userEvent.type(screen.getByRole('textbox', { name: 'Entregable' }), 'Proyecto corregido');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+      'Proyecto corregido',
+    );
 
-    conConfiguracion({
-      competencias: [],
-      mediciones: [
-        {
-          competenciaId: 'c-1',
-          periodoId: 'p-1',
-          porcentajeAlcanzado: null,
-          asignaturas: [
-            {
-              id: 'ae-1',
-              asignaturaId: 'a-1',
-              entregable: 'Proyecto',
-              docenteId: null,
-              evidencias: [],
-            },
-          ],
-        },
-      ],
-    });
+    conConfiguracion(CON_LA_FILA_YA_GUARDADA);
 
-    expect(screen.getByRole('textbox', { name: 'Entregable' })).toHaveValue('Proyecto corregido');
+    expect(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+    ).toHaveValue('Proyecto corregido');
   });
 });
 
@@ -377,7 +472,10 @@ describe('guardar el periodo', () => {
     // dos entregables escritos igual dejaran de parecerse.
     const props = montarDos();
 
-    await userEvent.type(screen.getByRole('textbox', { name: 'Entregable' }), '   ');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Entregable de la asignatura 1 de CPE-01' }),
+      '   ',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Guardar el periodo' }));
 
     expect(props.onGuardarAsignaturas).toHaveBeenCalledWith('c-1', [

@@ -18,6 +18,12 @@
  *     definición se desactiva por esto, el motivo va escrito al lado —un
  *     campo desactivado y mudo hace pensar en un fallo.
  *
+ * Cada campo que se repite dice a qué fila y a qué competencia pertenece
+ * (WCAG 2.4.6): «Entregable» a secas se repite una vez por fila y no distingue
+ * nada, aunque `axe-core` no proteste porque los `id` sí son únicos. La
+ * convención vale para todos los campos del componente, no para algunos: es
+ * media convención la que se olvida al añadir el siguiente.
+ *
  * Un solo botón «Guardar el periodo», no uno por sección (RF-PE-021): al
  * pulsarlo se compara el estado local contra el que llegó por props y solo se
  * disparan los `PUT` de lo que de verdad cambió. El componente no consulta
@@ -176,6 +182,62 @@ function conciliarConElServidor(
   return algoCambio ? conciliados : null;
 }
 
+/**
+ * Lo que se ve y el punto contra el que se compara, en un solo estado.
+ *
+ * Juntos y no en dos `useState` porque el punto de comparación se calcula a
+ * partir del visible: al terminar un guardado hay que escribirlo mirando lo que
+ * el visible tenga **en ese momento**, no lo que tenía cuando se pulsó el
+ * botón. Con dos estados separados, el actualizador funcional de uno no puede
+ * leer el otro, y esa era exactamente la vía por la que se perdía el `aeId`.
+ */
+interface EstadoDelFormulario {
+  /** Lo que el usuario ve y edita. */
+  readonly visible: Record<string, EstadoCompetencia>;
+  /** Lo último que llegó al servidor: contra esto se decide qué `PUT` salen. */
+  readonly base: Record<string, EstadoCompetencia>;
+}
+
+/**
+ * El punto de comparación tras un guardado con éxito.
+ *
+ * El **contenido** sale de lo que de verdad se envió (`enviados`), no del
+ * estado visible del momento: quien siguió escribiendo mientras el `PUT`
+ * viajaba no envió eso, y darlo por guardado perdería su edición en el
+ * guardado siguiente.
+ *
+ * La **identidad**, en cambio, sale del estado visible (`vigentes`), porque
+ * durante ese viaje la consulta se refresca y la conciliación adopta ahí los
+ * `aeId` que el servidor acaba de asignar. Sin este cruce, la base se quedaba
+ * con `aeId: null` mientras el visible ya tenía el bueno, y la comparación de
+ * evidencias —que empareja las filas por `aeId`— no encontraba pareja: se
+ * anunciaba «Guardado.» y la evidencia no salía hacia el servidor.
+ *
+ * El emparejamiento es por `asignaturaId` y no por posición porque la fila
+ * pudo moverse entretanto; dos filas de la misma asignatura en el mismo cruce
+ * no existen (índice único), así que no hay ambigüedad.
+ */
+function baseTrasGuardar(
+  enviados: Record<string, EstadoCompetencia>,
+  vigentes: Record<string, EstadoCompetencia>,
+): Record<string, EstadoCompetencia> {
+  const conIdentidad: Record<string, EstadoCompetencia> = {};
+
+  for (const [competenciaId, enviado] of Object.entries(enviados)) {
+    const vigente = vigentes[competenciaId];
+    conIdentidad[competenciaId] = {
+      ...enviado,
+      filas: enviado.filas.map((fila) => {
+        if (fila.aeId) return fila;
+        const gemela = vigente?.filas.find((f) => f.aeId && f.asignaturaId === fila.asignaturaId);
+        return gemela?.aeId ? { ...fila, aeId: gemela.aeId } : fila;
+      }),
+    };
+  }
+
+  return conIdentidad;
+}
+
 function claveFila(f: FilaAsignatura): string {
   return JSON.stringify([f.asignaturaId, f.entregable, f.docenteId]);
 }
@@ -215,22 +277,30 @@ export function ConfiguracionDelPeriodo({
     programadas.includes(`${c.id}|${periodo.id}`),
   );
 
-  const [estados, setEstados] = useState<Record<string, EstadoCompetencia>>(() => {
+  // El estado visible y su punto de comparación viven juntos: ver
+  // `EstadoDelFormulario`. En estado y no en un `useRef` como antes porque la
+  // conciliación de más abajo también tiene que alcanzarlos, y leer o escribir
+  // un ref durante el renderizado es justo lo que `react-hooks/refs` prohíbe.
+  // El coste es un renderizado más por guardado, que no se nota.
+  const [formulario, setFormulario] = useState<EstadoDelFormulario>(() => {
     const inicial: Record<string, EstadoCompetencia> = {};
     for (const c of competenciasProgramadas) {
       inicial[c.id] = estadoInicial(c.id, periodo.id, configuracion);
     }
-    return inicial;
+    return { visible: inicial, base: inicial };
   });
-  // Punto de comparación para saber qué cambió al pulsar "Guardar el
-  // periodo". Se actualiza tras cada guardado con éxito para no reenviar lo
-  // mismo dos veces.
-  //
-  // En estado y no en un `useRef` como antes: la conciliación de más abajo
-  // también tiene que alcanzarlo, y leer o escribir un ref durante el
-  // renderizado es justo lo que `react-hooks/refs` prohíbe. El coste es un
-  // renderizado más por guardado, que no se nota.
-  const [base, setBase] = useState(estados);
+  const estados = formulario.visible;
+  const base = formulario.base;
+
+  /**
+   * Editar solo mueve lo visible: la base es lo que el servidor tiene, y eso
+   * únicamente cambia cuando un guardado termina bien.
+   */
+  function setEstados(
+    actualizar: (previos: Record<string, EstadoCompetencia>) => Record<string, EstadoCompetencia>,
+  ) {
+    setFormulario((previo) => ({ ...previo, visible: actualizar(previo.visible) }));
+  }
 
   // Conciliación con lo que la consulta acaba de devolver. Va en el
   // renderizado y no en un `useEffect` a propósito: es un ajuste de estado
@@ -239,7 +309,7 @@ export function ConfiguracionDelPeriodo({
   // `conciliarConElServidor` devuelve `null` cuando no hay nada que adoptar,
   // el ajuste converge en un renderizado y no encadena más.
   //
-  // Los `aeId` nuevos entran también en `base`, y no solo en el estado
+  // Los `aeId` nuevos entran también en la base, y no solo en el estado
   // visible: la comparación de evidencias empareja las filas por `aeId`
   // (`anterior.filas.find(f => f.aeId === fila.aeId)`, más abajo), así que una
   // base con `aeId: null` no encontraría nunca su pareja y las evidencias de
@@ -247,8 +317,18 @@ export function ConfiguracionDelPeriodo({
   const [configuracionVista, setConfiguracionVista] = useState(configuracion);
   if (configuracion !== configuracionVista) {
     setConfiguracionVista(configuracion);
-    setEstados((previos) => conciliarConElServidor(previos, periodo.id, configuracion) ?? previos);
-    setBase((previa) => conciliarConElServidor(previa, periodo.id, configuracion) ?? previa);
+    setFormulario((previo) => {
+      const visibleConciliado = conciliarConElServidor(previo.visible, periodo.id, configuracion);
+      const baseConciliada = conciliarConElServidor(previo.base, periodo.id, configuracion);
+      // Devolver el mismo objeto cuando no hay nada que adoptar mantiene lo que
+      // el `null` de `conciliarConElServidor` busca: ningún renderizado extra
+      // por cada refresco de la consulta.
+      if (!visibleConciliado && !baseConciliada) return previo;
+      return {
+        visible: visibleConciliado ?? previo.visible,
+        base: baseConciliada ?? previo.base,
+      };
+    });
   }
 
   const [guardando, setGuardando] = useState(false);
@@ -385,7 +465,15 @@ export function ConfiguracionDelPeriodo({
         }
       }
 
-      setBase(estados);
+      // Actualización funcional, y no `setBase(estados)`: `estados` es la
+      // instantánea del cierre, tomada al pulsar el botón. Mientras los `PUT`
+      // viajaban, la consulta se refrescó y la conciliación adoptó los `aeId`
+      // nuevos en el estado visible; pisar la base con esa instantánea los
+      // tiraba. Ver `baseTrasGuardar`.
+      setFormulario((previo) => ({
+        ...previo,
+        base: baseTrasGuardar(estados, previo.visible),
+      }));
       setMensaje('Guardado.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el periodo.');
@@ -532,7 +620,9 @@ export function ConfiguracionDelPeriodo({
                               </div>
 
                               <div className="flex flex-col gap-1 text-xs font-medium text-tinta-suave">
-                                <label htmlFor={idEntregable}>Entregable</label>
+                                <label htmlFor={idEntregable}>
+                                  Entregable de la asignatura {indice + 1} de {competencia.codigo}
+                                </label>
                                 <Entrada
                                   id={idEntregable}
                                   disabled={!editable}
@@ -547,7 +637,10 @@ export function ConfiguracionDelPeriodo({
                               </div>
 
                               <div className="flex flex-col gap-1 text-xs font-medium text-tinta-suave">
-                                <label htmlFor={idDocente}>Docente responsable</label>
+                                <label htmlFor={idDocente}>
+                                  Docente responsable de la asignatura {indice + 1} de{' '}
+                                  {competencia.codigo}
+                                </label>
                                 <Selector
                                   id={idDocente}
                                   disabled={!editable}
