@@ -9,9 +9,7 @@ import {
   IsUUID,
   Length,
 } from 'class-validator';
-
-const Recortado = (): PropertyDecorator =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+import { Recortado } from '../../../../../platform/http/recortado.js';
 
 export class CrearUsuarioDto {
   /**

@@ -1,9 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
-
-/** Recorta antes de medir la longitud; si no, `"   "` supera el mínimo. */
-const Recortado = (): PropertyDecorator =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+import { Recortado } from '../../../../../platform/http/recortado.js';
 
 export class DatosAtributoDto {
   // El código es la etiqueta del marco de acreditación (AG-I01…), no un
