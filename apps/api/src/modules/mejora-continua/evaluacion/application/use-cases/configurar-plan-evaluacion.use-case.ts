@@ -1,27 +1,39 @@
 /**
  * Caso de uso que valida y orquesta la configuración de un plan de
- * evaluación: instrumento y frecuencia por competencia (RF-PE-013/014),
- * asignaturas por cruce competencia×periodo (RF-PE-016 a RF-PE-018),
- * porcentaje alcanzado (RF-PE-019) y evidencias (RF-PE-020).
+ * evaluación: instrumento, frecuencia y responsable por competencia
+ * (RF-PE-013/014/024), asignaturas por cruce competencia×periodo (RF-PE-016 a
+ * RF-PE-018) para un plan DIRECTA, indicaciones por grupo objetivo y año
+ * (RF-PE-028 a RF-PE-030) para un plan INDIRECTA, porcentaje alcanzado
+ * (RF-PE-019), evidencias (RF-PE-020) y el enlace a resultados de una
+ * indicación (RF-PE-029).
  *
  * La decisión que este caso de uso toma y que ninguna pieza suelta puede
  * tomar por él es la frontera de estados, en dos guardianes distintos:
  *
  * - `exigirDefinicionEditable` acepta **solo Borrador**: instrumento,
- *   frecuencia, asignaturas, entregable y docente son la definición del plan
- *   — lo que alguien aprobó. Tocarla después de aprobada invalidaría esa
- *   aprobación en silencio.
+ *   frecuencia, responsable, asignaturas, entregable, docente e indicaciones
+ *   son la definición del plan — lo que alguien aprobó. Tocarla después de
+ *   aprobada invalidaría esa aprobación en silencio.
  * - `exigirSeguimientoEditable` acepta **Borrador y Vigente, nada más**: el
- *   porcentaje alcanzado y las evidencias son lo que fue ocurriendo, y
- *   RF-PE-006 RN2 los exceptúa expresamente. Sin esa excepción, el porcentaje
- *   de un periodo que ya cerró no podría registrarse nunca, porque no se
- *   conoce mientras el plan se redacta. Aprobado no admite registro de
- *   mediciones: RN2 nombra solo Vigente, y un plan Aprobado todavía no rige.
+ *   porcentaje alcanzado, las evidencias y el enlace a resultados de una
+ *   indicación son lo que fue ocurriendo, y RF-PE-006 RN2 los exceptúa
+ *   expresamente. Sin esa excepción, el resultado de una encuesta cerrada o
+ *   el porcentaje de un periodo que ya cerró no podrían registrarse nunca,
+ *   porque no se conocen mientras el plan se redacta. Aprobado no admite
+ *   registro de mediciones: RN2 nombra solo Vigente, y un plan Aprobado
+ *   todavía no rige.
+ *
+ * Una tercera frontera, distinta de las dos de estado, es el tipo del plan de
+ * medición base (`exigirTipo`, RF-PE-002 RN2): un plan DIRECTA no acepta
+ * indicaciones y uno INDIRECTA no acepta asignaturas, porque el tipo se
+ * hereda de la base y ninguna pantalla ni exportación de un tipo muestra los
+ * datos del otro.
  *
  * El docente no se valida contra su rol al guardar: se guarda el UUID que
  * llega. Validarlo convertiría un cambio de rol futuro en un dato histórico
  * inválido — la pantalla ya ofrece solo docentes, y el registro debe
  * conservar a quien fuera responsable entonces, aunque después deje de serlo.
+ * Lo mismo aplica al responsable de una competencia (RF-PE-024).
  */
 
 import type {
@@ -47,6 +59,7 @@ import type {
 import { ConfiguracionEvaluacionCambiada } from '../../domain/events/eventos-evaluacion.js';
 import type {
   ConfiguracionDelPlan,
+  GrupoObjetivo,
   RepositorioConfiguracionEvaluacionPort,
 } from '../ports/configuracion-evaluacion.port.js';
 import type {
@@ -86,12 +99,22 @@ export class ConfigurarPlanEvaluacion {
     return this.configuraciones.del(planEvaluacionId);
   }
 
-  /** RF-PE-013 y RF-PE-014: instrumento y frecuencia de una competencia. */
+  /**
+   * RF-PE-013, RF-PE-014 y RF-PE-024: instrumento, frecuencia y responsable de
+   * una competencia.
+   *
+   * `responsableId` es opcional en el puerto (2c-C lo dejó así para que un
+   * `update` sin ese dato no borre el que ya estaba), pero aquí es
+   * obligatorio: este caso de uso es el único que llama al puerto, y un campo
+   * ausente en la llamada no da error, se escribe como `undefined` y Prisma
+   * simplemente no toca la columna — un fallo silencioso. Exigirlo aquí hace
+   * que quien llama decida siempre, aunque decida `null`.
+   */
   async guardarCompetencia(
     actor: Actor,
     planEvaluacionId: string,
     competenciaId: string,
-    datos: { instrumento: string | null; frecuencia: string | null },
+    datos: { instrumento: string | null; frecuencia: string | null; responsableId: string | null },
   ): Promise<void> {
     const plan = await this.exigirPlan(planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
@@ -109,6 +132,7 @@ export class ConfigurarPlanEvaluacion {
       competenciaId,
       instrumento: datos.instrumento,
       frecuencia: datos.frecuencia,
+      responsableId: datos.responsableId,
     });
 
     await this.dejarConstancia(actor, plan, 'instrumento y frecuencia de una competencia');
@@ -126,6 +150,7 @@ export class ConfigurarPlanEvaluacion {
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirDefinicionEditable(plan);
+    this.exigirTipo(base, 'DIRECTA');
 
     await this.exigirCruceProgramado(base, competenciaId, periodoId);
 
@@ -217,6 +242,66 @@ export class ConfigurarPlanEvaluacion {
     await this.dejarConstancia(actor, plan, 'evidencias de una asignatura');
   }
 
+  /**
+   * RF-PE-028 a RF-PE-030: las indicaciones de medición a un grupo objetivo,
+   * por año. Es definición —lo que la encuesta va a preguntar— así que sigue
+   * la misma frontera que instrumento/frecuencia/asignaturas y no la del
+   * seguimiento: `exigirDefinicionEditable`, no `exigirSeguimientoEditable`.
+   */
+  async guardarIndicaciones(
+    actor: Actor,
+    planEvaluacionId: string,
+    periodoId: string,
+    indicaciones: readonly {
+      grupoObjetivo: GrupoObjetivo;
+      instruccion: string;
+      enlaceInstrumento: string;
+    }[],
+  ): Promise<void> {
+    const plan = await this.exigirPlan(planEvaluacionId);
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
+    this.exigirDefinicionEditable(plan);
+    this.exigirTipo(base, 'INDIRECTA');
+
+    this.exigirPeriodoDeLaBase(base, periodoId);
+
+    await this.configuraciones.reemplazarIndicaciones(planEvaluacionId, periodoId, indicaciones);
+
+    await this.dejarConstancia(actor, plan, 'indicaciones de medición de un periodo');
+  }
+
+  /**
+   * RF-PE-029: solo el enlace a resultados; el resto de la indicación es
+   * definición y se edita con `guardarIndicaciones`. Es seguimiento —lo que
+   * fue ocurriendo— así que usa `exigirSeguimientoEditable`, la misma
+   * frontera que el porcentaje alcanzado y las evidencias.
+   *
+   * `indicacionId` llega suelto en la ruta, igual que `asignaturaEvaluadaId`
+   * en `guardarEvidencias`: el plan se resuelve desde la propia indicación, no
+   * desde un `planEvaluacionId` que la ruta podría hacer contradecir al plan
+   * real.
+   */
+  async guardarResultados(
+    actor: Actor,
+    indicacionId: string,
+    enlaceResultados: string | null,
+  ): Promise<void> {
+    const planEvaluacionId = await this.configuraciones.planDeIndicacion(indicacionId);
+    if (!planEvaluacionId) {
+      throw new NoEncontrado('la indicación', indicacionId);
+    }
+
+    const plan = await this.exigirPlan(planEvaluacionId);
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
+    this.exigirSeguimientoEditable(plan);
+
+    await this.configuraciones.guardarResultados(indicacionId, enlaceResultados);
+
+    await this.dejarConstancia(actor, plan, 'enlace a resultados de una indicación');
+  }
+
   private async dejarConstancia(
     actor: Actor,
     plan: DatosPlanEvaluacion,
@@ -261,6 +346,36 @@ export class ConfigurarPlanEvaluacion {
     if (!programado) {
       throw new ReglaDeNegocioViolada(
         `El plan de medición base no programó la competencia ${competenciaId} en el periodo ${periodoId}; no se puede configurar un cruce que no está en la matriz.`,
+      );
+    }
+  }
+
+  /**
+   * RF-PE-002 RN2: un plan de evaluación hereda el tipo de su base y no lo
+   * cambia. Sin esto, un plan directo acumularía indicaciones que su pantalla
+   * no muestra y su exportación no imprime, y uno indirecto acumularía
+   * asignaturas evaluadas que tampoco tienen dónde mostrarse: datos huérfanos
+   * que nadie vuelve a ver.
+   */
+  private exigirTipo(base: DatosPlanMedicion, esperado: 'DIRECTA' | 'INDIRECTA'): void {
+    if (base.tipo !== esperado) {
+      throw new ReglaDeNegocioViolada(
+        `El plan de medición base es de tipo ${base.tipo}; esta configuración solo cabe en un plan ${esperado}.`,
+      );
+    }
+  }
+
+  /**
+   * RF-PE-028: las indicaciones se declaran por año, y ese año tiene que ser
+   * uno de los periodos que la base definió. No es `exigirCruceProgramado`
+   * porque una indicación no cuelga de una competencia — cuelga de un grupo
+   * objetivo — así que no hay cruce competencia×periodo que comprobar, solo
+   * que el periodo exista en la base.
+   */
+  private exigirPeriodoDeLaBase(base: DatosPlanMedicion, periodoId: string): void {
+    if (base.periodos.every((p) => p.id !== periodoId)) {
+      throw new ReglaDeNegocioViolada(
+        `El plan de medición base no declaró el periodo ${periodoId}; las indicaciones solo caben en un año que la base programó.`,
       );
     }
   }
