@@ -87,6 +87,13 @@ const PERMISOS = [
     'mejora-continua',
   ],
 
+  // Mejora continua — Planes de Mejora
+  ['mejora.leer', 'Consultar planes de mejora', 'mejora-continua'],
+  ['mejora.crear', 'Crear un plan de mejora', 'mejora-continua'],
+  ['mejora.editar', 'Editar un plan de mejora en Borrador', 'mejora-continua'],
+  ['mejora.eliminar', 'Eliminar un plan de mejora en Borrador', 'mejora-continua'],
+  ['mejora.aprobar', 'Aprobar, observar y dar vigencia a un plan de mejora', 'mejora-continua'],
+
   // Transversales
   ['reporte.generar', 'Generar PDF y Excel del plan', 'plan-estudios'],
   ['auditoria.leer', 'Consultar el histórico de cambios', 'auditoria'],
@@ -143,6 +150,7 @@ const ROLES: {
       // mide y aprobarlo es una responsabilidad académica, no de administración.
       'medicion.leer',
       'evaluacion.leer',
+      'mejora.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
@@ -195,6 +203,13 @@ const ROLES: {
       'evaluacion.editar',
       'evaluacion.eliminar',
       'evaluacion.aprobar',
+      // RF-PJ-044: misma separación que medición y evaluación. Quien
+      // construye no da el visto bueno, pero el Director sí hace ambas cosas.
+      'mejora.leer',
+      'mejora.crear',
+      'mejora.editar',
+      'mejora.eliminar',
+      'mejora.aprobar',
       'reporte.generar',
       'auditoria.leer',
     ],
@@ -240,6 +255,11 @@ const ROLES: {
       'evaluacion.crear',
       'evaluacion.editar',
       'evaluacion.eliminar',
+      // Misma separación otra vez (RF-PJ-044): arma y edita, no aprueba.
+      'mejora.leer',
+      'mejora.crear',
+      'mejora.editar',
+      'mejora.eliminar',
       // Solo el historial de una entidad concreta, no la bitácora entera: quien
       // edita un plan tiene que poder ver qué se hizo sobre él (RF-PM-032), y
       // eso no exige darle acceso a los accesos de todos ni a los demás módulos.
@@ -267,6 +287,7 @@ const ROLES: {
       // Ve en qué periodos se mide la competencia de la asignatura que dicta.
       'medicion.leer',
       'evaluacion.leer',
+      'mejora.leer',
       'reporte.generar',
     ],
   },
@@ -286,6 +307,7 @@ const ROLES: {
       'criterio.leer',
       'medicion.leer',
       'evaluacion.leer',
+      'mejora.leer',
     ],
   },
 ];

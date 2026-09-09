@@ -7,9 +7,13 @@
  * error de restricción de PostgreSQL.
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
+import {
+  IMPACTO_PLAN_MEJORA,
+  type ImpactoPlanMejoraPort,
+} from '../../../mejora-continua/mejora/application/ports/impacto-plan-mejora.port.js';
 import type {
   DatosCriterio,
   FiltroAcreditacion,
@@ -48,7 +52,10 @@ function aDatos(fila: Fila): DatosCriterio {
 
 @Injectable()
 export class CriterioRepositoryPrisma implements RepositorioCriterioPort {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(IMPACTO_PLAN_MEJORA) private readonly impactoPlanMejora: ImpactoPlanMejoraPort,
+  ) {}
 
   /** RF131 RN1: ordenado por código. */
   async listar(carreraId: string, filtro?: FiltroAcreditacion): Promise<DatosCriterio[]> {
@@ -117,12 +124,17 @@ export class CriterioRepositoryPrisma implements RepositorioCriterioPort {
   }
 
   /**
-   * RF132 pide advertir de los planes de mejora asociados. Ese submódulo aún no
-   * existe, así que el recuento es cero por construcción y no por consulta. Al
-   * construir Plan de Mejora, reemplazar por un `count` sobre su tabla: el caso
-   * de uso y el endpoint ya están preparados para recibir el número.
+   * RF132: el recuento real de planes de mejora vinculados, vía
+   * `ImpactoPlanMejoraPort` (2c-J-B, §2f del diseño) — la primera
+   * dependencia circular de primer nivel del proyecto, blindada por las
+   * guardias de `aislamiento.spec.ts` de ambos módulos. Antes de 2c-J-B
+   * devolvía `0` fijo, porque el submódulo Plan de Mejora no existía.
    */
-  async impactoDeInactivar(_id: string): Promise<ImpactoCriterio> {
-    return { planesMejoraVinculados: 0 };
+  async impactoDeInactivar(id: string): Promise<ImpactoCriterio> {
+    const planesMejoraVinculados = await this.impactoPlanMejora.contarVinculados(
+      'CRITERIO_ACREDITACION',
+      id,
+    );
+    return { planesMejoraVinculados };
   }
 }

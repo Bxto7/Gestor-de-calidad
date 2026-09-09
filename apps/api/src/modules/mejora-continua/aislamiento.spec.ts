@@ -25,8 +25,14 @@ import { describe, expect, it } from 'vitest';
 
 const RAIZ = import.meta.dirname;
 
-/** Lo único que este módulo puede importar del Plan de Estudios. */
-const PUERTO_PERMITIDO = 'ports/contenido-curricular.port.js';
+/**
+ * Lo único que este módulo puede importar del Plan de Estudios.
+ *
+ * Dos puertos desde 2c-J-B: `contenido-curricular.port.js` (existente, de
+ * `medicion`/`evaluacion`) y `acreditacion-cross-modulo.port.js` (nuevo, de
+ * `mejora` — RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B).
+ */
+const PUERTO_PERMITIDO = ['ports/contenido-curricular.port.js', 'ports/acreditacion-cross-modulo.port.js'];
 
 /**
  * Las tres pertenencias, con las dos barras y no con el nombre suelto: `auth`
@@ -67,7 +73,7 @@ describe('aislamiento de mejora-continua', () => {
   it('solo importa de plan-estudios el puerto de contenido curricular', () => {
     const vistos = importsDe().filter(({ importado }) => DE_PLAN_ESTUDIOS.test(importado));
     const infractores = vistos
-      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO))
+      .filter(({ importado }) => !PUERTO_PERMITIDO.some((p) => importado.endsWith(p)))
       .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);

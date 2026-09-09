@@ -32,6 +32,7 @@ export const ENTIDADES_AUDITABLES = [
   'CriterioAcreditacion',
   'PlanMedicion',
   'PlanEvaluacion',
+  'PlanMejora',
   'Usuario',
   'Sesión',
 ] as const;

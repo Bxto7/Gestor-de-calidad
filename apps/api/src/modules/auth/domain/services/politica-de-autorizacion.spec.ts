@@ -163,12 +163,13 @@ describe('los permisos de mejora-continua se acotan a la carrera', () => {
   it.each([
     'medicion.crear', 'medicion.editar', 'medicion.eliminar', 'medicion.aprobar',
     'evaluacion.crear', 'evaluacion.editar', 'evaluacion.eliminar', 'evaluacion.aprobar',
+    'mejora.crear', 'mejora.editar', 'mejora.eliminar', 'mejora.aprobar',
   ])('%s sobre la carrera de otro se deniega', (permiso) => {
     const d = puede(contexto([permiso], 'carrera-A'), permiso, 'carrera-B');
     expect(d.permitido).toBe(false);
   });
 
-  it.each(['medicion.leer', 'evaluacion.leer'])(
+  it.each(['medicion.leer', 'evaluacion.leer', 'mejora.leer'])(
     '%s no se acota: consultar planes ajenos sigue permitido',
     (permiso) => {
       // La política del proyecto, escrita en el comentario de la constante:
