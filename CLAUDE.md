@@ -30,7 +30,7 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 8 de septiembre de 2026: **157 de 243 requisitos contables construidos**,
+> Al 9 de septiembre de 2026: **158 de 243 requisitos contables construidos**,
 > un 65 %. El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
@@ -40,7 +40,7 @@ Se están construyendo **en paralelo**:
 > | Plan de Estudios (fichas) | 60 | 60 |
 > | Atributos del Graduado y Criterios (`RF120`–`RF132`) | 13 | 13 |
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
-> | Mejora Continua · Evaluación (`RF-PE`) | 37 | 49 |
+> | Mejora Continua · Evaluación (`RF-PE`) | 38 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 0 | 47 |
 > | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
 >
@@ -58,10 +58,10 @@ Se están construyendo **en paralelo**:
 >   campo «Frecuencia de `<código>`» y el selector «Año a configurar» de
 >   `ConfiguracionDelAnio.tsx`— bajo el comentario general de cabecera del
 >   fichero, sin su propio número.
-> - **Citado sin construir.** `RF-PE-041` aparece en el código y **no está
->   hecho**: es una referencia hacia adelante — el comentario de `transicionar`
->   dice que la validación integral de consistencia llega en el ciclo 2c-D.
->   Quien cuente citaciones a secas lo dará por construido.
+> - **Citado sin construir** ya no tiene ejemplo vigente en este bloque:
+>   `RF-PE-041` se cerró el 9 de septiembre de 2026 (ciclo 2c-D) — la
+>   validación integral de consistencia reemplazó el placeholder de
+>   `transicionar` que solo citaba el requisito sin implementarlo.
 >
 > El cruce sirve además para detectar erratas: destapó una prueba que decía
 > cubrir un `RF-PM-080` que no existe en ningún documento.

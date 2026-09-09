@@ -1075,3 +1075,156 @@ model IndicacionDeMedicion {
   @@map("indicacion_medicion")
   @@schema("mejora_continua")
 }
+
+// ============================================================================
+// Módulo MEJORA CONTINUA — Submódulo Plan de Mejora (RF-PJ-000 a RF-PJ-019, 2c-J-A)
+// ============================================================================
+
+/// RF-PJ-001: los tres aspectos sobre los que se genera un plan de mejora.
+/// `PlanMejora` es un agregado único con este discriminador y no tres
+/// entidades: los tres aspectos comparten entidad, máquina de estados
+/// documental y todos los campos de definición/retroalimentación. La lógica
+/// específica de cada aspecto (qué elemento se ofrece, de dónde sale el input
+/// automático) es de 2c-J-B, no de este modelo.
+enum AspectoPlanMejora {
+  CRITERIO_ACREDITACION
+  OBJETIVO_EDUCACIONAL
+  COMPETENCIA
+
+  @@schema("mejora_continua")
+}
+
+/// RF-PJ-014 RN1: enum fijo, no configurable — ver el comentario de
+/// `estado-implementacion.ts` para la razón completa. Máquina de estados
+/// independiente del estado documental (`EstadoMedicion`, reutilizado tal
+/// cual para `PlanMejora.estado`).
+enum EstadoImplementacionMejora {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADO
+
+  @@schema("mejora_continua")
+}
+
+/// RF-PJ-000 a RF-PJ-031: el núcleo del Plan de Mejora y sus tres aspectos.
+///
+/// `criterioAcreditacionId`, `objetivoEducacionalId` y `competenciaId` son
+/// mutuamente excluyentes según `aspecto` — sin clave foránea, como el resto
+/// de referencias a `plan_estudios` en este módulo: §3.2 prohíbe compartir
+/// tablas entre schemas. RF-PJ-002 valida la existencia y la pertenencia a
+/// la carrera del actor a nivel de caso de uso, vía `AcreditacionPort`
+/// (2c-J-B) — no a nivel de esquema.
+///
+/// `competenciaId` y `periodoId` (id real de `DatosPeriodo`, no una
+/// etiqueta) se resolvieron en 2c-J-B (§2g del diseño): tres campos, no dos
+/// — `planEvaluacionId` se guarda aparte porque el cálculo del "% del
+/// periodo anterior" (RF-PJ-028) necesita saber a qué plan de evaluación
+/// pertenece, y no hay forma de derivarlo solo de `periodoId`.
+///
+/// `carreraId` (2c-J-B, §2a del diseño): siempre la del actor que crea el
+/// plan (`AuthorizationPort.carreraACargoDe`), nunca derivada del elemento
+/// asociado — separa RBAC de la validación de negocio de que el elemento
+/// pertenezca a esa carrera.
+///
+/// `input` (2c-J-B): RF-PJ-021/024 piden un campo de texto libre distinto de
+/// `causaRaiz` — RF-PJ-042 los lista por separado. Sin uso para el aspecto
+/// Competencia: su "input" (RF-PJ-028) se calcula en caliente y no se
+/// guarda como snapshot (decisión 5 del diseño).
+///
+/// `planMedicionAfectadoId` (RF-PJ-031): trazabilidad opcional, solo para
+/// Competencia, sin lógica adicional — el diseño (§9) lo deja así a
+/// propósito.
+///
+/// Sin `@@unique` sobre `codigo`: la unicidad la garantiza la función pura
+/// `siguienteCodigoMejora` contra `codigosDe(aspecto, elementoId)`, no un
+/// índice de base de datos — mismo patrón que `evaluacion`/`medicion`. El
+/// ámbito varía por aspecto (RF-PJ-003 RN2): por criterio, por objetivo, o
+/// por periodo para competencias.
+model PlanMejora {
+  id                     String @id @default(uuid()) @db.Uuid
+  codigo                 String @db.VarChar(80)
+  aspecto                AspectoPlanMejora
+  carreraId              String  @map("carrera_id") @db.Uuid
+  criterioAcreditacionId String? @map("criterio_acreditacion_id") @db.Uuid
+  objetivoEducacionalId  String? @map("objetivo_educacional_id") @db.Uuid
+  competenciaId          String? @map("competencia_id") @db.Uuid
+  /// El periodo académico, solo para el aspecto Competencia (RF-PJ-003 RN2:
+  /// el ámbito de unicidad del código es el periodo, no la competencia).
+  periodoId              String? @map("periodo_id") @db.Uuid
+  /// El plan de evaluación Directa base, solo para Competencia (RF-PJ-026).
+  planEvaluacionId       String? @map("plan_evaluacion_id") @db.Uuid
+  /// RF-PJ-031: el plan de medición afectado, si la acción derivó en un
+  /// cambio — opcional, solo Competencia.
+  planMedicionAfectadoId String? @map("plan_medicion_afectado_id") @db.Uuid
+
+  /// Mismo VO que `PlanMedicion`/`PlanEvaluacion` — RF-PJ-004 lo exige
+  /// explícitamente ("replicando el mismo esquema").
+  estado               EstadoMedicion             @default(BORRADOR)
+  estadoImplementacion EstadoImplementacionMejora @default(PENDIENTE) @map("estado_implementacion")
+
+  /// RF-PJ-009 a RF-PJ-013: la definición, editable solo en Borrador.
+  nombre        String @db.VarChar(300)
+  causaRaiz     String @map("causa_raiz") @db.Text
+  justificacion String @db.Text
+  /// RF-PJ-021/024: input de texto libre, distinto de `causaRaiz` — ver el
+  /// comentario de cabecera del modelo.
+  input         String? @db.Text
+  plazo         DateTime @db.Date
+  recursos      String @db.Text
+  metas         String @db.Text
+  responsable   String @db.VarChar(300)
+
+  /// RF-PJ-018: logro de meta e impacto, cada uno opcional hasta completarse.
+  logroMeta String? @map("logro_meta") @db.Text
+  impacto   String? @db.Text
+
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+
+  evidencias EvidenciaPlanMejora[]
+
+  /// Las consultas del alta van por aspecto + elemento, para calcular el
+  /// ámbito del correlativo (RF-PJ-003 RN2).
+  @@index([aspecto, criterioAcreditacionId])
+  @@index([aspecto, objetivoEducacionalId])
+  @@index([aspecto, periodoId])
+  @@map("planes_mejora")
+  @@schema("mejora_continua")
+}
+
+/// RF-PJ-022/025 (decisión 7 del diseño de 2c-J-B): el mínimo configurable de
+/// acciones de mejora por criterio/objetivo, como fila única — sin pantalla
+/// de administración en este ciclo, editable solo por migración/seed.
+model ParametroPlanMejora {
+  id                     Int @id @default(1)
+  minimoAccionesCriterio Int @default(1) @map("minimo_acciones_criterio")
+  minimoAccionesObjetivo Int @default(1) @map("minimo_acciones_objetivo")
+
+  @@map("parametro_plan_mejora")
+  @@schema("mejora_continua")
+}
+
+/// RF-PJ-016 y RF-PJ-017: una o varias evidencias por plan de mejora.
+///
+/// Índice sobre la clave foránea desde el principio — a diferencia de
+/// `Evidencia` (evaluación), que se quedó sin él hasta 2c-C: no repetir esa
+/// deuda.
+model EvidenciaPlanMejora {
+  id           String @id @default(uuid()) @db.Uuid
+  planMejoraId String @map("plan_mejora_id") @db.Uuid
+
+  /// URL o ruta del archivo/enlace (RF-PJ-016).
+  referencia    String  @db.VarChar(2000)
+  nombreArchivo String? @map("nombre_archivo") @db.VarChar(300)
+  /// Sin clave foránea a usuarios: el registro debe seguir siendo legible
+  /// aunque la cuenta desaparezca, igual que el resto de la evidencia del
+  /// módulo (`docenteId` en AsignaturaEvaluada, `solicitadoPor` en
+  /// DocumentoMedicion).
+  subidoPor String   @map("subido_por") @db.Uuid
+  subidoEn  DateTime @default(now()) @map("subido_en") @db.Timestamptz(6)
+
+  plan PlanMejora @relation(fields: [planMejoraId], references: [id], onDelete: Cascade)
+
+  @@index([planMejoraId])
+  @@map("evidencia_plan_mejora")
+  @@schema("mejora_continua")
+}

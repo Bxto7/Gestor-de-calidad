@@ -38,6 +38,11 @@ coverage/
 *.log
 npm-debug.log*
 
+# ── Caches locales de agentes de IA ───────────────────────────────────────
+# Índices/registros locales, no artefactos del proyecto.
+.atl/
+.codegraph/
+
 # ── Editor / SO ──────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

@@ -75,6 +75,11 @@ import {
   type RepositorioAtributoPort,
   type RepositorioCriterioPort,
 } from './modules/plan-estudios/application/ports/acreditacion.port.js';
+import {
+  ACREDITACION_PORT,
+  type AcreditacionPort,
+} from './modules/plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
+import { AcreditacionAdapter } from './modules/plan-estudios/infrastructure/acreditacion-cross-modulo.adapter.js';
 import { GestionarAtributos } from './modules/plan-estudios/application/use-cases/gestionar-atributos.use-case.js';
 import { GestionarCriterios } from './modules/plan-estudios/application/use-cases/gestionar-criterios.use-case.js';
 import { AtributoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/atributo.repository.js';
@@ -149,6 +154,17 @@ import {
   EvidenciasController,
   ResultadosController,
 } from './modules/mejora-continua/evaluacion/infrastructure/http/configuracion-evaluacion.controller.js';
+import {
+  REPOSITORIO_PLAN_MEJORA,
+  type RepositorioPlanMejoraPort,
+} from './modules/mejora-continua/mejora/application/ports/plan-mejora.port.js';
+import { IMPACTO_PLAN_MEJORA } from './modules/mejora-continua/mejora/application/ports/impacto-plan-mejora.port.js';
+import { GestionarPlanesMejora } from './modules/mejora-continua/mejora/application/use-cases/gestionar-planes-mejora.use-case.js';
+import { PlanMejoraRepositoryPrisma } from './modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
+import {
+  EvidenciasPlanMejoraController,
+  PlanesMejoraController,
+} from './modules/mejora-continua/mejora/infrastructure/http/planes-mejora.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
@@ -298,6 +314,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     EvidenciasController,
     ResultadosController,
     DocentesController,
+    PlanesMejoraController,
+    EvidenciasPlanMejoraController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
     DocumentosDelPlanController,
@@ -341,6 +359,16 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       provide: REPOSITORIO_CONFIGURACION_EVALUACION,
       useClass: ConfiguracionEvaluacionRepositoryPrisma,
     },
+    { provide: REPOSITORIO_PLAN_MEJORA, useClass: PlanMejoraRepositoryPrisma },
+    // 2c-J-B: la primera dependencia circular de primer nivel del proyecto
+    // (§2f/§4 del diseño) — el mismo `PlanMejoraRepositoryPrisma` implementa
+    // ambos puertos; `useExisting` reutiliza la instancia ya registrada
+    // arriba, mismo patrón que `SEGURIDAD_PORT`.
+    { provide: IMPACTO_PLAN_MEJORA, useExisting: REPOSITORIO_PLAN_MEJORA },
+    // La frontera en la otra dirección (RF-PJ-020 a 024): lo expone
+    // `plan-estudios`, lo consume `mejora` — mismo patrón que
+    // `CONTENIDO_CURRICULAR`.
+    { provide: ACREDITACION_PORT, useClass: AcreditacionAdapter },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
     { provide: REPOSITORIO_DOCUMENTOS, useClass: DocumentoRepositoryPrisma },
     { provide: REPOSITORIO_DATOS_DOCUMENTO, useClass: DatosDocumentoRepositoryPrisma },
@@ -471,6 +499,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         REPOSITORIO_PLAN_EVALUACION,
         REPOSITORIO_PLAN_MEDICION,
         CONTENIDO_CURRICULAR,
+        REPOSITORIO_CONFIGURACION_EVALUACION,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
       ],
@@ -478,10 +507,18 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         evaluaciones: RepositorioPlanEvaluacionPort,
         mediciones: RepositorioPlanMedicionPort,
         curricular: ContenidoCurricularPort,
+        configuraciones: RepositorioConfiguracionEvaluacionPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) =>
-        new GestionarPlanesEvaluacion(evaluaciones, mediciones, curricular, autorizacion, eventos),
+        new GestionarPlanesEvaluacion(
+          evaluaciones,
+          mediciones,
+          curricular,
+          configuraciones,
+          autorizacion,
+          eventos,
+        ),
     },
     {
       provide: ConfigurarPlanEvaluacion,
@@ -509,6 +546,44 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           curricular,
           configuraciones,
           directorio,
+          autorizacion,
+          eventos,
+        ),
+    },
+    {
+      // 2c-J-B añade `ACREDITACION_PORT` (Criterio/Objetivo) y los tres
+      // puertos que ya usaba `evaluacion`/`medicion` (Competencia, §2d y §2e
+      // del diseño) — a diferencia de 2c-J-A, este caso de uso ya sí cruza a
+      // `plan-estudios`, ahora que RF-PJ-002 valida existencia y pertenencia
+      // a la carrera del actor.
+      provide: GestionarPlanesMejora,
+      inject: [
+        REPOSITORIO_PLAN_MEJORA,
+        ACREDITACION_PORT,
+        REPOSITORIO_PLAN_EVALUACION,
+        REPOSITORIO_PLAN_MEDICION,
+        REPOSITORIO_CONFIGURACION_EVALUACION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        planes: RepositorioPlanMejoraPort,
+        acreditacion: AcreditacionPort,
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        mediciones: RepositorioPlanMedicionPort,
+        configuraciones: RepositorioConfiguracionEvaluacionPort,
+        curricular: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new GestionarPlanesMejora(
+          planes,
+          acreditacion,
+          evaluaciones,
+          mediciones,
+          configuraciones,
+          curricular,
           autorizacion,
           eventos,
         ),

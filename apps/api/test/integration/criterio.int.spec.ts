@@ -9,10 +9,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { CriterioRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
+import { PlanMejoraRepositoryPrisma } from '../../src/modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
-const criterios = new CriterioRepositoryPrisma(prisma);
+const impactoPlanMejora = new PlanMejoraRepositoryPrisma(prisma);
+const criterios = new CriterioRepositoryPrisma(prisma, impactoPlanMejora);
 
 let carreraA: string;
 let carreraB: string;
@@ -107,10 +109,53 @@ describe('RF132 — inactivar', () => {
     expect(leido?.activo).toBe(false);
   });
 
-  it('el impacto es cero mientras no exista el submódulo Plan de Mejora', async () => {
+  it('el impacto es cero sin planes de mejora vinculados', async () => {
     const creado = await criterios.crear(carreraA, 'C-01', 'Estudiantes');
 
     expect(await criterios.impactoDeInactivar(creado.id)).toEqual({ planesMejoraVinculados: 0 });
+  });
+
+  it('2c-J-B: el impacto cuenta los planes de mejora reales vinculados (ImpactoPlanMejoraPort)', async () => {
+    const creado = await criterios.crear(carreraA, 'C-01', 'Estudiantes');
+
+    await prisma.$executeRawUnsafe(
+      `TRUNCATE mejora_continua.evidencia_plan_mejora, mejora_continua.planes_mejora RESTART IDENTITY CASCADE`,
+    );
+    await impactoPlanMejora.crear({
+      codigo: 'PJ-1',
+      aspecto: 'CRITERIO_ACREDITACION',
+      carreraId: carreraA,
+      criterioAcreditacionId: creado.id,
+      objetivoEducacionalId: null,
+      competenciaId: null,
+      periodoId: null,
+      planEvaluacionId: null,
+    });
+    await impactoPlanMejora.crear({
+      codigo: 'PJ-2',
+      aspecto: 'CRITERIO_ACREDITACION',
+      carreraId: carreraA,
+      criterioAcreditacionId: creado.id,
+      objetivoEducacionalId: null,
+      competenciaId: null,
+      periodoId: null,
+      planEvaluacionId: null,
+    });
+    // Un plan de mejora de otro criterio no debe contarse.
+    const otro = await criterios.crear(carreraA, 'C-02', 'Otro criterio');
+    await impactoPlanMejora.crear({
+      codigo: 'PJ-3',
+      aspecto: 'CRITERIO_ACREDITACION',
+      carreraId: carreraA,
+      criterioAcreditacionId: otro.id,
+      objetivoEducacionalId: null,
+      competenciaId: null,
+      periodoId: null,
+      planEvaluacionId: null,
+    });
+
+    expect(await criterios.impactoDeInactivar(creado.id)).toEqual({ planesMejoraVinculados: 2 });
+    expect(await criterios.impactoDeInactivar(otro.id)).toEqual({ planesMejoraVinculados: 1 });
   });
 
   it('`onDelete: Restrict` impide borrar una carrera con criterios', async () => {
