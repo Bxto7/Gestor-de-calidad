@@ -19,6 +19,7 @@ import {
   AsignaturaEvaluadaDto,
   EvidenciaDto,
   IndicacionDto,
+  IndicacionesDelAnioDto,
 } from './configuracion-evaluacion.dto.js';
 
 const UUID = '11111111-1111-4111-8111-111111111111';
@@ -97,5 +98,56 @@ describe('RF-PE-029 RN1 — la instrucción de una indicación sigue la misma re
     });
 
     expect(dto.instruccion).toBe('Responda la encuesta.');
+  });
+});
+
+/**
+ * §8 del diseño promete un 409 cuando «dos indicaciones del mismo grupo»
+ * llegan en un año. El caso más simple —dos entradas del mismo
+ * `grupoObjetivo` en el mismo array del cuerpo— no lo detectaba: el `upsert`
+ * de `reemplazarIndicaciones` ve su propia escritura dentro de la misma
+ * transacción y actualiza en vez de chocar contra el índice único, así que la
+ * segunda entrada pisaba a la primera sin ningún error. La barrera va en el
+ * DTO, como el resto de validaciones de esta pantalla, con el mismo
+ * `@ArrayUnique` que ya usa `competenciaIds` en
+ * `plan-estudios/.../asignatura.dto.ts`.
+ */
+describe('RF-PE-028 a RF-PE-030 §8 — no puede haber dos indicaciones del mismo grupo objetivo', () => {
+  it('rechaza dos indicaciones con el mismo grupo objetivo en el mismo envío', () => {
+    expect(
+      fallos(IndicacionesDelAnioDto, {
+        indicaciones: [
+          {
+            grupoObjetivo: 'EGRESADOS',
+            instruccion: 'Responda la encuesta antes del 30 de noviembre.',
+            enlaceInstrumento: 'https://drive.example/x',
+          },
+          {
+            grupoObjetivo: 'EGRESADOS',
+            instruccion: 'Otra instrucción para el mismo grupo.',
+            enlaceInstrumento: 'https://drive.example/y',
+          },
+        ],
+      }),
+    ).toContain('indicaciones');
+  });
+
+  it('y acepta grupos objetivo distintos en el mismo envío', () => {
+    expect(
+      fallos(IndicacionesDelAnioDto, {
+        indicaciones: [
+          {
+            grupoObjetivo: 'EGRESADOS',
+            instruccion: 'Responda la encuesta antes del 30 de noviembre.',
+            enlaceInstrumento: 'https://drive.example/x',
+          },
+          {
+            grupoObjetivo: 'EMPLEADORES',
+            instruccion: 'Responda la encuesta antes del 30 de noviembre.',
+            enlaceInstrumento: 'https://drive.example/y',
+          },
+        ],
+      }),
+    ).toEqual([]);
   });
 });

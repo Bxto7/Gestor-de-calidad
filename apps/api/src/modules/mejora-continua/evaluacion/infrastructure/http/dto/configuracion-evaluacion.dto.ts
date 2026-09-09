@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsIn,
   IsInt,
@@ -103,6 +104,17 @@ export class IndicacionesDelAnioDto {
   @IsArray()
   // Son cuatro grupos objetivo: más de cuatro entradas es un error de carga.
   @ArrayMaxSize(4)
+  // §8 del diseño promete 409 cuando dos indicaciones repiten el mismo grupo
+  // objetivo. El `upsert` de `reemplazarIndicaciones` no lo detecta por sí
+  // solo: dentro de la misma transacción ve su propia escritura anterior y
+  // actualiza en vez de chocar contra el índice único, así que la segunda
+  // entrada pisaría a la primera sin ningún error. El identificador compara
+  // por `grupoObjetivo`, no por referencia del objeto completo (que siempre
+  // sería único). Mismo patrón que `competenciaIds` en
+  // `plan-estudios/.../asignatura.dto.ts`.
+  @ArrayUnique((i: IndicacionDto) => i.grupoObjetivo, {
+    message: 'No puede haber dos indicaciones para el mismo grupo objetivo.',
+  })
   @ValidateNested({ each: true })
   @Type(() => IndicacionDto)
   indicaciones!: IndicacionDto[];
