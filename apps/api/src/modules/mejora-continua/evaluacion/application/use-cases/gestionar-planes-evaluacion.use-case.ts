@@ -39,10 +39,15 @@ import type {
 } from '../../../medicion/application/ports/plan-medicion.port.js';
 import { siguienteCodigoEvaluacion } from '../../domain/value-objects/codigo-evaluacion.js';
 import {
+  type ResultadoConsistencia,
+  validarConsistenciaEvaluacion,
+} from '../../domain/services/motor-de-consistencia.js';
+import {
   PlanEvaluacionCreado,
   PlanEvaluacionEliminado,
   PlanEvaluacionTransicionado,
 } from '../../domain/events/eventos-evaluacion.js';
+import type { RepositorioConfiguracionEvaluacionPort } from '../ports/configuracion-evaluacion.port.js';
 import type {
   DatosPlanEvaluacion,
   FiltroPlanesEvaluacion,
@@ -65,6 +70,7 @@ export class GestionarPlanesEvaluacion {
     private readonly evaluaciones: RepositorioPlanEvaluacionPort,
     private readonly mediciones: RepositorioPlanMedicionPort,
     private readonly curricular: ContenidoCurricularPort,
+    private readonly configuraciones: RepositorioConfiguracionEvaluacionPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
   ) {}
@@ -206,14 +212,22 @@ export class GestionarPlanesEvaluacion {
       await this.carreraDe(base.planEstudiosId),
     );
 
-    // La validación integral de consistencia es RF-PE-041, en el ciclo 2c-D:
-    // hoy no hay ningún dato de configuración que validar. Pasar `false` no es
-    // saltarse la comprobación, es que todavía no existe nada que comprobar.
+    // RF-PE-041 RN1: la validación integral es requisito previo, pero solo
+    // para las transiciones que la exigen (enviar a revisión y aprobar). Se
+    // evalúa condicionalmente, igual que en `GestionarPlanesMedicion`:
+    // volver a pedirla al observar o marcar vigente no tiene sentido y
+    // costaría dos lecturas de configuración por nada.
+    const resultado = transicion.exigeSinBloqueos ? await this.evaluar(plan, base) : null;
+
     const r = intentarTransicion(plan.estado, accion, {
-      tieneBloqueos: false,
+      tieneBloqueos: resultado?.tieneBloqueos ?? false,
       comentario: contexto.comentario,
     });
-    if (!r.ok) throw new ReglaDeNegocioViolada(r.motivo);
+    if (!r.ok) {
+      throw new ReglaDeNegocioViolada(
+        resultado?.tieneBloqueos ? this.mensajeDeInconsistencias(resultado) : r.motivo,
+      );
+    }
 
     const actualizado = await this.evaluaciones.cambiarEstado(id, r.nuevoEstado);
 
@@ -228,6 +242,80 @@ export class GestionarPlanesEvaluacion {
       ),
     ]);
     return actualizado;
+  }
+
+  /**
+   * RF-PE-041: la validación integral, resuelta con nombres legibles.
+   *
+   * Lee la configuración ya guardada (`RepositorioConfiguracionEvaluacionPort
+   * .del`) y el catálogo de competencias y asignaturas del plan de estudios
+   * base, para que el motor —puro, sin acceso a infraestructura— pueda
+   * nombrar sus hallazgos por código en vez de por UUID. Por RN2, el motor
+   * solo recibe las filas que ya existen: no hay aquí ninguna comprobación de
+   * "qué falta configurar del todo", eso no es lo que RF-PE-041 pide.
+   */
+  private async evaluar(
+    plan: DatosPlanEvaluacion,
+    base: DatosPlanMedicion,
+  ): Promise<ResultadoConsistencia> {
+    const [config, competenciasCatalogo, asignaturasCatalogo] = await Promise.all([
+      this.configuraciones.del(plan.id),
+      this.curricular.competenciasDelPlan(base.planEstudiosId),
+      this.curricular.asignaturasDelPlan(base.planEstudiosId),
+    ]);
+
+    const competenciaPorId = new Map(competenciasCatalogo.map((c) => [c.id, c]));
+    const asignaturaPorId = new Map(asignaturasCatalogo.map((a) => [a.id, a]));
+    const periodoPorId = new Map(base.periodos.map((p) => [p.id, p]));
+
+    const competencias = config.competencias.map((c) => {
+      const cat = competenciaPorId.get(c.competenciaId);
+      return {
+        competenciaId: c.competenciaId,
+        // Una competencia retirada del plan de estudios después de
+        // configurarse se queda sin código: se nombra igual, no se descarta —
+        // sigue siendo una fila incompleta si le falta algo.
+        codigo: cat?.codigo ?? c.competenciaId,
+        nombre: cat?.nombre ?? 'ya no está en el plan de estudios',
+        instrumento: c.instrumento,
+        frecuencia: c.frecuencia,
+        responsableId: c.responsableId,
+      };
+    });
+
+    const asignaturas = config.mediciones.flatMap((m) => {
+      const competenciaCat = competenciaPorId.get(m.competenciaId);
+      const periodo = periodoPorId.get(m.periodoId);
+      return m.asignaturas.map((a) => {
+        const asignaturaCat = asignaturaPorId.get(a.asignaturaId);
+        return {
+          id: a.id,
+          competenciaCodigo: competenciaCat?.codigo ?? m.competenciaId,
+          periodoEtiqueta: periodo?.etiqueta ?? m.periodoId,
+          asignaturaCodigo: asignaturaCat?.codigo ?? a.asignaturaId,
+          asignaturaNombre: asignaturaCat?.nombre ?? 'ya no está en el plan de estudios',
+          entregable: a.entregable,
+          docenteId: a.docenteId,
+        };
+      });
+    });
+
+    return validarConsistenciaEvaluacion({ tipo: base.tipo, competencias, asignaturas });
+  }
+
+  /**
+   * RF-PE-041: el mensaje que ve el frontend cuando la transición se rechaza
+   * por bloqueos. `intentarTransicion` (compartida con medición) solo sabe
+   * decir «hay bloqueos»; aquí se nombra cada uno, porque este ciclo no
+   * construye un endpoint de consulta aparte —a diferencia de medición, que
+   * expone `GET /planes-medicion/:id/consistencia`— así que el reporte
+   * consolidado tiene que viajar en la propia excepción para ser útil.
+   */
+  private mensajeDeInconsistencias(resultado: ResultadoConsistencia): string {
+    const detalle = resultado.bloqueantes
+      .map((h) => `${h.titulo} (${h.afectados.join(', ')})`)
+      .join('; ');
+    return `Hay inconsistencias bloqueantes sin resolver: ${detalle}.`;
   }
 
   private async exigirPlan(id: string): Promise<DatosPlanEvaluacion> {

@@ -40,6 +40,10 @@ import type {
   RepositorioPlanMedicionPort,
 } from '../../../medicion/application/ports/plan-medicion.port.js';
 import type {
+  ConfiguracionDelPlan,
+  RepositorioConfiguracionEvaluacionPort,
+} from '../ports/configuracion-evaluacion.port.js';
+import type {
   DatosPlanEvaluacion,
   RepositorioPlanEvaluacionPort,
 } from '../ports/plan-evaluacion.port.js';
@@ -202,6 +206,31 @@ function repoEvaluacion(
   };
 }
 
+/**
+ * Doble de `RepositorioConfiguracionEvaluacionPort`: `transicionar` solo usa
+ * `del`. El resto lanza si algo lo invoca por error, para que una prueba que
+ * dependiera de un método de escritura no pasara en silencio con un `noop`.
+ */
+function repoConfiguraciones(
+  sobre: Partial<RepositorioConfiguracionEvaluacionPort> = {},
+): RepositorioConfiguracionEvaluacionPort {
+  const noUsado = (metodo: string) => async () => {
+    throw new Error(`${metodo} no se usa en este spec.`);
+  };
+  return {
+    del: async () => ({ competencias: [], mediciones: [], indicaciones: [] }),
+    guardarCompetencia: noUsado('guardarCompetencia'),
+    reemplazarAsignaturas: noUsado('reemplazarAsignaturas'),
+    guardarPorcentaje: noUsado('guardarPorcentaje'),
+    reemplazarEvidencias: noUsado('reemplazarEvidencias'),
+    planDeAsignaturaEvaluada: noUsado('planDeAsignaturaEvaluada'),
+    reemplazarIndicaciones: noUsado('reemplazarIndicaciones'),
+    guardarResultados: noUsado('guardarResultados'),
+    planDeIndicacion: noUsado('planDeIndicacion'),
+    ...sobre,
+  };
+}
+
 function montar(
   opciones: {
     base?: DatosPlanMedicion | null;
@@ -210,6 +239,7 @@ function montar(
     evaluacion?: DatosPlanEvaluacion;
     vigente?: DatosPlanEvaluacion | null;
     contenido?: Partial<ContenidoCurricularPort>;
+    configuraciones?: Partial<RepositorioConfiguracionEvaluacionPort>;
     autorizacion?: AuthorizationPort;
   } = {},
 ) {
@@ -247,10 +277,13 @@ function montar(
     ...opciones.contenido,
   });
 
+  const configuraciones = repoConfiguraciones(opciones.configuraciones);
+
   const caso = new GestionarPlanesEvaluacion(
     evaluaciones,
     mediciones,
     curricular,
+    configuraciones,
     opciones.autorizacion ?? permitirTodo(),
     publicador,
   );
@@ -457,6 +490,137 @@ describe('RF-PE-005 — las transiciones', () => {
     expect(publicados[0]?.nombre).toBe('evaluacion.transicionado');
     expect(publicados[0]?.detalle).toContain('Borrador → En revisión');
   });
+});
+
+describe('RF-PE-041 — la validación integral antes de transicionar', () => {
+  it('enviar a revisión con una competencia configurada e incompleta se rechaza y la nombra', async () => {
+    const { caso } = montar({
+      evaluacion: evaluacion({ estado: 'Borrador' }),
+      configuraciones: {
+        del: async () =>
+          ({
+            competencias: [
+              {
+                competenciaId: 'c-1',
+                instrumento: null,
+                frecuencia: 'Semestral',
+                responsableId: null,
+              },
+            ],
+            mediciones: [],
+            indicaciones: [],
+          }) satisfies ConfiguracionDelPlan,
+      },
+    });
+
+    await expect(caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {})).rejects.toThrow(
+      /instrumento/i,
+    );
+  });
+
+  it('aprobar con una asignatura sin docente se rechaza', async () => {
+    const { caso } = montar({
+      evaluacion: evaluacion({ estado: 'En revisión' }),
+      configuraciones: {
+        del: async () =>
+          ({
+            competencias: [],
+            mediciones: [
+              {
+                competenciaId: 'c-1',
+                periodoId: 'p-1',
+                porcentajeAlcanzado: null,
+                asignaturas: [
+                  {
+                    id: 'ae-1',
+                    asignaturaId: 'a-1',
+                    entregable: 'Informe',
+                    docenteId: null,
+                    evidencias: [],
+                  },
+                ],
+              },
+            ],
+            indicaciones: [],
+          }) satisfies ConfiguracionDelPlan,
+      },
+    });
+
+    await expect(caso.transicionar(ACTOR, 'ev-1', 'aprobar', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('el mensaje nombra el código de la competencia, no su UUID', async () => {
+    const { caso } = montar({
+      evaluacion: evaluacion({ estado: 'Borrador' }),
+      configuraciones: {
+        del: async () =>
+          ({
+            competencias: [
+              { competenciaId: 'c-1', instrumento: null, frecuencia: null, responsableId: null },
+            ],
+            mediciones: [],
+            indicaciones: [],
+          }) satisfies ConfiguracionDelPlan,
+      },
+    });
+
+    await expect(caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {})).rejects.toThrow(
+      /CPE-01/,
+    );
+  });
+
+  it('sin nada configurado, la transición procede igual (RN2)', async () => {
+    const { caso } = montar({ evaluacion: evaluacion({ estado: 'Borrador' }) });
+    // El doble por defecto de `configuraciones` ya devuelve las tres listas
+    // vacías: RN2 dice que eso no es una inconsistencia.
+
+    const resultado = await caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {});
+
+    expect(resultado.estado).toBe('En revisión');
+  });
+
+  it('con todo completo, la transición procede', async () => {
+    const { caso } = montar({
+      evaluacion: evaluacion({ estado: 'Borrador' }),
+      configuraciones: {
+        del: async () =>
+          ({
+            competencias: [
+              {
+                competenciaId: 'c-1',
+                instrumento: 'Rúbrica',
+                frecuencia: 'Semestral',
+                responsableId: null,
+              },
+            ],
+            mediciones: [],
+            indicaciones: [],
+          }) satisfies ConfiguracionDelPlan,
+      },
+    });
+
+    const resultado = await caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {});
+
+    expect(resultado.estado).toBe('En revisión');
+  });
+
+  it.each(['observar', 'marcar-vigente'] as const)(
+    '%s no dispara el motor: la transición no exige estar sin bloqueos',
+    async (accion) => {
+      const del = vi.fn(async () => ({ competencias: [], mediciones: [], indicaciones: [] }));
+      const estadoDesde = accion === 'observar' ? 'En revisión' : 'Aprobado';
+      const { caso } = montar({
+        evaluacion: evaluacion({ estado: estadoDesde }),
+        configuraciones: { del },
+      });
+
+      await caso.transicionar(ACTOR, 'ev-1', accion, { comentario: 'motivo' });
+
+      expect(del).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('RF-PE-044 — el vigente', () => {
