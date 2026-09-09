@@ -217,9 +217,18 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
   const existente = await prisma.planMedicion.findUnique({ where: { codigo } });
   if (existente) return;
 
+  // `orderBy` explícito y no el orden natural de la tabla: sin él, qué dos
+  // competencias caen en `slice(0, 2)` —y por tanto cuál es «la primera» que
+  // se programa más abajo— no está garantizado por Postgres, y una corrida
+  // podía dar CPE-E2E01 y otra CPE-E2E02. Es justo la competencia que
+  // `evaluacion.spec.ts` busca por código literal en la cuadrícula heredada:
+  // con el orden librado al azar, esa prueba —y cualquier otra que asuma
+  // CPE-E2E01— era intermitente sin que nada de su propio código estuviera
+  // mal.
   const competencias = await prisma.competencia.findMany({
     where: { codigo: { in: COMPETENCIAS.map((c) => c.codigo) } },
     select: { id: true },
+    orderBy: { codigo: 'asc' },
   });
   const competenciasDelPlan = competencias.slice(0, 2);
 
