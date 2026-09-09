@@ -61,7 +61,7 @@ export class ConfigurarPlanMedicion {
 
   /** RF-PM-013 y RF-PM-014: las competencias del plan base, agrupadas. */
   async competenciasDisponibles(actor: Actor, id: string): Promise<GrupoDeCompetencias[]> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(id);
     const competencias = await this.curricular.competenciasDelPlan(plan.planEstudiosId);
 
@@ -74,8 +74,9 @@ export class ConfigurarPlanMedicion {
     id: string,
     competenciaIds: readonly string[],
   ): Promise<DatosPlanMedicion> {
-    await this.exigir(actor, 'medicion.editar');
-    const plan = await this.exigirEditable(id);
+    const plan = await this.exigirPlan(id);
+    await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
+    this.verificarEditable(plan);
 
     // RN1: una competencia solo puede incluirse una vez. Se normaliza en vez de
     // rechazar, porque mandarla dos veces expresa la misma intención.
@@ -102,7 +103,7 @@ export class ConfigurarPlanMedicion {
 
   /** RF-PM-016: la propuesta inicial. Solo para la Directa. */
   async periodosPropuestos(actor: Actor, id: string): Promise<PeriodoPropuesto[]> {
-    await this.exigir(actor, 'medicion.leer');
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(id);
 
     // La Indirecta cubre años calendario que elige el usuario (RF-PM-020): el
@@ -122,8 +123,9 @@ export class ConfigurarPlanMedicion {
     id: string,
     periodos: readonly PeriodoADeclarar[],
   ): Promise<DatosPlanMedicion> {
-    await this.exigir(actor, 'medicion.editar');
-    const plan = await this.exigirEditable(id);
+    const plan = await this.exigirPlan(id);
+    await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
+    this.verificarEditable(plan);
 
     // RF-PM-016 RN3 y RF-PM-020 RN1.
     if (periodos.length === 0) {
@@ -167,18 +169,31 @@ export class ConfigurarPlanMedicion {
   }
 
   /** RF-PM-007 RN1. */
-  private async exigirEditable(id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.exigirPlan(id);
+  private verificarEditable(plan: DatosPlanMedicion): void {
     if (!permiteEdicion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
         `El plan de medición ${plan.codigo} está en ${plan.estado}; solo se configura en Borrador.`,
       );
     }
-    return plan;
   }
 
-  private async exigir(actor: Actor, permiso: string): Promise<void> {
-    const decision = await this.autorizacion.puede(actor.id, permiso, null);
+  /**
+   * La carrera del plan, para acotar el permiso.
+   *
+   * Sale de la cadena que ya existe —medición → plan de estudios— y no de una
+   * columna propia: desnormalizarla es una migración que se añade el día que
+   * el número lo justifique, y hoy no hay número.
+   */
+  private async carreraDe(planEstudiosId: string): Promise<string> {
+    const plan = await this.curricular.planPorId(planEstudiosId);
+    if (!plan) {
+      throw new NoEncontrado('el plan de estudios', planEstudiosId);
+    }
+    return plan.carreraId;
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }

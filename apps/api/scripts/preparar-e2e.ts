@@ -18,6 +18,10 @@
  * Es idempotente, y además **reinicia** los planes de medición de esta carrera:
  * la suite crea uno en cada ejecución y sin esto el correlativo de versión
  * crecería sin fin entre corridas locales.
+ *
+ * Desde la Task 7 (2c-C) deja además un segundo plan de medición, Indirecta y
+ * ya Aprobado, para el recorrido E2E de la configuración indirecta
+ * (RF-PE-022 a RF-PE-030): ver `planDeMedicionIndirectaAprobada`.
  */
 
 import { existsSync } from 'node:fs';
@@ -50,6 +54,22 @@ const ASIGNATURAS = [
   { codigo: 'AS-E2E01', nombre: 'Asignatura de pruebas I', creditos: 4, horasTeoricas: 3 },
   { codigo: 'AS-E2E02', nombre: 'Asignatura de pruebas II', creditos: 3, horasTeoricas: 2 },
 ] as const;
+
+/**
+ * La única competencia del plan de medición Indirecta de partida.
+ *
+ * Código `CPE-01` y no `CPE-E2E0x`, a propósito: es el literal que el
+ * recorrido E2E de la configuración indirecta busca en pantalla
+ * (`Instrumento de CPE-01`, `Porcentaje alcanzado de CPE-01`). No colisiona
+ * con nada real: no es un código que `cargar-plan-isi-2018.ts` ni el seed
+ * usen, solo aparece como ejemplo en comentarios y en specs unitarios que
+ * corren contra repositorios de prueba, no contra esta base de datos.
+ */
+const COMPETENCIA_INDIRECTA = {
+  codigo: 'CPE-01',
+  nombre: 'Competencia de evaluación indirecta de prueba',
+  atributo: 'AG-I08',
+} as const;
 
 async function main(): Promise<void> {
   const facultad = await prisma.facultad.upsert({
@@ -170,11 +190,13 @@ async function main(): Promise<void> {
   }
 
   await planDeMedicionVigente(plan.id);
+  await planDeMedicionIndirectaAprobada(plan.id);
 
   console.log(
     `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias y ` +
-      `${ASIGNATURAS.length} asignaturas, y un plan de medición vigente de partida con una ` +
-      'competencia programada en ambos periodos.',
+      `${ASIGNATURAS.length} asignaturas, un plan de medición vigente de partida con una ` +
+      'competencia programada en ambos periodos, y un plan de medición Indirecta Aprobado ' +
+      'con dos años.',
   );
 }
 
@@ -195,9 +217,18 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
   const existente = await prisma.planMedicion.findUnique({ where: { codigo } });
   if (existente) return;
 
+  // `orderBy` explícito y no el orden natural de la tabla: sin él, qué dos
+  // competencias caen en `slice(0, 2)` —y por tanto cuál es «la primera» que
+  // se programa más abajo— no está garantizado por Postgres, y una corrida
+  // podía dar CPE-E2E01 y otra CPE-E2E02. Es justo la competencia que
+  // `evaluacion.spec.ts` busca por código literal en la cuadrícula heredada:
+  // con el orden librado al azar, esa prueba —y cualquier otra que asuma
+  // CPE-E2E01— era intermitente sin que nada de su propio código estuviera
+  // mal.
   const competencias = await prisma.competencia.findMany({
     where: { codigo: { in: COMPETENCIAS.map((c) => c.codigo) } },
     select: { id: true },
+    orderBy: { codigo: 'asc' },
   });
   const competenciasDelPlan = competencias.slice(0, 2);
 
@@ -260,6 +291,94 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
       })),
     });
   }
+}
+
+/**
+ * Un plan de medición Indirecta, ya Aprobado — la base elegible que necesita
+ * el recorrido E2E de la configuración indirecta (RF-PE-022 a RF-PE-030).
+ *
+ * Aprobado y no Vigente: RF-PE-001 RN3 admite las dos, y dejando este en
+ * Aprobado la Directa de arriba sigue siendo la única Vigente de la carrera —
+ * que es la que `asegurarUnPlanEvaluacion` (`global-setup.ts`) toma como base
+ * del plan de evaluación de partida que ya usan `evaluacion.spec.ts` y
+ * `configuracion-evaluacion.spec.ts` (`basesElegibles` devuelve primero los
+ * Vigentes). La suite E2E crea su propio plan de evaluación indirecto por
+ * encima de este, con su propia cuenta y su propio recorrido.
+ *
+ * Dos años (`2026`, `2027`) y no periodos académicos: RF-PM-016 solo propone
+ * periodos para la Directa (`proponerPeriodos` devuelve `[]` en Indirecta), así
+ * que aquí se crean a mano, igual que la matriz de `planDeMedicionVigente`.
+ * Sin `fechaCierre`: RF-PM-017 RN1 la exige solo en la Directa.
+ *
+ * La única competencia se programa en los DOS años, no en uno: el recorrido de
+ * la Task 7 escribe el instrumento (dato de competencia, común a todo el plan)
+ * en 2026 y comprueba que sigue en 2027, mientras el porcentaje (dato del año)
+ * no viaja. Sin programar la competencia también en 2027, esa tarjeta no
+ * tendría ninguna fila que enseñar allí y la comprobación no tendría nada que
+ * negar — el mismo motivo que ya vale para el plan Directo de arriba.
+ */
+async function planDeMedicionIndirectaAprobada(planEstudiosId: string): Promise<void> {
+  const codigo = 'PM-PE-E2E-v1-I-v1';
+
+  const existente = await prisma.planMedicion.findUnique({ where: { codigo } });
+  if (existente) return;
+
+  const atributo = await prisma.atributoGraduado.findFirst({
+    where: { marco: 'ICACIT', codigo: COMPETENCIA_INDIRECTA.atributo },
+  });
+  if (!atributo) {
+    throw new Error(
+      `El atributo ${COMPETENCIA_INDIRECTA.atributo} no existe. Ejecuta antes ` +
+        '`npx tsx prisma/seed.ts`.',
+    );
+  }
+
+  const competencia = await prisma.competencia.upsert({
+    where: { codigo: COMPETENCIA_INDIRECTA.codigo },
+    update: { nombre: COMPETENCIA_INDIRECTA.nombre, estado: 'ACTIVO' },
+    create: { codigo: COMPETENCIA_INDIRECTA.codigo, nombre: COMPETENCIA_INDIRECTA.nombre },
+  });
+
+  await prisma.competenciaAtributo.deleteMany({ where: { competenciaId: competencia.id } });
+  await prisma.competenciaAtributo.create({
+    data: { competenciaId: competencia.id, atributoId: atributo.id },
+  });
+
+  await prisma.planCompetencia.upsert({
+    where: { planId_competenciaId: { planId: planEstudiosId, competenciaId: competencia.id } },
+    update: {},
+    create: { planId: planEstudiosId, competenciaId: competencia.id },
+  });
+
+  const creado = await prisma.planMedicion.create({
+    data: {
+      planEstudiosId,
+      tipo: 'INDIRECTA',
+      codigo,
+      version: 1,
+      meta: 0.7,
+      estado: 'APROBADO',
+    },
+  });
+
+  await prisma.competenciaDelPlan.create({
+    data: { planMedicionId: creado.id, competenciaId: competencia.id },
+  });
+
+  const periodos = await prisma.periodoMedicion.createManyAndReturn({
+    data: [
+      { planMedicionId: creado.id, etiqueta: '2026', orden: 1 },
+      { planMedicionId: creado.id, etiqueta: '2027', orden: 2 },
+    ],
+  });
+
+  await prisma.programacion.createMany({
+    data: periodos.map((periodo) => ({
+      planMedicionId: creado.id,
+      competenciaId: competencia.id,
+      periodoId: periodo.id,
+    })),
+  });
 }
 
 main()

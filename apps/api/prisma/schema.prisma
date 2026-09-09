@@ -881,6 +881,19 @@ enum EstadoDocumentoMedicion {
   @@schema("mejora_continua")
 }
 
+/// RF-PE-028. Cerrado y no texto libre: RN1 exige una indicación por grupo y
+/// año, y con texto libre «Docentes» y «docentes» serían dos grupos distintos
+/// y el índice único no protegería nada. Sin OTRO a propósito: dos «OTRO» en
+/// el mismo año chocarían contra el único sin que se entienda por qué.
+enum GrupoObjetivo {
+  EGRESADOS
+  EMPLEADORES
+  DOCENTES
+  ESTUDIANTES
+
+  @@schema("mejora_continua")
+}
+
 /// RF-PM-027: el plan de medición generado como archivo.
 ///
 /// Tabla propia y no la de Plan de Estudios: aquella tiene clave foránea a
@@ -946,6 +959,7 @@ model PlanEvaluacion {
 
   configuracion ConfiguracionCompetencia[]
   mediciones    MedicionAlcanzada[]
+  indicaciones  IndicacionDeMedicion[]
 
   @@index([planMedicionId])
   @@map("planes_evaluacion")
@@ -962,6 +976,12 @@ model ConfiguracionCompetencia {
 
   instrumento String? @db.VarChar(300)
   frecuencia  String? @db.VarChar(120)
+
+  /// RF-PE-024. UUID de una cuenta de cualquier rol —quien aplica una encuesta
+  /// a egresados suele ser un coordinador, no un docente—, sin clave foránea:
+  /// el registro debe seguir siendo legible aunque la cuenta desaparezca,
+  /// igual que `docenteId` en AsignaturaEvaluada.
+  responsableId String? @map("responsable_id") @db.Uuid
 
   plan PlanEvaluacion @relation(fields: [planEvaluacionId], references: [id], onDelete: Cascade)
 
@@ -1026,6 +1046,32 @@ model Evidencia {
 
   asignatura AsignaturaEvaluada @relation(fields: [asignaturaEvaluadaId], references: [id], onDelete: Cascade)
 
+  @@index([asignaturaEvaluadaId])
   @@map("evidencia")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-028 y RF-PE-029: indicaciones de medición dirigidas a un grupo objetivo.
+model IndicacionDeMedicion {
+  id               String @id @default(uuid()) @db.Uuid
+  planEvaluacionId String @map("plan_evaluacion_id") @db.Uuid
+  /// El periodo —el «año», en un plan indirecto— es un UUID del plan de
+  /// medición base, sin FK, como en MedicionAlcanzada.
+  periodoId        String @map("periodo_id") @db.Uuid
+
+  grupoObjetivo     GrupoObjetivo @map("grupo_objetivo")
+  instruccion       String        @db.VarChar(1000)
+  /// RF-PE-029 RN1: el del instrumento es obligatorio; el de resultados no,
+  /// «puede completarse después» — por eso vive del lado del seguimiento.
+  enlaceInstrumento String        @map("enlace_instrumento") @db.VarChar(500)
+  enlaceResultados  String?       @map("enlace_resultados") @db.VarChar(500)
+
+  plan PlanEvaluacion @relation(fields: [planEvaluacionId], references: [id], onDelete: Cascade)
+
+  /// RF-PE-028 RN1: «una por cada grupo objetivo» y año. Sin índice aparte
+  /// sobre (plan, periodo): las consultas van por esas dos y este único ya
+  /// sirve de prefijo.
+  @@unique([planEvaluacionId, periodoId, grupoObjetivo])
+  @@map("indicacion_medicion")
   @@schema("mejora_continua")
 }

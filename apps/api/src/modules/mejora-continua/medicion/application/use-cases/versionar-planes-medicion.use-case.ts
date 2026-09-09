@@ -104,12 +104,34 @@ export class VersionarPlanesMedicion {
   }
 
   private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanMedicion> {
-    // RF-PM-042: las dos operaciones crean un plan, así que exigen crearlos.
-    const decision = await this.autorizacion.puede(actor.id, 'medicion.crear', null);
-    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
-
     const plan = await this.planes.porId(id);
     if (!plan) throw new NoEncontrado('el plan de medición', id);
+
+    // RF-PM-042: las dos operaciones crean un plan, así que exigen crearlos.
+    // La carrera sale del plan de medición base, no de uno que todavía no
+    // existe: la copia hereda la carrera de lo que copia.
+    const decision = await this.autorizacion.puede(
+      actor.id,
+      'medicion.crear',
+      await this.carreraDe(plan.planEstudiosId),
+    );
+    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+
     return plan;
+  }
+
+  /**
+   * La carrera del plan, para acotar el permiso.
+   *
+   * Sale de la cadena que ya existe —medición → plan de estudios— y no de una
+   * columna propia: desnormalizarla es una migración que se añade el día que
+   * el número lo justifique, y hoy no hay número.
+   */
+  private async carreraDe(planEstudiosId: string): Promise<string> {
+    const plan = await this.curricular.planPorId(planEstudiosId);
+    if (!plan) {
+      throw new NoEncontrado('el plan de estudios', planEstudiosId);
+    }
+    return plan.carreraId;
   }
 }

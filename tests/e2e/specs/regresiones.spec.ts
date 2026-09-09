@@ -186,3 +186,119 @@ test('una escritura lenta no pisa a la que salió después', async ({ page }) =>
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Competencias a medir (2)' })).toBeVisible();
 });
+
+/** Crea un plan de evaluación fresco sobre la base indicada y abre su detalle. */
+async function abrirPlanEvaluacionFresco(page: Page, base: string): Promise<void> {
+  await page.goto('/mejora-continua/evaluacion');
+  await page.getByRole('button', { name: 'Nuevo plan de evaluación' }).click();
+
+  const modal = page.getByRole('dialog');
+  await modal.getByLabel('Plan de medición base*').selectOption({ label: base });
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(modal).toBeHidden();
+
+  const enlace = page.getByRole('link', { name: /^EV-/ }).first();
+  await expect(enlace).toBeVisible();
+  await enlace.click();
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+}
+
+/**
+ * El `id`/`aeId` que el servidor asigna a una fila recién creada se perdía si
+ * se seguía escribiendo en la misma visita, sin recargar.
+ *
+ * `ConfiguracionDelAnio.tsx` y `ConfiguracionDelPeriodo.tsx` (Task 7, 2c-C)
+ * reconciliaban ese identificador **durante el renderizado** — el patrón que
+ * la documentación de React sugiere para "ajustar estado ante un cambio de
+ * props". Cuando la actualización de `@tanstack/react-query` (que usa
+ * `useSyncExternalStore`) coincidía con el propio `setState` del guardado que
+ * la disparó, React reinvocaba el cuerpo del componente más veces de las que
+ * ese ajuste contempla, y una invocación de más ganaba la última palabra con
+ * el formulario todavía sin conciliar: el campo que solo se pinta con el `id`
+ * ya asignado —enlace a los resultados, evidencias— desaparecía otra vez, en
+ * la misma visita en la que se acababa de guardar. Recargar la página lo hacía
+ * reaparecer, porque el montaje inicial sí lee el `id` de la respuesta fresca:
+ * por eso las dos pruebas siguientes recargan antes de comprobar, y no se
+ * conforman con lo que la pantalla dice sin recargar.
+ *
+ * Las dos se comprobaron revirtiendo el arreglo (`useEffect` + `useRef` en vez
+ * del ajuste durante el renderizado) en el componente correspondiente: cada
+ * una cae exactamente donde el identificador se pierde, y ninguna otra prueba
+ * de este fichero ni de `configuracion-indirecta.spec.ts` cae con ella —el
+ * hallazgo no tenía ninguna prueba de regresión propia hasta esta ronda.
+ */
+test('el enlace a resultados de una indicación indirecta persiste sin recargar entre guardado y guardado', async ({
+  page,
+}) => {
+  await abrirPlanEvaluacionFresco(page, 'PM-PE-E2E-v1-I-v1 — Aprobado');
+  await page.getByLabel('Año a configurar').selectOption({ label: '2026' });
+
+  await page.getByRole('button', { name: 'Añadir indicación' }).click();
+  await page
+    .getByRole('combobox', { name: 'Grupo objetivo de la indicación 1' })
+    .selectOption('DOCENTES');
+  await page
+    .getByRole('textbox', { name: 'Instrucción para DOCENTES' })
+    .fill('Encuesta a docentes');
+  await page
+    .getByRole('textbox', { name: 'Enlace al instrumento para DOCENTES' })
+    .fill('https://forms.example/docentes');
+  await page.getByRole('button', { name: 'Guardar el año' }).click();
+  await expect(page.getByText(/Guardado/)).toBeVisible();
+
+  // Sin recargar: si el `id` recién asignado se perdió, este campo no existe
+  // todavía —solo se pinta con `fila.id !== null`— y `getByRole` se queda
+  // esperando hasta el timeout en vez de encontrarlo deshabilitado o vacío.
+  await page
+    .getByRole('textbox', { name: 'Enlace a los resultados para DOCENTES' })
+    .fill('https://drive.example/docentes');
+  await page.getByRole('button', { name: 'Guardar el año' }).click();
+  await expect(page.getByText(/Guardado/)).toBeVisible();
+
+  // Y se recarga: lo que importa es que el enlace llegó al servidor, no que la
+  // pantalla siga pintando lo que tenía en memoria desde antes de recargar.
+  await page.reload();
+  await page.getByLabel('Año a configurar').selectOption({ label: '2026' });
+  await expect(
+    page.getByRole('textbox', { name: 'Enlace a los resultados para DOCENTES' }),
+  ).toHaveValue('https://drive.example/docentes');
+});
+
+test('la evidencia de una asignatura evaluada persiste sin recargar entre guardado y guardado', async ({
+  page,
+}) => {
+  await abrirPlanEvaluacionFresco(page, 'PM-PE-E2E-v1-D-v1 — Vigente');
+  await expect(page.getByRole('heading', { name: 'Configuración por competencia' })).toBeVisible();
+  await page.getByLabel('Periodo a configurar').selectOption({ label: '2026-I' });
+
+  await page.getByRole('button', { name: 'Añadir asignatura' }).click();
+  await page
+    .getByLabel('Asignatura 1 de CPE-E2E01', { exact: true })
+    .selectOption({ label: 'AS-E2E01 — Asignatura de pruebas I' });
+  await page
+    .getByLabel('Entregable de la asignatura 1 de CPE-E2E01', { exact: true })
+    .fill('Informe final');
+  await page.getByRole('button', { name: 'Guardar el periodo' }).click();
+  await expect(page.getByText(/Guardado/)).toBeVisible();
+
+  // Sin recargar: si el `aeId` recién asignado se perdió, la fila sigue
+  // mostrando «Guarda el periodo para poder adjuntar evidencias de esta fila»
+  // en vez de la sección de evidencias, y este botón no existe.
+  await page.getByRole('button', { name: 'Añadir evidencia' }).click();
+  await page
+    .getByLabel('Enlace de la evidencia 1 de la asignatura 1 de CPE-E2E01', { exact: true })
+    .fill('https://drive.example/evidencia');
+  await page
+    .getByLabel('Descripción de la evidencia 1 de la asignatura 1 de CPE-E2E01', { exact: true })
+    .fill('Informe entregado');
+  await page.getByRole('button', { name: 'Guardar el periodo' }).click();
+  await expect(page.getByText(/Guardado/)).toBeVisible();
+
+  // Y se recarga: lo que importa es que la evidencia llegó al servidor, no que
+  // la pantalla siga pintando lo que tenía en memoria desde antes de recargar.
+  await page.reload();
+  await page.getByLabel('Periodo a configurar').selectOption({ label: '2026-I' });
+  await expect(
+    page.getByLabel('Enlace de la evidencia 1 de la asignatura 1 de CPE-E2E01', { exact: true }),
+  ).toHaveValue('https://drive.example/evidencia');
+});

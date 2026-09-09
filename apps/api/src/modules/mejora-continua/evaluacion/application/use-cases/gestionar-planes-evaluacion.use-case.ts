@@ -80,20 +80,20 @@ export class GestionarPlanesEvaluacion {
    * clave indexada cuestan menos que arrastrar planes que se van a descartar.
    */
   async basesElegibles(actor: Actor): Promise<DatosPlanMedicion[]> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     const vigentes = await this.mediciones.listar({ estado: 'Vigente' });
     const aprobados = await this.mediciones.listar({ estado: 'Aprobado' });
     return [...vigentes, ...aprobados];
   }
 
   async listar(actor: Actor, filtro?: FiltroPlanesEvaluacion): Promise<DatosPlanEvaluacion[]> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     return this.evaluaciones.listar(filtro);
   }
 
   /** RF-PE-010 a RF-PE-012: arma la vista leyendo la base, nada se copia. */
   async porId(actor: Actor, id: string): Promise<VistaPlanEvaluacion> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(id);
     const base = await this.exigirBase(plan.planMedicionId);
 
@@ -130,16 +130,22 @@ export class GestionarPlanesEvaluacion {
 
   /** RF-PE-044: cero o uno vigente por plan de medición. */
   async vigenteDe(actor: Actor, planMedicionId: string): Promise<DatosPlanEvaluacion | null> {
-    await this.exigir(actor, 'evaluacion.leer');
+    await this.exigir(actor, 'evaluacion.leer', null);
     return this.evaluaciones.vigenteDe(planMedicionId);
   }
 
-  /** RF-PE-001 y RF-PE-002: el alta. */
+  /**
+   * RF-PE-001 y RF-PE-002: el alta.
+   *
+   * La carrera sale del plan de medición base que llega en la petición, no de
+   * uno que todavía no existe: un plan de evaluación no puede resolver su
+   * propia carrera antes de nacer.
+   */
   async crear(actor: Actor, planMedicionId: string): Promise<DatosPlanEvaluacion> {
-    await this.exigir(actor, 'evaluacion.crear');
-
     const base = await this.mediciones.porId(planMedicionId);
     if (!base) throw new NoEncontrado('el plan de medición', planMedicionId);
+
+    await this.exigir(actor, 'evaluacion.crear', await this.carreraDe(base.planEstudiosId));
 
     // RN3: un plan de medición que todavía se edita puede cambiar sus
     // competencias y sus periodos bajo los pies del plan de evaluación que se
@@ -170,8 +176,9 @@ export class GestionarPlanesEvaluacion {
 
   /** RF-PE-008: solo un Borrador se elimina. */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    await this.exigir(actor, 'evaluacion.eliminar');
     const plan = await this.exigirPlan(id);
+    const base = await this.exigirBase(plan.planMedicionId);
+    await this.exigir(actor, 'evaluacion.eliminar', await this.carreraDe(base.planEstudiosId));
 
     if (!permiteEliminacion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
@@ -191,8 +198,13 @@ export class GestionarPlanesEvaluacion {
     contexto: { comentario?: string },
   ): Promise<DatosPlanEvaluacion> {
     const plan = await this.exigirPlan(id);
+    const base = await this.exigirBase(plan.planMedicionId);
     const transicion = describirTransicion(accion);
-    await this.exigir(actor, `evaluacion.${transicion.permiso}`);
+    await this.exigir(
+      actor,
+      `evaluacion.${transicion.permiso}`,
+      await this.carreraDe(base.planEstudiosId),
+    );
 
     // La validación integral de consistencia es RF-PE-041, en el ciclo 2c-D:
     // hoy no hay ningún dato de configuración que validar. Pasar `false` no es
@@ -230,8 +242,23 @@ export class GestionarPlanesEvaluacion {
     return base;
   }
 
-  private async exigir(actor: Actor, permiso: string): Promise<void> {
-    const decision = await this.autorizacion.puede(actor.id, permiso, null);
+  /**
+   * La carrera del plan, para acotar el permiso.
+   *
+   * Sale de la cadena que ya existe —evaluación → medición → plan de estudios—
+   * y no de una columna propia: desnormalizarla es una migración que se añade
+   * el día que el número lo justifique, y hoy no hay número.
+   */
+  private async carreraDe(planEstudiosId: string): Promise<string> {
+    const plan = await this.curricular.planPorId(planEstudiosId);
+    if (!plan) {
+      throw new NoEncontrado('el plan de estudios', planEstudiosId);
+    }
+    return plan.carreraId;
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }

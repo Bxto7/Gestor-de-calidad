@@ -154,6 +154,38 @@ describe('Clasificación de permisos', () => {
   });
 });
 
+describe('los permisos de mejora-continua se acotan a la carrera', () => {
+  const contexto = (permisos: string[], carreraACargo: string | null) => ({
+    permisos: new Set(permisos),
+    carreraACargo,
+  });
+
+  it.each([
+    'medicion.crear', 'medicion.editar', 'medicion.eliminar', 'medicion.aprobar',
+    'evaluacion.crear', 'evaluacion.editar', 'evaluacion.eliminar', 'evaluacion.aprobar',
+  ])('%s sobre la carrera de otro se deniega', (permiso) => {
+    const d = puede(contexto([permiso], 'carrera-A'), permiso, 'carrera-B');
+    expect(d.permitido).toBe(false);
+  });
+
+  it.each(['medicion.leer', 'evaluacion.leer'])(
+    '%s no se acota: consultar planes ajenos sigue permitido',
+    (permiso) => {
+      // La política del proyecto, escrita en el comentario de la constante:
+      // un Director consulta planes de otras carreras, no los modifica.
+      expect(puede(contexto([permiso], 'carrera-A'), permiso, 'carrera-B').permitido).toBe(true);
+    },
+  );
+
+  it('un permiso acotado sin carrera se deniega, no se asume', () => {
+    // Es la propiedad que hace seguro este refactor: si una llamada olvida
+    // pasar la carrera, falla de forma ruidosa en vez de dejar el hueco.
+    const d = puede(contexto(['evaluacion.editar'], 'carrera-A'), 'evaluacion.editar', null);
+    expect(d.permitido).toBe(false);
+    if (!d.permitido) expect(d.motivo).toContain('acotado a una carrera');
+  });
+});
+
 describe('tienePermiso — comprobación sin alcance', () => {
   it('informa solo de la existencia del permiso', () => {
     expect(tienePermiso(director(ISI), 'plan.aprobar')).toBe(true);

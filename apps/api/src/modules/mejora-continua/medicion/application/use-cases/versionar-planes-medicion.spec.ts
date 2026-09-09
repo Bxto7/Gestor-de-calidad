@@ -8,7 +8,7 @@
  * razón de que sean dos métodos y no uno con bandera.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   Actor,
@@ -107,6 +107,7 @@ function montar(
     estado?: DatosPlanMedicion['estado'];
     autorizacion?: AuthorizationPort;
     codigosUsados?: string[];
+    curricular?: Partial<ContenidoCurricularPort>;
   } = {},
 ) {
   const vistos: DomainEvent[] = [];
@@ -122,7 +123,10 @@ function montar(
     },
   } as unknown as RepositorioPlanMedicionPort;
 
-  const curricular = { planPorId: async () => planBase() } as unknown as ContenidoCurricularPort;
+  const curricular = {
+    planPorId: async () => planBase(),
+    ...opciones.curricular,
+  } as unknown as ContenidoCurricularPort;
 
   const publicador: PublicadorDeEventos = {
     publicar: async (e) => {
@@ -218,5 +222,43 @@ describe('permisos', () => {
 
     await expect(caso.generarNuevaVersion(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
     await expect(caso.duplicarPlan(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
+  });
+});
+
+/**
+ * El alcance por carrera (2c-C): `mejora-continua` no comprobaba la carrera en
+ * ninguno de sus casos de uso. La carrera sale del `planEstudiosId` del propio
+ * plan de medición que se copia, sin saltar por evaluación: la copia hereda la
+ * carrera de lo que copia.
+ */
+describe('el alcance por carrera (2c-C)', () => {
+  it('versionar el plan de otra carrera se deniega', async () => {
+    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
+      carreraId === 'carrera-propia'
+        ? ({ permitido: true } as const)
+        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
+    );
+    const { caso } = montar({
+      curricular: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await expect(caso.generarNuevaVersion(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'medicion.crear', 'carrera-ajena');
+  });
+
+  it.each([
+    ['generarNuevaVersion', (caso: VersionarPlanesMedicion) => caso.generarNuevaVersion(ACTOR, 'pm-1')],
+    ['duplicarPlan', (caso: VersionarPlanesMedicion) => caso.duplicarPlan(ACTOR, 'pm-1')],
+  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
+    const puede = vi.fn(async () => ({ permitido: true }) as const);
+    const { caso } = montar({
+      curricular: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+    });
+
+    await ejecutar(caso).catch(() => undefined);
+
+    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
   });
 });

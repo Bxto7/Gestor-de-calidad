@@ -147,6 +147,7 @@ import {
   ConfiguracionEvaluacionController,
   DocentesController,
   EvidenciasController,
+  ResultadosController,
 } from './modules/mejora-continua/evaluacion/infrastructure/http/configuracion-evaluacion.controller.js';
 import {
   REPOSITORIO_CARRERA,
@@ -295,6 +296,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     EvaluacionVigenteController,
     ConfiguracionEvaluacionController,
     EvidenciasController,
+    ResultadosController,
     DocentesController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
@@ -542,14 +544,22 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       ) => new ConfigurarPlanMedicion(planes, curricular, autorizacion, eventos),
     },
     {
-      // Sin el puerto curricular: todo lo que valida sale del propio plan.
+      // El puerto curricular entra solo por el alcance por carrera (2c-C): lo
+      // que valida el contenido —competencia, periodo— sigue saliendo del
+      // propio plan.
       provide: ProgramarMediciones,
-      inject: [REPOSITORIO_PLAN_MEDICION, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
       useFactory: (
         planes: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new ProgramarMediciones(planes, autorizacion, eventos),
+      ) => new ProgramarMediciones(planes, curricular, autorizacion, eventos),
     },
     {
       provide: GestionarAsignaturas,
