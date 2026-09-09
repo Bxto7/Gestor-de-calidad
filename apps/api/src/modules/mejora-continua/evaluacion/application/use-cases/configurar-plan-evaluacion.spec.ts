@@ -718,7 +718,7 @@ describe('los catálogos', () => {
  * ninguno de sus casos de uso, así que alguien con permiso de edición en una
  * carrera podía escribir en el plan de otra. Estas pruebas cierran justo eso,
  * y por la propiedad de `puede()` que lo hace seguro —un permiso acotado con
- * `carreraId === null` se deniega— cualquiera de los cuatro guardados que
+ * `carreraId === null` se deniega— cualquiera de los seis guardados que
  * llegara a pedir el permiso sin la carrera resuelta caería aquí.
  */
 describe('el alcance por carrera (2c-C)', () => {
@@ -746,10 +746,10 @@ describe('el alcance por carrera (2c-C)', () => {
   });
 
   /**
-   * Los cuatro guardados, uno por uno: la propiedad que se comprueba es la
-   * misma en los cuatro —que la carrera que llega a `puede()` es la del plan
+   * Los seis guardados, uno por uno: la propiedad que se comprueba es la
+   * misma en los seis —que la carrera que llega a `puede()` es la del plan
    * sobre el que se opera, y no `null`— y una tabla evita que una prueba que
-   * solo cubre `guardarCompetencia` deje a las otras tres sin cubrir.
+   * solo cubre `guardarCompetencia` deje a las otras cinco sin cubrir.
    */
   it.each([
     [
@@ -772,6 +772,17 @@ describe('el alcance por carrera (2c-C)', () => {
     [
       'guardarEvidencias',
       (caso: ConfigurarPlanEvaluacion) => caso.guardarEvidencias(ACTOR, 'ae-1', []),
+    ],
+    // Los dos métodos que 2c-C añadió (indicaciones y resultados de la vía
+    // indirecta): la misma propiedad, y sin fila propia una regresión al
+    // copiar el patrón de otro método pasaría desapercibida.
+    [
+      'guardarIndicaciones',
+      (caso: ConfigurarPlanEvaluacion) => caso.guardarIndicaciones(ACTOR, 'ev-1', 'p-1', []),
+    ],
+    [
+      'guardarResultados',
+      (caso: ConfigurarPlanEvaluacion) => caso.guardarResultados(ACTOR, 'ind-1', null),
     ],
   ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);
