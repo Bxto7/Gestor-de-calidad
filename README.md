@@ -167,7 +167,7 @@ Si en el log aparecen rutas pero no la línea de PrismaService, el problema es
 la base de datos, no la aplicación. Y la suite completa debe quedar en verde:
 
 ```bash
-cd apps/api && npm test        # 504 pruebas en 22 archivos
+cd apps/api && npm test        # 815 pruebas en 42 archivos
 ```
 
 La suite de integración corre aparte y **vacía tablas con `TRUNCATE`**: exige una
@@ -221,20 +221,28 @@ artefactos de compilación viven fuera del control de versiones.
   realizadas, motor de consistencia, versionado y duplicado con su linaje,
   historial, y exportación a PDF y Excel (RF-PM-027 a RF-PM-029) por la misma
   cola de BullMQ, con el worker enrutando cada trabajo a su módulo.
-- Submódulo **Planes de Evaluación, 28 de 49 (RF-PE-001 a RF-PE-021)**: alta de
+- Submódulo **Planes de Evaluación, 37 de 49 (RF-PE-001 a RF-PE-030)**: alta de
   un plan de evaluación a partir de un plan de medición Aprobado o Vigente, que
   hereda el tipo y la meta (nunca se repiten a mano); tarjeta de lo heredado
   —competencias y periodos del plan de medición base, en solo lectura, sin
   casillas ni campos editables porque RF-PE-010 y RF-PE-011 no dejan añadir ni
   quitar desde aquí—; el mismo ciclo de vida de estados que Planes de
   Medición, con permisos propios (`evaluacion.*`) y su propia entrada en la
-  bitácora; y la **configuración directa por competencia y periodo**
+  bitácora; la **configuración directa por competencia y periodo**
   (RF-PE-013 a RF-PE-021): instrumento y frecuencia —uno por competencia, vale
   para todos los periodos—, las asignaturas y el docente responsable de cada
   cruce competencia×periodo que la matriz del plan de medición base programó,
   y el porcentaje alcanzado, que RF-PE-006 RN2 deja registrar también con el
   plan ya Vigente aunque su definición —instrumento, frecuencia, asignaturas—
-  se cierre al aprobarlo.
+  se cierre al aprobarlo; y la **configuración indirecta por competencia y
+  año** (RF-PE-022 a RF-PE-030): instrumento, frecuencia y responsable de cada
+  competencia —comunes a todos los años del plan, no solo el que se está
+  editando—, el porcentaje alcanzado por año, y las indicaciones de medición
+  por grupo objetivo (Egresados, Empleadores, Docentes, Estudiantes) con su
+  enlace al instrumento de recolección y, cuando ya se aplicó, al de los
+  resultados —estas últimas editables y eliminables con confirmación
+  (RF-PE-030) mientras el plan está en Borrador, y el enlace a resultados
+  también sobre un plan ya Vigente (RF-PE-006 RN2).
 - Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
   aviso de impacto al editar un atributo que ya usan competencias o planes
   (RF120–RF123, RF128–RF132).
@@ -243,9 +251,9 @@ artefactos de compilación viven fuera del control de versiones.
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
   estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
   queda ningún almacén en memoria.
-- Pruebas en verde: 758 unitarias en la API, 202 en el frontend, 269 de
-  integración en quince suites contra un PostgreSQL real y desechable, y 31
-  recorridos E2E con Playwright —seis de ellos con `axe-core` sobre WCAG 2.1
+- Pruebas en verde: 815 unitarias en la API, 227 en el frontend, 278 de
+  integración en dieciséis suites contra un PostgreSQL real y desechable, y 34
+  recorridos E2E con Playwright —siete de ellos con `axe-core` sobre WCAG 2.1
   AA—. Los guiones de carga k6 viven en `tests/carga/`.
 - CI en GitHub Actions con los quality gates de §6.6: typecheck, lint, formato,
   cobertura, `npm audit` y Semgrep, más un job de E2E que levanta PostgreSQL,

@@ -32,7 +32,7 @@
  * compone contra sus mutaciones.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Boton, Campo, Entrada, EstadoVacio, Selector, Tarjeta } from '@/shared/components/ui';
 
@@ -278,10 +278,7 @@ export function ConfiguracionDelPeriodo({
   );
 
   // El estado visible y su punto de comparación viven juntos: ver
-  // `EstadoDelFormulario`. En estado y no en un `useRef` como antes porque la
-  // conciliación de más abajo también tiene que alcanzarlos, y leer o escribir
-  // un ref durante el renderizado es justo lo que `react-hooks/refs` prohíbe.
-  // El coste es un renderizado más por guardado, que no se nota.
+  // `EstadoDelFormulario`.
   const [formulario, setFormulario] = useState<EstadoDelFormulario>(() => {
     const inicial: Record<string, EstadoCompetencia> = {};
     for (const c of competenciasProgramadas) {
@@ -302,21 +299,33 @@ export function ConfiguracionDelPeriodo({
     setFormulario((previo) => ({ ...previo, visible: actualizar(previo.visible) }));
   }
 
-  // Conciliación con lo que la consulta acaba de devolver. Va en el
-  // renderizado y no en un `useEffect` a propósito: es un ajuste de estado
-  // ante un cambio de props, el caso que la documentación de React resuelve
-  // así, y `react-hooks/set-state-in-effect` rechaza la otra forma. Como
-  // `conciliarConElServidor` devuelve `null` cuando no hay nada que adoptar,
-  // el ajuste converge en un renderizado y no encadena más.
+  // Conciliación con lo que la consulta acaba de devolver.
+  //
+  // En un `useEffect` y no durante el renderizado, a pesar de que el patrón
+  // "ajustar estado ante un cambio de props" que documenta React sugiere lo
+  // segundo (y de que así estaba antes): la Task 7, sobre la tarjeta hermana
+  // de esta (`ConfiguracionDelAnio`), destapó el caso que lo rompe. La
+  // consulta se refresca vía `@tanstack/react-query`, que expone su valor con
+  // `useSyncExternalStore`; cuando esa actualización coincide con otro
+  // `setState` en vuelo del mismo componente (el de `guardarPeriodo` al
+  // terminar), React puede reinvocar el cuerpo de la función más veces de las
+  // que este ajuste "durante el renderizado" contempla, y una de esas
+  // invocaciones de más gana la última palabra con el `formulario` todavía
+  // sin conciliar — el `aeId` recién adoptado se pierde en el propio commit
+  // que se suponía que lo fijaba. Un `useEffect` no compite por ese commit:
+  // corre después, sobre el estado ya asentado. Leer y escribir el centinela
+  // en un `useRef` deja de estar prohibido por lo mismo: `react-hooks/refs`
+  // veta mutar una ref durante el renderizado, no dentro de un efecto.
   //
   // Los `aeId` nuevos entran también en la base, y no solo en el estado
   // visible: la comparación de evidencias empareja las filas por `aeId`
   // (`anterior.filas.find(f => f.aeId === fila.aeId)`, más abajo), así que una
   // base con `aeId: null` no encontraría nunca su pareja y las evidencias de
   // una fila recién creada no se llegarían a enviar.
-  const [configuracionVista, setConfiguracionVista] = useState(configuracion);
-  if (configuracion !== configuracionVista) {
-    setConfiguracionVista(configuracion);
+  const configuracionVistaRef = useRef(configuracion);
+  useEffect(() => {
+    if (configuracion === configuracionVistaRef.current) return;
+    configuracionVistaRef.current = configuracion;
     setFormulario((previo) => {
       const visibleConciliado = conciliarConElServidor(previo.visible, periodo.id, configuracion);
       const baseConciliada = conciliarConElServidor(previo.base, periodo.id, configuracion);
@@ -329,7 +338,7 @@ export function ConfiguracionDelPeriodo({
         base: baseConciliada ?? previo.base,
       };
     });
-  }
+  }, [configuracion, periodo.id]);
 
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);

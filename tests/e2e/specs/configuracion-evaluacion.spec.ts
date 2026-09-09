@@ -4,12 +4,18 @@
  * Lo que solo se ve aquí: que configurar un periodo no toque los demás
  * (RF-PE-021), y que un plan Vigente deje registrar el porcentaje pero no
  * cambiar las asignaturas (RF-PE-006 RN2).
+ *
+ * El filtro por tipo antes de `.first()` es desde la Task 7: la semilla E2E
+ * ahora también trae un plan de medición Indirecta y `accesibilidad.spec.ts`
+ * crea su propio plan de evaluación indirecto, así que «el más reciente» ya no
+ * es siempre el Directo que este fichero necesita.
  */
 
 import { expect, test } from '../fixtures/sesion';
 
 test('configurar un periodo deja los demás intactos', async ({ page }) => {
   await page.goto('/mejora-continua/evaluacion');
+  await page.getByLabel('Filtrar por tipo').selectOption('DIRECTA');
   await page.getByRole('link', { name: /^EV-/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
 
@@ -62,6 +68,7 @@ test.describe('con la cuenta que aprueba', () => {
     // RF-PE-006 RN2. Es la mitad del submódulo: sin esta excepción, el porcentaje
     // alcanzado de un periodo que ya cerró no podría registrarse nunca.
     await page.goto('/mejora-continua/evaluacion');
+    await page.getByLabel('Filtrar por tipo').selectOption('DIRECTA');
     await page.getByRole('link', { name: /^EV-/ }).first().click();
     await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
 

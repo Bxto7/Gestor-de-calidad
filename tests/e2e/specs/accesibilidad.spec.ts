@@ -38,7 +38,13 @@ test('el detalle de evaluación, con la cuadrícula de lo heredado', async ({ pa
   // La tabla por atributo con `caption`, `scope="row"` y columna fija es
   // estructura nueva: el resto de la pantalla calca la de medición, pero esa
   // cuadrícula no existía en ninguna otra parte.
+  //
+  // Filtrado por tipo Directa a propósito: desde la Task 7 la semilla también
+  // trae un plan de medición Indirecta, y el test siguiente de este fichero
+  // crea su propio plan de evaluación sobre él — sin el filtro, «el más
+  // reciente» dejaría de ser fiable en cuanto ese test se ejecutara antes.
   await page.goto('/mejora-continua/evaluacion');
+  await page.getByLabel('Filtrar por tipo').selectOption('DIRECTA');
   const primero = page.getByRole('link', { name: /^EV-/ }).first();
   await expect(primero).toBeVisible();
   await primero.click();
@@ -55,6 +61,44 @@ test('el detalle de evaluación, con la cuadrícula de lo heredado', async ({ pa
   await page.getByRole('button', { name: 'Añadir asignatura' }).click();
 
   await analizar(page, 'el detalle del plan de evaluación');
+});
+
+test('el detalle de un plan de evaluación indirecta, con sus indicaciones', async ({ page }) => {
+  // `ConfiguracionDelAnio` es una tarjeta hermana de la directa, no una rama
+  // suya (RF-PE-022 a RF-PE-030): tiene su propia mitad de campos —responsable
+  // por competencia e indicaciones por grupo objetivo, sin cruce con
+  // asignaturas— que la pantalla directa nunca pinta. Sin abrirla, axe nunca
+  // llegaría a analizar el selector de grupo objetivo ni los campos de una
+  // indicación.
+  //
+  // Crea su propio plan de evaluación sobre el plan de medición Indirecta de
+  // la semilla (`PM-PE-E2E-v1-I-v1`, Task 7): por orden alfabético este
+  // fichero corre antes que `configuracion-indirecta.spec.ts`, que es quien
+  // tiene el suyo, y ninguno de los dos puede compartirlo con el otro.
+  await page.goto('/mejora-continua/evaluacion');
+  await page.getByRole('button', { name: 'Nuevo plan de evaluación' }).click();
+  const modal = page.getByRole('dialog');
+  await modal
+    .getByLabel('Plan de medición base*')
+    .selectOption({ label: 'PM-PE-E2E-v1-I-v1 — Aprobado' });
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(modal).toBeHidden();
+
+  await page.getByLabel('Filtrar por tipo').selectOption('INDIRECTA');
+  const primero = page.getByRole('link', { name: /^EV-/ }).first();
+  await expect(primero).toBeVisible();
+  await primero.click();
+
+  await expect(page.getByRole('heading', { name: 'Heredado del plan de medición' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Configuración por competencia' })).toBeVisible();
+
+  // Con contenido real: en 2c-A se analizó el estado vacío y axe no llegó a
+  // ver ningún campo. Selecciona el año y añade una indicación antes de
+  // analizar, tal como pide la Task 7.
+  await page.getByLabel('Año a configurar').selectOption({ label: '2026' });
+  await page.getByRole('button', { name: 'Añadir indicación' }).click();
+
+  await analizar(page, 'el detalle del plan de evaluación indirecta');
 });
 
 test('los atributos del graduado', async ({ page }) => {

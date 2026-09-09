@@ -17,10 +17,11 @@
  *      lo visible al terminar un guardado, y con dos estados separados el
  *      actualizador funcional de uno no puede leer el otro — esa era la vía por
  *      la que se perdía el identificador de una fila recién creada.
- *   2. La conciliación con la configuración refrescada va **durante el
- *      renderizado**, con un centinela, y no en un `useEffect`: es el ajuste de
- *      estado ante un cambio de props que documenta React, y
- *      `react-hooks/set-state-in-effect` rechaza la otra forma.
+ *   2. La conciliación con la configuración refrescada va en un `useEffect`
+ *      con una referencia como centinela — no durante el renderizado, que es
+ *      lo que React documenta para "ajustar estado ante un cambio de props" y
+ *      lo que este componente hacía hasta que la Task 7 encontró el caso que
+ *      lo rompe: ver el comentario junto a `configuracionVistaRef`.
  *   3. `baseTrasGuardar` toma el **contenido** de lo que se envió y la
  *      **identidad** de lo visible del momento. Las dos mitades importan: quien
  *      siguió escribiendo mientras el `PUT` viajaba no envió eso, y darlo por
@@ -42,7 +43,7 @@
  * convención la que se olvida al añadir el siguiente.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   AreaTexto,
@@ -329,27 +330,40 @@ export function ConfiguracionDelAnio({
     setFormulario((previo) => ({ ...previo, visible: actualizar(previo.visible) }));
   }
 
-  // Conciliación con lo que la consulta acaba de devolver. Va en el
-  // renderizado y no en un `useEffect` a propósito: es un ajuste de estado ante
-  // un cambio de props, el caso que la documentación de React resuelve así, y
-  // `react-hooks/set-state-in-effect` rechaza la otra forma. Como
-  // `conciliarConElServidor` devuelve `null` cuando no hay nada que adoptar, el
-  // ajuste converge en un renderizado y no encadena más.
+  // Conciliación con lo que la consulta acaba de devolver.
+  //
+  // En un `useEffect` y no durante el renderizado, a pesar de que el patrón
+  // "ajustar estado ante un cambio de props" que documenta React sugiere lo
+  // segundo: así estaba desde que este componente se escribió, sin que
+  // ninguna prueba unitaria lo notara, y el primer recorrido E2E de punta a
+  // punta contra la aplicación real —el de la Task 7— es quien lo destapa: guarda
+  // una indicación y sigue en la misma pantalla, sin desmontar
+  // `ConfiguracionDelAnio`. `useConfiguracionDelPlan`
+  // se refresca por `@tanstack/react-query`, que expone su valor con
+  // `useSyncExternalStore`; cuando la actualización de ese store coincide con
+  // otro `setState` en vuelo de este mismo componente (aquí, el de
+  // `guardarAnio` al terminar), React puede reinvocar el cuerpo de la función
+  // más veces de las que este ajuste "durante el renderizado" contempla, y una
+  // de esas invocaciones de más gana la última palabra con el `formulario`
+  // todavía sin conciliar — el `id` recién adoptado se pierde en el propio
+  // commit que se suponía que lo fijaba. Un `useEffect` no compite por ese
+  // commit: corre después, sobre el estado ya asentado.
   //
   // Los `id` nuevos entran también en la base, y no solo en el visible: la
   // comparación del enlace a resultados empareja por `id`, así que una base con
   // `id: null` no encontraría nunca su pareja y el enlace de una indicación
   // recién creada no se llegaría a enviar.
-  const [configuracionVista, setConfiguracionVista] = useState(configuracion);
-  if (configuracion !== configuracionVista) {
-    setConfiguracionVista(configuracion);
+  const configuracionVistaRef = useRef(configuracion);
+  useEffect(() => {
+    if (configuracion === configuracionVistaRef.current) return;
+    configuracionVistaRef.current = configuracion;
     setFormulario((previo) => {
       const visible = conciliarConElServidor(previo.visible, periodo.id, configuracion);
       const baseConciliada = conciliarConElServidor(previo.base, periodo.id, configuracion);
       if (!visible && !baseConciliada) return previo;
       return { visible: visible ?? previo.visible, base: baseConciliada ?? previo.base };
     });
-  }
+  }, [configuracion, periodo.id]);
 
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
