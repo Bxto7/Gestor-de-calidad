@@ -25,6 +25,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../../auth/infrastructure/http/jwt.guard.js';
 import { GestionarPlanesEvaluacion } from '../../application/use-cases/gestionar-planes-evaluacion.use-case.js';
+import { VersionarPlanesEvaluacion } from '../../application/use-cases/versionar-planes-evaluacion.use-case.js';
 import {
   CrearPlanEvaluacionDto,
   FiltroPlanesEvaluacionDto,
@@ -35,7 +36,10 @@ import {
 @ApiBearerAuth()
 @Controller('planes-evaluacion')
 export class PlanesEvaluacionController {
-  constructor(private readonly casos: GestionarPlanesEvaluacion) {}
+  constructor(
+    private readonly casos: GestionarPlanesEvaluacion,
+    private readonly versionar: VersionarPlanesEvaluacion,
+  ) {}
 
   @Get('bases-elegibles')
   @ApiOperation({
@@ -94,6 +98,40 @@ export class PlanesEvaluacionController {
     @Body() dto: TransicionEvaluacionDto,
   ) {
     return this.casos.transicionar(actor, id, dto.accion, { comentario: dto.comentario });
+  }
+
+  /* ── Versionado (RF-PE-034) ──────────────────────────────────────────────
+   * Ambos métodos viven en `VersionarPlanesEvaluacion`, no en
+   * `GestionarPlanesEvaluacion`: a diferencia del gemelo de medición (cuyo
+   * `linaje` cuelga del caso de uso de gestión), aquí `versionesDe` está en la
+   * misma clase que `generarNuevaVersion` — ver la cabecera del caso de uso.
+   */
+
+  @Post(':id/versiones')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Generar una nueva versión del plan de evaluación',
+    description:
+      'RF-PE-034: copia editable en Borrador, con vínculo a la versión de la ' +
+      'que proviene. Copia la definición configurada, no el seguimiento — ver ' +
+      'la cabecera de `versionar-planes-evaluacion.use-case.ts`.',
+  })
+  @ApiResponse({ status: 404, description: 'El plan de evaluación no existe.' })
+  @ApiResponse({
+    status: 409,
+    description: 'El plan no está aprobado, vigente ni histórico. Un Borrador se edita.',
+  })
+  async nuevaVersion(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.versionar.generarNuevaVersion(actor, id);
+  }
+
+  @Get(':id/versiones')
+  @ApiOperation({
+    summary: 'Consultar el linaje de versiones del plan',
+    description: 'RF-PE-034 RN1: de la versión más reciente a la más antigua.',
+  })
+  async versiones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.versionar.versionesDe(actor, id);
   }
 }
 

@@ -137,6 +137,7 @@ import {
   type RepositorioPlanEvaluacionPort,
 } from './modules/mejora-continua/evaluacion/application/ports/plan-evaluacion.port.js';
 import { GestionarPlanesEvaluacion } from './modules/mejora-continua/evaluacion/application/use-cases/gestionar-planes-evaluacion.use-case.js';
+import { VersionarPlanesEvaluacion } from './modules/mejora-continua/evaluacion/application/use-cases/versionar-planes-evaluacion.use-case.js';
 import { PlanEvaluacionRepositoryPrisma } from './modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
 import {
   EvaluacionVigenteController,
@@ -157,6 +158,10 @@ import {
   ConsultarDocumentoEvaluacion,
   GenerarDocumentoEvaluacion,
 } from './modules/mejora-continua/evaluacion/application/use-cases/generar-documento-evaluacion.use-case.js';
+import {
+  DocumentosDelPlanEvaluacionController,
+  DocumentosEvaluacionController,
+} from './modules/mejora-continua/evaluacion/infrastructure/http/documentos-evaluacion.controller.js';
 import {
   ConfiguracionEvaluacionController,
   DocentesController,
@@ -327,6 +332,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     EvidenciasPlanMejoraController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
+    DocumentosDelPlanEvaluacionController,
+    DocumentosEvaluacionController,
     DocumentosDelPlanController,
     DocumentosController,
     ReportesController,
@@ -522,6 +529,37 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         eventos: PublicadorDeEventos,
       ) =>
         new GestionarPlanesEvaluacion(
+          evaluaciones,
+          mediciones,
+          curricular,
+          configuraciones,
+          autorizacion,
+          eventos,
+        ),
+    },
+    {
+      // Mismos puertos y mismo orden que `GestionarPlanesEvaluacion`: las dos
+      // operaciones que crean un plan de evaluación (crear directo y
+      // versionar) comparten la cadena evaluación → medición → plan de
+      // estudios para resolver la carrera del permiso.
+      provide: VersionarPlanesEvaluacion,
+      inject: [
+        REPOSITORIO_PLAN_EVALUACION,
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        REPOSITORIO_CONFIGURACION_EVALUACION,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        mediciones: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        configuraciones: RepositorioConfiguracionEvaluacionPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new VersionarPlanesEvaluacion(
           evaluaciones,
           mediciones,
           curricular,
