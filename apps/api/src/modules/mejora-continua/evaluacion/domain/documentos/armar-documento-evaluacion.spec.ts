@@ -101,6 +101,24 @@ it('un periodo sin porcentaje se exporta igual, diciendo que falta', () => {
   expect(matriz.tabla!.filas.flat()).toContain('Sin registrar');
 });
 
+it('un cruce sin medición programada queda en blanco, no "Sin registrar"', () => {
+  // Dos periodos, uno solo con medición programada para la competencia: el
+  // cruce sin registro (no se programó) no es lo mismo que uno con registro
+  // pero sin porcentaje todavía (RF-PE-031/032). Confundirlos —convertir el
+  // "no aplicaba" en un "no medido"— borraría justo la distinción que un
+  // expediente de acreditación necesita mantener.
+  const d = armarDocumentoEvaluacion(
+    { ...BASE, periodos: [...BASE.periodos, { id: 'p-2', etiqueta: '2026-II' }] },
+    'excel',
+  );
+  const medicion = d.secciones.find((s) => s.titulo === 'Medición alcanzada')!;
+  const fila = medicion.tabla!.filas[0]!;
+
+  expect(fila[1]).toBe('80%');
+  expect(fila[2]).toBe('');
+  expect(fila).not.toContain('Sin registrar');
+});
+
 it('un plan sin competencias produce documento, no una tabla muda', () => {
   const d = armarDocumentoEvaluacion({ ...BASE, competencias: [], mediciones: [] }, 'pdf');
   const comp = d.secciones.find((s) => s.titulo === 'Competencias')!;

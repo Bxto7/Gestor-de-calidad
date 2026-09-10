@@ -8,9 +8,13 @@
  *
  * El dibujo lo hacen los renderizadores de `platform/documentos/`, que no
  * saben de qué hablan — y tampoco saben que un plan de evaluación puede ser
- * directo o indirecto. Esa es la única rama de este archivo: el resto del
- * documento (resumen, competencias, periodos, medición alcanzada) es idéntico
- * para los dos tipos, porque el gemelo de medición no la necesita.
+ * directo o indirecto. La única rama de tipo de este archivo es la
+ * estructural, al final de `secciones` en `armarDocumentoEvaluacion`: el
+ * resto del documento (resumen, competencias, periodos, medición alcanzada)
+ * es idéntico para los dos tipos, porque el gemelo de medición no la
+ * necesita. Donde el tipo solo cambia un texto (la etiqueta «Directa»/
+ * «Indirecta» de la cabecera, o su versión en minúscula del resumen) no hay
+ * rama: `ETIQUETA_TIPO` es una tabla de consulta, no un `? :` repetido.
  */
 
 import {
@@ -67,6 +71,18 @@ const SIN_DATO = 'Sin definir';
 
 const SIN_COMPETENCIAS = 'Este plan no tiene competencias asignadas.';
 
+/**
+ * Cómo se presenta cada tipo de plan — una tabla de consulta, no una rama.
+ *
+ * El valor de dominio (`DIRECTA`/`INDIRECTA`) es una constante técnica, no un
+ * texto pensado para salir en un documento de acreditación. Antes esto se
+ * resolvía con un `? :` en cada sitio que necesitaba el texto — dos ramas de
+ * presentación además de la estructural — y eso es justo lo que el comentario
+ * de cabecera del archivo decía que no pasaba. Con la tabla, añadir un texto
+ * nuevo (o una tercera variante) no es una rama más, es una entrada más.
+ */
+const ETIQUETA_TIPO = { DIRECTA: 'Directa', INDIRECTA: 'Indirecta' } as const;
+
 function competenciaPorId(datos: DatosParaDocumentoEvaluacion, id: string) {
   return datos.competencias.find((c) => c.id === id);
 }
@@ -80,10 +96,7 @@ function periodoPorId(datos: DatosParaDocumentoEvaluacion, id: string) {
 /**
  * Los pares de la cabecera.
  *
- * RF-PE-033 RN1 exige código, tipo y estado como mínimo — literal. El tipo se
- * presenta capitalizado («Directa»/«Indirecta») porque el valor de dominio
- * (`DIRECTA`/`INDIRECTA`) es una constante técnica, no un texto pensado para
- * salir en un documento de acreditación.
+ * RF-PE-033 RN1 exige código, tipo y estado como mínimo — literal.
  */
 function cabecera(datos: DatosParaDocumentoEvaluacion): Metadato[] {
   return [
@@ -91,7 +104,7 @@ function cabecera(datos: DatosParaDocumentoEvaluacion): Metadato[] {
     { etiqueta: 'Versión', valor: String(datos.version) },
     { etiqueta: 'Carrera', valor: datos.carreraNombre },
     { etiqueta: 'Plan base', valor: datos.planBaseCodigo },
-    { etiqueta: 'Tipo', valor: datos.tipo === 'DIRECTA' ? 'Directa' : 'Indirecta' },
+    { etiqueta: 'Tipo', valor: ETIQUETA_TIPO[datos.tipo] },
     { etiqueta: 'Estado', valor: datos.estado },
   ];
 }
@@ -107,7 +120,9 @@ function pie(datos: DatosParaDocumentoEvaluacion): string {
 
 function seccionResumen(datos: DatosParaDocumentoEvaluacion): Seccion {
   const registradas = datos.mediciones.filter((m) => m.porcentajeAlcanzado !== null).length;
-  const tipoTexto = datos.tipo === 'DIRECTA' ? 'directa' : 'indirecta';
+  // Minúscula porque aquí va en medio de una frase, no en una etiqueta de
+  // cabecera; se deriva de la misma tabla de consulta, no de una rama propia.
+  const tipoTexto = ETIQUETA_TIPO[datos.tipo].toLowerCase();
 
   return {
     titulo: 'Resumen',
