@@ -13,9 +13,11 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { DocumentoEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/documentos-evaluacion.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
+const repo = new DocumentoEvaluacionRepositoryPrisma(prisma);
 
 let planEstudiosId: string;
 let baseId: string;
@@ -97,5 +99,86 @@ describe('RF-PE-032 y RF-PE-033 — el ciclo de vida del documento', () => {
     const superviviente = await prisma.planEvaluacion.findUnique({ where: { id: v2.id } });
     expect(superviviente).not.toBeNull();
     expect(superviviente?.derivadoDeId).toBeNull();
+  });
+});
+
+describe('Task 3 — el repositorio de documentos del plan de evaluación', () => {
+  it('un fallo se guarda como estado, no se pierde', async () => {
+    // El trabajo corre en otro proceso: cuando falla no hay ninguna petición
+    // HTTP viva a la que devolverle un error, y sin esto la pantalla
+    // esperaría para siempre un archivo que no va a llegar.
+    const t = await repo.crear({
+      planEvaluacionId: planId,
+      tipo: 'PLAN_EVALUACION_PDF',
+      solicitadoPor: ACTOR_ID,
+    });
+    await repo.marcarFallido(t.id, 'El plan no tiene competencias.');
+
+    const f = await repo.porId(t.id);
+    expect(f?.estado).toBe('Fallido');
+    expect(f?.error).toBe('El plan no tiene competencias.');
+  });
+
+  it('un error larguísimo se recorta en vez de tumbar el UPDATE', async () => {
+    // El fallo al guardar el fallo es el peor: dejaría el trabajo en
+    // «Generando» para siempre.
+    const t = await repo.crear({
+      planEvaluacionId: planId,
+      tipo: 'PLAN_EVALUACION_PDF',
+      solicitadoPor: ACTOR_ID,
+    });
+    await repo.marcarFallido(t.id, 'x'.repeat(9000));
+    expect((await repo.porId(t.id))?.error).toHaveLength(2000);
+  });
+
+  it('la ubicación no sale en el trabajo, solo por su método', async () => {
+    const t = await repo.crear({
+      planEvaluacionId: planId,
+      tipo: 'PLAN_EVALUACION_PDF',
+      solicitadoPor: ACTOR_ID,
+    });
+    await repo.marcarListo(t.id, {
+      nombreArchivo: 'p.pdf',
+      tipoMime: 'application/pdf',
+      bytes: 10,
+      ubicacion: '/secreto/p.pdf',
+    });
+
+    expect(JSON.stringify(await repo.porId(t.id))).not.toContain('/secreto/');
+    expect(JSON.stringify(await repo.listarDePlan(planId, 10))).not.toContain('/secreto/');
+    expect(await repo.ubicacionDe(t.id)).toBe('/secreto/p.pdf');
+  });
+
+  it('el listado va del más reciente al más antiguo, y es de un plan', async () => {
+    // Un segundo plan de evaluación, derivado del primero, para comprobar que
+    // el listado no se cuela entre planes.
+    const otroPlan = await prisma.planEvaluacion.create({
+      data: { planMedicionId: baseId, codigo: 'EV-PE-E2E-v1-OTRO' },
+    });
+    const otroPlanId = otroPlan.id;
+
+    await repo.crear({
+      planEvaluacionId: planId,
+      tipo: 'PLAN_EVALUACION_PDF',
+      solicitadoPor: ACTOR_ID,
+    });
+    await repo.crear({
+      planEvaluacionId: planId,
+      tipo: 'PLAN_EVALUACION_EXCEL',
+      solicitadoPor: ACTOR_ID,
+    });
+
+    const lista = await repo.listarDePlan(planId, 10);
+    expect(lista[0]!.tipo).toBe('PLAN_EVALUACION_EXCEL');
+    expect(await repo.listarDePlan(otroPlanId, 10)).toEqual([]);
+  });
+
+  it('el estado viaja en el vocabulario del dominio, no en MAYÚSCULAS', async () => {
+    const t = await repo.crear({
+      planEvaluacionId: planId,
+      tipo: 'PLAN_EVALUACION_PDF',
+      solicitadoPor: ACTOR_ID,
+    });
+    expect(t.estado).toBe('En cola');
   });
 });
