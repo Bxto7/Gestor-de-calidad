@@ -881,6 +881,25 @@ enum EstadoDocumentoMedicion {
   @@schema("mejora_continua")
 }
 
+/// RF-PE-032 y RF-PE-033. Propios y no compartidos con medición aunque los
+/// valores rimen: son dos ciclos de vida documentales que pueden divergir, y un
+/// enum compartido entre submódulos es acoplamiento disfrazado de reutilización.
+enum TipoDocumentoEvaluacion {
+  PLAN_EVALUACION_PDF
+  PLAN_EVALUACION_EXCEL
+
+  @@schema("mejora_continua")
+}
+
+enum EstadoDocumentoEvaluacion {
+  EN_COLA
+  GENERANDO
+  LISTO
+  FALLIDO
+
+  @@schema("mejora_continua")
+}
+
 /// RF-PE-028. Cerrado y no texto libre: RN1 exige una indicación por grupo y
 /// año, y con texto libre «Docentes» y «docentes» serían dos grupos distintos
 /// y el índice único no protegería nada. Sin OTRO a propósito: dos «OTRO» en
@@ -948,6 +967,18 @@ model PlanEvaluacion {
   version        Int            @default(1)
   estado         EstadoMedicion @default(BORRADOR)
 
+  /// RF-PE-042: quién aprobó y cuándo. Está también en la bitácora, pero ahí es
+  /// un evento entre miles; aquí es un dato del plan que la pantalla enseña sin
+  /// consultar otro módulo. No se borran al pasar a Vigente o Histórico: son el
+  /// registro de quién autorizó este documento.
+  aprobadoPorId String?   @map("aprobado_por_id") @db.Uuid
+  aprobadoEn    DateTime? @map("aprobado_en") @db.Timestamptz(6)
+
+  /// RF-PE-034 RN1: la versión nueva referencia a la que la originó.
+  /// `SetNull` y no `Cascade`: borrar una versión no puede llevarse su
+  /// descendencia, que es evidencia por sí misma.
+  derivadoDeId String? @map("derivado_de_id") @db.Uuid
+
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
@@ -957,12 +988,51 @@ model PlanEvaluacion {
   /// no un plan de evaluación apuntando al vacío.
   plan PlanMedicion @relation(fields: [planMedicionId], references: [id], onDelete: Restrict)
 
+  derivadoDe PlanEvaluacion?       @relation("VersionesEvaluacion", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados  PlanEvaluacion[]      @relation("VersionesEvaluacion")
+  documentos DocumentoEvaluacion[]
+
   configuracion ConfiguracionCompetencia[]
   mediciones    MedicionAlcanzada[]
   indicaciones  IndicacionDeMedicion[]
 
   @@index([planMedicionId])
   @@map("planes_evaluacion")
+  @@schema("mejora_continua")
+}
+
+/// RF-PE-032 a RF-PE-034: el plan de evaluación generado como archivo, y su
+/// linaje de versiones. Tabla propia y no la de medición, por la misma razón
+/// que separa `DocumentoMedicion` de `PlanEstudios` (CLAUDE.md §3.2): dos
+/// módulos —aquí, dos submódulos con ciclos de vida propios— no comparten
+/// tabla.
+model DocumentoEvaluacion {
+  id               String                    @id @default(uuid()) @db.Uuid
+  planEvaluacionId String                    @map("plan_evaluacion_id") @db.Uuid
+  tipo             TipoDocumentoEvaluacion
+  estado           EstadoDocumentoEvaluacion @default(EN_COLA)
+
+  nombreArchivo String? @map("nombre_archivo") @db.VarChar(200)
+  tipoMime      String? @map("tipo_mime") @db.VarChar(120)
+  bytes         Int?
+  /// Opaca a propósito: hoy una ruta en disco, mañana una clave de Backblaze B2
+  /// (§5.6). No sale nunca en el objeto que viaja al navegador: se lee por su
+  /// propio método.
+  ubicacion     String? @db.VarChar(500)
+  /// Solo con estado FALLIDO. Redactado para una persona, no una traza.
+  error         String? @db.Text
+
+  /// Sin clave foránea a usuarios, igual que el resto de la evidencia: el
+  /// registro debe seguir siendo legible aunque la cuenta desaparezca.
+  solicitadoPor String    @map("solicitado_por") @db.Uuid
+  solicitadoEn  DateTime  @default(now()) @map("solicitado_en") @db.Timestamptz(6)
+  terminadoEn   DateTime? @map("terminado_en") @db.Timestamptz(6)
+
+  plan PlanEvaluacion @relation(fields: [planEvaluacionId], references: [id], onDelete: Cascade)
+
+  /// El listado va del más reciente al más antiguo, y siempre de un plan.
+  @@index([planEvaluacionId, solicitadoEn])
+  @@map("documentos_evaluacion")
   @@schema("mejora_continua")
 }
 
@@ -1141,21 +1211,21 @@ enum EstadoImplementacionMejora {
 /// ámbito varía por aspecto (RF-PJ-003 RN2): por criterio, por objetivo, o
 /// por periodo para competencias.
 model PlanMejora {
-  id                     String @id @default(uuid()) @db.Uuid
-  codigo                 String @db.VarChar(80)
+  id                     String            @id @default(uuid()) @db.Uuid
+  codigo                 String            @db.VarChar(80)
   aspecto                AspectoPlanMejora
-  carreraId              String  @map("carrera_id") @db.Uuid
-  criterioAcreditacionId String? @map("criterio_acreditacion_id") @db.Uuid
-  objetivoEducacionalId  String? @map("objetivo_educacional_id") @db.Uuid
-  competenciaId          String? @map("competencia_id") @db.Uuid
+  carreraId              String            @map("carrera_id") @db.Uuid
+  criterioAcreditacionId String?           @map("criterio_acreditacion_id") @db.Uuid
+  objetivoEducacionalId  String?           @map("objetivo_educacional_id") @db.Uuid
+  competenciaId          String?           @map("competencia_id") @db.Uuid
   /// El periodo académico, solo para el aspecto Competencia (RF-PJ-003 RN2:
   /// el ámbito de unicidad del código es el periodo, no la competencia).
-  periodoId              String? @map("periodo_id") @db.Uuid
+  periodoId              String?           @map("periodo_id") @db.Uuid
   /// El plan de evaluación Directa base, solo para Competencia (RF-PJ-026).
-  planEvaluacionId       String? @map("plan_evaluacion_id") @db.Uuid
+  planEvaluacionId       String?           @map("plan_evaluacion_id") @db.Uuid
   /// RF-PJ-031: el plan de medición afectado, si la acción derivó en un
   /// cambio — opcional, solo Competencia.
-  planMedicionAfectadoId String? @map("plan_medicion_afectado_id") @db.Uuid
+  planMedicionAfectadoId String?           @map("plan_medicion_afectado_id") @db.Uuid
 
   /// Mismo VO que `PlanMedicion`/`PlanEvaluacion` — RF-PJ-004 lo exige
   /// explícitamente ("replicando el mismo esquema").
@@ -1163,16 +1233,16 @@ model PlanMejora {
   estadoImplementacion EstadoImplementacionMejora @default(PENDIENTE) @map("estado_implementacion")
 
   /// RF-PJ-009 a RF-PJ-013: la definición, editable solo en Borrador.
-  nombre        String @db.VarChar(300)
-  causaRaiz     String @map("causa_raiz") @db.Text
-  justificacion String @db.Text
+  nombre        String   @db.VarChar(300)
+  causaRaiz     String   @map("causa_raiz") @db.Text
+  justificacion String   @db.Text
   /// RF-PJ-021/024: input de texto libre, distinto de `causaRaiz` — ver el
   /// comentario de cabecera del modelo.
-  input         String? @db.Text
+  input         String?  @db.Text
   plazo         DateTime @db.Date
-  recursos      String @db.Text
-  metas         String @db.Text
-  responsable   String @db.VarChar(300)
+  recursos      String   @db.Text
+  metas         String   @db.Text
+  responsable   String   @db.VarChar(300)
 
   /// RF-PJ-018: logro de meta e impacto, cada uno opcional hasta completarse.
   logroMeta String? @map("logro_meta") @db.Text
@@ -1213,14 +1283,14 @@ model EvidenciaPlanMejora {
   planMejoraId String @map("plan_mejora_id") @db.Uuid
 
   /// URL o ruta del archivo/enlace (RF-PJ-016).
-  referencia    String  @db.VarChar(2000)
-  nombreArchivo String? @map("nombre_archivo") @db.VarChar(300)
+  referencia    String   @db.VarChar(2000)
+  nombreArchivo String?  @map("nombre_archivo") @db.VarChar(300)
   /// Sin clave foránea a usuarios: el registro debe seguir siendo legible
   /// aunque la cuenta desaparezca, igual que el resto de la evidencia del
   /// módulo (`docenteId` en AsignaturaEvaluada, `solicitadoPor` en
   /// DocumentoMedicion).
-  subidoPor String   @map("subido_por") @db.Uuid
-  subidoEn  DateTime @default(now()) @map("subido_en") @db.Timestamptz(6)
+  subidoPor     String   @map("subido_por") @db.Uuid
+  subidoEn      DateTime @default(now()) @map("subido_en") @db.Timestamptz(6)
 
   plan PlanMejora @relation(fields: [planMejoraId], references: [id], onDelete: Cascade)
 
