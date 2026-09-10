@@ -81,3 +81,30 @@ export class ConfiguracionEvaluacionCambiada extends EventoEvaluacion {
     this.detalle = `Plan de evaluación ${codigo}: ${que}.`;
   }
 }
+
+/** Nombre legible de cada formato, para la bitácora y para los mensajes de error. */
+export const NOMBRE_DOCUMENTO_EVALUACION: Readonly<Record<string, string>> = {
+  PLAN_EVALUACION_PDF: 'PDF',
+  PLAN_EVALUACION_EXCEL: 'Excel',
+};
+
+/**
+ * RF-PE-032. Se registra al pedirlo y no al terminarlo: lo que la acreditación
+ * pregunta es quién se llevó la evidencia, y eso se sabe aquí. Si la
+ * generación falla después, el estado del trabajo lo cuenta; la petición
+ * ocurrió igual.
+ */
+export class DocumentoEvaluacionSolicitado extends EventoEvaluacion {
+  readonly nombre = 'evaluacion.documento';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    tipo: string,
+  ) {
+    super(actor);
+    this.detalle = `Exportación de ${codigo} en ${NOMBRE_DOCUMENTO_EVALUACION[tipo] ?? tipo}.`;
+  }
+}

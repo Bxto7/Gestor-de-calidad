@@ -149,6 +149,15 @@ import {
 import { ConfigurarPlanEvaluacion } from './modules/mejora-continua/evaluacion/application/use-cases/configurar-plan-evaluacion.use-case.js';
 import { ConfiguracionEvaluacionRepositoryPrisma } from './modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
 import {
+  REPOSITORIO_DOCUMENTOS_EVALUACION,
+  type RepositorioDocumentosEvaluacionPort,
+} from './modules/mejora-continua/evaluacion/application/ports/documentos-evaluacion.port.js';
+import { DocumentoEvaluacionRepositoryPrisma } from './modules/mejora-continua/evaluacion/infrastructure/persistence/documentos-evaluacion.repository.js';
+import {
+  ConsultarDocumentoEvaluacion,
+  GenerarDocumentoEvaluacion,
+} from './modules/mejora-continua/evaluacion/application/use-cases/generar-documento-evaluacion.use-case.js';
+import {
   ConfiguracionEvaluacionController,
   DocentesController,
   EvidenciasController,
@@ -377,6 +386,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: DIRECTORIO_USUARIOS, useClass: DirectorioDeUsuariosAdapter },
     { provide: REPOSITORIO_DOCUMENTOS_MEDICION, useClass: DocumentoMedicionRepositoryPrisma },
     { provide: DATOS_DOCUMENTO_MEDICION, useClass: DatosDocumentoMedicionRepositoryPrisma },
+    { provide: REPOSITORIO_DOCUMENTOS_EVALUACION, useClass: DocumentoEvaluacionRepositoryPrisma },
     {
       // Por fábrica y no por `useClass`: el constructor lleva un parámetro con
       // valor por defecto, y Nest intentaría inyectar un `string` que ningún
@@ -801,14 +811,73 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       ) => new ConsultarDocumentoMedicion(documentos, almacen, autorizacion),
     },
     {
+      provide: GenerarDocumentoEvaluacion,
+      inject: [
+        REPOSITORIO_DOCUMENTOS_EVALUACION,
+        REPOSITORIO_PLAN_EVALUACION,
+        REPOSITORIO_PLAN_MEDICION,
+        CONTENIDO_CURRICULAR,
+        REPOSITORIO_CONFIGURACION_EVALUACION,
+        DIRECTORIO_USUARIOS,
+        COLA_DOCUMENTOS,
+        ALMACEN_ARCHIVOS,
+        RENDERIZADOR_PDF,
+        RENDERIZADOR_HOJA,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        documentos: RepositorioDocumentosEvaluacionPort,
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        mediciones: RepositorioPlanMedicionPort,
+        curricular: ContenidoCurricularPort,
+        configuraciones: RepositorioConfiguracionEvaluacionPort,
+        directorio: DirectorioDeUsuariosPort,
+        cola: ColaDeDocumentosPort,
+        almacen: AlmacenDeArchivosPort,
+        pdf: RenderizadorPdfPort,
+        hoja: RenderizadorHojaPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new GenerarDocumentoEvaluacion(
+          documentos,
+          evaluaciones,
+          mediciones,
+          curricular,
+          configuraciones,
+          directorio,
+          cola,
+          almacen,
+          pdf,
+          hoja,
+          autorizacion,
+          eventos,
+        ),
+    },
+    {
+      provide: ConsultarDocumentoEvaluacion,
+      inject: [REPOSITORIO_DOCUMENTOS_EVALUACION, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      useFactory: (
+        documentos: RepositorioDocumentosEvaluacionPort,
+        almacen: AlmacenDeArchivosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarDocumentoEvaluacion(documentos, almacen, autorizacion),
+    },
+    {
       // El worker despacha por esta clave y no conoce ningún módulo. Añadir un
       // tercero que genere documentos es una entrada más aquí, y nada en
       // `platform/`.
       provide: GENERADORES_DE_DOCUMENTOS,
-      inject: [GenerarDocumento, GenerarDocumentoMedicion],
-      useFactory: (planEstudios: GenerarDocumento, mejoraContinua: GenerarDocumentoMedicion) => ({
+      inject: [GenerarDocumento, GenerarDocumentoMedicion, GenerarDocumentoEvaluacion],
+      useFactory: (
+        planEstudios: GenerarDocumento,
+        medicion: GenerarDocumentoMedicion,
+        evaluacion: GenerarDocumentoEvaluacion,
+      ) => ({
         'plan-estudios': planEstudios,
-        'mejora-continua': mejoraContinua,
+        'mejora-continua': medicion,
+        'mejora-continua-evaluacion': evaluacion,
       }),
     },
     {

@@ -40,7 +40,15 @@ export const RENDERIZADOR_HOJA = Symbol('RenderizadorHojaPort');
  * existe en la de `plan-estudios`. Sin este dato, el worker buscaría en la
  * tabla equivocada y daría por inexistente un trabajo que sí está.
  */
-export type ModuloDeDocumentos = 'plan-estudios' | 'mejora-continua';
+/**
+ * `'mejora-continua'` es histórico y significa **medición**: se llamó así
+ * cuando era el único submódulo del módulo con documentos. No se renombra
+ * porque los trabajos ya encolados en Redis llevan ese valor escrito.
+ */
+export type ModuloDeDocumentos =
+  | 'plan-estudios'
+  | 'mejora-continua'
+  | 'mejora-continua-evaluacion';
 
 export interface ColaDeDocumentosPort {
   encolar(trabajoId: string, modulo: ModuloDeDocumentos): Promise<void>;
