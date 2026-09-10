@@ -41,6 +41,22 @@ export class PlanEvaluacionEliminado extends EventoEvaluacion {
   }
 }
 
+/** RF-PE-034: nueva versión, con el vínculo a la que la originó. */
+export class PlanEvaluacionVersionado extends EventoEvaluacion {
+  readonly nombre = 'evaluacion.version';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    codigoOrigen: string,
+  ) {
+    super(actor);
+    this.detalle = `Nueva versión ${codigo}, derivada de ${codigoOrigen}.`;
+  }
+}
+
 export class PlanEvaluacionTransicionado extends EventoEvaluacion {
   readonly nombre = 'evaluacion.transicionado';
   readonly detalle: string;

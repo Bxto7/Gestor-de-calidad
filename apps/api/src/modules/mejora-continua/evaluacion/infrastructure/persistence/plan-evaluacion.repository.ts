@@ -13,6 +13,7 @@ import { ReglaDeNegocioViolada } from '../../../../../shared-kernel/errors/error
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
 import type { TipoMedicion } from '../../../medicion/domain/value-objects/tipo-medicion.js';
 import type {
+  ContenidoEvaluacionACopiar,
   DatosPlanEvaluacion,
   FiltroPlanesEvaluacion,
   RepositorioPlanEvaluacionPort,
@@ -42,6 +43,9 @@ const SELECCION = {
   estado: true,
   creadoEn: true,
   actualizadoEn: true,
+  derivadoDeId: true,
+  aprobadoPorId: true,
+  aprobadoEn: true,
 } as const;
 
 interface Fila {
@@ -52,6 +56,9 @@ interface Fila {
   estado: string;
   creadoEn: Date;
   actualizadoEn: Date;
+  derivadoDeId: string | null;
+  aprobadoPorId: string | null;
+  aprobadoEn: Date | null;
 }
 
 function aDatos(fila: Fila): DatosPlanEvaluacion {
@@ -63,6 +70,9 @@ function aDatos(fila: Fila): DatosPlanEvaluacion {
     estado: A_DOMINIO[fila.estado as EstadoBd] ?? 'Borrador',
     creadoEn: fila.creadoEn,
     actualizadoEn: fila.actualizadoEn,
+    derivadoDeId: fila.derivadoDeId,
+    aprobadoPorId: fila.aprobadoPorId,
+    aprobadoEn: fila.aprobadoEn,
   };
 }
 
@@ -142,11 +152,18 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
     return aDatos(fila);
   }
 
-  async cambiarEstado(id: string, estado: EstadoMedicion): Promise<DatosPlanEvaluacion> {
+  async cambiarEstado(
+    id: string,
+    estado: EstadoMedicion,
+    aprobacion?: { actorId: string; fecha: Date },
+  ): Promise<DatosPlanEvaluacion> {
     try {
       const fila = await this.prisma.planEvaluacion.update({
         where: { id },
-        data: { estado: A_BD[estado] },
+        data: {
+          estado: A_BD[estado],
+          ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+        },
         select: SELECCION,
       });
       return aDatos(fila);
@@ -166,5 +183,142 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
 
   async eliminar(id: string): Promise<void> {
     await this.prisma.planEvaluacion.delete({ where: { id } });
+  }
+
+  /**
+   * RF-PE-034: crea la versión nueva con todo su contenido copiado, en una
+   * transacción — o entran todas las filas, o ninguna.
+   *
+   * Sigue el patrón de `PlanMedicionRepositoryPrisma.copiar`: primero la fila
+   * del plan, después las que cuelgan de ella. `MedicionAlcanzada` se crea
+   * antes que `AsignaturaEvaluada` porque esta última necesita el id que
+   * `createMany` no devuelve — se relee tras crearla, emparejando por
+   * `competenciaId`+`periodoId`, igual que el gemelo empareja por
+   * `periodoEtiqueta`.
+   */
+  async copiar(datos: {
+    planMedicionId: string;
+    codigo: string;
+    version: number;
+    derivadoDeId: string;
+    contenido: ContenidoEvaluacionACopiar;
+  }): Promise<DatosPlanEvaluacion> {
+    const { contenido } = datos;
+
+    const id = await this.prisma.$transaction(async (tx) => {
+      const creado = await tx.planEvaluacion.create({
+        data: {
+          planMedicionId: datos.planMedicionId,
+          codigo: datos.codigo,
+          version: datos.version,
+          derivadoDeId: datos.derivadoDeId,
+        },
+      });
+
+      if (contenido.competencias.length > 0) {
+        await tx.configuracionCompetencia.createMany({
+          data: contenido.competencias.map((c) => ({
+            planEvaluacionId: creado.id,
+            competenciaId: c.competenciaId,
+            instrumento: c.instrumento,
+            frecuencia: c.frecuencia,
+            responsableId: c.responsableId,
+          })),
+        });
+      }
+
+      if (contenido.mediciones.length > 0) {
+        await tx.medicionAlcanzada.createMany({
+          data: contenido.mediciones.map((m) => ({
+            planEvaluacionId: creado.id,
+            competenciaId: m.competenciaId,
+            periodoId: m.periodoId,
+            porcentajeAlcanzado: m.porcentajeAlcanzado,
+          })),
+        });
+      }
+
+      if (contenido.asignaturas.length > 0) {
+        // Los ids se leen DESPUES de crear las filas de medición: `createMany`
+        // no los devuelve, y las asignaturas del origen apuntan a filas de
+        // otro plan.
+        const nuevas = await tx.medicionAlcanzada.findMany({
+          where: { planEvaluacionId: creado.id },
+          select: { id: true, competenciaId: true, periodoId: true },
+        });
+        const idDe = new Map(nuevas.map((m) => [`${m.competenciaId}|${m.periodoId}`, m.id]));
+
+        await tx.asignaturaEvaluada.createMany({
+          data: contenido.asignaturas.flatMap((a) => {
+            const medicionAlcanzadaId = idDe.get(`${a.competenciaId}|${a.periodoId}`);
+            if (!medicionAlcanzadaId) return [];
+            return [
+              {
+                medicionAlcanzadaId,
+                asignaturaId: a.asignaturaId,
+                entregable: a.entregable,
+                docenteId: a.docenteId,
+              },
+            ];
+          }),
+        });
+      }
+
+      if (contenido.indicaciones.length > 0) {
+        await tx.indicacionDeMedicion.createMany({
+          data: contenido.indicaciones.map((i) => ({
+            planEvaluacionId: creado.id,
+            periodoId: i.periodoId,
+            grupoObjetivo: i.grupoObjetivo,
+            instruccion: i.instruccion,
+            enlaceInstrumento: i.enlaceInstrumento,
+          })),
+        });
+      }
+
+      return creado.id;
+    });
+
+    const fila = await this.prisma.planEvaluacion.findUniqueOrThrow({
+      where: { id },
+      select: SELECCION,
+    });
+    return aDatos(fila);
+  }
+
+  /** RF-PE-034: el linaje completo, de la versión más reciente a la más antigua. */
+  async linajeDe(id: string): Promise<DatosPlanEvaluacion[]> {
+    let raiz = await this.prisma.planEvaluacion.findUnique({
+      where: { id },
+      select: { id: true, derivadoDeId: true },
+    });
+    if (!raiz) return [];
+
+    const vistos = new Set<string>([raiz.id]);
+    while (raiz?.derivadoDeId && !vistos.has(raiz.derivadoDeId)) {
+      vistos.add(raiz.derivadoDeId);
+      raiz = await this.prisma.planEvaluacion.findUnique({
+        where: { id: raiz.derivadoDeId },
+        select: { id: true, derivadoDeId: true },
+      });
+    }
+    if (!raiz) return [];
+
+    const cadena: string[] = [];
+    const pendientes = [raiz.id];
+    while (pendientes.length > 0) {
+      const actual = pendientes.shift()!;
+      cadena.push(actual);
+      const hijos = await this.prisma.planEvaluacion.findMany({
+        where: { derivadoDeId: actual },
+        select: { id: true },
+      });
+      pendientes.push(...hijos.map((h) => h.id));
+    }
+
+    const planes = await Promise.all(cadena.map((c) => this.porId(c)));
+    return planes
+      .filter((p): p is DatosPlanEvaluacion => p !== null)
+      .sort((a, b) => b.version - a.version);
   }
 }

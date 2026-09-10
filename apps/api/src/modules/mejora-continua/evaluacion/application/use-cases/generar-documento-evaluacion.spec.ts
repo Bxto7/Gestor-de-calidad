@@ -189,6 +189,9 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
     estado: 'Vigente',
     creadoEn: new Date('2026-02-01'),
     actualizadoEn: new Date('2026-02-01'),
+    derivadoDeId: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }
@@ -209,6 +212,8 @@ function repoEvaluacion(
     crear: noUsado('crear'),
     cambiarEstado: noUsado('cambiarEstado'),
     eliminar: noUsado('eliminar'),
+    copiar: noUsado('copiar'),
+    linajeDe: noUsado('linajeDe'),
     ...sobre,
   };
 }

@@ -229,7 +229,15 @@ export class GestionarPlanesEvaluacion {
       );
     }
 
-    const actualizado = await this.evaluaciones.cambiarEstado(id, r.nuevoEstado);
+    // RF-PE-042. El instante lo pone la aplicación y no la base, para que la
+    // fecha de la columna y la del evento de bitácora sean la misma.
+    const actualizado =
+      accion === 'aprobar'
+        ? await this.evaluaciones.cambiarEstado(id, r.nuevoEstado, {
+            actorId: actor.id,
+            fecha: new Date(),
+          })
+        : await this.evaluaciones.cambiarEstado(id, r.nuevoEstado);
 
     await this.eventos.publicar([
       new PlanEvaluacionTransicionado(

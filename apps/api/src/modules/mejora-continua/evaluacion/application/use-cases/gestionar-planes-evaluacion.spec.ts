@@ -135,6 +135,9 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
     estado: 'Borrador',
     creadoEn: new Date('2026-02-01'),
     actualizadoEn: new Date('2026-02-01'),
+    derivadoDeId: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }
@@ -200,8 +203,14 @@ function repoEvaluacion(
     vigenteDe: async () => evaluacion({ estado: 'Vigente' }),
     codigosDe: async () => [],
     crear: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo }),
-    cambiarEstado: async (_id, estado) => evaluacion({ estado }),
+    cambiarEstado: async (_id, estado, aprobacion) =>
+      evaluacion({
+        estado,
+        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+      }),
     eliminar: async () => undefined,
+    copiar: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
+    linajeDe: async () => [evaluacion()],
     ...sobre,
   };
 }
@@ -253,7 +262,10 @@ function montar(
   const pedidos: { filtros: (FiltroPlanesMedicion | undefined)[] } = { filtros: [] };
   const fuenteListado = opciones.listado ?? [planMedicion()];
   const baseActual = opciones.base === undefined ? planMedicion() : opciones.base;
-  const evaluacionActual = opciones.evaluacion ?? evaluacion();
+  // `let` y no `const`: `transicionar` puede invocarse dos veces seguidas
+  // sobre el mismo `caso` (p. ej. aprobar y luego marcar vigente), y la
+  // segunda debe ver el estado que dejó la primera.
+  let evaluacionActual = opciones.evaluacion ?? evaluacion();
 
   const mediciones = repoMedicion({
     porId: async () => baseActual,
@@ -269,7 +281,14 @@ function montar(
     porId: async () => evaluacionActual,
     vigenteDe: async () =>
       opciones.vigente === undefined ? evaluacion({ estado: 'Vigente' }) : opciones.vigente,
-    cambiarEstado: async (_id, estado) => ({ ...evaluacionActual, estado }),
+    cambiarEstado: async (_id, estado, aprobacion) => {
+      evaluacionActual = {
+        ...evaluacionActual,
+        estado,
+        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+      };
+      return evaluacionActual;
+    },
   });
 
   const curricular = contenido({
@@ -489,6 +508,27 @@ describe('RF-PE-005 — las transiciones', () => {
 
     expect(publicados[0]?.nombre).toBe('evaluacion.transicionado');
     expect(publicados[0]?.detalle).toContain('Borrador → En revisión');
+  });
+});
+
+describe('RF-PE-042 — quién aprobó y cuándo', () => {
+  it('aprobar registra quién y cuándo', async () => {
+    const antes = Date.now();
+    const { caso } = montar({ evaluacion: evaluacion({ estado: 'En revisión' }) });
+
+    const plan = await caso.transicionar(ACTOR, 'ev-1', 'aprobar', {});
+
+    expect(plan.aprobadoPorId).toBe(ACTOR.id);
+    expect(plan.aprobadoEn!.getTime()).toBeGreaterThanOrEqual(antes);
+  });
+
+  it('las demás transiciones no tocan el responsable de aprobación', async () => {
+    const { caso } = montar({ evaluacion: evaluacion({ estado: 'En revisión' }) });
+
+    await caso.transicionar(ACTOR, 'ev-1', 'aprobar', {});
+    const vigente = await caso.transicionar(ACTOR, 'ev-1', 'marcar-vigente', {});
+
+    expect(vigente.aprobadoPorId).toBe(ACTOR.id);
   });
 });
 

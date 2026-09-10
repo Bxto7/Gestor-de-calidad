@@ -180,6 +180,9 @@ function planEvaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEval
     estado: 'Vigente',
     creadoEn: new Date('2026-01-01'),
     actualizadoEn: new Date('2026-01-01'),
+    derivadoDeId: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }
@@ -235,6 +238,8 @@ function evaluacionesDouble(
     crear: async () => planEvaluacion(),
     cambiarEstado: async () => planEvaluacion(),
     eliminar: async () => undefined,
+    copiar: async () => planEvaluacion(),
+    linajeDe: async () => [planEvaluacion()],
     ...sobre,
   };
 }

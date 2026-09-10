@@ -86,6 +86,9 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
     estado: 'Borrador',
     creadoEn: new Date('2026-02-01'),
     actualizadoEn: new Date('2026-02-01'),
+    derivadoDeId: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }
@@ -198,6 +201,8 @@ function repoEvaluacion(
     crear: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo }),
     cambiarEstado: async (_id, estado) => evaluacion({ estado }),
     eliminar: async () => undefined,
+    copiar: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
+    linajeDe: async () => [evaluacion()],
     ...sobre,
   };
 }
