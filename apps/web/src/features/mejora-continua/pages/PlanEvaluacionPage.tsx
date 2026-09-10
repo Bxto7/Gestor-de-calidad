@@ -23,12 +23,12 @@
  * RN2).
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
-import { ErrorDeNegocio } from '@/shared/api/cliente';
+import { ErrorDeNegocio, guardarArchivo } from '@/shared/api/cliente';
 import {
   AreaTexto,
   Badge,
@@ -45,18 +45,27 @@ import {
   useAsignaturasElegibles,
   useConfiguracionDelPlan,
   useDocentes,
+  useDocumentosEvaluacion,
+  useGenerarDocumentoEvaluacion,
   useGuardarAsignaturas,
   useGuardarCompetencia,
   useGuardarEvidencias,
   useGuardarIndicaciones,
   useGuardarPorcentaje,
   useGuardarResultados,
+  useHistorialEvaluacion,
+  useNuevaVersionEvaluacion,
   usePlanEvaluacion,
   useTransicionarEvaluacion,
+  useVersionesEvaluacion,
 } from '../api/queries';
+import { descargarDocumentoEvaluacion } from '../api/evaluacion.api';
 import { ConfiguracionDelAnio } from '../components/ConfiguracionDelAnio';
 import { ConfiguracionDelPeriodo } from '../components/ConfiguracionDelPeriodo';
+import { DocumentosDelPlanEvaluacion } from '../components/DocumentosDelPlanEvaluacion';
 import { HeredadoDelPlanBase } from '../components/HeredadoDelPlanBase';
+import { HistorialDelPlan } from '../components/HistorialDelPlan';
+import { VersionesDelPlan } from '../components/VersionesDelPlan';
 import {
   describirTransicion,
   permiteEdicionDefinicionEvaluacion,
@@ -66,13 +75,35 @@ import {
 } from '../domain/estado-medicion';
 import type { AccionMedicion } from '../domain/tipos';
 
+/** Las tres pestañas de esta pantalla, en el orden en que se muestran. */
+const PESTANAS = [
+  ['documentos', 'Documentos'],
+  ['versiones', 'Versiones'],
+  ['historial', 'Historial de cambios'],
+] as const;
+
+type Pestana = (typeof PESTANAS)[number][0];
+
 export function PlanEvaluacionPage() {
   const { id = '' } = useParams();
   const { publicar } = useEncabezado();
   const { puede } = useSesion();
+  const navegar = useNavigate();
 
   const { data: vista, isLoading } = usePlanEvaluacion(id);
   const transicionar = useTransicionarEvaluacion(id);
+
+  // ── Documentos, versiones e historial (Task 7) ─────────────────────────
+  const { data: documentos } = useDocumentosEvaluacion(id);
+  const generarDocumento = useGenerarDocumentoEvaluacion(id);
+  const { data: versiones } = useVersionesEvaluacion(id);
+  const nuevaVersion = useNuevaVersionEvaluacion(id);
+  const { data: historial, isError: historialDenegado } = useHistorialEvaluacion(id);
+  const [pestana, setPestana] = useState<Pestana>('documentos');
+  // Prefijo estable de esta instancia de página: sin él, dos pantallas
+  // montadas a la vez (poco probable, pero posible con caché de rutas)
+  // compartirían los mismos `id`s de pestaña y romperían `aria-controls`.
+  const idBase = useId();
 
   // El tipo del plan lo fija su base y no cambia (RF-PE-001 RN2), así que la
   // pantalla enseña una tarjeta o la otra, nunca las dos.
@@ -300,6 +331,120 @@ export function PlanEvaluacionPage() {
           )}
         </div>
       )}
+
+      {/* ── Documentos, versiones e historial ────────────────────────────── */}
+      <div className="space-y-4">
+        <div
+          role="tablist"
+          aria-label="Documentos, versiones e historial del plan"
+          className="flex flex-wrap gap-2"
+        >
+          {PESTANAS.map(([valor, etiqueta]) => (
+            <button
+              key={valor}
+              type="button"
+              role="tab"
+              id={`${idBase}-tab-${valor}`}
+              aria-selected={pestana === valor}
+              aria-controls={`${idBase}-panel-${valor}`}
+              onClick={() => setPestana(valor)}
+              className={[
+                'rounded-lg px-3.5 py-2 text-sm font-semibold transition',
+                pestana === valor
+                  ? 'bg-uc-primary text-white'
+                  : 'bg-superficie text-tinta-suave hover:text-uc-primary',
+              ].join(' ')}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
+
+        {/*
+          Las tres siguen montadas y solo se ocultan con `hidden`: si se
+          desmontara la que no está activa, su `aria-controls` apuntaría a un
+          id que no existe en el DOM mientras esa pestaña no se visita, lo que
+          axe-core marca como referencia inválida.
+        */}
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-documentos`}
+          aria-labelledby={`${idBase}-tab-documentos`}
+          hidden={pestana !== 'documentos'}
+        >
+          <Tarjeta>
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-tinta">Documentos</h2>
+              <DocumentosDelPlanEvaluacion
+                documentos={documentos ?? []}
+                generando={generarDocumento.isPending}
+                onGenerar={(tipo) => void ejecutar(() => generarDocumento.mutateAsync(tipo))}
+                onDescargar={(idDocumento) =>
+                  void ejecutar(async () =>
+                    guardarArchivo(await descargarDocumentoEvaluacion(idDocumento)),
+                  )
+                }
+              />
+            </div>
+          </Tarjeta>
+        </div>
+
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-versiones`}
+          aria-labelledby={`${idBase}-tab-versiones`}
+          hidden={pestana !== 'versiones'}
+        >
+          <Tarjeta>
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-tinta">Versiones</h2>
+              <VersionesDelPlan
+                versiones={versiones ?? []}
+                versionAbierta={plan.id}
+                estadoActual={plan.estado}
+                generandoVersion={nuevaVersion.isPending}
+                onGenerarVersion={
+                  // RF-PE-034 exige `evaluacion.crear`, el mismo permiso del
+                  // caso de uso de versionado — no `evaluacion.editar`, que
+                  // es el de este plan y no el de la copia que se crearía.
+                  puede('evaluacion.crear')
+                    ? () =>
+                        void ejecutar(async () => {
+                          const creado = await nuevaVersion.mutateAsync(undefined);
+                          void navegar(`/mejora-continua/evaluacion/${creado.id}`);
+                        })
+                    : undefined
+                }
+              />
+            </div>
+          </Tarjeta>
+        </div>
+
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-historial`}
+          aria-labelledby={`${idBase}-tab-historial`}
+          hidden={pestana !== 'historial'}
+        >
+          <Tarjeta>
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-tinta">Historial de cambios</h2>
+              {/*
+                Se distingue «no hay movimientos» de «no puedes verlos» —mismo
+                razonamiento que en `PlanMedicionPage`—: pintar el vacío ante
+                un 403 afirmaría que el plan no se ha tocado, que es falso.
+              */}
+              {historialDenegado ? (
+                <p className="text-sm text-tinta-suave">
+                  Tu rol no permite consultar el historial de este plan.
+                </p>
+              ) : (
+                <HistorialDelPlan eventos={historial ?? []} />
+              )}
+            </div>
+          </Tarjeta>
+        </div>
+      </div>
 
       {enTransicion && (
         <ModalObservacion

@@ -14,6 +14,7 @@ import type {
   AccionMedicion,
   IndicacionAGuardar,
   PlanMedicion,
+  TipoDocumentoEvaluacion,
   TipoDocumentoMedicion,
 } from '../domain/tipos';
 import * as api from './medicion.api';
@@ -279,6 +280,9 @@ export const clavesEval = {
       f?.texto ?? '',
     ] as const,
   plan: (id: string) => ['evaluacion', id] as const,
+  versiones: (id: string) => ['evaluacion', id, 'versiones'] as const,
+  historial: (id: string) => ['evaluacion', id, 'historial'] as const,
+  documentos: (id: string) => ['evaluacion', id, 'documentos'] as const,
 };
 
 /**
@@ -346,6 +350,69 @@ export function useTransicionarEvaluacion(id: string) {
   return useMutacionDeEvaluacion(id, (v: { accion: AccionMedicion; comentario?: string }) =>
     evaluacionApi.transicionarEvaluacion(id, v.accion, v.comentario),
   );
+}
+
+/* ── Versionado, historial y documentos del plan de evaluación ───────────── */
+
+export function useVersionesEvaluacion(id: string) {
+  return useQuery({
+    queryKey: clavesEval.versiones(id),
+    queryFn: () => evaluacionApi.versionesDeEvaluacion(id),
+    enabled: !!id,
+  });
+}
+
+/**
+ * RF-PE-034: crea una versión nueva. Invalida también el listado del
+ * submódulo —igual que `useNuevaVersion` de medición— porque el plan recién
+ * creado tiene que aparecer ahí sin que haga falta recargar.
+ */
+export function useNuevaVersionEvaluacion(id: string) {
+  return useMutacionDeEvaluacion(id, () => evaluacionApi.generarNuevaVersionEvaluacion(id));
+}
+
+export function useHistorialEvaluacion(id: string) {
+  return useQuery({
+    queryKey: clavesEval.historial(id),
+    queryFn: () => evaluacionApi.historialDeEvaluacion(id),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Los documentos generados del plan de evaluación.
+ *
+ * Mientras haya un trabajo «En cola» o «Generando» vuelve a preguntar sola
+ * cada 2 s; en cuanto todos terminan, `refetchInterval` devuelve `false` y el
+ * sondeo se detiene. Sin ese corte, la pestaña seguiría pidiendo el mismo
+ * listado de por vida aunque nadie esté mirando un trabajo pendiente — una
+ * fuga de peticiones silenciosa.
+ */
+export function useDocumentosEvaluacion(id: string) {
+  return useQuery({
+    queryKey: clavesEval.documentos(id),
+    queryFn: () => evaluacionApi.documentosDeEvaluacion(id),
+    enabled: !!id,
+    refetchInterval: (consulta) =>
+      (consulta.state.data ?? []).some((t) => t.estado === 'En cola' || t.estado === 'Generando')
+        ? 2_000
+        : false,
+  });
+}
+
+/**
+ * RF-PE-032 a RF-PE-034: pedir la exportación. Invalida solo la lista de
+ * documentos y no la rama entera del plan — generar un archivo no cambia el
+ * plan, igual que en medición.
+ */
+export function useGenerarDocumentoEvaluacion(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tipo: TipoDocumentoEvaluacion) => evaluacionApi.generarDocumentoEvaluacion(id, tipo),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: clavesEval.documentos(id) });
+    },
+  });
 }
 
 /* ── Configuración por competencia (RF-PE-013 a RF-PE-021) ────────────── */

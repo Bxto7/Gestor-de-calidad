@@ -223,11 +223,19 @@ export function porcentajeDeMeta(fraccion: number): number {
 /* ── Documentos exportados (RF-PM-027 a RF-PM-029) ────────────────────── */
 
 export type TipoDocumentoMedicion = 'PLAN_MEDICION_PDF' | 'PLAN_MEDICION_EXCEL';
+/** RF-PE-032 a RF-PE-034: el mismo par PDF/Excel, pero del plan de evaluación. */
+export type TipoDocumentoEvaluacion = 'PLAN_EVALUACION_PDF' | 'PLAN_EVALUACION_EXCEL';
 export type EstadoTrabajo = 'En cola' | 'Generando' | 'Listo' | 'Fallido';
 
-export interface TrabajoDocumento {
+/**
+ * Genérico en el tipo de documento porque medición y evaluación comparten
+ * exactamente esta forma —id, estado, archivo, error— y solo difieren en qué
+ * valores admite `tipo`. El parámetro por defecto conserva sin cambios a todo
+ * el código de medición que ya escribía `TrabajoDocumento` a secas.
+ */
+export interface TrabajoDocumento<TTipo extends string = TipoDocumentoMedicion> {
   readonly id: string;
-  readonly tipo: TipoDocumentoMedicion;
+  readonly tipo: TTipo;
   readonly estado: EstadoTrabajo;
   readonly nombreArchivo: string | null;
   readonly bytes: number | null;
