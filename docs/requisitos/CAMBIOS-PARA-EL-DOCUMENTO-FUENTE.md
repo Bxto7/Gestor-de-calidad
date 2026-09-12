@@ -2,11 +2,11 @@
 
 Dirigido a quien mantiene *«Módulo de Plan de Estudios — Especificación de Requerimientos»* (Huancayo, 15 de agosto de 2026) y *«Módulo de Mejora Continua — Requerimientos»*.
 
-Al construir los módulos aparecieron doce puntos en los que el sistema y el documento no coinciden. **Diez necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
+Al construir los módulos aparecieron trece puntos en los que el sistema y el documento no coinciden. **Once necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
 
-Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-13** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
+Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-14** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
 
-Fecha de este informe: **7 de septiembre de 2026** (la primera versión es del 25 de agosto).
+Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto).
 
 ---
 
@@ -144,6 +144,20 @@ RN2 dice que se exceptúa «el registro progresivo de mediciones por periodo o a
 **Qué hace el sistema hoy.** Ya implementa la lectura correcta: el porcentaje alcanzado se puede registrar en Borrador y en Vigente, sin condicionarlo al tipo de plan. La cita rota no llegó a afectar el comportamiento, porque el código nunca dependió de esos dos números.
 
 **Qué hay que decidir.** Confirmar el cambio y corregir RN2 en el documento de Mejora Continua, cambiando «RF-PE-022 y RF-PE-028» por «RF-PE-019 y RF-PE-026».
+
+---
+
+### D-14 · RF-PE-032 RN2 y RF-PE-033 RN2 · El formato exportado no es el institucional, sino el de medición
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+Las dos reglas exigen que el Excel y el PDF del plan de evaluación salgan «igual al formato institucional utilizado actualmente para los planes de evaluación». Esa plantilla no está en ningún sitio del repositorio — nadie la ha entregado todavía —, así que no hay con qué compararse ni qué replicar.
+
+**Qué hace el sistema hoy.** Genera el PDF y el Excel calcando la misma plantilla que ya usa el plan de medición (RF-PM-028, RF-PM-029): mismas secciones y el mismo estilo de tabla, con los datos propios de la evaluación en vez de los de la medición. Es un formato consistente dentro del sistema, pero no el formato institucional que piden RN2.
+
+**Por qué se hizo así.** Sin la plantilla real no hay nada que igualar. Inventar un formato desde cero habría sido una apuesta arbitraria justo donde ya existe un patrón consistente —el de medición— que la propia universidad usa en el submódulo hermano del mismo sistema.
+
+**Qué hay que decidir.** Si la plantilla institucional real existe y se puede compartir, para reemplazar la actual por ella. Afecta a la vez a RF-PE-032/RF-PE-033 y, por la misma razón, a RF-PM-028/RF-PM-029 si tampoco se resolvió allí. Mientras tanto, el documento y el sistema no coinciden en la letra de RN2, aunque sí coinciden en que el resultado es un documento de tabla completo y descargable.
 
 ---
 

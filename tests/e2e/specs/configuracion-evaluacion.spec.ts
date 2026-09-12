@@ -26,6 +26,16 @@ test('configurar un periodo deja los demás intactos', async ({ page }) => {
     .getByRole('textbox', { name: /instrumento/i })
     .first()
     .fill('Rúbrica analítica');
+  // La frecuencia se escribe junto al instrumento y no más abajo, con el
+  // porcentaje: RF-PE-041 (2c-D) bloquea «Enviar a revisión» si una
+  // competencia ya configurada no tiene frecuencia, y la prueba de más abajo
+  // («con la cuenta que aprueba») lleva este mismo plan a Vigente pasando por
+  // esa transición — sin esto, se quedaría bloqueada por una inconsistencia
+  // que este recorrido no se propone probar.
+  await page
+    .getByRole('textbox', { name: /frecuencia/i })
+    .first()
+    .fill('Semestral');
   // El porcentaje se escribe **antes** de cambiar de periodo, y ese es el punto
   // del recorrido: sin escribir ninguno, la aserción final sobre 2026-II no
   // distinguiría «el porcentaje es por periodo» (RF-PE-019 RN1, RF-PE-021) de

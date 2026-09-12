@@ -30,8 +30,8 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 10 de septiembre de 2026: **190 de 243 requisitos contables construidos**,
-> un 78 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> Al 11 de septiembre de 2026: **201 de 243 requisitos contables construidos**,
+> un 83 %. El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
 >
@@ -40,7 +40,7 @@ Se están construyendo **en paralelo**:
 > | Plan de Estudios (fichas) | 60 | 60 |
 > | Atributos del Graduado y Criterios (`RF120`–`RF132`) | 13 | 13 |
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
-> | Mejora Continua · Evaluación (`RF-PE`) | 38 | 49 |
+> | Mejora Continua · Evaluación (`RF-PE`) | 49 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 32 | 47 |
 > | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
 >
@@ -57,7 +57,9 @@ Se están construyendo **en paralelo**:
 >   evaluación) y `025` (seleccionar el año a completar) están construidos —el
 >   campo «Frecuencia de `<código>`» y el selector «Año a configurar» de
 >   `ConfiguracionDelAnio.tsx`— bajo el comentario general de cabecera del
->   fichero, sin su propio número. Y de los 32 `RF-PJ-000` a `RF-PJ-031` que
+>   fichero, sin su propio número. De los `RF-PE-038` a `RF-PE-040` pasa lo
+>   mismo: `transicionar` los cubre desde el ciclo 2c-A y recibe el comentario
+>   en su contexto, sin número propio. Y de los 32 `RF-PJ-000` a `RF-PJ-031` que
 >   cierran 2c-J-A y 2c-J-B pasa lo mismo con cuatro: `010` causa raíz, `011`
 >   justificación, `015` estado de implementación y `030` guardado por periodo
 >   están construidos —`causaRaiz`, `estadoImplementacion` y `periodoId` en el

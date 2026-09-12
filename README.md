@@ -167,7 +167,7 @@ Si en el log aparecen rutas pero no la línea de PrismaService, el problema es
 la base de datos, no la aplicación. Y la suite completa debe quedar en verde:
 
 ```bash
-cd apps/api && npm test        # 815 pruebas en 42 archivos
+cd apps/api && npm test        # 991 pruebas en 51 archivos
 ```
 
 La suite de integración corre aparte y **vacía tablas con `TRUNCATE`**: exige una
@@ -251,9 +251,9 @@ artefactos de compilación viven fuera del control de versiones.
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
   estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
   queda ningún almacén en memoria.
-- Pruebas en verde: 815 unitarias en la API, 227 en el frontend, 278 de
-  integración en dieciséis suites contra un PostgreSQL real y desechable, y 34
-  recorridos E2E con Playwright —siete de ellos con `axe-core` sobre WCAG 2.1
+- Pruebas en verde: 991 unitarias en la API, 239 en el frontend, 305 de
+  integración en dieciocho suites contra un PostgreSQL real y desechable, y 40
+  recorridos E2E con Playwright —nueve de ellos con `axe-core` sobre WCAG 2.1
   AA—. Los guiones de carga k6 viven en `tests/carga/`.
 - CI en GitHub Actions con los quality gates de §6.6: typecheck, lint, formato,
   cobertura, `npm audit` y Semgrep, más un job de E2E que levanta PostgreSQL,

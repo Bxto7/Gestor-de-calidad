@@ -110,5 +110,17 @@ test.describe('con la cuenta que aprueba', () => {
       .fill('https://drive.example/resultados');
     await page.getByRole('button', { name: 'Guardar el año' }).click();
     await expect(page.getByText(/Guardado/)).toBeVisible();
+
+    // Archiva al terminar: «una única versión Vigente por plan de medición»
+    // (`evaluacion_una_vigente_por_medicion`) es un invariante de dominio, y
+    // este plan de evaluación no es el único que se crea sobre
+    // `PM-PE-E2E-v1-I-v1` — `documentos-evaluacion.spec.ts` crea el suyo y
+    // también lo lleva a Vigente. Sin liberar el cupo aquí, ese fichero
+    // encontraría la base ya ocupada y su transición fallaría con un 409 que
+    // no tiene nada que ver con lo que él prueba.
+    await page.getByRole('button', { name: 'Archivar' }).click();
+    await expect(
+      page.locator('main').getByText('Histórico', { exact: true }).first(),
+    ).toBeVisible();
   });
 });

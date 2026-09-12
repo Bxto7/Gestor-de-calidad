@@ -7,8 +7,37 @@
  * necesitando a una persona. Esta suite cubre lo que una máquina sí puede.
  */
 
+import type { Page } from '@playwright/test';
+
 import { analizar } from '../fixtures/axe';
 import { expect, test } from '../fixtures/sesion';
+
+/**
+ * Crea un plan de evaluación fresco sobre la base Indirecta de la semilla y
+ * abre su detalle. Sirve de punto de partida a las dos pruebas de Documentos
+ * y Versiones de más abajo.
+ *
+ * La base Indirecta y no la Directa: este fichero corre alfabéticamente antes
+ * que `configuracion-evaluacion.spec.ts`, que depende de que «el plan Directo
+ * más reciente» siga siendo el mismo entre sus dos pruebas. Crear aquí un
+ * Directo más lo desplazaría. El tipo de plan es irrelevante para lo que estas
+ * dos pruebas comprueban.
+ */
+async function crearPlanEvaluacion(page: Page): Promise<void> {
+  await page.goto('/mejora-continua/evaluacion');
+  await page.getByRole('button', { name: 'Nuevo plan de evaluación' }).click();
+  const modal = page.getByRole('dialog');
+  await modal
+    .getByLabel('Plan de medición base*')
+    .selectOption({ label: 'PM-PE-E2E-v1-I-v1 — Aprobado' });
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(modal).toBeHidden();
+
+  const enlace = page.getByRole('link', { name: /^EV-/ }).first();
+  await expect(enlace).toBeVisible();
+  await enlace.click();
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+}
 
 test('el listado de planes de medición', async ({ page }) => {
   await page.goto('/mejora-continua/medicion');
@@ -113,4 +142,50 @@ test('el resumen', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /Bienvenido/ })).toBeVisible();
 
   await analizar(page, 'el resumen');
+});
+
+test('la pestaña de documentos del plan de evaluación, con un PDF ya generado', async ({
+  page,
+}) => {
+  // Con contenido real: analizar la lista vacía no distingue «sin problemas»
+  // de «axe nunca llegó a ver la fila de un documento», que es justo el
+  // defecto de 2c-A que esta suite ya corrigió una vez para otras pantallas.
+  await crearPlanEvaluacion(page);
+  await page.getByRole('tab', { name: 'Documentos' }).click();
+  await page.getByRole('button', { name: 'Generar PDF' }).click();
+  await expect(page.getByText('Listo')).toBeVisible({ timeout: 30_000 });
+
+  await analizar(page, 'la pestaña de documentos del plan de evaluación');
+});
+
+test.describe('con la cuenta que aprueba', () => {
+  // Generar una versión exige `evaluacion.crear` y aprobar exige
+  // `evaluacion.aprobar`; la cuenta por defecto no tiene el segundo.
+  test.use({ rol: 'director' });
+
+  test('la pestaña de versiones del plan de evaluación, con un linaje real', async ({ page }) => {
+    await crearPlanEvaluacion(page);
+
+    // RF-PE-034 RN: «Generar nueva versión» solo cabe desde Aprobado, Vigente
+    // o Histórico — hace falta salir de Borrador primero.
+    await page.getByRole('button', { name: 'Enviar a revisión' }).click();
+    await page.getByRole('button', { name: 'Aprobar' }).click();
+    await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Versiones' }).click();
+    await page.getByRole('button', { name: 'Generar nueva versión' }).click();
+
+    // La operación navega a la copia nueva y reinicia la pestaña activa a
+    // Documentos: se espera ese reinicio (evidencia de que la navegación ya
+    // ocurrió) antes de volver a pedir Versiones, para no pulsar la pestaña
+    // vieja un instante antes de que la página cambie por debajo.
+    await expect(page.getByRole('tab', { name: 'Documentos' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await page.getByRole('tab', { name: 'Versiones' }).click();
+    await expect(page.getByRole('link', { name: /^EV-/ })).toBeVisible();
+
+    await analizar(page, 'la pestaña de versiones del plan de evaluación');
+  });
 });

@@ -1279,6 +1279,7 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-11 | RF127 (Mejora Continua) | Una competencia sin atributo del graduado se muestra y se puede incluir en un plan de medición; el requisito dice excluirla | **PENDIENTE** |
 | D-12 | RF-PE-020 (Mejora Continua) | La evidencia del entregable se registra como enlace; el requisito admite «archivos o enlaces» y no hay subida de archivos | **PENDIENTE** |
 | D-13 | RF-PE-006 RN2 (Mejora Continua) | La excepción del registro progresivo remite a RF-PE-022 y RF-PE-028 (medición Indirecta, ninguno registra un porcentaje); los que sí lo describen son RF-PE-019 y RF-PE-026 | **PENDIENTE** |
+| D-14 | RF-PE-032 RN2 · RF-PE-033 RN2 (Mejora Continua) | El Excel y el PDF calcan la plantilla del plan de medición, no «el formato institucional»: esa plantilla no está en el repositorio | **PENDIENTE** |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1509,6 +1510,35 @@ el documento fuente.
 de RF-PE-022 y RF-PE-028) y actualizar RN2 en el documento de Mejora Continua.
 Mientras tanto, quien lea RN2 junto a los dos números que cita hoy llega a la
 conclusión contraria a lo que la propia regla quiere decir.
+
+---
+
+### D-14 · RF-PE-032 RN2 · RF-PE-033 RN2 — el formato exportado no es el institucional, sino el de medición
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+**Pide:** RN2 de los dos requisitos, con el mismo texto salvo el formato:
+«El formato exportado debe ser igual al formato institucional utilizado
+actualmente para los planes de evaluación.»
+
+**Hace:** genera el PDF y el Excel calcando la misma plantilla que ya usa el
+plan de medición (RF-PM-028, RF-PM-029) — mismas secciones, mismo estilo de
+tabla — con los datos propios de la evaluación (competencias, instrumento,
+frecuencia y, por periodo o año, asignaturas/indicaciones con sus mediciones)
+en vez de los de la medición.
+
+**Por qué:** la plantilla institucional que RN2 pide replicar no está en
+ningún sitio de este repositorio — nadie la ha entregado todavía —, así que no
+hay con qué comparar el resultado ni qué imitar exactamente. Calcar el de
+medición usa un patrón que ya existe y que la propia universidad ya acepta en
+el submódulo hermano, en vez de inventar un tercer formato sin referencia.
+
+**Qué hay que decidir:** si la plantilla institucional real existe y puede
+compartirse, para reemplazarla. La respuesta afecta a la vez a RF-PE-032 y
+RF-PE-033, y por la misma razón a RF-PM-028 y RF-PM-029, que citan la misma
+exigencia y no la resuelven tampoco. Mientras tanto, el documento y el sistema
+no coinciden en la letra de RN2, aunque el resultado sí sea un documento de
+tabla completo y descargable.
 
 ---
 
