@@ -44,12 +44,22 @@ describe('ModalNuevoPlanMejora', () => {
     const usuario = userEvent.setup();
     renderizar();
 
+    // Selecciona un criterio en CRITERIO_ACREDITACION
     await usuario.selectOptions(screen.getByLabelText('Aspecto'), 'CRITERIO_ACREDITACION');
     await usuario.selectOptions(screen.getByLabelText('Elemento'), 'cri-1');
     expect(screen.getByLabelText<HTMLSelectElement>('Elemento').value).toBe('cri-1');
 
+    // Cambia a OBJETIVO_EDUCACIONAL — el selector de Elemento ahora lista objetivos, no criterios
     await usuario.selectOptions(screen.getByLabelText('Aspecto'), 'OBJETIVO_EDUCACIONAL');
+    await waitFor(() => {
+      // El selector nuevo (de objetivos) debe estar vacío, no guardar el cri-1 anterior
+      expect(screen.getByLabelText<HTMLSelectElement>('Elemento').value).toBe('');
+    });
 
+    // Vuelve a CRITERIO_ACREDITACION — el criterio cri-1 vuelve a ser una opción válida.
+    // Si el estado no se limpió al cambiar, la controladora mostraría cri-1 de nuevo.
+    // Este es el test que atrapa la ausencia del guardián.
+    await usuario.selectOptions(screen.getByLabelText('Aspecto'), 'CRITERIO_ACREDITACION');
     await waitFor(() => {
       expect(screen.getByLabelText<HTMLSelectElement>('Elemento').value).toBe('');
     });

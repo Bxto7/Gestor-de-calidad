@@ -11,7 +11,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useCriterios } from '@/features/acreditacion/api/queries';
 import { useObjetivos } from '@/features/plan-estudios/api/queries';
@@ -75,11 +75,20 @@ export function ModalNuevoPlanMejora({
 
   // RF-PJ-029: la competencia se limita a las programadas en el periodo
   // elegido del plan base — no al catálogo global de competencias.
-  const competenciasDelPeriodo = vistaBase
-    ? vistaBase.grupos
-        .flatMap((g) => g.competencias)
-        .filter((c) => vistaBase.programadas.includes(`${c.id}|${periodoId}`))
-    : [];
+  // Una competencia puede responder a dos atributos y aparecer en dos grupos,
+  // así que de-duplicamos por id (igual que PlanEvaluacionPage.tsx:148-152).
+  const competenciasDelPeriodo = useMemo(() => {
+    if (!vistaBase || !periodoId) return [];
+    const mapa = new Map<string, (typeof vistaBase.grupos)[0]['competencias'][0]>();
+    for (const g of vistaBase.grupos) {
+      for (const c of g.competencias) {
+        if (vistaBase.programadas.includes(`${c.id}|${periodoId}`)) {
+          mapa.set(c.id, c);
+        }
+      }
+    }
+    return [...mapa.values()];
+  }, [vistaBase, periodoId]);
 
   const listo =
     aspecto === 'CRITERIO_ACREDITACION' || aspecto === 'OBJETIVO_EDUCACIONAL'
