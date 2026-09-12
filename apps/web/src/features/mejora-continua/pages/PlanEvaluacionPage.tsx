@@ -228,6 +228,13 @@ export function PlanEvaluacionPage() {
               </p>
             )}
           </div>
+
+          {/* RF-PE-042: quién aprobó y cuándo, junto al plan y no enterrado en la bitácora. */}
+          {plan.aprobadoEn && (
+            <p className="text-sm text-tinta-suave">
+              Aprobado el {new Date(plan.aprobadoEn).toLocaleDateString('es-PE')}.
+            </p>
+          )}
         </div>
       </Tarjeta>
 
@@ -378,7 +385,15 @@ export function PlanEvaluacionPage() {
               <DocumentosDelPlanEvaluacion
                 documentos={documentos ?? []}
                 generando={generarDocumento.isPending}
-                onGenerar={(tipo) => void ejecutar(() => generarDocumento.mutateAsync(tipo))}
+                onGenerar={
+                  // A diferencia del gemelo de medición (que solo lee),
+                  // `GenerarDocumentoEvaluacion.encolar` exige
+                  // `evaluacion.editar` porque aquí exportar sí muta. Sin el
+                  // permiso, ni se ofrecen los botones.
+                  puede('evaluacion.editar')
+                    ? (tipo) => void ejecutar(() => generarDocumento.mutateAsync(tipo))
+                    : undefined
+                }
                 onDescargar={(idDocumento) =>
                   void ejecutar(async () =>
                     guardarArchivo(await descargarDocumentoEvaluacion(idDocumento)),

@@ -43,7 +43,15 @@ export interface DocumentosDelPlanEvaluacionProps {
   readonly documentos: readonly TrabajoDocumento<TipoDocumentoEvaluacion>[];
   /** Hay una petición en vuelo: los botones no aceptan un segundo clic. */
   readonly generando: boolean;
-  readonly onGenerar: (tipo: TipoDocumentoEvaluacion) => void;
+  /**
+   * A diferencia del gemelo de medición, `encolar` aquí exige
+   * `evaluacion.editar` (ver cabecera de
+   * `generar-documento-evaluacion.use-case.ts`): exportar sí muta. Por eso es
+   * opcional — quien la usa solo la pasa cuando el permiso lo permite, y sin
+   * ella los botones ni se pintan, en vez de dejar que el clic termine en un
+   * 403 silencioso.
+   */
+  readonly onGenerar?: (tipo: TipoDocumentoEvaluacion) => void;
   readonly onDescargar: (id: string) => void;
 }
 
@@ -55,22 +63,24 @@ export function DocumentosDelPlanEvaluacion({
 }: DocumentosDelPlanEvaluacionProps) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Boton
-          variante="secundario"
-          disabled={generando}
-          onClick={() => onGenerar('PLAN_EVALUACION_PDF')}
-        >
-          Generar PDF
-        </Boton>
-        <Boton
-          variante="secundario"
-          disabled={generando}
-          onClick={() => onGenerar('PLAN_EVALUACION_EXCEL')}
-        >
-          Generar Excel
-        </Boton>
-      </div>
+      {onGenerar && (
+        <div className="flex flex-wrap gap-2">
+          <Boton
+            variante="secundario"
+            disabled={generando}
+            onClick={() => onGenerar('PLAN_EVALUACION_PDF')}
+          >
+            Generar PDF
+          </Boton>
+          <Boton
+            variante="secundario"
+            disabled={generando}
+            onClick={() => onGenerar('PLAN_EVALUACION_EXCEL')}
+          >
+            Generar Excel
+          </Boton>
+        </div>
+      )}
 
       {documentos.length === 0 ? (
         <EstadoVacio

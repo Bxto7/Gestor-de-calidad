@@ -85,6 +85,9 @@ test.describe('con la cuenta que aprueba', () => {
     await expect(
       page.locator('main').getByText('Vigente', { exact: true }).first(),
     ).toBeVisible();
+    // RF-PE-042: la fecha de aprobación queda junto al plan, no solo en la
+    // bitácora — sigue visible aunque el plan ya haya avanzado a Vigente.
+    await expect(page.getByText('Aprobado el')).toBeVisible();
 
     await page.getByLabel('Año a configurar').selectOption({ label: '2026' });
   }

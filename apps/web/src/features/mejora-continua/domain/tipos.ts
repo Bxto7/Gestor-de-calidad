@@ -55,6 +55,9 @@ export interface PlanEvaluacion {
   readonly version: number;
   readonly estado: EstadoMedicion;
   readonly creadoEn: string;
+  /** RF-PE-042: quién aprobó y cuándo. Nulos mientras no se haya aprobado. */
+  readonly aprobadoPorId: string | null;
+  readonly aprobadoEn: string | null;
 }
 
 /* ── Configuración por competencia (RF-PE-013 a RF-PE-021) ────────────── */

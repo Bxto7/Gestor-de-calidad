@@ -82,6 +82,16 @@ describe('los estados de un trabajo', () => {
 });
 
 describe('generar', () => {
+  it('sin permiso para exportar, los botones de generar no se pintan', () => {
+    // `GenerarDocumentoEvaluacion.encolar` exige `evaluacion.editar`: quien la
+    // usa pasa `onGenerar` como `undefined` sin ese permiso, y el componente
+    // no debe ofrecer un botón que terminaría en un 403.
+    montar({ onGenerar: undefined });
+
+    expect(screen.queryByRole('button', { name: 'Generar PDF' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generar Excel' })).not.toBeInTheDocument();
+  });
+
   it('generar encola el tipo que se pulsó', async () => {
     const p = montar({ documentos: [] });
     await userEvent.click(screen.getByRole('button', { name: 'Generar Excel' }));

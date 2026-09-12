@@ -24,6 +24,8 @@ function version(sobre: Partial<PlanEvaluacion> & { id: string }): PlanEvaluacio
     version: 1,
     estado: 'Borrador',
     creadoEn: '2026-01-01T00:00:00.000Z',
+    aprobadoPorId: null,
+    aprobadoEn: null,
     ...sobre,
   };
 }
