@@ -123,6 +123,8 @@ export interface RepositorioPlanMejoraPort {
     id: string,
     planMedicionAfectadoId: string | null,
   ): Promise<DatosPlanMejora>;
+  /** Listado básico por carrera, sin filtros — RF-PJ-038 los añade en 2c-J-C. */
+  listarDeCarrera(carreraId: string): Promise<readonly DatosPlanMejora[]>;
 }
 
 export const REPOSITORIO_PLAN_MEJORA = Symbol('RepositorioPlanMejoraPort');

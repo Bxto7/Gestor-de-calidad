@@ -149,6 +149,7 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
     parametros: async () => parametros(),
     registrarImpactoEnMedicion: async (_id, planMedicionAfectadoId) =>
       plan({ planMedicionAfectadoId }),
+    listarDeCarrera: async () => [],
     ...sobre,
   };
 }
