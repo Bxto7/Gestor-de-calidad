@@ -369,6 +369,25 @@ describe('la lectura', () => {
   });
 });
 
+describe('el listado', () => {
+  it('devuelve lo que el repositorio lista para esa carrera', async () => {
+    const unPlan = plan({ id: 'pj-listado' });
+    const { caso } = montar({ planes: { listarDeCarrera: async () => [unPlan] } });
+
+    const listado = await caso.listar(ACTOR, CARRERA);
+
+    expect(listado).toEqual([unPlan]);
+  });
+
+  it('exige `mejora.leer`', async () => {
+    const pedidos: string[] = [];
+    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+
+    await expect(caso.listar(ACTOR, CARRERA)).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toEqual(['mejora.leer']);
+  });
+});
+
 describe('RF-PJ-001 a RF-PJ-003 y §2a del diseño de 2c-J-B — el alta', () => {
   it('nace en Borrador con estado de implementación Pendiente, y con la carrera real del actor', async () => {
     const { caso } = montar();

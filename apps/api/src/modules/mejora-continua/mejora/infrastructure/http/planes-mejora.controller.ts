@@ -52,6 +52,12 @@ export class PlanesMejoraController {
     return this.casos.crear(actor, dto);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'Listado de planes de mejora de una carrera (RF-PJ-038, básico)' })
+  async listar(@ActorActual() actor: Actor, @Query('carreraId', ParseUUIDPipe) carreraId: string) {
+    return this.casos.listar(actor, carreraId);
+  }
+
   // Rutas estáticas antes de `:id/...` — si no, Nest les hace perder contra
   // el parámetro genérico.
 
