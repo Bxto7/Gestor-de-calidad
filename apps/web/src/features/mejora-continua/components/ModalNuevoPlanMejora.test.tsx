@@ -34,7 +34,7 @@ function renderizar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ModalNuevoPlanMejora carreraId="carrera-1" onCerrar={() => {}} onCreado={() => {}} />
+      <ModalNuevoPlanMejora carreraId="carrera-1" onCerrar={() => undefined} onCreado={() => undefined} />
     </QueryClientProvider>,
   );
 }
