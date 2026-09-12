@@ -221,7 +221,7 @@ artefactos de compilación viven fuera del control de versiones.
   realizadas, motor de consistencia, versionado y duplicado con su linaje,
   historial, y exportación a PDF y Excel (RF-PM-027 a RF-PM-029) por la misma
   cola de BullMQ, con el worker enrutando cada trabajo a su módulo.
-- Submódulo **Planes de Evaluación, 37 de 49 (RF-PE-001 a RF-PE-030)**: alta de
+- Submódulo **Planes de Evaluación completo, 49 de 49 (RF-PE-001 a RF-PE-042)**: alta de
   un plan de evaluación a partir de un plan de medición Aprobado o Vigente, que
   hereda el tipo y la meta (nunca se repiten a mano); tarjeta de lo heredado
   —competencias y periodos del plan de medición base, en solo lectura, sin
@@ -242,7 +242,17 @@ artefactos de compilación viven fuera del control de versiones.
   enlace al instrumento de recolección y, cuando ya se aplicó, al de los
   resultados —estas últimas editables y eliminables con confirmación
   (RF-PE-030) mientras el plan está en Borrador, y el enlace a resultados
-  también sobre un plan ya Vigente (RF-PE-006 RN2).
+  también sobre un plan ya Vigente (RF-PE-006 RN2); enviar a revisión, aprobar
+  u observar con comentarios, con responsable y fecha de aprobación quedando
+  en el propio plan (RF-PE-038 a RF-PE-042); **generar y exportar** el plan a
+  PDF y Excel (RF-PE-031 a RF-PE-033) por la misma cola de BullMQ que Planes de
+  Medición, calcando su formato mientras no exista el institucional (D-14); y
+  **versionar** (RF-PE-034 a RF-PE-037): la versión nueva copia la definición
+  —instrumento, frecuencia, responsable, asignaturas o indicaciones— pero nunca
+  el seguimiento —porcentaje alcanzado, evidencias, enlace a resultados—, que
+  es lo que ocurrió en un periodo concreto y no se hereda; el linaje se
+  consulta de la más reciente a la más antigua, y una versión histórica se abre
+  en solo lectura.
 - Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
   aviso de impacto al editar un atributo que ya usan competencias o planes
   (RF120–RF123, RF128–RF132).
