@@ -188,11 +188,14 @@ decide autorización por su cuenta.
   fail-closed si el actor no tiene `mejora.leer` en esa carrera — mismo
   patrón que el resto del módulo); integración para el nuevo `GET
   /planes-mejora` contra Postgres real.
-- **Frontend:** component tests para `PlanesMejoraPage` (listado, estado
-  vacío, filtro de carrera), el modal de creación (los tres pasos en
+- **Frontend:** component test para el modal de creación (los tres pasos en
   cascada, incluida la limpieza del elemento al cambiar de aspecto — mutation
-  test explícito, seguido el criterio de todo el ciclo 2c-E), y
-  `PlanMejoraPage` (las cinco tarjetas, el guardián de edición por estado).
+  test explícito, seguido el criterio de todo el ciclo 2c-E). `PlanesMejoraPage`
+  y `PlanMejoraPage` no llevan test de componente propio — mismo patrón que
+  `CriteriosPage.tsx`, la página gemela ya existente, que tampoco lo tiene: su
+  comportamiento (listado, estado vacío, filtro de carrera; las cinco
+  tarjetas y el guardián de edición por estado) queda cubierto por el
+  recorrido E2E y la verificación manual de cada Task.
 - **E2E:** un recorrido por cada uno de los tres aspectos (crear, ver el
   detalle, editar definición en Borrador, avanzar una transición), más
   accesibilidad (`axe-core`) en listado y detalle con contenido real — un

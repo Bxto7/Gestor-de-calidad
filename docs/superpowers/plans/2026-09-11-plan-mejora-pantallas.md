@@ -462,11 +462,9 @@ Esperado: FALLA — `clavesMejora is not defined`.
 
 - [ ] **Step 6: Hooks en `queries.ts`**
 
-Añade al final de `queries.ts`:
+Añade estos imports junto a los que ya existen al principio de `queries.ts` — no los metas a mitad de archivo, o `npm run lint` se queja por `import/first` (mismo tipo de descuido ya corregido una vez en `ModalNuevoPlanMejora.tsx`):
 
 ```typescript
-/* ── Plan de Mejora ────────────────────────────────────────────────────── */
-
 import * as mejoraApi from './mejora.api';
 import type {
   AccionMejora,
@@ -474,6 +472,12 @@ import type {
   DefinicionPlanMejora,
 } from './mejora.api';
 import type { EstadoImplementacion } from '../domain/tipos';
+```
+
+Y añade el resto —claves y hooks— al final de `queries.ts`:
+
+```typescript
+/* ── Plan de Mejora ────────────────────────────────────────────────────── */
 
 export const clavesMejora = {
   lista: (carreraId: string) => ['mejora', 'lista', carreraId] as const,
@@ -1010,13 +1014,12 @@ git commit -m "El modal de alta del plan de mejora, por aspecto"
  */
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { useCriterios } from '@/features/acreditacion/api/queries';
 import { SiPuede } from '@/features/auth/components/SiPuede';
 import { useCarreras, useCompetencias, useObjetivos } from '@/features/plan-estudios/api/queries';
-import { useNavigate } from 'react-router-dom';
 import {
   Badge,
   Boton,
@@ -1255,6 +1258,16 @@ import {
   transicionesDisponibles,
 } from '../domain/estado-medicion';
 import { ESTADOS_IMPLEMENTACION } from '../domain/tipos';
+import {
+  useActualizarImplementacionMejora,
+  useActualizarRetroalimentacionMejora,
+  useCargarEvidenciaMejora,
+  useEditarDefinicionMejora,
+  useEliminarEvidenciaMejora,
+  useHistorialMejora,
+  usePlanMejora,
+  useTransicionarMejora,
+} from '../api/queries';
 import type { DefinicionPlanMejora } from '../api/mejora.api';
 import type { PlanMejora } from '../domain/tipos';
 
@@ -1271,16 +1284,6 @@ function datosDefinicionActual(plan: PlanMejora): DefinicionPlanMejora {
     responsable: plan.responsable,
   };
 }
-import {
-  useActualizarImplementacionMejora,
-  useActualizarRetroalimentacionMejora,
-  useCargarEvidenciaMejora,
-  useEditarDefinicionMejora,
-  useEliminarEvidenciaMejora,
-  useHistorialMejora,
-  usePlanMejora,
-  useTransicionarMejora,
-} from '../api/queries';
 
 export function PlanMejoraPage() {
   const { id = '' } = useParams<{ id: string }>();
