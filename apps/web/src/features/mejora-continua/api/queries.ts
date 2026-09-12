@@ -21,6 +21,13 @@ import * as api from './medicion.api';
 import * as evaluacionApi from './evaluacion.api';
 import type { FiltroEvaluaciones } from './evaluacion.api';
 import * as configuracionApi from './configuracion-evaluacion.api';
+import * as mejoraApi from './mejora.api';
+import type {
+  AccionMejora,
+  DatosCrearPlanMejora,
+  DefinicionPlanMejora,
+} from './mejora.api';
+import type { EstadoImplementacion } from '../domain/tipos';
 
 export const claves = {
   planes: (filtro?: api.FiltroPlanes) =>
@@ -544,5 +551,109 @@ export function useGuardarResultados(planId: string) {
     planId,
     (v: { indicacionId: string; enlaceResultados: string | null }) =>
       configuracionApi.guardarResultados(v.indicacionId, v.enlaceResultados),
+  );
+}
+
+/* ── Plan de Mejora ────────────────────────────────────────────────────── */
+
+export const clavesMejora = {
+  lista: (carreraId: string) => ['mejora', 'lista', carreraId] as const,
+  plan: (id: string) => ['mejora', 'plan', id] as const,
+  historial: (id: string) => ['mejora', 'historial', id] as const,
+};
+
+export function usePlanesMejora(carreraId: string) {
+  return useQuery({
+    queryKey: clavesMejora.lista(carreraId),
+    queryFn: () => mejoraApi.listarPlanesMejora(carreraId),
+    enabled: !!carreraId,
+  });
+}
+
+export function usePlanMejora(id: string) {
+  return useQuery({
+    queryKey: clavesMejora.plan(id),
+    queryFn: () => mejoraApi.obtenerPlanMejora(id),
+    enabled: !!id,
+  });
+}
+
+export function useHistorialMejora(id: string) {
+  return useQuery({
+    queryKey: clavesMejora.historial(id),
+    queryFn: () => mejoraApi.historialDeMejora(id),
+    enabled: !!id,
+  });
+}
+
+function useMutacionDePlanMejora<TVars>(
+  fn: (v: TVars) => Promise<unknown>,
+  idDe: (v: TVars) => string,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: async (_datos, variables) => {
+      await qc.invalidateQueries({ queryKey: clavesMejora.plan(idDe(variables)) });
+      await qc.invalidateQueries({ queryKey: ['mejora', 'lista'] });
+    },
+  });
+}
+
+export function useCrearPlanMejora() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: DatosCrearPlanMejora) => mejoraApi.crearPlanMejora(v),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['mejora', 'lista'] });
+    },
+  });
+}
+
+export function useEditarDefinicionMejora() {
+  return useMutacionDePlanMejora(
+    (v: { id: string; datos: DefinicionPlanMejora }) =>
+      mejoraApi.editarDefinicionMejora(v.id, v.datos),
+    (v) => v.id,
+  );
+}
+
+export function useTransicionarMejora() {
+  return useMutacionDePlanMejora(
+    (v: { id: string; accion: AccionMejora; comentario?: string }) =>
+      mejoraApi.transicionarMejora(v.id, v.accion, v.comentario),
+    (v) => v.id,
+  );
+}
+
+export function useActualizarImplementacionMejora() {
+  return useMutacionDePlanMejora(
+    (v: { id: string; estado: EstadoImplementacion }) =>
+      mejoraApi.actualizarImplementacionMejora(v.id, v.estado),
+    (v) => v.id,
+  );
+}
+
+export function useCargarEvidenciaMejora() {
+  return useMutacionDePlanMejora(
+    (v: { id: string; referencia: string; nombreArchivo?: string }) =>
+      mejoraApi.cargarEvidenciaMejora(v.id, v.referencia, v.nombreArchivo),
+    (v) => v.id,
+  );
+}
+
+export function useEliminarEvidenciaMejora() {
+  return useMutacionDePlanMejora(
+    (v: { evidenciaId: string; planId: string }) =>
+      mejoraApi.eliminarEvidenciaMejora(v.evidenciaId),
+    (v) => v.planId,
+  );
+}
+
+export function useActualizarRetroalimentacionMejora() {
+  return useMutacionDePlanMejora(
+    (v: { id: string; logroMeta: string; impacto: string }) =>
+      mejoraApi.actualizarRetroalimentacionMejora(v.id, v.logroMeta, v.impacto),
+    (v) => v.id,
   );
 }

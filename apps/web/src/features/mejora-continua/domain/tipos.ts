@@ -246,3 +246,46 @@ export interface TrabajoDocumento<TTipo extends string = TipoDocumentoMedicion> 
   readonly error: string | null;
   readonly solicitadoEn: string;
 }
+
+/* ── Plan de Mejora (RF-PJ-001 y siguientes) ──────────────────────────── */
+
+export const ESTADOS_IMPLEMENTACION = ['Pendiente', 'En proceso', 'Completado'] as const;
+export type EstadoImplementacion = (typeof ESTADOS_IMPLEMENTACION)[number];
+
+export type AspectoPlanMejora = 'CRITERIO_ACREDITACION' | 'OBJETIVO_EDUCACIONAL' | 'COMPETENCIA';
+
+export interface EvidenciaPlanMejora {
+  readonly id: string;
+  readonly planMejoraId: string;
+  readonly referencia: string;
+  readonly nombreArchivo: string | null;
+  readonly subidoPor: string;
+  readonly subidoEn: string;
+}
+
+export interface PlanMejora {
+  readonly id: string;
+  readonly codigo: string;
+  readonly aspecto: AspectoPlanMejora;
+  readonly carreraId: string;
+  readonly criterioAcreditacionId: string | null;
+  readonly objetivoEducacionalId: string | null;
+  readonly competenciaId: string | null;
+  readonly periodoId: string | null;
+  readonly planEvaluacionId: string | null;
+  readonly planMedicionAfectadoId: string | null;
+  readonly estado: EstadoMedicion;
+  readonly estadoImplementacion: EstadoImplementacion;
+  readonly nombre: string;
+  readonly causaRaiz: string;
+  readonly justificacion: string;
+  readonly input: string | null;
+  readonly plazo: string;
+  readonly recursos: string;
+  readonly metas: string;
+  readonly responsable: string;
+  readonly logroMeta: string | null;
+  readonly impacto: string | null;
+  readonly creadoEn: string;
+  readonly evidencias: readonly EvidenciaPlanMejora[];
+}
