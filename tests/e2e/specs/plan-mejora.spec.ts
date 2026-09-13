@@ -4,10 +4,11 @@
  * revisión) — sobre las pantallas base construidas en este ciclo (Tasks 5 y
  * 6).
  *
- * No cubre RF-PJ-006 (definición editable en Borrador): en un plan recién
- * creado ese guardado por campo nunca tiene éxito (ver el comentario dentro
- * del primer test) — un defecto real, separado del que motivó esta tarea, y
- * fuera de su alcance.
+ * El primer recorrido cubre además RF-PJ-006 (definición editable en
+ * Borrador, guardado por campo): `DefinicionPlanMejoraDto` ya no exige los
+ * seis campos de texto no vacíos a la vez (`plan-mejora.dto.ts`), así que
+ * guardar "Nombre de la acción" en un plan recién creado —con el resto de la
+ * definición todavía vacía— tiene éxito.
  *
  * Corre alfabéticamente después de `configuracion-evaluacion.spec.ts`, que
  * deja al menos un plan de evaluación Directa en estado Vigente: es la base
@@ -36,20 +37,26 @@ test('crear un plan de mejora de Criterio de Acreditación y enviarlo a revisió
 
   await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
 
-  // No se comprueba aquí el guardado de "Nombre de la acción": en un plan
-  // recién creado, `causaRaiz`/`justificacion`/`recursos`/`metas`/
-  // `responsable` nacen vacíos (`plan-mejora.repository.ts:196-203`) y
-  // `DefinicionPlanMejoraDto` exige los cinco no vacíos A LA VEZ en cada PATCH
-  // (`plan-mejora.dto.ts:56-95`) — pero `PlanMejoraPage.tsx` guarda un campo
-  // por `onBlur`, cada uno con el resto de `datosDefinicionActual(plan)`
-  // todavía vacío. Confirmado con un spec de depuración: el primer campo que
-  // se intenta guardar responde 400 ("causaRaiz must be longer than or equal
-  // to 1 characters..."), así que no hay ninguna secuencia de campos que
-  // logre guardar el primero. Es un defecto real y separado del que motivó
-  // esta tarea (la navegación tras crear), fuera de su alcance — RF-PJ-004/005
-  // (enviar a revisión) no exige la definición completa, así que este
-  // recorrido puede seguir sin ella.
-  //
+  // RF-PJ-006: el plan nace con la definición vacía (`causaRaiz`,
+  // `justificacion`, `recursos`, `metas` y `responsable` todavía sin
+  // completar) y "Nombre de la acción" debe poder guardarse igual — cada
+  // `onBlur` reenvía el objeto entero, así que esto ejercita justo el caso
+  // que antes fallaba con 400 ("causaRaiz must be longer than or equal to 1
+  // characters...").
+  const nombreDeLaAccion = page.getByLabel('Nombre de la acción');
+  await nombreDeLaAccion.fill('Reforzar el syllabus del curso');
+  // `onBlur` dispara el PATCH sin esperarlo (`void ejecutar(...)`): hay que
+  // esperar la respuesta antes de recargar, o la recarga puede ganarle a la
+  // petición todavía en vuelo.
+  const guardado = page.waitForResponse(
+    (r) => r.url().includes('/definicion') && r.request().method() === 'PATCH',
+  );
+  await nombreDeLaAccion.blur();
+  await guardado;
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel('Nombre de la acción')).toHaveValue('Reforzar el syllabus del curso');
+
   // RF-PJ-004/005: Borrador → En revisión.
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
   await expect(page.locator('main').getByText('En revisión', { exact: true }).first()).toBeVisible();

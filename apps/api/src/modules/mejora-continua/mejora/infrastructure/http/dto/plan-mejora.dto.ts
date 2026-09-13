@@ -40,25 +40,32 @@ export class CrearPlanMejoraDto {
   planEvaluacionId?: string;
 }
 
+/**
+ * Sin `@MinLength(1)` a propósito, en los seis campos de texto: RF-PJ-006 a
+ * RF-PJ-013 se completan de a uno por vez sobre un plan que nace con todos
+ * ellos en `''` (`PlanMejoraRepositoryPrisma.crear()`), y cada guardado
+ * reenvía el objeto entero (`datosDefinicionActual` + el campo tocado) — así
+ * que exigir no-vacío aquí rechazaba cualquier guardado mientras el resto
+ * siguiera sin completar. La completitud real es RF-PJ-042 (2c-J-D, todavía
+ * no existe — ver el `tieneBloqueos: false` de `transicionar` en el caso de
+ * uso); este DTO solo seguirá validando tipo y longitud máxima.
+ */
 export class DefinicionPlanMejoraDto {
   @ApiProperty()
   @Recortado()
   @IsString()
-  @MinLength(1)
   @MaxLength(300)
   nombre!: string;
 
   @ApiProperty()
   @Recortado()
   @IsString()
-  @MinLength(1)
   @MaxLength(4000)
   causaRaiz!: string;
 
   @ApiProperty()
   @Recortado()
   @IsString()
-  @MinLength(1)
   @MaxLength(4000)
   justificacion!: string;
 
@@ -82,7 +89,6 @@ export class DefinicionPlanMejoraDto {
   @ApiProperty()
   @Recortado()
   @IsString()
-  @MinLength(1)
   @MaxLength(4000)
   recursos!: string;
 
@@ -90,14 +96,12 @@ export class DefinicionPlanMejoraDto {
   @ApiProperty()
   @Recortado()
   @IsString()
-  @MinLength(1)
   @MaxLength(4000)
   metas!: string;
 
   @ApiProperty()
   @Recortado()
   @IsString()
-  @MinLength(1)
   @MaxLength(300)
   responsable!: string;
 }
