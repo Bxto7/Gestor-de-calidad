@@ -6,7 +6,7 @@
 
 **Architecture:** Mismo patrón que `mejora-continua/evaluacion` (el más reciente y el más cercano: sin operación "duplicar", worker por `Record<ModuloDeDocumentos, GeneradorDeDocumentos>`, dos clases separadas `Generar.../Consultar...`). Diverge de evaluación en un solo punto, decidido con el usuario: la copia de "nueva versión" conserva el seguimiento completo (evidencias, logro de meta, impacto, estado de implementación), no solo la definición.
 
-**Tech Stack:** NestJS 11, Prisma 7, BullMQ sobre Redis, `pdfkit`, `exceljs`, Jest (backend), Vitest (frontend), Testcontainers para integración.
+**Tech Stack:** NestJS 11, Prisma 7, BullMQ sobre Redis, `pdfkit`, `exceljs`, Vitest (backend y frontend — no Jest, pese a lo que dice CLAUDE.md §4.2; confirmado corriendo `npm test` en el worktree: `apps/api/package.json` y `apps/web/package.json` invocan `vitest run`), Playwright + `@axe-core/playwright` para E2E y accesibilidad, Testcontainers para integración.
 
 **Spec:** `docs/superpowers/specs/2026-09-13-plan-mejora-2c-j-c-design.md`
 
@@ -368,7 +368,7 @@ describe('lo que se copia', () => {
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/domain/services/copia-de-plan-mejora.spec.ts
+npx vitest run src/modules/mejora-continua/mejora/domain/services/copia-de-plan-mejora.spec.ts
 ```
 
 Expected: FAIL — no existe el módulo.
@@ -469,7 +469,7 @@ Ajustar la forma del constructor a la que ya usen las demás clases del archivo 
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/domain/
+npx vitest run src/modules/mejora-continua/mejora/domain/
 npm run typecheck && npm run lint && npm run format:check
 git add apps/api/src/modules/mejora-continua/mejora/domain/
 git commit -m "feat(mejora): la nueva versión conserva el seguimiento completo"
@@ -607,7 +607,7 @@ describe('formato', () => {
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/domain/documentos/
+npx vitest run src/modules/mejora-continua/mejora/domain/documentos/
 ```
 
 Expected: FAIL — no existe el módulo.
@@ -730,7 +730,7 @@ export function armarDocumentoMejora(
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/domain/
+npx vitest run src/modules/mejora-continua/mejora/domain/
 ```
 
 Expected: PASS, 7 pruebas nuevas.
@@ -801,7 +801,7 @@ export class DocumentoMejoraSolicitado extends EventoMejora {
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/
+npx vitest run src/modules/mejora-continua/mejora/
 npm run typecheck && npm run lint && npm run format:check
 git add apps/api/src/modules/mejora-continua/mejora/domain/ apps/api/src/modules/mejora-continua/mejora/application/ports/documentos-mejora.port.ts
 git commit -m "feat(mejora): qué dice el documento y su puerto"
@@ -1223,7 +1223,7 @@ describe('RF-PJ-037 — el linaje', () => {
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.spec.ts
+npx vitest run src/modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.spec.ts
 ```
 
 Expected: FAIL — no existe el módulo.
@@ -1340,7 +1340,7 @@ Si `plan.version` no está expuesto en `DatosPlanMejora` (ver la nota de la Task
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/
+npx vitest run src/modules/mejora-continua/mejora/
 npm run typecheck && npm run lint && npm run format:check
 git add apps/api/src/modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.use-case.ts apps/api/src/modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.spec.ts
 git commit -m "feat(mejora): generar nueva versión y consultar el linaje"
@@ -1382,7 +1382,7 @@ describe('RF-PJ-032 — generar', () => {
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/application/use-cases/generar-documento-mejora.spec.ts
+npx vitest run src/modules/mejora-continua/mejora/application/use-cases/generar-documento-mejora.spec.ts
 ```
 
 Expected: FAIL — no existe el módulo.
@@ -1603,7 +1603,7 @@ export class ConsultarDocumentoMejora {
 
 ```bash
 cd apps/api
-npx jest src/modules/mejora-continua/mejora/
+npx vitest run src/modules/mejora-continua/mejora/
 npm run typecheck && npm run lint && npm run format:check
 git add apps/api/src/modules/mejora-continua/mejora/application/use-cases/generar-documento-mejora.use-case.ts apps/api/src/modules/mejora-continua/mejora/application/use-cases/generar-documento-mejora.spec.ts
 git commit -m "feat(mejora): generar y consultar los documentos del plan"
@@ -2172,11 +2172,10 @@ Expected: PASS.
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { axe } from 'jest-axe'; // o el helper que ya use el resto del repo
 import { describe, expect, it } from 'vitest';
 
-// … helpers de montaje: mismo patrón que PlanEvaluacionPage.test.tsx, con
-// un QueryClientProvider + MemoryRouter + mocks de useParams/id.
+// … helpers de montaje: QueryClientProvider + MemoryRouter + mocks de
+// useParams/id, mismo patrón que otros `*Page.test.tsx` del módulo.
 
 describe('pestañas ARIA', () => {
   it('cinco pestañas: Definición, Seguimiento, Documentos, Versiones, Historial', () => {
@@ -2194,15 +2193,10 @@ describe('pestañas ARIA', () => {
     expect(screen.getByRole('tab', { name: /documentos/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /definición/i })).toHaveAttribute('aria-selected', 'false');
   });
-
-  it('sin violaciones de accesibilidad', async () => {
-    const { container } = montar();
-    expect(await axe(container)).toHaveNoViolations();
-  });
 });
 ```
 
-Si el repo ya tiene un helper `axe`/`jest-axe` para otras páginas con pestañas (`PlanEvaluacionPage.test.tsx` casi seguro lo usa — leerlo primero), reutilizarlo tal cual en vez de configurar uno nuevo.
+**Corrección de preflight (controlador, 13 sept.):** el plan original asumía `jest-axe` y un `PlanEvaluacionPage.test.tsx` que no existen en este repo. Verificado en el worktree: no hay dependencia `jest-axe`/`axe-core` en `apps/web/package.json`, y `PlanEvaluacionPage.test.tsx` no existe. La accesibilidad WCAG 2.1 AA se verifica con `@axe-core/playwright` **solo en E2E**, vía `tests/e2e/fixtures/axe.ts` (función `analizar(page, donde)`) y `tests/e2e/specs/accesibilidad.spec.ts` — que ya tiene `test('el listado de planes de mejora', ...)` y `test('el detalle de un plan de mejora', ...)`. No hay assertion de axe a nivel de componente en ningún `*.test.tsx` del repo; no se introduce una aquí. Los nuevos Steps 5-6 de abajo extienden ese fichero E2E en vez de un test de componente.
 
 - [ ] **Step 2: Ejecutar y comprobar que falla**
 
@@ -2235,7 +2229,55 @@ cd apps/web
 npx vitest run src/features/mejora-continua/pages/PlanMejoraPage.test.tsx
 ```
 
-- [ ] **Step 5: Verificar en el navegador**
+- [ ] **Step 5: Extender la suite de accesibilidad E2E con las pestañas nuevas**
+
+En `tests/e2e/specs/accesibilidad.spec.ts`, junto al test existente `'el detalle de un plan de mejora'`, añadir dos pruebas que mirroring las que ya existen para Evaluación (`'la pestaña de documentos del plan de evaluación, con un PDF ya generado'` y, dentro de `test.describe('con la cuenta que aprueba', ...)`, `'la pestaña de versiones del plan de evaluación, con un linaje real'`):
+
+```ts
+test('la pestaña de documentos del plan de mejora, con un PDF ya generado', async ({ page }) => {
+  await page.goto('/mejora-continua/mejora');
+  await page.getByRole('button', { name: 'Nuevo plan de mejora' }).click();
+  const modal = page.getByRole('dialog');
+  await modal.getByLabel('Aspecto').selectOption('CRITERIO_ACREDITACION');
+  await modal.getByLabel('Elemento').selectOption({ index: 1 });
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Documentos' }).click();
+  await page.getByRole('button', { name: 'Generar PDF' }).click();
+  await expect(page.getByText('Listo')).toBeVisible({ timeout: 30_000 });
+
+  await analizar(page, 'la pestaña de documentos del plan de mejora');
+});
+```
+
+Para la pestaña de Versiones, verificar primero qué permiso exige `generarNuevaVersion` (Task 5) — en Mejora es `mejora.crear`, no una aprobación separada como en Evaluación (`evaluacion.aprobar`), así que probablemente **no** hace falta el bloque `test.describe('con la cuenta que aprueba', ...)`: alcanza con transicionar el plan a Aprobado/Vigente/Histórico con el rol por defecto si ya tiene `mejora.aprobar`, o añadir `test.use({ rol: '<el que corresponda' })` solo si la cuenta por defecto no alcanza — confirmar contra `tests/e2e/fixtures/sesion.ts` y la política de autorización antes de escribir el test, no asumirlo:
+
+```ts
+test('la pestaña de versiones del plan de mejora, con un linaje real', async ({ page }) => {
+  // … crear el plan, transicionar a Aprobado (mismo patrón que arriba, más
+  // 'Enviar a revisión' + 'Aprobar'), luego:
+  await page.getByRole('tab', { name: 'Versiones' }).click();
+  await page.getByRole('button', { name: 'Generar nueva versión' }).click();
+
+  await expect(page).toHaveURL(/\/mejora-continua\/mejora\/[a-f0-9-]+$/);
+  await page.getByRole('tab', { name: 'Versiones' }).click();
+  await expect(page.getByText(/viendo esta/i).or(page.getByRole('link', { name: /^PJ-/ }))).toBeVisible();
+
+  await analizar(page, 'la pestaña de versiones del plan de mejora');
+});
+```
+
+- [ ] **Step 6: Ejecutar la suite de accesibilidad E2E**
+
+```bash
+cd apps/api && npm run start:worker &
+cd ../../tests/e2e && SGC_E2E_PASSWORD='E2E.Pruebas.2026!' npx playwright test accesibilidad.spec.ts
+```
+
+Expected: PASS, incluidas las dos pruebas nuevas — sin violaciones WCAG 2.1 AA en ninguna pestaña.
+
+- [ ] **Step 7: Verificar en el navegador**
 
 ```bash
 cd apps/web && npm run dev
@@ -2243,11 +2285,12 @@ cd apps/web && npm run dev
 
 Abrir un plan de mejora existente, recorrer las cinco pestañas con teclado (Tab, flechas si el patrón ARIA las implementa, Enter/Espacio) y confirmar que cada contenido sigue funcionando: editar la definición en Borrador, cargar una evidencia, generar un PDF, generar una nueva versión y verla en el linaje, ver el historial.
 
-- [ ] **Step 6: Verificar y commitear**
+- [ ] **Step 8: Verificar y commitear**
 
 ```bash
 cd apps/web && npm run typecheck && npm run lint && npm run format:check && npm test && npm run build
-git add apps/web/src/features/mejora-continua/pages/PlanMejoraPage.tsx apps/web/src/features/mejora-continua/pages/PlanMejoraPage.test.tsx
+cd ../../tests/e2e && npm run typecheck && npm run format:check
+git add apps/web/src/features/mejora-continua/pages/PlanMejoraPage.tsx apps/web/src/features/mejora-continua/pages/PlanMejoraPage.test.tsx tests/e2e/specs/accesibilidad.spec.ts
 git commit -m "feat(mejora): PlanMejoraPage a pestañas ARIA con Documentos y Versiones"
 ```
 
