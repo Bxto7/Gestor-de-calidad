@@ -22,6 +22,16 @@
  * Desde la Task 7 (2c-C) deja además un segundo plan de medición, Indirecta y
  * ya Aprobado, para el recorrido E2E de la configuración indirecta
  * (RF-PE-022 a RF-PE-030): ver `planDeMedicionIndirectaAprobada`.
+ *
+ * Desde la Task 7 de Plan de Mejora (2c-J-E) deja además un Criterio de
+ * Acreditación y un Objetivo Educacional, activos, para los aspectos
+ * Criterio/Objetivo del recorrido E2E de ese submódulo: sin ellos el modal de
+ * alta (`ModalNuevoPlanMejora.tsx`) no tiene ningún elemento que ofrecer en
+ * esos dos aspectos. Ver `criterioYObjetivoDePrueba`. El aspecto Competencia
+ * no necesita nada nuevo aquí: reutiliza el plan de evaluación Directa que
+ * `configuracion-evaluacion.spec.ts` deja Vigente antes de que
+ * `plan-mejora.spec.ts` corra (este fichero corre después en orden
+ * alfabético).
  */
 
 import { existsSync } from 'node:fs';
@@ -191,13 +201,50 @@ async function main(): Promise<void> {
 
   await planDeMedicionVigente(plan.id);
   await planDeMedicionIndirectaAprobada(plan.id);
+  await criterioYObjetivoDePrueba(carrera.id);
 
   console.log(
     `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias y ` +
       `${ASIGNATURAS.length} asignaturas, un plan de medición vigente de partida con una ` +
       'competencia programada en ambos periodos, y un plan de medición Indirecta Aprobado ' +
-      'con dos años.',
+      'con dos años, más un Criterio de Acreditación y un Objetivo Educacional activos para ' +
+      'los aspectos de Plan de Mejora.',
   );
+}
+
+/**
+ * Un Criterio de Acreditación (de la carrera E2E) y un Objetivo Educacional
+ * (catálogo institucional, sin carrera propia — ver el comentario de
+ * `ObjetivoEducacional` en el schema), ambos ACTIVO.
+ *
+ * Los necesita el recorrido E2E de los tres aspectos de Plan de Mejora
+ * (Task 7, 2c-J-E): sin al menos uno de cada, el desplegable "Elemento" del
+ * modal de alta no tiene nada que ofrecer para CRITERIO_ACREDITACION ni para
+ * OBJETIVO_EDUCACIONAL, y esos dos recorridos no se pueden escribir.
+ *
+ * Nombres reconocibles (`C-E2E-01`, `OE-E2E-01`) para que un fallo en pantalla
+ * sea legible sin tener que ir a la base de datos a averiguar qué se creó.
+ */
+async function criterioYObjetivoDePrueba(carreraId: string): Promise<void> {
+  await prisma.criterioAcreditacion.upsert({
+    where: { carreraId_codigo: { carreraId, codigo: 'C-E2E-01' } },
+    update: { nombre: 'Criterio de acreditación de prueba', estado: 'ACTIVO' },
+    create: {
+      carreraId,
+      codigo: 'C-E2E-01',
+      nombre: 'Criterio de acreditación de prueba',
+    },
+  });
+
+  await prisma.objetivoEducacional.upsert({
+    where: { codigo: 'OE-E2E-01' },
+    update: { nombre: 'Objetivo educacional de prueba', estado: 'ACTIVO' },
+    create: {
+      codigo: 'OE-E2E-01',
+      nombre: 'Objetivo educacional de prueba',
+      descripcion: 'Objetivo educacional sembrado para la suite E2E.',
+    },
+  });
 }
 
 /**

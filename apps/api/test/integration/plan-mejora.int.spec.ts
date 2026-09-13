@@ -250,6 +250,25 @@ describe('el repositorio', () => {
       expect(await repo.codigosDe('CRITERIO_ACREDITACION', critX)).toEqual(['PJ-DUP', 'PJ-DUP']);
     });
   });
+
+  describe('listarDeCarrera', () => {
+    it('lista solo los de la carrera pedida, más reciente primero', async () => {
+      const carreraA = randomUUID();
+      const carreraB = randomUUID();
+      const primero = await crearPlan({ codigo: 'PJ-1', carreraId: carreraA });
+      await new Promise((r) => setTimeout(r, 10));
+      const segundo = await crearPlan({ codigo: 'PJ-2', carreraId: carreraA });
+      await crearPlan({ codigo: 'PJ-3', carreraId: carreraB });
+
+      const listado = await repo.listarDeCarrera(carreraA);
+
+      expect(listado.map((p) => p.id)).toEqual([segundo.id, primero.id]);
+    });
+
+    it('una carrera sin planes devuelve una lista vacía', async () => {
+      expect(await repo.listarDeCarrera(randomUUID())).toEqual([]);
+    });
+  });
 });
 
 /**

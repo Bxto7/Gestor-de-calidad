@@ -327,6 +327,15 @@ export class PlanMejoraRepositoryPrisma implements RepositorioPlanMejoraPort, Im
     return aDatos(fila);
   }
 
+  async listarDeCarrera(carreraId: string): Promise<DatosPlanMejora[]> {
+    const filas = await this.prisma.planMejora.findMany({
+      where: { carreraId },
+      select: SELECCION,
+      orderBy: { creadoEn: 'desc' },
+    });
+    return filas.map(aDatos);
+  }
+
   /** `ImpactoPlanMejoraPort` (RF132, §2f del diseño de 2c-J-B). */
   async contarVinculados(aspecto: AspectoPlanMejora, elementoId: string): Promise<number> {
     return this.prisma.planMejora.count({

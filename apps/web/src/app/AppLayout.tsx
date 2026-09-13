@@ -7,7 +7,7 @@
  * Informática") viven en los datos, no en la URL.
  */
 
-import { useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
@@ -61,6 +61,13 @@ const ENLACES: {
     permiso: 'evaluacion.leer',
   },
   {
+    a: '/mejora-continua/mejora',
+    etiqueta: 'Planes de Mejora',
+    icono: IconoPlan,
+    exacto: false,
+    permiso: 'mejora.leer',
+  },
+  {
     a: '/reportes',
     etiqueta: 'Reportes',
     icono: IconoReportes,
@@ -110,12 +117,26 @@ export function AppLayout() {
     return (primera + ultima).toUpperCase();
   }, [identidad]);
 
+  // `publicar` debe conservar su identidad entre renders: si cambiara cada vez
+  // que se llama (como pasaba antes, al depender de `encabezado` a través del
+  // `useMemo` de más abajo), cualquier pantalla que la invoque dentro de un
+  // `useEffect` con `publicar` en las dependencias (el patrón de todas las
+  // páginas de detalle) entra en un bucle infinito: publicar → cambia
+  // `encabezado` → nueva `publicar` → el efecto la ve distinta y se vuelve a
+  // disparar → publicar otra vez. Ese bucle nunca lanza un error — cada
+  // render pinta lo mismo—, pero mantiene a React ocupado con actualizaciones
+  // urgentes sin parar. Eso es lo que dejaba sin oportunidad de confirmarse a
+  // la transición de baja prioridad con la que React Router (BrowserRouter,
+  // por defecto desde la v7) envuelve el cambio de ubicación: la navegación
+  // cambiaba la URL pero la pantalla nueva nunca llegaba a montarse.
+  const publicar = useCallback<ContextoEncabezado['publicar']>(
+    (e) => setEncabezado((prev) => ({ ...prev, ...e })),
+    [],
+  );
+
   const valor = useMemo<ContextoEncabezado>(
-    () => ({
-      ...encabezado,
-      publicar: (e) => setEncabezado((prev) => ({ ...prev, ...e })),
-    }),
-    [encabezado],
+    () => ({ ...encabezado, publicar }),
+    [encabezado, publicar],
   );
 
   return (

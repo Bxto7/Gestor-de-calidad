@@ -13,7 +13,9 @@ import {
   describirTransicion,
   permiteEdicion,
   permiteEdicionDefinicionEvaluacion,
+  permiteEdicionDefinicionMejora,
   permiteEdicionSeguimientoEvaluacion,
+  permiteEdicionSeguimientoMejora,
   permiteEliminacion,
   permiteVersionado,
   transicionesDisponibles,
@@ -117,6 +119,42 @@ describe('RF-PE-006 — la definición y el seguimiento de una evaluación exige
     it('Aprobado e Histórico quedan fuera aunque haya permiso', () => {
       expect(permiteEdicionSeguimientoEvaluacion('Aprobado', true)).toBe(false);
       expect(permiteEdicionSeguimientoEvaluacion('Histórico', true)).toBe(false);
+    });
+  });
+});
+
+describe('RF-PJ-006/007/014-019 — la definición y el seguimiento de un plan de mejora exigen permiso', () => {
+  // Mismo riesgo que en RF-PE-006: sin la mitad del permiso, la pantalla
+  // habilitaría campos que el backend rechazaría igual — trabajo perdido para
+  // quien solo tiene `mejora.leer`, descubierto tras el 403.
+  describe('permiteEdicionDefinicionMejora', () => {
+    it('en Borrador, depende exclusivamente del permiso', () => {
+      expect(permiteEdicionDefinicionMejora('Borrador', true)).toBe(true);
+      expect(permiteEdicionDefinicionMejora('Borrador', false)).toBe(false);
+    });
+
+    it('fuera de Borrador es siempre falso, tenga o no el permiso', () => {
+      for (const estado of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+        expect(permiteEdicionDefinicionMejora(estado, true)).toBe(false);
+        expect(permiteEdicionDefinicionMejora(estado, false)).toBe(false);
+      }
+    });
+  });
+
+  describe('permiteEdicionSeguimientoMejora', () => {
+    it('también Vigente, no solo Borrador, siempre que haya permiso', () => {
+      expect(permiteEdicionSeguimientoMejora('Borrador', true)).toBe(true);
+      expect(permiteEdicionSeguimientoMejora('Vigente', true)).toBe(true);
+    });
+
+    it('sin el permiso, ni Borrador ni Vigente lo admiten', () => {
+      expect(permiteEdicionSeguimientoMejora('Borrador', false)).toBe(false);
+      expect(permiteEdicionSeguimientoMejora('Vigente', false)).toBe(false);
+    });
+
+    it('Aprobado e Histórico quedan fuera aunque haya permiso', () => {
+      expect(permiteEdicionSeguimientoMejora('Aprobado', true)).toBe(false);
+      expect(permiteEdicionSeguimientoMejora('Histórico', true)).toBe(false);
     });
   });
 });

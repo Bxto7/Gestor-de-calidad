@@ -149,6 +149,7 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
     parametros: async () => parametros(),
     registrarImpactoEnMedicion: async (_id, planMedicionAfectadoId) =>
       plan({ planMedicionAfectadoId }),
+    listarDeCarrera: async () => [],
     ...sobre,
   };
 }
@@ -365,6 +366,25 @@ describe('la lectura', () => {
     const { caso } = montar({ planes: { porId: async () => null } });
 
     await expect(caso.porId(ACTOR, 'pj-inexistente')).rejects.toThrow(NoEncontrado);
+  });
+});
+
+describe('el listado', () => {
+  it('devuelve lo que el repositorio lista para esa carrera', async () => {
+    const unPlan = plan({ id: 'pj-listado' });
+    const { caso } = montar({ planes: { listarDeCarrera: async () => [unPlan] } });
+
+    const listado = await caso.listar(ACTOR, CARRERA);
+
+    expect(listado).toEqual([unPlan]);
+  });
+
+  it('exige `mejora.leer`', async () => {
+    const pedidos: string[] = [];
+    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+
+    await expect(caso.listar(ACTOR, CARRERA)).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toEqual(['mejora.leer']);
   });
 });
 

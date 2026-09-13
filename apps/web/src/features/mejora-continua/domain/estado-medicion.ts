@@ -126,6 +126,31 @@ export function permiteEdicionSeguimientoEvaluacion(
 }
 
 /**
+ * RF-PJ-006/007: la definición del plan de mejora solo se toca en Borrador,
+ * y solo con `mejora.editar` — mismo par de condiciones que su gemela de
+ * evaluación, para no habilitar campos que el backend rechazaría igual.
+ */
+export function permiteEdicionDefinicionMejora(
+  estado: EstadoMedicion,
+  puedeEditar: boolean,
+): boolean {
+  return permiteEdicion(estado) && puedeEditar;
+}
+
+/**
+ * RF-PJ-014 a RF-PJ-019: el seguimiento (implementación, evidencias,
+ * retroalimentación) se admite en Borrador y en Vigente — el mismo par de
+ * estados que el seguimiento de evaluación, por el mismo motivo: quien
+ * ejecuta la acción sigue avanzando aunque el plan ya esté Vigente.
+ */
+export function permiteEdicionSeguimientoMejora(
+  estado: EstadoMedicion,
+  puedeEditar: boolean,
+): boolean {
+  return (estado === 'Borrador' || estado === 'Vigente') && puedeEditar;
+}
+
+/**
  * El tono del badge de cada estado.
  *
  * Vive aquí y no en una pantalla porque lo usan tres: el listado, el detalle y

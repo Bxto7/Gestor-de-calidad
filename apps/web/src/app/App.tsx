@@ -14,6 +14,8 @@ import { PlanesMedicionPage } from '@/features/mejora-continua/pages/PlanesMedic
 import { PlanMedicionPage } from '@/features/mejora-continua/pages/PlanMedicionPage';
 import { PlanesEvaluacionPage } from '@/features/mejora-continua/pages/PlanesEvaluacionPage';
 import { PlanEvaluacionPage } from '@/features/mejora-continua/pages/PlanEvaluacionPage';
+import { PlanesMejoraPage } from '@/features/mejora-continua/pages/PlanesMejoraPage';
+import { PlanMejoraPage } from '@/features/mejora-continua/pages/PlanMejoraPage';
 import { AtributosPage } from '@/features/acreditacion/pages/AtributosPage';
 import { CriteriosPage } from '@/features/acreditacion/pages/CriteriosPage';
 import { ObjetivosPage } from '@/features/plan-estudios/pages/ObjetivosPage';
@@ -73,6 +75,8 @@ export function App() {
                 <Route path="mejora-continua/medicion/:id" element={<PlanMedicionPage />} />
                 <Route path="mejora-continua/evaluacion" element={<PlanesEvaluacionPage />} />
                 <Route path="mejora-continua/evaluacion/:id" element={<PlanEvaluacionPage />} />
+                <Route path="mejora-continua/mejora" element={<PlanesMejoraPage />} />
+                <Route path="mejora-continua/mejora/:id" element={<PlanMejoraPage />} />
                 <Route path="reportes" element={<ReportesPage />} />
                 <Route path="reportes/planes/:planId" element={<ReportePlanPage />} />
                 <Route path="usuarios" element={<UsuariosPage />} />

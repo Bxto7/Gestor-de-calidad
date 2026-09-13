@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { claves, clavesEval } from './queries';
+import { claves, clavesEval, clavesMejora } from './queries';
 
 describe('claves.planes — Planes de Medición', () => {
   it('cambia con el tipo, aunque el resto del filtro sea igual', () => {
@@ -43,5 +43,14 @@ describe('clavesEval.lista — Planes de Evaluación', () => {
     const conTexto = clavesEval.lista({ texto: 'ingeniería' });
 
     expect(sinTexto).not.toEqual(conTexto);
+  });
+});
+
+describe('clavesMejora.lista — Planes de Mejora', () => {
+  it('cambia con la carrera', () => {
+    const a = clavesMejora.lista('carrera-a');
+    const b = clavesMejora.lista('carrera-b');
+
+    expect(a).not.toEqual(b);
   });
 });

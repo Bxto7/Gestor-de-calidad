@@ -158,6 +158,29 @@ test('la pestaña de documentos del plan de evaluación, con un PDF ya generado'
   await analizar(page, 'la pestaña de documentos del plan de evaluación');
 });
 
+test('el listado de planes de mejora', async ({ page }) => {
+  await page.goto('/mejora-continua/mejora');
+  await expect(page.getByRole('heading', { name: 'Planes de Mejora' })).toBeVisible();
+
+  await analizar(page, 'el listado de planes de mejora');
+});
+
+test('el detalle de un plan de mejora', async ({ page }) => {
+  // Con contenido real: este fichero corre alfabéticamente antes que
+  // `plan-mejora.spec.ts`, así que todavía no hay ningún plan de mejora
+  // sembrado — se crea uno al vuelo, igual que `crearPlanEvaluacion` de más
+  // arriba hace para Documentos y Versiones.
+  await page.goto('/mejora-continua/mejora');
+  await page.getByRole('button', { name: 'Nuevo plan de mejora' }).click();
+  const modal = page.getByRole('dialog');
+  await modal.getByLabel('Aspecto').selectOption('CRITERIO_ACREDITACION');
+  await modal.getByLabel('Elemento').selectOption({ index: 1 });
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+
+  await analizar(page, 'el detalle del plan de mejora');
+});
+
 test.describe('con la cuenta que aprueba', () => {
   // Generar una versión exige `evaluacion.crear` y aprobar exige
   // `evaluacion.aprobar`; la cuenta por defecto no tiene el segundo.

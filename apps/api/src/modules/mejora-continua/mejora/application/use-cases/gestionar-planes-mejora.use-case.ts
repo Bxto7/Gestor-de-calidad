@@ -129,6 +129,11 @@ export class GestionarPlanesMejora {
     return this.exigirPlan(id);
   }
 
+  async listar(actor: Actor, carreraId: string): Promise<readonly DatosPlanMejora[]> {
+    await this.exigir(actor, 'mejora.leer', null);
+    return this.planes.listarDeCarrera(carreraId);
+  }
+
   /**
    * RF-PJ-001 a RF-PJ-003 y RF-PJ-020/023/026 a 029: el alta, con la
    * carrera real del actor y la validación por aspecto (§2a y §5 del
