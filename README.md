@@ -253,21 +253,29 @@ artefactos de compilación viven fuera del control de versiones.
   es lo que ocurrió en un periodo concreto y no se hereda; el linaje se
   consulta de la más reciente a la más antigua, y una versión histórica se abre
   en solo lectura.
-- Submódulo **Planes de Mejora, 39 de 47 (RF-PJ-001 a RF-PJ-038)**: acciones de
-  mejora sobre los tres aspectos —Criterio de Acreditación, Objetivo
-  Educacional y Competencia—, cada una con su propio ciclo de vida
+- Submódulo **Planes de Mejora, 47 de 47 (RF-PJ-000 a RF-PJ-046 — completo)**:
+  acciones de mejora sobre los tres aspectos —Criterio de Acreditación,
+  Objetivo Educacional y Competencia—, cada una con su propio ciclo de vida
   (`mejora.*`) y bitácora; definición guardada campo por campo desde Borrador
   (RF-PJ-006, sin exigir los seis campos de texto a la vez); seguimiento
   —estado de implementación, evidencias, logro de meta e impacto— editable
-  también con el plan Vigente (RF-PJ-014 a RF-PJ-019); y, del ciclo 2c-J-C:
+  también con el plan Vigente (RF-PJ-014 a RF-PJ-019); del ciclo 2c-J-C:
   **documentos** (RF-PJ-032 a RF-PJ-034, PDF y Excel por la misma cola de
   BullMQ que Medición y Evaluación), **versionado** (RF-PJ-035 a RF-PJ-037:
   una sola operación que conserva íntegro tanto la definición como el
   seguimiento —evidencias, logro de meta, impacto, estado de implementación—
   de la versión origen, a diferencia de Evaluación, que descarta el
   seguimiento; y deja el linaje en solo lectura) y **búsqueda y filtros** por
-  texto, aspecto, estado
-  de implementación y estado documental (RF-PJ-038).
+  texto, aspecto, estado de implementación y estado documental (RF-PJ-038);
+  y, del cierre del flujo de aprobación (RF-PJ-039 a RF-PJ-046): enviar a
+  revisión, aprobar y rechazar/observar reusando la misma máquina de estados
+  y el mismo permiso por acción que Medición y Evaluación, con su propio
+  **motor de validación integral de consistencia** (RF-PJ-042 —completitud de
+  la definición, y de la retroalimentación solo cuando el estado de
+  implementación es 'Completado'— gateando enviar a revisión y aprobar, mismo
+  patrón que RF-PE-041), y restricción de roles, sesión y auditoría
+  transversales (RF-PJ-043 a RF-PJ-046) sobre el mismo mecanismo
+  `AuthorizationPort`/bitácora que ya usa todo el módulo.
 - Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
   aviso de impacto al editar un atributo que ya usan competencias o planes
   (RF120–RF123, RF128–RF132).
@@ -276,7 +284,7 @@ artefactos de compilación viven fuera del control de versiones.
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
   estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
   queda ningún almacén en memoria.
-- Pruebas en verde: 1036 unitarias en la API, 265 en el frontend, 320 de
+- Pruebas en verde: 1056 unitarias en la API, 265 en el frontend, 320 de
   integración en diecinueve suites contra un PostgreSQL real y desechable, y
   50 recorridos E2E con Playwright —trece de ellos con `axe-core` sobre WCAG
   2.1 AA—. Los guiones de carga k6 viven en `tests/carga/`.

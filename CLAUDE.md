@@ -30,8 +30,8 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 11 de septiembre de 2026: **201 de 243 requisitos contables construidos**,
-> un 83 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> Al 14 de septiembre de 2026: **216 de 243 requisitos contables construidos**,
+> un 89 %. El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
 >
@@ -41,7 +41,7 @@ Se están construyendo **en paralelo**:
 > | Atributos del Graduado y Criterios (`RF120`–`RF132`) | 13 | 13 |
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
 > | Mejora Continua · Evaluación (`RF-PE`) | 49 | 49 |
-> | Mejora Continua · Planes de Mejora (`RF-PJ`) | 32 | 47 |
+> | Mejora Continua · Planes de Mejora (`RF-PJ`) | 47 | 47 |
 > | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
 >
 > La cuenta sale de cruzar los `RF-` distintos del documento fuente con sus
@@ -64,15 +64,19 @@ Se están construyendo **en paralelo**:
 >   justificación, `015` estado de implementación y `030` guardado por periodo
 >   están construidos —`causaRaiz`, `estadoImplementacion` y `periodoId` en el
 >   modelo `PlanMejora`— sin comentario que los nombre.
-> - **Citado sin construir.** `RF-PE-041` dejó de serlo el 9 de septiembre de
->   2026 (ciclo 2c-D): la validación integral de consistencia reemplazó el
->   placeholder de `transicionar` que solo citaba el requisito. El relevo lo
->   toman dos `RF-PJ`, y ambos son referencias honestas, no descuidos:
->   `RF-PJ-038` (buscar y filtrar) lo aplaza `planes-mejora.controller.ts:5` al
->   ciclo 2c-J-C con esas palabras, y `RF-PJ-042` (validación integral) aparece
->   solo en un comentario del esquema que explica por qué `input` y `causaRaiz`
->   son campos distintos. Quien cuente citaciones a secas los dará por
->   construidos y se pasará de dos.
+> - **Citado sin construir (histórico, ya resuelto).** `RF-PE-041` dejó de
+>   serlo el 9 de septiembre de 2026 (ciclo 2c-D). El relevo lo tomaron dos
+>   `RF-PJ`, y los dos ya se cerraron: `RF-PJ-038` (buscar y filtrar) se
+>   construyó en el ciclo 2c-J-C (11–13 de septiembre), y `RF-PJ-042`
+>   (validación integral) se construyó el 14 de septiembre de 2026 con su
+>   propio `motor-de-consistencia.ts` en `mejora/domain/services/`, mismo
+>   patrón que `RF-PE-041`/`RF-PM-038` — reemplazando el placeholder de
+>   `transicionar` que solo citaba el requisito sin implementarlo. De paso se
+>   agregaron las citas que faltaban en el mismo caso de uso para `RF-PJ-039`
+>   a `RF-PJ-041` y `RF-PJ-043` a `RF-PJ-046`: los siete ya estaban
+>   construidos desde 2c-J-A/2c-J-B (vía `transicionar` y el patrón
+>   `exigir()`/bitácora que usa cada método), solo les faltaba el comentario
+>   que los nombrara. No queda ningún `RF-PJ` citado sin construir.
 >
 > El cruce sirve además para detectar erratas: destapó una prueba que decía
 > cubrir un `RF-PM-080` que no existe en ningún documento.
