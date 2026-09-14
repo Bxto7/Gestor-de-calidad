@@ -54,6 +54,7 @@ import type { AcreditacionPort } from '../../../../plan-estudios/application/por
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import {
   type AccionMedicion,
+  type EstadoMedicion,
   describirTransicion,
   intentarTransicion,
   permiteEdicion,
@@ -129,9 +130,19 @@ export class GestionarPlanesMejora {
     return this.exigirPlan(id);
   }
 
-  async listar(actor: Actor, carreraId: string): Promise<readonly DatosPlanMejora[]> {
+  /** RF-PJ-038: listado por carrera, con filtro opcional de texto/aspecto/estado. */
+  async listar(
+    actor: Actor,
+    carreraId: string,
+    filtro?: {
+      texto?: string;
+      aspecto?: AspectoPlanMejora;
+      estadoImplementacion?: EstadoImplementacion;
+      estado?: EstadoMedicion;
+    },
+  ): Promise<readonly DatosPlanMejora[]> {
     await this.exigir(actor, 'mejora.leer', null);
-    return this.planes.listarDeCarrera(carreraId);
+    return this.planes.listarDeCarrera(carreraId, filtro);
   }
 
   /**

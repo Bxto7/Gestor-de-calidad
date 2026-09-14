@@ -29,7 +29,11 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../../auth/infrastructure/http/jwt.guard.js';
+import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
 import { GestionarPlanesMejora } from '../../application/use-cases/gestionar-planes-mejora.use-case.js';
+import { VersionarPlanMejora } from '../../application/use-cases/versionar-plan-mejora.use-case.js';
+import type { AspectoPlanMejora } from '../../application/ports/plan-mejora.port.js';
+import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 import {
   CrearPlanMejoraDto,
   DefinicionPlanMejoraDto,
@@ -44,7 +48,10 @@ import {
 @ApiBearerAuth()
 @Controller('planes-mejora')
 export class PlanesMejoraController {
-  constructor(private readonly casos: GestionarPlanesMejora) {}
+  constructor(
+    private readonly casos: GestionarPlanesMejora,
+    private readonly versionar: VersionarPlanMejora,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear un plan de mejora (RF-PJ-001 a RF-PJ-003)' })
@@ -53,9 +60,16 @@ export class PlanesMejoraController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listado de planes de mejora de una carrera (RF-PJ-038, básico)' })
-  async listar(@ActorActual() actor: Actor, @Query('carreraId', ParseUUIDPipe) carreraId: string) {
-    return this.casos.listar(actor, carreraId);
+  @ApiOperation({ summary: 'Listado de planes de mejora, con búsqueda y filtros (RF-PJ-038)' })
+  async listar(
+    @ActorActual() actor: Actor,
+    @Query('carreraId', ParseUUIDPipe) carreraId: string,
+    @Query('texto') texto?: string,
+    @Query('aspecto') aspecto?: AspectoPlanMejora,
+    @Query('estadoImplementacion') estadoImplementacion?: EstadoImplementacion,
+    @Query('estado') estado?: EstadoMedicion,
+  ) {
+    return this.casos.listar(actor, carreraId, { texto, aspecto, estadoImplementacion, estado });
   }
 
   // Rutas estáticas antes de `:id/...` — si no, Nest les hace perder contra
@@ -134,6 +148,20 @@ export class PlanesMejoraController {
     @Body() dto: TransicionMejoraDto,
   ) {
     return this.casos.transicionar(actor, id, dto.accion, { comentario: dto.comentario });
+  }
+
+  @Post(':id/versiones')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Generar una nueva versión del plan de mejora (RF-PJ-035)' })
+  @ApiResponse({ status: 409, description: 'El plan no está aprobado, vigente ni histórico.' })
+  async nuevaVersion(@ActorActual() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.versionar.generarNuevaVersion(actor, id);
+  }
+
+  @Get(':id/versiones')
+  @ApiOperation({ summary: 'Consultar el linaje de versiones (RF-PJ-037)' })
+  async versiones(@ActorActual() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.versionar.versionesDe(actor, id);
   }
 
   @Patch(':id/implementacion')

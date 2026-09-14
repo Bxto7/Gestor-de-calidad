@@ -174,11 +174,25 @@ import {
 } from './modules/mejora-continua/mejora/application/ports/plan-mejora.port.js';
 import { IMPACTO_PLAN_MEJORA } from './modules/mejora-continua/mejora/application/ports/impacto-plan-mejora.port.js';
 import { GestionarPlanesMejora } from './modules/mejora-continua/mejora/application/use-cases/gestionar-planes-mejora.use-case.js';
+import { VersionarPlanMejora } from './modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.use-case.js';
 import { PlanMejoraRepositoryPrisma } from './modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
 import {
   EvidenciasPlanMejoraController,
   PlanesMejoraController,
 } from './modules/mejora-continua/mejora/infrastructure/http/planes-mejora.controller.js';
+import {
+  REPOSITORIO_DOCUMENTOS_MEJORA,
+  type RepositorioDocumentosMejoraPort,
+} from './modules/mejora-continua/mejora/application/ports/documentos-mejora.port.js';
+import { DocumentoMejoraRepositoryPrisma } from './modules/mejora-continua/mejora/infrastructure/persistence/documentos-mejora.repository.js';
+import {
+  ConsultarDocumentoMejora,
+  GenerarDocumentoMejora,
+} from './modules/mejora-continua/mejora/application/use-cases/generar-documento-mejora.use-case.js';
+import {
+  DocumentosDelPlanMejoraController,
+  DocumentosMejoraController,
+} from './modules/mejora-continua/mejora/infrastructure/http/documentos-mejora.controller.js';
 import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
@@ -330,6 +344,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     DocentesController,
     PlanesMejoraController,
     EvidenciasPlanMejoraController,
+    DocumentosDelPlanMejoraController,
+    DocumentosMejoraController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
     DocumentosDelPlanEvaluacionController,
@@ -637,6 +653,58 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         ),
     },
     {
+      provide: VersionarPlanMejora,
+      inject: [REPOSITORIO_PLAN_MEJORA, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        planes: RepositorioPlanMejoraPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new VersionarPlanMejora(planes, autorizacion, eventos),
+    },
+    { provide: REPOSITORIO_DOCUMENTOS_MEJORA, useClass: DocumentoMejoraRepositoryPrisma },
+    {
+      provide: GenerarDocumentoMejora,
+      inject: [
+        REPOSITORIO_DOCUMENTOS_MEJORA,
+        REPOSITORIO_PLAN_MEJORA,
+        COLA_DOCUMENTOS,
+        ALMACEN_ARCHIVOS,
+        RENDERIZADOR_PDF,
+        RENDERIZADOR_HOJA,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        documentos: RepositorioDocumentosMejoraPort,
+        planes: RepositorioPlanMejoraPort,
+        cola: ColaDeDocumentosPort,
+        almacen: AlmacenDeArchivosPort,
+        pdf: RenderizadorPdfPort,
+        hoja: RenderizadorHojaPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) =>
+        new GenerarDocumentoMejora(
+          documentos,
+          planes,
+          cola,
+          almacen,
+          pdf,
+          hoja,
+          autorizacion,
+          eventos,
+        ),
+    },
+    {
+      provide: ConsultarDocumentoMejora,
+      inject: [REPOSITORIO_DOCUMENTOS_MEJORA, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      useFactory: (
+        documentos: RepositorioDocumentosMejoraPort,
+        almacen: AlmacenDeArchivosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarDocumentoMejora(documentos, almacen, autorizacion),
+    },
+    {
       provide: VersionarPlanesMedicion,
       inject: [
         REPOSITORIO_PLAN_MEDICION,
@@ -907,15 +975,22 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       // tercero que genere documentos es una entrada más aquí, y nada en
       // `platform/`.
       provide: GENERADORES_DE_DOCUMENTOS,
-      inject: [GenerarDocumento, GenerarDocumentoMedicion, GenerarDocumentoEvaluacion],
+      inject: [
+        GenerarDocumento,
+        GenerarDocumentoMedicion,
+        GenerarDocumentoEvaluacion,
+        GenerarDocumentoMejora,
+      ],
       useFactory: (
         planEstudios: GenerarDocumento,
         medicion: GenerarDocumentoMedicion,
         evaluacion: GenerarDocumentoEvaluacion,
+        mejora: GenerarDocumentoMejora,
       ) => ({
         'plan-estudios': planEstudios,
         'mejora-continua': medicion,
         'mejora-continua-evaluacion': evaluacion,
+        'mejora-continua-mejora': mejora,
       }),
     },
     {
