@@ -63,9 +63,22 @@ export class VersionarPlanMejora {
     const yaUsados = await this.planes.codigosDe(origen.aspecto, ambitoId);
     const codigo = siguienteCodigoMejora(PREFIJO_POR_ASPECTO[origen.aspecto], yaUsados);
 
+    // El código de Mejora no lleva sufijo `-vN` del que derivar el
+    // correlativo (a diferencia de Medición y Evaluación, que sí lo tienen).
+    // `origen.version + 1` calcula "profundidad desde la raíz", no "cuántas
+    // veces se versionó este linaje": si el mismo plan se versiona dos veces
+    // (dos hijos del mismo origen — ramificación, que el esquema y
+    // `permiteVersionado` permiten porque el origen sigue en un estado
+    // elegible tras versionarse), ambos hijos calcularían el mismo número y
+    // colisionarían. El máximo del linaje entero sí es único por construcción:
+    // cada versión nueva queda por encima de cualquier otra ya creada a
+    // partir de la misma raíz, sin importar desde cuál de sus ramas se pidió.
+    const linaje = await this.planes.linajeDe(origen.id);
+    const version = Math.max(0, ...linaje.map((p) => p.version)) + 1;
+
     const creado = await this.planes.copiar({
       codigo,
-      version: (origen.version ?? 1) + 1,
+      version,
       derivadoDeId: origen.id,
       contenido: copiarPlanMejora(origen),
     });

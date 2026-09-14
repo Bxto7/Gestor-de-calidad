@@ -31,6 +31,7 @@ import type {
 import type { EstadoImplementacion } from '../../src/modules/mejora-continua/mejora/domain/value-objects/estado-implementacion.js';
 import { PlanMejoraRepositoryPrisma } from '../../src/modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
 import { GestionarPlanesMejora } from '../../src/modules/mejora-continua/mejora/application/use-cases/gestionar-planes-mejora.use-case.js';
+import { VersionarPlanMejora } from '../../src/modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.use-case.js';
 import { PlanEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
 import { ConfiguracionEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
 import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
@@ -432,6 +433,47 @@ describe('RF-PJ-037 — el linaje', () => {
         'PJ-CADENA-1',
       ]);
     }
+  });
+});
+
+/**
+ * Revisión final de rama (post 2c-J-C): `VersionarPlanMejora.generarNuevaVersion`
+ * calculaba `version` como `origen.version + 1` — "profundidad desde la raíz",
+ * no "cuántas veces se versionó este linaje". El esquema no impide ramificar
+ * (el origen sigue Vigente/Aprobado/Histórico después de versionarse una vez),
+ * así que dos "generar nueva versión" seguidas sobre el mismo origen producían
+ * dos hijos con el mismo `version`. La prueba de arriba (`repo.copiar` directo,
+ * con `version` fijado a mano) no lo detecta porque nunca pasa por ese
+ * cálculo — hace falta el caso de uso real contra Postgres real, no solo el
+ * repositorio.
+ */
+describe('RF-PJ-035 — ramificación real contra Postgres', () => {
+  const autorizacionPermiteTodo = {
+    puede: async () => ({ permitido: true }) as const,
+    permisosDe: async () => new Set<string>(),
+    carreraACargoDe: async () => null,
+  };
+  const eventos: PublicadorDeEventos = { async publicar() {} };
+  const casoVersionar = new VersionarPlanMejora(repo, autorizacionPermiteTodo, eventos);
+  const ACTOR = { id: randomUUID(), nombre: 'Actor de prueba' };
+
+  it('versionar el mismo plan dos veces produce dos hijos con version distinta', async () => {
+    const origen = await crearPlan({ codigo: 'PJ-RAMA-1' });
+    await repo.editarDefinicion(origen.id, DEFINICION);
+    await repo.actualizarImplementacion(origen.id, 'En proceso');
+    // `permiteVersionado` exige Aprobado/Vigente/Histórico — `crearPlan` nace
+    // en Borrador. Esta prueba no ejercita la máquina de transición en sí
+    // (RF-PJ-004/005, ya cubierta en `gestionar-planes-mejora.spec.ts`) sino
+    // la ramificación de versiones, así que basta con dejar el repo en un
+    // estado elegible directamente.
+    await repo.cambiarEstado(origen.id, 'Aprobado');
+
+    const hijo1 = await casoVersionar.generarNuevaVersion(ACTOR, origen.id);
+    const hijo2 = await casoVersionar.generarNuevaVersion(ACTOR, origen.id);
+
+    expect(hijo1.derivadoDeId).toBe(origen.id);
+    expect(hijo2.derivadoDeId).toBe(origen.id);
+    expect(hijo1.version).not.toBe(hijo2.version);
   });
 });
 

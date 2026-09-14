@@ -266,3 +266,46 @@ describe('RF-PJ-037 — el linaje', () => {
     await expect(caso.versionesDe(ACTOR, 'pj-1')).rejects.toThrow(AccesoDenegado);
   });
 });
+
+describe('RF-PJ-035 — ramificación: versionar el mismo origen más de una vez', () => {
+  it('dos versiones nacidas del mismo plan reciben números de version distintos', async () => {
+    // Revisión final de rama completa (post 2c-J-C): `origen.version + 1`
+    // calcula "profundidad desde la raíz", no "cuántas veces se versionó este
+    // linaje". El esquema y `permiteVersionado` sí permiten ramificar — el
+    // origen sigue Vigente/Aprobado/Histórico después de versionarse una vez
+    // —, así que dos llamadas seguidas sobre el mismo origen deben producir
+    // dos hijos con `version` distinta. Este repo doble es intencionalmente
+    // *con estado*, a diferencia de `montar()`, porque el propio origen del
+    // bug solo aparece cuando `linajeDe` refleja lo que ya se creó entre una
+    // llamada y la siguiente — un doble sin estado (como el `linajeDe: async
+    // () => [plan()]` por defecto de `montar()`) no lo habría detectado.
+    const origen = plan({ id: 'pj-1', estado: 'Vigente', version: 1, codigo: 'PJ-CRI-1' });
+    const creadas: DatosPlanMejora[] = [];
+
+    const repo: Partial<RepositorioPlanMejoraPort> = {
+      porId: async () => origen,
+      codigosDe: async () => [origen.codigo, ...creadas.map((p) => p.codigo)],
+      copiar: async (datos: DatosCopiar) => {
+        const nuevo = plan({
+          id: `pj-hijo-${creadas.length + 1}`,
+          codigo: datos.codigo,
+          version: datos.version,
+          derivadoDeId: datos.derivadoDeId,
+          estado: 'Borrador',
+        });
+        creadas.push(nuevo);
+        return nuevo;
+      },
+      linajeDe: async () => [origen, ...creadas],
+    };
+
+    const { caso } = montar({ repo });
+
+    const hijo1 = await caso.generarNuevaVersion(ACTOR, 'pj-1');
+    const hijo2 = await caso.generarNuevaVersion(ACTOR, 'pj-1');
+
+    expect(hijo1.derivadoDeId).toBe('pj-1');
+    expect(hijo2.derivadoDeId).toBe('pj-1');
+    expect(hijo1.version).not.toBe(hijo2.version);
+  });
+});

@@ -46,6 +46,19 @@ describe('la cabecera', () => {
     expect(texto).toContain('Criterio 4.2');
     expect(texto).toContain('Vigente');
   });
+
+  it('muestra la etiqueta legible del aspecto, distinta del nombre del elemento asociado', () => {
+    const documento = armarDocumentoMejora(datos(), 'pdf');
+
+    expect(documento.metadatos).toContainEqual({
+      etiqueta: 'Aspecto',
+      valor: 'Criterio de acreditación',
+    });
+    expect(documento.metadatos).toContainEqual({
+      etiqueta: 'Elemento asociado',
+      valor: 'Criterio 4.2 — Infraestructura',
+    });
+  });
 });
 
 describe('la definición', () => {

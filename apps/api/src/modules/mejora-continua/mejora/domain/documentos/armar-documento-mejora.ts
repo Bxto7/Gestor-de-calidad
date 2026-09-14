@@ -41,13 +41,21 @@ function fecha(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Etiqueta legible del aspecto — `datos.aspecto` es el nombre de la categoría, no del elemento asociado. */
+const ETIQUETA_ASPECTO: Record<DatosParaDocumentoMejora['aspecto'], string> = {
+  CRITERIO_ACREDITACION: 'Criterio de acreditación',
+  OBJETIVO_EDUCACIONAL: 'Objetivo educacional',
+  COMPETENCIA: 'Competencia',
+};
+
 export function armarDocumentoMejora(
   datos: DatosParaDocumentoMejora,
   formato: FormatoDocumentoMejora,
 ): Documento {
   const metadatos = [
     { etiqueta: 'Código', valor: datos.codigo },
-    { etiqueta: 'Aspecto', valor: datos.elementoNombre },
+    { etiqueta: 'Aspecto', valor: ETIQUETA_ASPECTO[datos.aspecto] },
+    { etiqueta: 'Elemento asociado', valor: datos.elementoNombre },
     { etiqueta: 'Estado documental', valor: datos.estado },
     { etiqueta: 'Estado de implementación', valor: datos.estadoImplementacion },
   ];
