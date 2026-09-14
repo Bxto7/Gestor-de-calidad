@@ -1,15 +1,17 @@
 /**
- * RF-PJ-004 a RF-PJ-019: el detalle de un plan de mejora — ciclo de vida,
- * elemento asociado, definición, seguimiento e historial.
+ * RF-PJ-004 a RF-PJ-019, RF-PJ-032 a RF-PJ-037: el detalle de un plan de
+ * mejora — ciclo de vida, elemento asociado, definición, seguimiento,
+ * documentos, versiones e historial.
  *
- * Sin pestañas ARIA: a diferencia de Plan de Evaluación (2c-E), aquí no hay
- * todavía Documentos ni Versiones que las justifiquen — llegan con RF-PJ-032
- * a 038 en el ciclo siguiente, momento en el que también tendrá sentido
- * decidir si conviene introducirlas.
+ * Con pestañas ARIA desde este ciclo (2c-J-C): Documentos y Versiones llegan
+ * en las Tasks 8-9, y con ellas ya hay cinco bloques que justifican el mismo
+ * patrón de `PlanEvaluacionPage.tsx` — antes (2c-J-A/B) solo existían
+ * Definición, Seguimiento e Historial, y agruparlos en pestañas no habría
+ * aportado nada.
  */
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useId, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { useQuery } from '@tanstack/react-query';
 
@@ -17,7 +19,7 @@ import { useEncabezado } from '@/app/encabezado';
 import { useCriterios } from '@/features/acreditacion/api/queries';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { useCompetencias, useObjetivos } from '@/features/plan-estudios/api/queries';
-import { ErrorDeNegocio } from '@/shared/api/cliente';
+import { ErrorDeNegocio, guardarArchivo } from '@/shared/api/cliente';
 import {
   AreaTexto,
   Badge,
@@ -29,8 +31,11 @@ import {
   Tarjeta,
 } from '@/shared/components/ui';
 
+import { descargarDocumentoMejora } from '../api/mejora.api';
 import { obtenerEvaluacion } from '../api/evaluacion.api';
+import { DocumentosDelPlanMejora } from '../components/DocumentosDelPlanMejora';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
+import { VersionesDelPlanMejora } from '../components/VersionesDelPlanMejora';
 import {
   describirTransicion,
   permiteEdicionDefinicionMejora,
@@ -43,14 +48,29 @@ import {
   useActualizarImplementacionMejora,
   useActualizarRetroalimentacionMejora,
   useCargarEvidenciaMejora,
+  useDocumentosMejora,
   useEditarDefinicionMejora,
   useEliminarEvidenciaMejora,
+  useGenerarDocumentoMejora,
   useHistorialMejora,
+  useNuevaVersionMejora,
   usePlanMejora,
   useTransicionarMejora,
+  useVersionesMejora,
 } from '../api/queries';
 import type { DefinicionPlanMejora } from '../api/mejora.api';
 import type { PlanMejora } from '../domain/tipos';
+
+/** Las cinco pestañas de esta pantalla, en el orden en que se muestran. */
+const PESTANAS = [
+  ['definicion', 'Definición'],
+  ['seguimiento', 'Seguimiento'],
+  ['documentos', 'Documentos'],
+  ['versiones', 'Versiones'],
+  ['historial', 'Historial de cambios'],
+] as const;
+
+type Pestana = (typeof PESTANAS)[number][0];
 
 /** Arma el `DefinicionPlanMejora` completo desde el plan actual — cada `onBlur` de la tarjeta de Definición parte de este objeto y solo pisa el campo que cambió. */
 function datosDefinicionActual(plan: PlanMejora): DefinicionPlanMejora {
@@ -70,6 +90,7 @@ export function PlanMejoraPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { publicar } = useEncabezado();
   const { puede } = useSesion();
+  const navegar = useNavigate();
 
   const { data: plan, isLoading } = usePlanMejora(id);
   const { data: criterios } = useCriterios(plan?.carreraId ?? '');
@@ -81,6 +102,17 @@ export function PlanMejoraPage() {
     queryFn: () => obtenerEvaluacion(plan!.planEvaluacionId!),
     enabled: plan?.aspecto === 'COMPETENCIA' && !!plan.planEvaluacionId,
   });
+
+  // ── Documentos y versiones (Tasks 8-9) ──────────────────────────────────
+  const { data: documentos } = useDocumentosMejora(id);
+  const generarDocumento = useGenerarDocumentoMejora(id);
+  const { data: versiones } = useVersionesMejora(id);
+  const nuevaVersion = useNuevaVersionMejora(id);
+  const [pestana, setPestana] = useState<Pestana>('definicion');
+  // Prefijo estable de esta instancia de página: sin él, dos pantallas
+  // montadas a la vez (poco probable, pero posible con caché de rutas)
+  // compartirían los mismos `id`s de pestaña y romperían `aria-controls`.
+  const idBase = useId();
 
   const editarDefinicion = useEditarDefinicionMejora();
   const transicionar = useTransicionarMejora();
@@ -213,281 +245,402 @@ export function PlanMejoraPage() {
         )}
       </Tarjeta>
 
-      {/* ── Definición (RF-PJ-006 a RF-PJ-013) ──────────────────────────── */}
-      <Tarjeta>
-        <h2 className="text-sm font-semibold text-tinta">Definición</h2>
-        <div className="mt-4 space-y-4">
-          <Campo etiqueta="Nombre de la acción">
-            {(props) => (
-              <Entrada
-                {...props}
-                disabled={!editableDefinicion}
-                defaultValue={plan.nombre}
-                onBlur={(e) =>
-                  e.target.value !== plan.nombre &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: { ...datosDefinicionActual(plan), nombre: e.target.value },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
-
-          <Campo etiqueta="Causa raíz">
-            {(props) => (
-              <AreaTexto
-                {...props}
-                disabled={!editableDefinicion}
-                defaultValue={plan.causaRaiz}
-                onBlur={(e) =>
-                  e.target.value !== plan.causaRaiz &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: { ...datosDefinicionActual(plan), causaRaiz: e.target.value },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
-
-          <Campo etiqueta="Justificación">
-            {(props) => (
-              <AreaTexto
-                {...props}
-                disabled={!editableDefinicion}
-                defaultValue={plan.justificacion}
-                onBlur={(e) =>
-                  e.target.value !== plan.justificacion &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: { ...datosDefinicionActual(plan), justificacion: e.target.value },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
-
-          {plan.aspecto !== 'COMPETENCIA' && (
-            <Campo
-              etiqueta="Input"
-              ayuda="Texto libre — no aplica a planes de Competencia (RF-PJ-028)."
+      {/* ── Definición, seguimiento, documentos, versiones e historial ──── */}
+      <div className="space-y-4">
+        <div
+          role="tablist"
+          aria-label="Definición, seguimiento, documentos, versiones e historial del plan"
+          className="flex flex-wrap gap-2"
+        >
+          {PESTANAS.map(([valor, etiqueta]) => (
+            <button
+              key={valor}
+              type="button"
+              role="tab"
+              id={`${idBase}-tab-${valor}`}
+              aria-selected={pestana === valor}
+              aria-controls={`${idBase}-panel-${valor}`}
+              onClick={() => setPestana(valor)}
+              className={[
+                'rounded-lg px-3.5 py-2 text-sm font-semibold transition',
+                pestana === valor
+                  ? 'bg-uc-primary text-white'
+                  : 'bg-superficie text-tinta-suave hover:text-uc-primary',
+              ].join(' ')}
             >
-              {(props) => (
-                <AreaTexto
-                  {...props}
-                  disabled={!editableDefinicion}
-                  defaultValue={plan.input ?? ''}
-                  onBlur={(e) =>
-                    e.target.value !== (plan.input ?? '') &&
-                    void ejecutar(() =>
-                      editarDefinicion.mutateAsync({
-                        id,
-                        datos: { ...datosDefinicionActual(plan), input: e.target.value },
-                      }),
-                    )
-                  }
-                />
-              )}
-            </Campo>
-          )}
-
-          <Campo etiqueta="Plazo">
-            {(props) => (
-              <Entrada
-                {...props}
-                type="date"
-                disabled={!editableDefinicion}
-                defaultValue={plan.plazo.slice(0, 10)}
-                onBlur={(e) =>
-                  e.target.value &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: {
-                        ...datosDefinicionActual(plan),
-                        plazo: new Date(e.target.value).toISOString(),
-                      },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
-
-          <Campo etiqueta="Recursos">
-            {(props) => (
-              <AreaTexto
-                {...props}
-                disabled={!editableDefinicion}
-                defaultValue={plan.recursos}
-                onBlur={(e) =>
-                  e.target.value !== plan.recursos &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: { ...datosDefinicionActual(plan), recursos: e.target.value },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
-
-          <Campo etiqueta="Metas">
-            {(props) => (
-              <AreaTexto
-                {...props}
-                disabled={!editableDefinicion}
-                defaultValue={plan.metas}
-                onBlur={(e) =>
-                  e.target.value !== plan.metas &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: { ...datosDefinicionActual(plan), metas: e.target.value },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
-
-          <Campo etiqueta="Responsable">
-            {(props) => (
-              <Entrada
-                {...props}
-                disabled={!editableDefinicion}
-                defaultValue={plan.responsable}
-                onBlur={(e) =>
-                  e.target.value !== plan.responsable &&
-                  void ejecutar(() =>
-                    editarDefinicion.mutateAsync({
-                      id,
-                      datos: { ...datosDefinicionActual(plan), responsable: e.target.value },
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
+              {etiqueta}
+            </button>
+          ))}
         </div>
-      </Tarjeta>
 
-      {/* ── Seguimiento (RF-PJ-014 a RF-PJ-019) ─────────────────────────── */}
-      <Tarjeta>
-        <h2 className="text-sm font-semibold text-tinta">Seguimiento</h2>
-        <div className="mt-4 space-y-4">
-          <Campo etiqueta="Estado de implementación">
-            {(props) => (
-              <Selector
-                {...props}
-                disabled={!editableSeguimiento}
-                value={plan.estadoImplementacion}
-                onChange={(e) =>
-                  void ejecutar(() =>
-                    actualizarImplementacion.mutateAsync({
-                      id,
-                      estado: e.target.value as (typeof ESTADOS_IMPLEMENTACION)[number],
-                    }),
-                  )
-                }
-              >
-                {ESTADOS_IMPLEMENTACION.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {estado}
-                  </option>
-                ))}
-              </Selector>
-            )}
-          </Campo>
+        {/*
+          Las cinco siguen montadas y solo se ocultan con `hidden`: si se
+          desmontara la que no está activa, su `aria-controls` apuntaría a un
+          id que no existe en el DOM mientras esa pestaña no se visita, lo que
+          axe-core marca como referencia inválida.
+        */}
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-definicion`}
+          aria-labelledby={`${idBase}-tab-definicion`}
+          hidden={pestana !== 'definicion'}
+        >
+          <Tarjeta>
+            <h2 className="text-sm font-semibold text-tinta">Definición</h2>
+            <div className="mt-4 space-y-4">
+              <Campo etiqueta="Nombre de la acción">
+                {(props) => (
+                  <Entrada
+                    {...props}
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.nombre}
+                    onBlur={(e) =>
+                      e.target.value !== plan.nombre &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: { ...datosDefinicionActual(plan), nombre: e.target.value },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
 
-          <div>
-            <h3 className="text-sm font-medium text-tinta">Evidencias</h3>
-            <ul className="mt-2 space-y-1">
-              {plan.evidencias.map((ev) => (
-                <li key={ev.id} className="flex items-center justify-between text-sm">
-                  <span>{ev.referencia}</span>
-                  {editableSeguimiento && (
-                    <Boton
-                      variante="secundario"
-                      tamano="sm"
-                      onClick={() =>
+              <Campo etiqueta="Causa raíz">
+                {(props) => (
+                  <AreaTexto
+                    {...props}
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.causaRaiz}
+                    onBlur={(e) =>
+                      e.target.value !== plan.causaRaiz &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: { ...datosDefinicionActual(plan), causaRaiz: e.target.value },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+
+              <Campo etiqueta="Justificación">
+                {(props) => (
+                  <AreaTexto
+                    {...props}
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.justificacion}
+                    onBlur={(e) =>
+                      e.target.value !== plan.justificacion &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: { ...datosDefinicionActual(plan), justificacion: e.target.value },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+
+              {plan.aspecto !== 'COMPETENCIA' && (
+                <Campo
+                  etiqueta="Input"
+                  ayuda="Texto libre — no aplica a planes de Competencia (RF-PJ-028)."
+                >
+                  {(props) => (
+                    <AreaTexto
+                      {...props}
+                      disabled={!editableDefinicion}
+                      defaultValue={plan.input ?? ''}
+                      onBlur={(e) =>
+                        e.target.value !== (plan.input ?? '') &&
                         void ejecutar(() =>
-                          eliminarEvidencia.mutateAsync({ evidenciaId: ev.id, planId: id }),
+                          editarDefinicion.mutateAsync({
+                            id,
+                            datos: { ...datosDefinicionActual(plan), input: e.target.value },
+                          }),
                         )
                       }
-                    >
-                      Eliminar
-                    </Boton>
+                    />
                   )}
-                </li>
-              ))}
-            </ul>
-            {editableSeguimiento && (
-              <FormularioEvidencia
-                onAgregar={(referencia, nombreArchivo) =>
-                  void ejecutar(() =>
-                    cargarEvidencia.mutateAsync({ id, referencia, nombreArchivo }),
-                  )
-                }
-              />
-            )}
-          </div>
+                </Campo>
+              )}
 
-          <Campo etiqueta="Logro de meta">
-            {(props) => (
-              <AreaTexto
-                {...props}
-                disabled={!editableSeguimiento}
-                defaultValue={plan.logroMeta ?? ''}
-                onBlur={(e) =>
-                  void ejecutar(() =>
-                    actualizarRetroalimentacion.mutateAsync({
-                      id,
-                      logroMeta: e.target.value,
-                      impacto: plan.impacto ?? '',
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
+              <Campo etiqueta="Plazo">
+                {(props) => (
+                  <Entrada
+                    {...props}
+                    type="date"
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.plazo.slice(0, 10)}
+                    onBlur={(e) =>
+                      e.target.value &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: {
+                            ...datosDefinicionActual(plan),
+                            plazo: new Date(e.target.value).toISOString(),
+                          },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
 
-          <Campo etiqueta="Impacto">
-            {(props) => (
-              <AreaTexto
-                {...props}
-                disabled={!editableSeguimiento}
-                defaultValue={plan.impacto ?? ''}
-                onBlur={(e) =>
-                  void ejecutar(() =>
-                    actualizarRetroalimentacion.mutateAsync({
-                      id,
-                      logroMeta: plan.logroMeta ?? '',
-                      impacto: e.target.value,
-                    }),
-                  )
-                }
-              />
-            )}
-          </Campo>
+              <Campo etiqueta="Recursos">
+                {(props) => (
+                  <AreaTexto
+                    {...props}
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.recursos}
+                    onBlur={(e) =>
+                      e.target.value !== plan.recursos &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: { ...datosDefinicionActual(plan), recursos: e.target.value },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+
+              <Campo etiqueta="Metas">
+                {(props) => (
+                  <AreaTexto
+                    {...props}
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.metas}
+                    onBlur={(e) =>
+                      e.target.value !== plan.metas &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: { ...datosDefinicionActual(plan), metas: e.target.value },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+
+              <Campo etiqueta="Responsable">
+                {(props) => (
+                  <Entrada
+                    {...props}
+                    disabled={!editableDefinicion}
+                    defaultValue={plan.responsable}
+                    onBlur={(e) =>
+                      e.target.value !== plan.responsable &&
+                      void ejecutar(() =>
+                        editarDefinicion.mutateAsync({
+                          id,
+                          datos: { ...datosDefinicionActual(plan), responsable: e.target.value },
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+            </div>
+          </Tarjeta>
         </div>
-      </Tarjeta>
 
-      {/* ── Historial (RF-PJ-036/037) ────────────────────────────────── */}
-      <Tarjeta>
-        <h2 className="text-sm font-semibold text-tinta">Historial</h2>
-        <div className="mt-4">
-          <HistorialDelPlan eventos={historial ?? []} />
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-seguimiento`}
+          aria-labelledby={`${idBase}-tab-seguimiento`}
+          hidden={pestana !== 'seguimiento'}
+        >
+          <Tarjeta>
+            <h2 className="text-sm font-semibold text-tinta">Seguimiento</h2>
+            <div className="mt-4 space-y-4">
+              <Campo etiqueta="Estado de implementación">
+                {(props) => (
+                  <Selector
+                    {...props}
+                    disabled={!editableSeguimiento}
+                    value={plan.estadoImplementacion}
+                    onChange={(e) =>
+                      void ejecutar(() =>
+                        actualizarImplementacion.mutateAsync({
+                          id,
+                          estado: e.target.value as (typeof ESTADOS_IMPLEMENTACION)[number],
+                        }),
+                      )
+                    }
+                  >
+                    {ESTADOS_IMPLEMENTACION.map((estado) => (
+                      <option key={estado} value={estado}>
+                        {estado}
+                      </option>
+                    ))}
+                  </Selector>
+                )}
+              </Campo>
+
+              <div>
+                <h3 className="text-sm font-medium text-tinta">Evidencias</h3>
+                <ul className="mt-2 space-y-1">
+                  {plan.evidencias.map((ev) => (
+                    <li key={ev.id} className="flex items-center justify-between text-sm">
+                      <span>{ev.referencia}</span>
+                      {editableSeguimiento && (
+                        <Boton
+                          variante="secundario"
+                          tamano="sm"
+                          onClick={() =>
+                            void ejecutar(() =>
+                              eliminarEvidencia.mutateAsync({ evidenciaId: ev.id, planId: id }),
+                            )
+                          }
+                        >
+                          Eliminar
+                        </Boton>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {editableSeguimiento && (
+                  <FormularioEvidencia
+                    onAgregar={(referencia, nombreArchivo) =>
+                      void ejecutar(() =>
+                        cargarEvidencia.mutateAsync({ id, referencia, nombreArchivo }),
+                      )
+                    }
+                  />
+                )}
+              </div>
+
+              <Campo etiqueta="Logro de meta">
+                {(props) => (
+                  <AreaTexto
+                    {...props}
+                    disabled={!editableSeguimiento}
+                    defaultValue={plan.logroMeta ?? ''}
+                    onBlur={(e) =>
+                      void ejecutar(() =>
+                        actualizarRetroalimentacion.mutateAsync({
+                          id,
+                          logroMeta: e.target.value,
+                          impacto: plan.impacto ?? '',
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+
+              <Campo etiqueta="Impacto">
+                {(props) => (
+                  <AreaTexto
+                    {...props}
+                    disabled={!editableSeguimiento}
+                    defaultValue={plan.impacto ?? ''}
+                    onBlur={(e) =>
+                      void ejecutar(() =>
+                        actualizarRetroalimentacion.mutateAsync({
+                          id,
+                          logroMeta: plan.logroMeta ?? '',
+                          impacto: e.target.value,
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </Campo>
+            </div>
+          </Tarjeta>
         </div>
-      </Tarjeta>
+
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-documentos`}
+          aria-labelledby={`${idBase}-tab-documentos`}
+          hidden={pestana !== 'documentos'}
+        >
+          <Tarjeta>
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-tinta">Documentos</h2>
+              <DocumentosDelPlanMejora
+                documentos={documentos ?? []}
+                generando={generarDocumento.isPending}
+                onGenerar={
+                  // RF-PJ-032 a RF-PJ-034: `GenerarDocumentoMejora.encolar` exige
+                  // `mejora.leer` (exportar es leer, igual que en Medición) — no
+                  // `mejora.editar`, que sí exige la evaluación gemela. Sin el
+                  // permiso, ni se ofrecen los botones.
+                  puede('mejora.leer')
+                    ? (tipo) => void ejecutar(() => generarDocumento.mutateAsync(tipo))
+                    : undefined
+                }
+                onDescargar={(idDocumento) =>
+                  void ejecutar(async () =>
+                    guardarArchivo(await descargarDocumentoMejora(idDocumento)),
+                  )
+                }
+              />
+            </div>
+          </Tarjeta>
+        </div>
+
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-versiones`}
+          aria-labelledby={`${idBase}-tab-versiones`}
+          hidden={pestana !== 'versiones'}
+        >
+          <Tarjeta>
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-tinta">Versiones</h2>
+              <VersionesDelPlanMejora
+                versiones={versiones ?? []}
+                versionAbierta={plan.id}
+                estadoActual={plan.estado}
+                generandoVersion={nuevaVersion.isPending}
+                onGenerarVersion={
+                  // RF-PJ-034 exige `mejora.crear`, el mismo permiso del caso de
+                  // uso de versionado — no `mejora.editar`, que es el de este
+                  // plan y no el de la copia que se crearía.
+                  puede('mejora.crear')
+                    ? () =>
+                        void ejecutar(async () => {
+                          // `useMutacionDePlanMejora` tipa `mutateAsync` como
+                          // `Promise<unknown>` (no lleva un segundo genérico
+                          // para el dato, a diferencia de `useMutacionDelPlan`
+                          // y `useMutacionDeEvaluacion`): el backend sí
+                          // devuelve el plan recién creado, como confirma
+                          // `versionar-plan-mejora.use-case.ts`.
+                          const creado = (await nuevaVersion.mutateAsync(undefined)) as PlanMejora;
+                          void navegar(`/mejora-continua/mejora/${creado.id}`);
+                        })
+                    : undefined
+                }
+              />
+            </div>
+          </Tarjeta>
+        </div>
+
+        <div
+          role="tabpanel"
+          id={`${idBase}-panel-historial`}
+          aria-labelledby={`${idBase}-tab-historial`}
+          hidden={pestana !== 'historial'}
+        >
+          <Tarjeta>
+            <h2 className="text-sm font-semibold text-tinta">Historial</h2>
+            <div className="mt-4">
+              <HistorialDelPlan eventos={historial ?? []} />
+            </div>
+          </Tarjeta>
+        </div>
+      </div>
     </div>
   );
 }

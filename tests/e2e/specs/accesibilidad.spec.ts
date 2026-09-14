@@ -181,9 +181,42 @@ test('el detalle de un plan de mejora', async ({ page }) => {
   await analizar(page, 'el detalle del plan de mejora');
 });
 
+/**
+ * Crea un plan de mejora fresco (Criterio de Acreditación) y abre su detalle.
+ * Sirve de punto de partida a las dos pruebas de Documentos y Versiones de
+ * más abajo — mismo papel que `crearPlanEvaluacion` para su gemelo.
+ */
+async function crearPlanMejora(page: Page): Promise<void> {
+  await page.goto('/mejora-continua/mejora');
+  await page.getByRole('button', { name: 'Nuevo plan de mejora' }).click();
+  const modal = page.getByRole('dialog');
+  await modal.getByLabel('Aspecto').selectOption('CRITERIO_ACREDITACION');
+  await modal.getByLabel('Elemento').selectOption({ index: 1 });
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+}
+
+test('la pestaña de documentos del plan de mejora, con un PDF ya generado', async ({ page }) => {
+  // Con contenido real: analizar la lista vacía no distingue «sin
+  // problemas» de «axe nunca llegó a ver la fila de un documento» — mismo
+  // motivo que la prueba gemela de Evaluación de más arriba.
+  await crearPlanMejora(page);
+
+  await page.getByRole('tab', { name: 'Documentos' }).click();
+  await page.getByRole('button', { name: 'Generar PDF' }).click();
+  await expect(page.getByText('Listo')).toBeVisible({ timeout: 30_000 });
+
+  await analizar(page, 'la pestaña de documentos del plan de mejora');
+});
+
 test.describe('con la cuenta que aprueba', () => {
-  // Generar una versión exige `evaluacion.crear` y aprobar exige
-  // `evaluacion.aprobar`; la cuenta por defecto no tiene el segundo.
+  // Generar una versión exige `evaluacion.crear`/`mejora.crear` y aprobar
+  // exige `evaluacion.aprobar`/`mejora.aprobar`; la cuenta por defecto
+  // (`editor` → COORDINADOR_ACADEMICO) tiene el primer permiso de cada par
+  // pero no el segundo (`prisma/seed.ts`, RF-PJ-044: "quien construye no da
+  // el visto bueno"). Verificado contra el seed y no asumido: `director`
+  // (DIRECTOR_CARRERA) es el único rol de la suite con los cinco permisos
+  // `mejora.*`, incluido `mejora.aprobar`.
   test.use({ rol: 'director' });
 
   test('la pestaña de versiones del plan de evaluación, con un linaje real', async ({ page }) => {
@@ -210,5 +243,39 @@ test.describe('con la cuenta que aprueba', () => {
     await expect(page.getByRole('link', { name: /^EV-/ })).toBeVisible();
 
     await analizar(page, 'la pestaña de versiones del plan de evaluación');
+  });
+
+  test('la pestaña de versiones del plan de mejora, con un linaje real', async ({ page }) => {
+    await crearPlanMejora(page);
+
+    // RF-PJ-034 RN (misma regla que RF-PE-034 en Evaluación): «Generar nueva
+    // versión» solo cabe desde Aprobado, Vigente o Histórico — hace falta
+    // salir de Borrador primero.
+    await page.getByRole('button', { name: 'Enviar a revisión' }).click();
+    await page.getByRole('button', { name: 'Aprobar' }).click();
+    await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Versiones' }).click();
+    await page.getByRole('button', { name: 'Generar nueva versión' }).click();
+
+    // La operación navega a la copia nueva y reinicia la pestaña activa a
+    // Definición —el primer valor de `useState<Pestana>('definicion')` en
+    // `PlanMejoraPage.tsx`, a diferencia de Evaluación que reinicia a
+    // Documentos—: se espera ese reinicio (evidencia de que la navegación ya
+    // ocurrió) antes de volver a pedir Versiones, para no pulsar la pestaña
+    // vieja un instante antes de que la página cambie por debajo.
+    await expect(page.getByRole('tab', { name: 'Definición' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await page.getByRole('tab', { name: 'Versiones' }).click();
+    // Como en la prueba gemela de Evaluación: con la versión original y la
+    // recién creada en la misma tabla, `(viendo esta)` y el enlace `PJ-...`
+    // están los dos visibles a la vez — combinarlos con `.or()` viola el modo
+    // estricto de Playwright (dos elementos, no uno). Basta el enlace a la
+    // versión original.
+    await expect(page.getByRole('link', { name: /^PJ-/ })).toBeVisible();
+
+    await analizar(page, 'la pestaña de versiones del plan de mejora');
   });
 });
