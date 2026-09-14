@@ -103,14 +103,20 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     planMedicionAfectadoId: null,
     estado: 'Borrador',
     estadoImplementacion: 'Pendiente',
-    nombre: '',
-    causaRaiz: '',
-    justificacion: '',
-    input: null,
+    // RF-PJ-042: completo por defecto —nombre, causaRaiz, justificacion,
+    // input, recursos, metas y responsable ya no nacen vacíos aquí— para que
+    // los specs de `transicionar` que no son sobre completitud (permisos,
+    // eventos, la máquina de estados en sí) no choquen con la validación
+    // integral. Los que sí prueban la validación pasan sus propios campos
+    // vacíos explícitamente.
+    nombre: 'Reforzar la línea base',
+    causaRaiz: 'Falta de seguimiento sistemático',
+    justificacion: 'El criterio viene bajando dos periodos seguidos',
+    input: 'Resultado del último ciclo de evaluación',
     plazo: new Date('2026-12-31'),
-    recursos: '',
-    metas: '',
-    responsable: '',
+    recursos: 'Presupuesto asignado por la facultad',
+    metas: 'Subir 10 puntos porcentuales',
+    responsable: 'Coordinador académico',
     logroMeta: null,
     impacto: null,
     creadoEn: new Date('2026-03-01'),
@@ -884,16 +890,6 @@ describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
     expect(pedidos).toEqual(['mejora.aprobar']);
   });
 
-  it('RF-PJ-042 no existe todavía: la transición nunca exige estar sin bloqueos', async () => {
-    // Placeholder explícito, mismo movimiento que RF-PE-041/2c-D: hoy no hay
-    // ningún dato que exija bloquear la transición por completitud.
-    const { caso } = montar({ plan: plan({ estado: 'Borrador' }) });
-
-    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'enviar-a-revision', {});
-
-    expect(resultado.estado).toBe('En revisión');
-  });
-
   it('deja constancia del antes y el después', async () => {
     const { caso, publicados } = montar({ plan: plan({ estado: 'Borrador' }) });
 
@@ -901,6 +897,80 @@ describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
 
     expect(publicados[0]?.nombre).toBe('mejora.transicionado');
     expect(publicados[0]?.detalle).toContain('Borrador → En revisión');
+  });
+});
+
+describe('RF-PJ-042 — la validación integral antes de enviar a revisión o aprobar', () => {
+  it('enviar a revisión se bloquea si el plan está incompleto, con el reporte consolidado en el mensaje', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'Borrador', nombre: '' }) });
+
+    await expect(caso.transicionar(ACTOR, 'pj-1', 'enviar-a-revision', {})).rejects.toThrow(
+      /definición del plan de mejora está incompleta/,
+    );
+  });
+
+  it('aprobar se bloquea si el plan está incompleto', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'En revisión', responsable: '' }) });
+
+    await expect(caso.transicionar(ACTOR, 'pj-1', 'aprobar', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('enviar a revisión se permite si el plan está completo', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'Borrador' }) });
+
+    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'enviar-a-revision', {});
+
+    expect(resultado.estado).toBe('En revisión');
+  });
+
+  it('aprobar se permite si el plan está completo', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'En revisión' }) });
+
+    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'aprobar', {});
+
+    expect(resultado.estado).toBe('Aprobado');
+  });
+
+  it('observar (rechazar) nunca se bloquea por esta validación, sin importar qué tan incompleto esté el plan', async () => {
+    // `observar` tiene `exigeSinBloqueos: false` en estado-plan.ts: devolver
+    // un plan con problemas es justamente lo que se hace cuando los tiene —
+    // exigirle estar limpio para eso sería contradictorio.
+    const { caso } = montar({
+      plan: plan({ estado: 'En revisión', nombre: '', causaRaiz: '', responsable: '' }),
+    });
+
+    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'observar', {
+      comentario: 'Falta completar la definición.',
+    });
+
+    expect(resultado.estado).toBe('Borrador');
+  });
+
+  it('RF-PJ-028: un plan de Competencia sin input SÍ puede enviarse a revisión — ese campo no le aplica', async () => {
+    const { caso } = montar({
+      plan: plan({ estado: 'Borrador', aspecto: 'COMPETENCIA', input: null }),
+    });
+
+    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'enviar-a-revision', {});
+
+    expect(resultado.estado).toBe('En revisión');
+  });
+
+  it('un plan con estadoImplementacion distinto de Completado se puede aprobar aunque no tenga retroalimentación', async () => {
+    const { caso } = montar({
+      plan: plan({
+        estado: 'En revisión',
+        estadoImplementacion: 'En proceso',
+        logroMeta: null,
+        impacto: null,
+      }),
+    });
+
+    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'aprobar', {});
+
+    expect(resultado.estado).toBe('Aprobado');
   });
 });
 

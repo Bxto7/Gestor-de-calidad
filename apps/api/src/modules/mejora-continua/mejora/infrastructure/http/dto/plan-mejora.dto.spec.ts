@@ -8,11 +8,10 @@
  * con `editarDefinicion`". Exigir `@MinLength(1)` en ellos bloqueaba guardar
  * CUALQUIER campo de un plan recién creado: el envío siempre incluye los
  * demás campos, todavía vacíos, y el DTO entero se rechazaba con 400 antes de
- * llegar al caso de uso. RF-PJ-042 (la validación real de completitud) es
- * 2c-J-D y hoy no existe (`gestionar-planes-mejora.use-case.ts` tiene
- * `tieneBloqueos: false` a propósito, mismo placeholder que tuvo RF-PE-041) —
- * nada exige hoy que estos campos estén llenos al guardarlos, solo al
- * completarlos.
+ * llegar al caso de uso. RF-PJ-042 (la validación real de completitud) vive
+ * en `mejora/domain/services/motor-de-consistencia.ts` y se aplica en
+ * `transicionar` —solo al enviar a revisión o aprobar—, no aquí: nada exige
+ * que estos campos estén llenos al guardarlos, solo al completarlos.
  */
 
 import { plainToInstance } from 'class-transformer';

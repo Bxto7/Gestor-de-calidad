@@ -77,6 +77,10 @@ import {
 import { permiteActualizarSeguimiento } from '../../domain/value-objects/estado-implementacion.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 import { siguienteCodigoMejora } from '../../domain/value-objects/codigo-mejora.js';
+import {
+  type ResultadoConsistencia,
+  validarConsistenciaMejora,
+} from '../../domain/services/motor-de-consistencia.js';
 import type {
   AspectoPlanMejora,
   DatosEvidencia,
@@ -113,6 +117,16 @@ export interface AlertaMinimoAcciones {
   readonly faltante: number;
 }
 
+/**
+ * RF-PJ-045: la sesión/permiso se valida de forma transversal en cada
+ * operación crítica — no hay un método público en esta clase que no empiece
+ * llamando a `this.exigir(...)` (ver el helper privado al final del
+ * archivo) antes de tocar cualquier dato.
+ *
+ * RF-PJ-046: cada mutación crítica ya deja constancia en la bitácora — cada
+ * método que cambia estado publica su propio evento de
+ * `../../domain/events/eventos-mejora.js` vía `this.eventos.publicar(...)`.
+ */
 export class GestionarPlanesMejora {
   constructor(
     private readonly planes: RepositorioPlanMejoraPort,
@@ -155,6 +169,7 @@ export class GestionarPlanesMejora {
     if (!carreraId) {
       throw new AccesoDenegado('El usuario no dirige ninguna carrera.');
     }
+    // RF-PJ-043: el alta queda restringida a roles autorizados.
     await this.exigir(actor, 'mejora.crear', carreraId);
 
     if (!datos.elementoId.trim()) {
@@ -250,6 +265,7 @@ export class GestionarPlanesMejora {
     datos: DefinicionAccionMejora,
   ): Promise<DatosPlanMejora> {
     const plan = await this.exigirPlan(id);
+    // RF-PJ-043: editar la definición queda restringido a roles autorizados.
     await this.exigir(actor, 'mejora.editar', plan.carreraId);
     this.exigirDefinicionEditable(plan);
 
@@ -261,6 +277,7 @@ export class GestionarPlanesMejora {
   /** RF-PJ-008: solo un Borrador se elimina. */
   async eliminar(actor: Actor, id: string): Promise<void> {
     const plan = await this.exigirPlan(id);
+    // RF-PJ-043: eliminar queda restringido a roles autorizados.
     await this.exigir(actor, 'mejora.eliminar', plan.carreraId);
 
     if (!permiteEliminacion(plan.estado)) {
@@ -274,8 +291,12 @@ export class GestionarPlanesMejora {
   }
 
   /**
-   * RF-PJ-004 y RF-PJ-005: reusa `estado-plan.ts` tal cual, mismo estado
-   * documental que `medicion`/`evaluacion`.
+   * RF-PJ-004, RF-PJ-005, RF-PJ-039, RF-PJ-040 y RF-PJ-041: reusa
+   * `estado-plan.ts` tal cual, mismo estado documental que
+   * `medicion`/`evaluacion`. RF-PJ-039 (enviar a revisión), RF-PJ-040
+   * (aprobar) y RF-PJ-041 (rechazar/observar) son las tres acciones de este
+   * mismo método genérico, distinguidas por `accion` — no hay un método por
+   * cada una porque la máquina de estados compartida ya las modela.
    */
   async transicionar(
     actor: Actor,
@@ -285,17 +306,26 @@ export class GestionarPlanesMejora {
   ): Promise<DatosPlanMejora> {
     const plan = await this.exigirPlan(id);
     const transicion = describirTransicion(accion);
+    // RF-PJ-044: la aprobación queda restringida al rol que tiene el permiso
+    // `mejora.aprobar` — este mismo `exigir` ya hace cumplir esa
+    // restricción, sea cual sea el permiso que le corresponda a `accion`.
     await this.exigir(actor, `mejora.${transicion.permiso}`, plan.carreraId);
 
-    // RF-PJ-042 (la validación integral) es 2c-J-D: hoy no hay ningún dato
-    // que exija bloquear la transición por completitud. Mismo placeholder
-    // que RF-PE-041 tuvo en su momento.
+    // RF-PJ-042 RN1: la validación integral es requisito previo, pero solo
+    // para las transiciones que la exigen (enviar a revisión y aprobar) —
+    // mismo patrón condicional que `GestionarPlanesEvaluacion.transicionar`.
+    // Observar o archivar no la piden: devolver un plan con problemas es
+    // justamente lo que se hace cuando los tiene.
+    const resultado = transicion.exigeSinBloqueos ? this.evaluar(plan) : null;
+
     const r = intentarTransicion(plan.estado, accion, {
-      tieneBloqueos: false,
+      tieneBloqueos: resultado?.tieneBloqueos ?? false,
       comentario: contexto.comentario,
     });
     if (!r.ok) {
-      throw new ReglaDeNegocioViolada(r.motivo);
+      throw new ReglaDeNegocioViolada(
+        resultado?.tieneBloqueos ? this.mensajeDeInconsistencias(resultado) : r.motivo,
+      );
     }
 
     const actualizado = await this.planes.cambiarEstado(id, r.nuevoEstado);
@@ -489,6 +519,32 @@ export class GestionarPlanesMejora {
       }
     }
     return alertas;
+  }
+
+  /**
+   * RF-PJ-042: la validación integral. Síncrona y sin ningún puerto — a
+   * diferencia de sus hermanas `GestionarPlanesMedicion.evaluar` (RF-PM-038)
+   * y `GestionarPlanesEvaluacion.evaluar` (RF-PE-041), que sí son `async`
+   * porque validan filas hijas leídas de otro repositorio, este motor solo
+   * necesita los campos que ya trae `plan` (ver el comentario de cabecera de
+   * `motor-de-consistencia.ts`).
+   */
+  private evaluar(plan: DatosPlanMejora): ResultadoConsistencia {
+    return validarConsistenciaMejora(plan);
+  }
+
+  /**
+   * RF-PJ-042: el mensaje que ve el frontend cuando la transición se rechaza
+   * por bloqueos. Mismo patrón que
+   * `GestionarPlanesEvaluacion.mensajeDeInconsistencias`: `intentarTransicion`
+   * (compartida) solo sabe decir «hay bloqueos», así que el reporte
+   * consolidado se nombra aquí para viajar en la propia excepción.
+   */
+  private mensajeDeInconsistencias(resultado: ResultadoConsistencia): string {
+    const detalle = resultado.bloqueantes
+      .map((h) => `${h.titulo} (${h.afectados.join(', ')})`)
+      .join('; ');
+    return `Hay inconsistencias bloqueantes sin resolver: ${detalle}.`;
   }
 
   private async exigirPlan(id: string): Promise<DatosPlanMejora> {
