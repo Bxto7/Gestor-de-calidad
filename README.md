@@ -276,7 +276,7 @@ artefactos de compilación viven fuera del control de versiones.
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
   estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
   queda ningún almacén en memoria.
-- Pruebas en verde: 1034 unitarias en la API, 264 en el frontend, 319 de
+- Pruebas en verde: 1036 unitarias en la API, 265 en el frontend, 320 de
   integración en diecinueve suites contra un PostgreSQL real y desechable, y
   50 recorridos E2E con Playwright —trece de ellos con `axe-core` sobre WCAG
   2.1 AA—. Los guiones de carga k6 viven en `tests/carga/`.
