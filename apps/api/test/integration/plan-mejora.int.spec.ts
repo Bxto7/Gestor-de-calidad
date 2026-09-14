@@ -24,7 +24,10 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PublicadorDeEventos } from '../../src/shared-kernel/domain-events/domain-event.js';
-import type { NuevoPlanMejora } from '../../src/modules/mejora-continua/mejora/application/ports/plan-mejora.port.js';
+import type {
+  DatosPlanMejora,
+  NuevoPlanMejora,
+} from '../../src/modules/mejora-continua/mejora/application/ports/plan-mejora.port.js';
 import { PlanMejoraRepositoryPrisma } from '../../src/modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
 import { GestionarPlanesMejora } from '../../src/modules/mejora-continua/mejora/application/use-cases/gestionar-planes-mejora.use-case.js';
 import { PlanEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
@@ -43,7 +46,8 @@ const repo = new PlanMejoraRepositoryPrisma(prisma);
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE mejora_continua.evidencia_plan_mejora, mejora_continua.planes_mejora
+    TRUNCATE mejora_continua.evidencia_plan_mejora, mejora_continua.documentos_mejora,
+             mejora_continua.planes_mejora
     RESTART IDENTITY CASCADE`);
 });
 
@@ -268,6 +272,72 @@ describe('el repositorio', () => {
     it('una carrera sin planes devuelve una lista vacía', async () => {
       expect(await repo.listarDeCarrera(randomUUID())).toEqual([]);
     });
+  });
+});
+
+/**
+ * Task 1 de 2c-J-C: los campos de versionado y el modelo de documentos.
+ *
+ * `datosBase` reconstruye lo que `repo.crear` ya escribió (codigo, aspecto,
+ * elemento, definición vacía) para poder crear directamente con
+ * `prisma.planMejora.create` una "v2" con `version`/`derivadoDeId`, que
+ * `RepositorioPlanMejoraPort.crear` no expone — mismo motivo que
+ * `plan-medicion.int.spec.ts` prueba el linaje contra Postgres real y no con
+ * dobles de puerto.
+ */
+function datosBase(plan: DatosPlanMejora) {
+  return {
+    codigo: plan.codigo,
+    aspecto: plan.aspecto,
+    carreraId: plan.carreraId,
+    criterioAcreditacionId: plan.criterioAcreditacionId,
+    objetivoEducacionalId: plan.objetivoEducacionalId,
+    competenciaId: plan.competenciaId,
+    periodoId: plan.periodoId,
+    planEvaluacionId: plan.planEvaluacionId,
+    nombre: plan.nombre,
+    causaRaiz: plan.causaRaiz,
+    justificacion: plan.justificacion,
+    input: plan.input,
+    plazo: plan.plazo,
+    recursos: plan.recursos,
+    metas: plan.metas,
+    responsable: plan.responsable,
+  };
+}
+
+const ACTOR_ID = randomUUID();
+
+describe('RF-PJ-035 RN1 — el linaje', () => {
+  it('borrar un plan intermedio no rompe el vínculo de sus descendientes', async () => {
+    const v1 = await crearPlan({ codigo: 'PJ-LINAJE-1' });
+    const v2 = await prisma.planMejora.create({
+      data: {
+        ...datosBase(v1),
+        codigo: 'PJ-LINAJE-2',
+        version: 2,
+        derivadoDeId: v1.id,
+      },
+    });
+
+    await repo.eliminar(v1.id);
+
+    const tras = await prisma.planMejora.findUnique({ where: { id: v2.id } });
+    expect(tras).not.toBeNull();
+    expect(tras?.derivadoDeId).toBeNull();
+  });
+});
+
+describe('RF-PJ-032 — los documentos', () => {
+  it('borrar el plan se lleva sus documentos', async () => {
+    const p = await crearPlan({ codigo: 'PJ-DOCS-1' });
+    await prisma.documentoMejora.create({
+      data: { planMejoraId: p.id, tipo: 'PLAN_MEJORA_PDF', solicitadoPor: ACTOR_ID },
+    });
+
+    await repo.eliminar(p.id);
+
+    expect(await prisma.documentoMejora.count({ where: { planMejoraId: p.id } })).toBe(0);
   });
 });
 

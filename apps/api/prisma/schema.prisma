@@ -1250,7 +1250,22 @@ model PlanMejora {
 
   creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
 
+  /// RF-PJ-035 RN1: la versión nueva referencia a la que viene. `SetNull` y no
+  /// `Cascade` — mismo razonamiento que `PlanMedicion`/`PlanEvaluacion`:
+  /// borrar un borrador intermedio no puede llevarse por delante el linaje de
+  /// sus descendientes.
+  version      Int     @default(1) @db.SmallInt
+  derivadoDeId String? @map("derivado_de_id") @db.Uuid
+
+  /// Quién aprobó y cuándo — mismo campo que en Medición/Evaluación.
+  aprobadoPorId String?   @map("aprobado_por_id") @db.Uuid
+  aprobadoEn    DateTime? @map("aprobado_en") @db.Timestamptz(6)
+
   evidencias EvidenciaPlanMejora[]
+  documentos DocumentoMejora[]
+
+  derivadoDe PlanMejora?  @relation("VersionesMejora", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados  PlanMejora[] @relation("VersionesMejora")
 
   /// Las consultas del alta van por aspecto + elemento, para calcular el
   /// ámbito del correlativo (RF-PJ-003 RN2).
@@ -1296,5 +1311,46 @@ model EvidenciaPlanMejora {
 
   @@index([planMejoraId])
   @@map("evidencia_plan_mejora")
+  @@schema("mejora_continua")
+}
+
+/// RF-PJ-033 y RF-PJ-034.
+enum TipoDocumentoMejora {
+  PLAN_MEJORA_PDF
+  PLAN_MEJORA_EXCEL
+
+  @@schema("mejora_continua")
+}
+
+/// RF-PJ-032: el plan de mejora generado como archivo.
+///
+/// Tabla propia, no la de Medición ni Evaluación: cada una tiene su propia
+/// clave foránea, y CLAUDE.md §3.2 prohíbe que dos módulos —o dos
+/// submódulos con su propia tabla de negocio— compartan una.
+model DocumentoMejora {
+  id           String                  @id @default(uuid()) @db.Uuid
+  planMejoraId String                  @map("plan_mejora_id") @db.Uuid
+  tipo         TipoDocumentoMejora
+  estado       EstadoDocumentoMedicion @default(EN_COLA)
+
+  nombreArchivo String? @map("nombre_archivo") @db.VarChar(200)
+  tipoMime      String? @map("tipo_mime") @db.VarChar(120)
+  bytes         Int?
+  /// Opaca a propósito: hoy una ruta en disco, mañana una clave de Backblaze
+  /// B2 (§5.6 de CLAUDE.md), sin que cambie nada más.
+  ubicacion     String? @db.VarChar(500)
+  /// Solo con estado FALLIDO. Redactado para una persona, no una traza.
+  error         String? @db.Text
+
+  /// Sin clave foránea a usuarios, igual que el resto de la evidencia: el
+  /// registro debe seguir siendo legible aunque la cuenta desaparezca.
+  solicitadoPor String    @map("solicitado_por") @db.Uuid
+  solicitadoEn  DateTime  @default(now()) @map("solicitado_en") @db.Timestamptz(6)
+  terminadoEn   DateTime? @map("terminado_en") @db.Timestamptz(6)
+
+  plan PlanMejora @relation(fields: [planMejoraId], references: [id], onDelete: Cascade)
+
+  @@index([planMejoraId, solicitadoEn])
+  @@map("documentos_mejora")
   @@schema("mejora_continua")
 }
