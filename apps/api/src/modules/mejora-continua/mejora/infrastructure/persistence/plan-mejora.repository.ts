@@ -14,6 +14,7 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { CopiaPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 import type { ImpactoPlanMejoraPort } from '../../application/ports/impacto-plan-mejora.port.js';
 import type {
@@ -87,6 +88,8 @@ const SELECCION = {
   logroMeta: true,
   impacto: true,
   creadoEn: true,
+  version: true,
+  derivadoDeId: true,
   evidencias: { select: SELECCION_EVIDENCIA, orderBy: { subidoEn: 'asc' as const } },
 } as const;
 
@@ -123,6 +126,8 @@ interface Fila {
   logroMeta: string | null;
   impacto: string | null;
   creadoEn: Date;
+  version: number;
+  derivadoDeId: string | null;
   evidencias: FilaEvidencia[];
 }
 
@@ -163,6 +168,8 @@ function aDatos(fila: Fila): DatosPlanMejora {
     logroMeta: fila.logroMeta,
     impacto: fila.impacto,
     creadoEn: fila.creadoEn,
+    version: fila.version,
+    derivadoDeId: fila.derivadoDeId,
     evidencias: fila.evidencias.map(aEvidencia),
   };
 }
@@ -177,7 +184,9 @@ function filtroPorAspecto(aspecto: AspectoPlanMejora, elementoId: string) {
 }
 
 @Injectable()
-export class PlanMejoraRepositoryPrisma implements RepositorioPlanMejoraPort, ImpactoPlanMejoraPort {
+export class PlanMejoraRepositoryPrisma
+  implements RepositorioPlanMejoraPort, ImpactoPlanMejoraPort
+{
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(datos: NuevoPlanMejora): Promise<DatosPlanMejora> {
@@ -327,9 +336,36 @@ export class PlanMejoraRepositoryPrisma implements RepositorioPlanMejoraPort, Im
     return aDatos(fila);
   }
 
-  async listarDeCarrera(carreraId: string): Promise<DatosPlanMejora[]> {
+  async listarDeCarrera(
+    carreraId: string,
+    filtro?: {
+      texto?: string;
+      aspecto?: AspectoPlanMejora;
+      estadoImplementacion?: EstadoImplementacion;
+      estado?: EstadoMedicion;
+    },
+  ): Promise<DatosPlanMejora[]> {
     const filas = await this.prisma.planMejora.findMany({
-      where: { carreraId },
+      where: {
+        carreraId,
+        ...(filtro?.aspecto ? { aspecto: filtro.aspecto } : {}),
+        ...(filtro?.estadoImplementacion
+          ? { estadoImplementacion: IMPLEMENTACION_A_BD[filtro.estadoImplementacion] }
+          : {}),
+        ...(filtro?.estado ? { estado: A_BD[filtro.estado] } : {}),
+        // Sin `mode: 'insensitive'` en el nombre porque MySQL/algunos
+        // collations no lo soportan igual; Postgres con collation por
+        // defecto (`en_US.utf8`/`C`) sí, y es el motor único del proyecto
+        // (CLAUDE.md §4.3) — se usa sin reparo.
+        ...(filtro?.texto
+          ? {
+              OR: [
+                { codigo: { contains: filtro.texto, mode: 'insensitive' } },
+                { nombre: { contains: filtro.texto, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
       select: SELECCION,
       orderBy: { creadoEn: 'desc' },
     });
@@ -341,5 +377,102 @@ export class PlanMejoraRepositoryPrisma implements RepositorioPlanMejoraPort, Im
     return this.prisma.planMejora.count({
       where: { aspecto, ...filtroPorAspecto(aspecto, elementoId) },
     });
+  }
+
+  /** RF-PJ-035: la copia entera, en una transacción — media copia es peor que ninguna. */
+  async copiar(datos: {
+    codigo: string;
+    version: number;
+    derivadoDeId: string;
+    contenido: CopiaPlanMejora;
+  }): Promise<DatosPlanMejora> {
+    const { contenido } = datos;
+
+    const id = await this.prisma.$transaction(async (tx) => {
+      const creado = await tx.planMejora.create({
+        data: {
+          codigo: datos.codigo,
+          version: datos.version,
+          derivadoDeId: datos.derivadoDeId,
+          aspecto: contenido.aspecto,
+          carreraId: contenido.carreraId,
+          criterioAcreditacionId: contenido.criterioAcreditacionId,
+          objetivoEducacionalId: contenido.objetivoEducacionalId,
+          competenciaId: contenido.competenciaId,
+          periodoId: contenido.periodoId,
+          planEvaluacionId: contenido.planEvaluacionId,
+          planMedicionAfectadoId: contenido.planMedicionAfectadoId,
+          nombre: contenido.nombre,
+          causaRaiz: contenido.causaRaiz,
+          justificacion: contenido.justificacion,
+          input: contenido.input,
+          plazo: contenido.plazo,
+          recursos: contenido.recursos,
+          metas: contenido.metas,
+          responsable: contenido.responsable,
+          estadoImplementacion: IMPLEMENTACION_A_BD[contenido.estadoImplementacion],
+          logroMeta: contenido.logroMeta,
+          impacto: contenido.impacto,
+        },
+      });
+
+      if (contenido.evidencias.length > 0) {
+        await tx.evidenciaPlanMejora.createMany({
+          data: contenido.evidencias.map((e) => ({
+            planMejoraId: creado.id,
+            referencia: e.referencia,
+            nombreArchivo: e.nombreArchivo,
+            subidoPor: e.subidoPor,
+            subidoEn: e.subidoEn,
+          })),
+        });
+      }
+
+      return creado.id;
+    });
+
+    return this.exigir(id);
+  }
+
+  /** RF-PJ-037: la cadena entera, se pida desde donde se pida. Mismo patrón que `linajeDe` de medición: en bucle, no CTE recursiva. */
+  async linajeDe(id: string): Promise<DatosPlanMejora[]> {
+    let raiz = await this.prisma.planMejora.findUnique({
+      where: { id },
+      select: { id: true, derivadoDeId: true },
+    });
+    if (!raiz) return [];
+
+    const vistos = new Set<string>([raiz.id]);
+    while (raiz?.derivadoDeId && !vistos.has(raiz.derivadoDeId)) {
+      vistos.add(raiz.derivadoDeId);
+      raiz = await this.prisma.planMejora.findUnique({
+        where: { id: raiz.derivadoDeId },
+        select: { id: true, derivadoDeId: true },
+      });
+    }
+    if (!raiz) return [];
+
+    const cadena: string[] = [];
+    const pendientes = [raiz.id];
+    while (pendientes.length > 0) {
+      const actual = pendientes.shift()!;
+      cadena.push(actual);
+      const hijos = await this.prisma.planMejora.findMany({
+        where: { derivadoDeId: actual },
+        select: { id: true },
+      });
+      pendientes.push(...hijos.map((h) => h.id));
+    }
+
+    const planes = await Promise.all(cadena.map((c) => this.porId(c)));
+    return planes
+      .filter((p): p is DatosPlanMejora => p !== null)
+      .sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
+  }
+
+  private async exigir(id: string): Promise<DatosPlanMejora> {
+    const plan = await this.porId(id);
+    if (!plan) throw new Error(`El plan de mejora ${id} desapareció durante la operación.`);
+    return plan;
   }
 }

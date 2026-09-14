@@ -30,7 +30,10 @@ import type {
   DatosCriterioMejora,
   DatosObjetivoMejora,
 } from '../../../../plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
-import type { ContenidoCurricularPort, PlanBase } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import type {
+  ContenidoCurricularPort,
+  PlanBase,
+} from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
 import type {
   ConfiguracionDelPlan,
@@ -112,6 +115,8 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     impacto: null,
     creadoEn: new Date('2026-03-01'),
     evidencias: [],
+    version: 1,
+    derivadoDeId: null,
     ...sobre,
   };
 }
@@ -150,6 +155,8 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
     registrarImpactoEnMedicion: async (_id, planMedicionAfectadoId) =>
       plan({ planMedicionAfectadoId }),
     listarDeCarrera: async () => [],
+    copiar: noUsado('copiar'),
+    linajeDe: noUsado('linajeDe'),
     ...sobre,
   };
 }
@@ -245,7 +252,9 @@ function evaluacionesDouble(
   };
 }
 
-function medicionesDouble(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlanMedicionPort {
+function medicionesDouble(
+  sobre: Partial<RepositorioPlanMedicionPort> = {},
+): RepositorioPlanMedicionPort {
   const noUsado = (metodo: string) => async () => {
     throw new Error(`${metodo} no se usa en este spec.`);
   };
@@ -404,7 +413,11 @@ describe('RF-PJ-001 a RF-PJ-003 y §2a del diseño de 2c-J-B — el alta', () =>
 
   it('sin carrera a cargo, se deniega antes de tocar cualquier otra cosa (fail-closed)', async () => {
     const { caso } = montar({
-      autorizacion: { puede: async () => ({ permitido: true }), permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+      autorizacion: {
+        puede: async () => ({ permitido: true }),
+        permisosDe: async () => new Set(),
+        carreraACargoDe: async () => null,
+      },
     });
 
     await expect(
@@ -470,8 +483,13 @@ describe('RF-PJ-020 a RF-PJ-022 — el aspecto Criterio de acreditación', () =>
 
   it('RF-PJ-022: alerta cuando el criterio no alcanza el mínimo de acciones', async () => {
     const { caso } = montar({
-      acreditacion: { criteriosActivosDe: async () => [criterioMejora({ id: 'cri-1', codigo: 'C-01' })] },
-      planes: { codigosDe: async () => [], parametros: async () => parametros({ minimoAccionesCriterio: 2 }) },
+      acreditacion: {
+        criteriosActivosDe: async () => [criterioMejora({ id: 'cri-1', codigo: 'C-01' })],
+      },
+      planes: {
+        codigosDe: async () => [],
+        parametros: async () => parametros({ minimoAccionesCriterio: 2 }),
+      },
     });
 
     const alertas = await caso.alertasMinimoCriterio(ACTOR, CARRERA);
@@ -491,7 +509,10 @@ describe('RF-PJ-020 a RF-PJ-022 — el aspecto Criterio de acreditación', () =>
   it('RF-PJ-022 RN1: sin alerta cuando el mínimo ya se cumple', async () => {
     const { caso } = montar({
       acreditacion: { criteriosActivosDe: async () => [criterioMejora()] },
-      planes: { codigosDe: async () => ['PJ-CRI-1'], parametros: async () => parametros({ minimoAccionesCriterio: 1 }) },
+      planes: {
+        codigosDe: async () => ['PJ-CRI-1'],
+        parametros: async () => parametros({ minimoAccionesCriterio: 1 }),
+      },
     });
 
     expect(await caso.alertasMinimoCriterio(ACTOR, CARRERA)).toEqual([]);
@@ -520,8 +541,13 @@ describe('RF-PJ-023 a RF-PJ-025 — el aspecto Objetivo educacional', () => {
 
   it('RF-PJ-025: alerta cuando el objetivo no alcanza el mínimo de acciones', async () => {
     const { caso } = montar({
-      acreditacion: { objetivosEducacionales: async () => [objetivoMejora({ id: 'obj-1', codigo: 'OE-01' })] },
-      planes: { codigosDe: async () => [], parametros: async () => parametros({ minimoAccionesObjetivo: 3 }) },
+      acreditacion: {
+        objetivosEducacionales: async () => [objetivoMejora({ id: 'obj-1', codigo: 'OE-01' })],
+      },
+      planes: {
+        codigosDe: async () => [],
+        parametros: async () => parametros({ minimoAccionesObjetivo: 3 }),
+      },
     });
 
     const alertas = await caso.alertasMinimoObjetivo(ACTOR);
@@ -561,7 +587,9 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
   });
 
   it('RF-PJ-026 RN1: rechaza un plan de evaluación de tipo Indirecta', async () => {
-    const { caso } = montar({ mediciones: { porId: async () => planMedicion({ tipo: 'INDIRECTA' }) } });
+    const { caso } = montar({
+      mediciones: { porId: async () => planMedicion({ tipo: 'INDIRECTA' }) },
+    });
 
     await expect(
       caso.crear(ACTOR, {
@@ -574,7 +602,9 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
   });
 
   it('rechaza un plan de evaluación que no está Aprobado ni Vigente', async () => {
-    const { caso } = montar({ evaluaciones: { porId: async () => planEvaluacion({ estado: 'Borrador' }) } });
+    const { caso } = montar({
+      evaluaciones: { porId: async () => planEvaluacion({ estado: 'Borrador' }) },
+    });
 
     await expect(
       caso.crear(ACTOR, {
@@ -587,7 +617,9 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
   });
 
   it('rechaza un plan de evaluación de otra carrera', async () => {
-    const { caso } = montar({ curricular: { planPorId: async () => planBase({ carreraId: 'otra-carrera' }) } });
+    const { caso } = montar({
+      curricular: { planPorId: async () => planBase({ carreraId: 'otra-carrera' }) },
+    });
 
     await expect(
       caso.crear(ACTOR, {
@@ -600,7 +632,9 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
   });
 
   it('RF-PJ-029: rechaza una competencia que no fue evaluada en la base', async () => {
-    const { caso } = montar({ mediciones: { porId: async () => planMedicion({ competenciaIds: ['otra-competencia'] }) } });
+    const { caso } = montar({
+      mediciones: { porId: async () => planMedicion({ competenciaIds: ['otra-competencia'] }) },
+    });
 
     await expect(
       caso.crear(ACTOR, {
@@ -652,7 +686,12 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
     it('null en el primer periodo (RN3)', async () => {
       const { caso } = montar();
 
-      const resultado = await caso.porcentajeAnteriorDeCompetencia(ACTOR, 'pe-1', 'comp-1', 'per-1');
+      const resultado = await caso.porcentajeAnteriorDeCompetencia(
+        ACTOR,
+        'pe-1',
+        'comp-1',
+        'per-1',
+      );
 
       expect(resultado).toBeNull();
     });
@@ -662,7 +701,12 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
         configuraciones: { del: async () => configuracionDelPlan({ mediciones: [] }) },
       });
 
-      const resultado = await caso.porcentajeAnteriorDeCompetencia(ACTOR, 'pe-1', 'comp-1', 'per-2');
+      const resultado = await caso.porcentajeAnteriorDeCompetencia(
+        ACTOR,
+        'pe-1',
+        'comp-1',
+        'per-2',
+      );
 
       expect(resultado).toBeNull();
     });
@@ -673,13 +717,23 @@ describe('RF-PJ-026 a RF-PJ-031 — el aspecto Competencia', () => {
           del: async () =>
             configuracionDelPlan({
               mediciones: [
-                { competenciaId: 'comp-1', periodoId: 'per-1', porcentajeAlcanzado: 0.65, asignaturas: [] },
+                {
+                  competenciaId: 'comp-1',
+                  periodoId: 'per-1',
+                  porcentajeAlcanzado: 0.65,
+                  asignaturas: [],
+                },
               ],
             }),
         },
       });
 
-      const resultado = await caso.porcentajeAnteriorDeCompetencia(ACTOR, 'pe-1', 'comp-1', 'per-2');
+      const resultado = await caso.porcentajeAnteriorDeCompetencia(
+        ACTOR,
+        'pe-1',
+        'comp-1',
+        'per-2',
+      );
 
       expect(resultado).toBe(0.65);
     });

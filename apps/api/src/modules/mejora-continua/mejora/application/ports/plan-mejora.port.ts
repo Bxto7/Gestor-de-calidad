@@ -20,6 +20,7 @@
  */
 
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { CopiaPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 
 export type AspectoPlanMejora = 'CRITERIO_ACREDITACION' | 'OBJETIVO_EDUCACIONAL' | 'COMPETENCIA';
@@ -68,6 +69,14 @@ export interface DatosPlanMejora extends DefinicionAccionMejora {
   readonly impacto: string | null;
   readonly creadoEn: Date;
   readonly evidencias: readonly DatosEvidencia[];
+  /**
+   * RF-PJ-037 RN1: el número de versión. Mismo campo que
+   * `DatosPlanMedicion`/`DatosPlanEvaluacion` — se replica la simetría entre
+   * los tres submódulos de `mejora-continua` (CLAUDE.md §3.2).
+   */
+  readonly version: number;
+  /** RF-PJ-035 RN1: de qué versión proviene. `null` en el alta. */
+  readonly derivadoDeId: string | null;
 }
 
 /**
@@ -123,8 +132,27 @@ export interface RepositorioPlanMejoraPort {
     id: string,
     planMedicionAfectadoId: string | null,
   ): Promise<DatosPlanMejora>;
-  /** Listado básico por carrera, sin filtros — RF-PJ-038 los añade en 2c-J-C. */
-  listarDeCarrera(carreraId: string): Promise<readonly DatosPlanMejora[]>;
+  /** RF-PJ-035: crea la copia en Borrador con todo su contenido. */
+  copiar(datos: {
+    codigo: string;
+    version: number;
+    derivadoDeId: string;
+    contenido: CopiaPlanMejora;
+  }): Promise<DatosPlanMejora>;
+
+  /** RF-PJ-037 RN1: el linaje completo, de más reciente a más antiguo. */
+  linajeDe(id: string): Promise<DatosPlanMejora[]>;
+
+  /** RF-PJ-038: listado por carrera, con filtro opcional de texto/aspecto/estado. */
+  listarDeCarrera(
+    carreraId: string,
+    filtro?: {
+      texto?: string;
+      aspecto?: AspectoPlanMejora;
+      estadoImplementacion?: EstadoImplementacion;
+      estado?: EstadoMedicion;
+    },
+  ): Promise<readonly DatosPlanMejora[]>;
 }
 
 export const REPOSITORIO_PLAN_MEJORA = Symbol('RepositorioPlanMejoraPort');

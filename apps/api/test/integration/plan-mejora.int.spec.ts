@@ -55,8 +55,16 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-function crearPlan(overrides: Partial<NuevoPlanMejora> = {}) {
-  return repo.crear({
+/**
+ * `nombre` no es parte de `NuevoPlanMejora` (RF-PJ-001/002/003 no lo
+ * captura, ver el comentario de `crear` en el repositorio) — cuando el
+ * llamador lo pide, se completa con un `editarDefinicion` extra sobre la
+ * base de `DEFINICION`, en vez de duplicar este helper para el filtro de
+ * texto de RF-PJ-038.
+ */
+function crearPlan(overrides: Partial<NuevoPlanMejora> & { nombre?: string } = {}) {
+  const { nombre, ...resto } = overrides;
+  const creado = repo.crear({
     codigo: 'PJ-1',
     aspecto: 'CRITERIO_ACREDITACION',
     carreraId: randomUUID(),
@@ -65,8 +73,20 @@ function crearPlan(overrides: Partial<NuevoPlanMejora> = {}) {
     competenciaId: null,
     periodoId: null,
     planEvaluacionId: null,
-    ...overrides,
+    ...resto,
   });
+  return nombre === undefined
+    ? creado
+    : creado.then((p) => repo.editarDefinicion(p.id, { ...DEFINICION, nombre }));
+}
+
+/**
+ * `PlanMejora` no tiene clave foránea hacia `carrera` (ver la cabecera del
+ * archivo), así que "crear una carrera" para estas pruebas es solo generar
+ * el UUID que agrupa un listado — no hace falta sembrar la tabla real.
+ */
+async function crearCarrera(): Promise<string> {
+  return randomUUID();
 }
 
 const DEFINICION = {
@@ -325,6 +345,94 @@ describe('RF-PJ-035 RN1 — el linaje', () => {
     const tras = await prisma.planMejora.findUnique({ where: { id: v2.id } });
     expect(tras).not.toBeNull();
     expect(tras?.derivadoDeId).toBeNull();
+  });
+});
+
+/**
+ * Task 4 de 2c-J-C: `copiar`/`linajeDe` a través del puerto (no del acceso
+ * directo a Prisma de arriba), y el filtro de `listarDeCarrera`.
+ */
+describe('RF-PJ-035 — copiar un plan de mejora', () => {
+  it('la copia lleva toda la definición y todo el seguimiento', async () => {
+    const origen = await crearPlan({ codigo: 'PJ-COPIA-1' });
+    await repo.editarDefinicion(origen.id, DEFINICION);
+    await repo.agregarEvidencia(origen.id, {
+      referencia: 'https://drive/ev1',
+      nombreArchivo: 'ev1.pdf',
+      subidoPor: ACTOR_ID,
+    });
+    await repo.actualizarImplementacion(origen.id, 'En proceso');
+    await repo.actualizarRetroalimentacion(origen.id, '70% cumplido', 'Mejora observable');
+    const conSeguimiento = await repo.porId(origen.id);
+
+    const copia = await repo.copiar({
+      codigo: 'PJ-COPIA-2',
+      version: 2,
+      derivadoDeId: origen.id,
+      contenido: {
+        ...conSeguimiento!,
+        evidencias: conSeguimiento!.evidencias.map((e) => ({
+          referencia: e.referencia,
+          nombreArchivo: e.nombreArchivo,
+          subidoPor: e.subidoPor,
+          subidoEn: e.subidoEn,
+        })),
+      },
+    });
+
+    expect(copia.estado).toBe('Borrador');
+    // Ruling de la Task 4 (Step 3): `DatosPlanMedicion`/`DatosPlanEvaluacion`
+    // sí exponen `version`/`derivadoDeId` — se replica esa simetría aquí, así
+    // que la copia SÍ los expone (a diferencia de lo que asumía el comentario
+    // original de este mismo test en el brief de la tarea).
+    expect(copia.derivadoDeId).toBe(origen.id);
+    expect(copia.version).toBe(2);
+    expect(copia.nombre).toBe(conSeguimiento!.nombre);
+    expect(copia.estadoImplementacion).toBe('En proceso');
+    expect(copia.logroMeta).toBe('70% cumplido');
+    expect(copia.evidencias).toHaveLength(1);
+    expect(copia.evidencias[0]?.referencia).toBe('https://drive/ev1');
+  });
+});
+
+describe('RF-PJ-037 — el linaje', () => {
+  it('devuelve la cadena de más reciente a más antigua', async () => {
+    const v1 = await crearPlan({ codigo: 'PJ-CADENA-1' });
+    const contenido1 = await repo.porId(v1.id);
+    const v2 = await repo.copiar({
+      codigo: 'PJ-CADENA-2',
+      version: 2,
+      derivadoDeId: v1.id,
+      contenido: { ...contenido1!, evidencias: [] },
+    });
+    const v3 = await repo.copiar({
+      codigo: 'PJ-CADENA-3',
+      version: 3,
+      derivadoDeId: v2.id,
+      contenido: { ...contenido1!, evidencias: [] },
+    });
+
+    for (const desde of [v1.id, v2.id, v3.id]) {
+      expect((await repo.linajeDe(desde)).map((p) => p.codigo)).toEqual([
+        'PJ-CADENA-3',
+        'PJ-CADENA-2',
+        'PJ-CADENA-1',
+      ]);
+    }
+  });
+});
+
+describe('RF-PJ-038 — filtro del listado', () => {
+  it('combina texto, aspecto y estado de implementación', async () => {
+    const carreraId = await crearCarrera();
+    await crearPlan({ codigo: 'PJ-BUSCA-1', carreraId, nombre: 'Renovar laboratorios' });
+    await crearPlan({ codigo: 'PJ-BUSCA-2', carreraId, nombre: 'Otra acción' });
+
+    const resultado = await repo.listarDeCarrera(carreraId, { texto: 'renovar' });
+    expect(resultado.map((p) => p.codigo)).toEqual(['PJ-BUSCA-1']);
+
+    const porCodigo = await repo.listarDeCarrera(carreraId, { texto: 'PJ-BUSCA-2' });
+    expect(porCodigo.map((p) => p.codigo)).toEqual(['PJ-BUSCA-2']);
   });
 });
 
