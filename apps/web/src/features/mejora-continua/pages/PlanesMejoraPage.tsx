@@ -1,12 +1,15 @@
 /**
- * RF-PJ-001 a RF-PJ-038 (base): el listado de planes de mejora, sin las
- * pantallas incrustadas en Criterios/Atributos/Competencias que 2c-J-A había
- * dejado como posibilidad — módulo de nivel superior, igual a medición y
- * evaluación (ver diseño del 11 de septiembre de 2026).
+ * RF-PJ-001 a RF-PJ-038: el listado de planes de mejora, sin las pantallas
+ * incrustadas en Criterios/Atributos/Competencias que 2c-J-A había dejado
+ * como posibilidad — módulo de nivel superior, igual a medición y evaluación
+ * (ver diseño del 11 de septiembre de 2026).
  *
- * Sin texto ni filtros por aspecto/estado todavía: RF-PJ-038 los añade en el
- * ciclo siguiente. Aquí solo se filtra por carrera, igual que
- * `CriteriosPage.tsx`.
+ * RF-PJ-038: búsqueda por texto y filtros por aspecto, estado de
+ * implementación y estado documental, además del filtro por carrera. El
+ * selector de estado documental reutiliza `TONO_ESTADO` en vez de una
+ * constante `ESTADOS_MEDICION` — no existe tal constante en el dominio web,
+ * y `PlanesMedicionPage.tsx`/`PlanesEvaluacionPage.tsx` ya listan sus
+ * opciones con `Object.keys(TONO_ESTADO)`.
  */
 
 import { useEffect, useState } from 'react';
@@ -21,6 +24,7 @@ import {
   Boton,
   CabeceraSeccion,
   Cargando,
+  Entrada,
   EstadoVacio,
   Selector,
 } from '@/shared/components/ui';
@@ -28,7 +32,13 @@ import {
 import { ModalNuevoPlanMejora } from '../components/ModalNuevoPlanMejora';
 import { TONO_ESTADO } from '../domain/estado-medicion';
 import { usePlanesMejora } from '../api/queries';
-import type { AspectoPlanMejora, PlanMejora } from '../domain/tipos';
+import {
+  ESTADOS_IMPLEMENTACION,
+  type AspectoPlanMejora,
+  type EstadoImplementacion,
+  type EstadoMedicion,
+  type PlanMejora,
+} from '../domain/tipos';
 
 const ETIQUETA_ASPECTO: Record<AspectoPlanMejora, string> = {
   CRITERIO_ACREDITACION: 'Criterio de Acreditación',
@@ -42,10 +52,20 @@ export function PlanesMejoraPage() {
   const { data: carreras } = useCarreras();
   const [elegida, setElegida] = useState('');
   const [creando, setCreando] = useState(false);
+  const [texto, setTexto] = useState('');
+  const [aspecto, setAspecto] = useState<AspectoPlanMejora | ''>('');
+  const [estadoImplementacion, setEstadoImplementacion] = useState<EstadoImplementacion | ''>('');
+  const [estado, setEstado] = useState<EstadoMedicion | ''>('');
 
   const carreraId = elegida || (carreras?.[0]?.id ?? '');
 
-  const { data: planes, isLoading } = usePlanesMejora({ carreraId });
+  const { data: planes, isLoading } = usePlanesMejora({
+    carreraId,
+    texto: texto || undefined,
+    aspecto: aspecto || undefined,
+    estadoImplementacion: estadoImplementacion || undefined,
+    estado: estado || undefined,
+  });
   const { data: criterios } = useCriterios(carreraId);
   const { data: objetivos } = useObjetivos();
   const { data: competencias } = useCompetencias();
@@ -91,6 +111,51 @@ export function PlanesMejoraPage() {
           </option>
         ))}
       </Selector>
+
+      <div className="flex flex-wrap gap-3">
+        <Entrada
+          role="searchbox"
+          aria-label="Buscar por código o nombre"
+          placeholder="Buscar por código o nombre…"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          className="max-w-xs"
+        />
+        <Selector
+          aria-label="Aspecto"
+          value={aspecto}
+          onChange={(e) => setAspecto(e.target.value as AspectoPlanMejora | '')}
+        >
+          <option value="">Todos los aspectos</option>
+          <option value="CRITERIO_ACREDITACION">Criterio de acreditación</option>
+          <option value="OBJETIVO_EDUCACIONAL">Objetivo educacional</option>
+          <option value="COMPETENCIA">Competencia</option>
+        </Selector>
+        <Selector
+          aria-label="Estado de implementación"
+          value={estadoImplementacion}
+          onChange={(e) => setEstadoImplementacion(e.target.value as EstadoImplementacion | '')}
+        >
+          <option value="">Toda implementación</option>
+          {ESTADOS_IMPLEMENTACION.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </Selector>
+        <Selector
+          aria-label="Estado documental"
+          value={estado}
+          onChange={(e) => setEstado(e.target.value as EstadoMedicion | '')}
+        >
+          <option value="">Todo estado</option>
+          {Object.keys(TONO_ESTADO).map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </Selector>
+      </div>
 
       {isLoading ? (
         <Cargando etiqueta="Cargando planes de mejora…" />
