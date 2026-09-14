@@ -605,19 +605,13 @@ export function PlanMejoraPage() {
                 estadoActual={plan.estado}
                 generandoVersion={nuevaVersion.isPending}
                 onGenerarVersion={
-                  // RF-PJ-034 exige `mejora.crear`, el mismo permiso del caso de
+                  // RF-PJ-035 exige `mejora.crear`, el mismo permiso del caso de
                   // uso de versionado — no `mejora.editar`, que es el de este
                   // plan y no el de la copia que se crearía.
                   puede('mejora.crear')
                     ? () =>
                         void ejecutar(async () => {
-                          // `useMutacionDePlanMejora` tipa `mutateAsync` como
-                          // `Promise<unknown>` (no lleva un segundo genérico
-                          // para el dato, a diferencia de `useMutacionDelPlan`
-                          // y `useMutacionDeEvaluacion`): el backend sí
-                          // devuelve el plan recién creado, como confirma
-                          // `versionar-plan-mejora.use-case.ts`.
-                          const creado = (await nuevaVersion.mutateAsync(undefined)) as PlanMejora;
+                          const creado = await nuevaVersion.mutateAsync(undefined);
                           void navegar(`/mejora-continua/mejora/${creado.id}`);
                         })
                     : undefined

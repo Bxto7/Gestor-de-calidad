@@ -61,3 +61,20 @@ describe('clavesMejora.lista — Planes de Mejora', () => {
     expect(sinFiltro).not.toEqual(conTexto);
   });
 });
+
+describe('clavesMejora.plan — jerarquía con versiones y documentos', () => {
+  it('es prefijo de versiones y documentos, para que invalidar el plan las alcance también', () => {
+    // Regresión: `plan` solía ser `['mejora', 'plan', id]`, una rama hermana
+    // de `['mejora', id, 'versiones']`/`['mejora', id, 'documentos']` — no un
+    // prefijo. `invalidateQueries({ queryKey: clavesMejora.plan(id) })` nunca
+    // llegaba a esas dos, así que editar el plan dejaba las pestañas de
+    // Versiones/Documentos con datos viejos. Ver `useMutacionDePlanMejora`.
+    const id = 'plan-1';
+    const plan = clavesMejora.plan(id);
+    const versiones = clavesMejora.versiones(id);
+    const documentos = clavesMejora.documentos(id);
+
+    expect(versiones.slice(0, plan.length)).toEqual(plan);
+    expect(documentos.slice(0, plan.length)).toEqual(plan);
+  });
+});

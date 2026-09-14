@@ -564,7 +564,12 @@ export const clavesMejora = {
       f.estadoImplementacion ?? 'todos',
       f.estado ?? 'todos',
     ] as const,
-  plan: (id: string) => ['mejora', 'plan', id] as const,
+  // `plan` cuelga directo de `['mejora', id]` —igual que `claves.plan`
+  // (medición) y el `plan` de evaluación— así que invalidar el plan también
+  // invalida `versiones` y `documentos`, que ya colgaban de ese mismo prefijo.
+  // Antes era `['mejora', 'plan', id]`, una rama hermana que no cubría a
+  // ninguna de las dos.
+  plan: (id: string) => ['mejora', id] as const,
   historial: (id: string) => ['mejora', 'historial', id] as const,
   versiones: (id: string) => ['mejora', id, 'versiones'] as const,
   documentos: (id: string) => ['mejora', id, 'documentos'] as const,
@@ -594,8 +599,8 @@ export function useHistorialMejora(id: string) {
   });
 }
 
-function useMutacionDePlanMejora<TVars>(
-  fn: (v: TVars) => Promise<unknown>,
+function useMutacionDePlanMejora<TVars, TDatos>(
+  fn: (v: TVars) => Promise<TDatos>,
   idDe: (v: TVars) => string,
 ) {
   const qc = useQueryClient();
