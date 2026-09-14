@@ -96,6 +96,8 @@ function montar(
   opciones: {
     repo?: Partial<RepositorioPlanMejoraPort>;
     autorizacion?: AuthorizationPort;
+    /** Códigos que `codigosDe` devuelve, sin dejar de capturar con qué se la llamó. */
+    codigosUsados?: readonly string[];
   } = {},
 ) {
   const vistos: DomainEvent[] = [];
@@ -106,7 +108,7 @@ function montar(
     porId: async () => plan(),
     codigosDe: async (aspecto: string, elementoId: string) => {
       vistoCodigosDe.push([aspecto, elementoId]);
-      return [] as readonly string[];
+      return opciones.codigosUsados ?? ([] as readonly string[]);
     },
     copiar: async (datos: DatosCopiar) => {
       copiados.push(datos);
@@ -135,7 +137,7 @@ function montar(
 
 describe('RF-PJ-035 — nueva versión', () => {
   it('nace en Borrador, vinculada al origen y con el siguiente correlativo del ámbito', async () => {
-    const { caso, copiados } = montar({
+    const { caso, copiados, vistoCodigosDe } = montar({
       repo: {
         porId: async () =>
           plan({
@@ -145,8 +147,8 @@ describe('RF-PJ-035 — nueva versión', () => {
             criterioAcreditacionId: 'crit-1',
             codigo: 'PJ-CRI-3',
           }),
-        codigosDe: async () => ['PJ-CRI-1', 'PJ-CRI-2', 'PJ-CRI-3'],
       },
+      codigosUsados: ['PJ-CRI-1', 'PJ-CRI-2', 'PJ-CRI-3'],
     });
 
     await caso.generarNuevaVersion(ACTOR, 'pj-1');
@@ -154,6 +156,34 @@ describe('RF-PJ-035 — nueva versión', () => {
     expect(copiados[0]?.derivadoDeId).toBe('pj-1');
     expect(copiados[0]?.codigo).toBe('PJ-CRI-4');
     expect(copiados[0]?.version).toBe(2);
+    // El ámbito de CRITERIO_ACREDITACION es el criterio, no el objetivo: una
+    // permutación en `elementoDe()` pasaría el resto de la prueba igual.
+    expect(vistoCodigosDe).toEqual([['CRITERIO_ACREDITACION', 'crit-1']]);
+  });
+
+  it('para Objetivo educacional, el ámbito del correlativo es el objetivo', async () => {
+    const { caso, copiados, vistoCodigosDe } = montar({
+      repo: {
+        porId: async () =>
+          plan({
+            id: 'pj-3',
+            estado: 'Vigente',
+            aspecto: 'OBJETIVO_EDUCACIONAL',
+            criterioAcreditacionId: null,
+            objetivoEducacionalId: 'obj-1',
+            codigo: 'PJ-OBJ-1',
+          }),
+      },
+      codigosUsados: ['PJ-OBJ-1'],
+    });
+
+    await caso.generarNuevaVersion(ACTOR, 'pj-3');
+
+    expect(copiados[0]?.codigo).toBe('PJ-OBJ-2');
+    // Mismo motivo que el caso de Criterio de acreditación: si `elementoDe()`
+    // cayera siempre al primer `if`, esto seguiría devolviendo un código válido
+    // pero con el ámbito equivocado.
+    expect(vistoCodigosDe).toEqual([['OBJETIVO_EDUCACIONAL', 'obj-1']]);
   });
 
   it('para Competencia, el ámbito del correlativo es el periodo, no la competencia', async () => {
