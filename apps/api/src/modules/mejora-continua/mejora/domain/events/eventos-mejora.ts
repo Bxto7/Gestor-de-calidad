@@ -165,3 +165,25 @@ export class PlanMejoraVersionado extends EventoMejora {
     this.detalle = `Nueva versión ${codigo}, derivada de ${codigoOrigen}.`;
   }
 }
+
+/**
+ * RF-PJ-032. Se registra al pedirlo y no al terminarlo: lo que la
+ * acreditación pregunta es quién se llevó la evidencia, y eso se sabe aquí.
+ * Si la generación falla después, el estado del trabajo lo cuenta; la
+ * petición ocurrió igual. Mismo criterio que `DocumentoEvaluacionSolicitado`
+ * y `DocumentoMedicionSolicitado`.
+ */
+export class DocumentoMejoraSolicitado extends EventoMejora {
+  readonly nombre = 'mejora.documento';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    tipo: string,
+  ) {
+    super(actor);
+    this.detalle = `Documento ${tipo} solicitado para ${codigo}.`;
+  }
+}
