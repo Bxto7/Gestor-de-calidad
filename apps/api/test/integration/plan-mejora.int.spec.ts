@@ -28,6 +28,7 @@ import type {
   DatosPlanMejora,
   NuevoPlanMejora,
 } from '../../src/modules/mejora-continua/mejora/application/ports/plan-mejora.port.js';
+import type { EstadoImplementacion } from '../../src/modules/mejora-continua/mejora/domain/value-objects/estado-implementacion.js';
 import { PlanMejoraRepositoryPrisma } from '../../src/modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
 import { GestionarPlanesMejora } from '../../src/modules/mejora-continua/mejora/application/use-cases/gestionar-planes-mejora.use-case.js';
 import { PlanEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
@@ -56,14 +57,19 @@ afterAll(async () => {
 });
 
 /**
- * `nombre` no es parte de `NuevoPlanMejora` (RF-PJ-001/002/003 no lo
- * captura, ver el comentario de `crear` en el repositorio) — cuando el
- * llamador lo pide, se completa con un `editarDefinicion` extra sobre la
- * base de `DEFINICION`, en vez de duplicar este helper para el filtro de
- * texto de RF-PJ-038.
+ * `nombre` y `estadoImplementacion` no son parte de `NuevoPlanMejora`
+ * (RF-PJ-001/002/003 no los captura, ver el comentario de `crear` en el
+ * repositorio) — cuando el llamador los pide, se completan con un
+ * `editarDefinicion`/`actualizarImplementacion` extra, en vez de duplicar
+ * este helper para los filtros de RF-PJ-038.
  */
-function crearPlan(overrides: Partial<NuevoPlanMejora> & { nombre?: string } = {}) {
-  const { nombre, ...resto } = overrides;
+function crearPlan(
+  overrides: Partial<NuevoPlanMejora> & {
+    nombre?: string;
+    estadoImplementacion?: EstadoImplementacion;
+  } = {},
+) {
+  const { nombre, estadoImplementacion, ...resto } = overrides;
   const creado = repo.crear({
     codigo: 'PJ-1',
     aspecto: 'CRITERIO_ACREDITACION',
@@ -75,9 +81,16 @@ function crearPlan(overrides: Partial<NuevoPlanMejora> & { nombre?: string } = {
     planEvaluacionId: null,
     ...resto,
   });
-  return nombre === undefined
-    ? creado
-    : creado.then((p) => repo.editarDefinicion(p.id, { ...DEFINICION, nombre }));
+  if (nombre === undefined && estadoImplementacion === undefined) return creado;
+  return creado.then(async (p) => {
+    let actual = p;
+    if (nombre !== undefined)
+      actual = await repo.editarDefinicion(actual.id, { ...DEFINICION, nombre });
+    if (estadoImplementacion !== undefined) {
+      actual = await repo.actualizarImplementacion(actual.id, estadoImplementacion);
+    }
+    return actual;
+  });
 }
 
 /**
@@ -423,7 +436,7 @@ describe('RF-PJ-037 — el linaje', () => {
 });
 
 describe('RF-PJ-038 — filtro del listado', () => {
-  it('combina texto, aspecto y estado de implementación', async () => {
+  it('filtra por texto, sobre código o nombre', async () => {
     const carreraId = await crearCarrera();
     await crearPlan({ codigo: 'PJ-BUSCA-1', carreraId, nombre: 'Renovar laboratorios' });
     await crearPlan({ codigo: 'PJ-BUSCA-2', carreraId, nombre: 'Otra acción' });
@@ -433,6 +446,77 @@ describe('RF-PJ-038 — filtro del listado', () => {
 
     const porCodigo = await repo.listarDeCarrera(carreraId, { texto: 'PJ-BUSCA-2' });
     expect(porCodigo.map((p) => p.codigo)).toEqual(['PJ-BUSCA-2']);
+  });
+
+  it('filtra por aspecto, sin mezclar los otros dos', async () => {
+    const carreraId = await crearCarrera();
+    await crearPlan({ codigo: 'PJ-ASP-CRI', carreraId, aspecto: 'CRITERIO_ACREDITACION' });
+    await crearPlan({
+      codigo: 'PJ-ASP-OBJ',
+      carreraId,
+      aspecto: 'OBJETIVO_EDUCACIONAL',
+      criterioAcreditacionId: null,
+      objetivoEducacionalId: randomUUID(),
+    });
+    await crearPlan({
+      codigo: 'PJ-ASP-COM',
+      carreraId,
+      aspecto: 'COMPETENCIA',
+      criterioAcreditacionId: null,
+      competenciaId: randomUUID(),
+      periodoId: randomUUID(),
+    });
+
+    const resultado = await repo.listarDeCarrera(carreraId, { aspecto: 'OBJETIVO_EDUCACIONAL' });
+    expect(resultado.map((p) => p.codigo)).toEqual(['PJ-ASP-OBJ']);
+  });
+
+  it('filtra por estado de implementación', async () => {
+    const carreraId = await crearCarrera();
+    await crearPlan({ codigo: 'PJ-IMPL-1', carreraId, estadoImplementacion: 'En proceso' });
+    await crearPlan({ codigo: 'PJ-IMPL-2', carreraId });
+
+    const resultado = await repo.listarDeCarrera(carreraId, { estadoImplementacion: 'En proceso' });
+    expect(resultado.map((p) => p.codigo)).toEqual(['PJ-IMPL-1']);
+  });
+
+  it('combina texto, aspecto y estado de implementación a la vez', async () => {
+    const carreraId = await crearCarrera();
+    // Calza los tres criterios.
+    await crearPlan({
+      codigo: 'PJ-COMBO-1',
+      carreraId,
+      aspecto: 'OBJETIVO_EDUCACIONAL',
+      criterioAcreditacionId: null,
+      objetivoEducacionalId: randomUUID(),
+      nombre: 'Renovar laboratorios',
+      estadoImplementacion: 'En proceso',
+    });
+    // Mismo aspecto y estado, nombre/código que no calza por texto.
+    await crearPlan({
+      codigo: 'PJ-COMBO-2',
+      carreraId,
+      aspecto: 'OBJETIVO_EDUCACIONAL',
+      criterioAcreditacionId: null,
+      objetivoEducacionalId: randomUUID(),
+      nombre: 'Otra acción',
+      estadoImplementacion: 'En proceso',
+    });
+    // Mismo texto y estado, pero aspecto distinto (default CRITERIO_ACREDITACION).
+    await crearPlan({
+      codigo: 'PJ-COMBO-3',
+      carreraId,
+      nombre: 'Renovar biblioteca',
+      estadoImplementacion: 'En proceso',
+    });
+
+    const resultado = await repo.listarDeCarrera(carreraId, {
+      texto: 'renovar',
+      aspecto: 'OBJETIVO_EDUCACIONAL',
+      estadoImplementacion: 'En proceso',
+    });
+
+    expect(resultado.map((p) => p.codigo)).toEqual(['PJ-COMBO-1']);
   });
 });
 
