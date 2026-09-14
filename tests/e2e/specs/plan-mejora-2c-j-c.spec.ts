@@ -67,7 +67,7 @@ test.describe('con la cuenta que aprueba', () => {
   test('generar una nueva versión y verla en el linaje', async ({ page }) => {
     await crearPlanMejora(page);
 
-    // RF-PJ-034 RN: «Generar nueva versión» solo cabe desde Aprobado, Vigente
+    // RF-PJ-035 RN: «Generar nueva versión» solo cabe desde Aprobado, Vigente
     // o Histórico — hace falta salir de Borrador primero.
     await page.getByRole('button', { name: 'Enviar a revisión' }).click();
     await page.getByRole('button', { name: 'Aprobar' }).click();

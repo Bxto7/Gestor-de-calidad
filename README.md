@@ -261,9 +261,12 @@ artefactos de compilación viven fuera del control de versiones.
   —estado de implementación, evidencias, logro de meta e impacto— editable
   también con el plan Vigente (RF-PJ-014 a RF-PJ-019); y, del ciclo 2c-J-C:
   **documentos** (RF-PJ-032 a RF-PJ-034, PDF y Excel por la misma cola de
-  BullMQ que Medición y Evaluación), **versionado** (RF-PJ-034 a RF-PJ-037:
-  una sola operación que copia la definición pero no el seguimiento, y deja el
-  linaje en solo lectura) y **búsqueda y filtros** por texto, aspecto, estado
+  BullMQ que Medición y Evaluación), **versionado** (RF-PJ-035 a RF-PJ-037:
+  una sola operación que conserva íntegro tanto la definición como el
+  seguimiento —evidencias, logro de meta, impacto, estado de implementación—
+  de la versión origen, a diferencia de Evaluación, que descarta el
+  seguimiento; y deja el linaje en solo lectura) y **búsqueda y filtros** por
+  texto, aspecto, estado
   de implementación y estado documental (RF-PJ-038).
 - Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
   aviso de impacto al editar un atributo que ya usan competencias o planes

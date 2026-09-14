@@ -248,7 +248,7 @@ test.describe('con la cuenta que aprueba', () => {
   test('la pestaña de versiones del plan de mejora, con un linaje real', async ({ page }) => {
     await crearPlanMejora(page);
 
-    // RF-PJ-034 RN (misma regla que RF-PE-034 en Evaluación): «Generar nueva
+    // RF-PJ-035 RN (misma regla que RF-PE-034 en Evaluación): «Generar nueva
     // versión» solo cabe desde Aprobado, Vigente o Histórico — hace falta
     // salir de Borrador primero.
     await page.getByRole('button', { name: 'Enviar a revisión' }).click();

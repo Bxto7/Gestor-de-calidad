@@ -45,10 +45,10 @@ export interface DocumentosDelPlanMejoraProps {
   /** Hay una petición en vuelo: los botones no aceptan un segundo clic. */
   readonly generando: boolean;
   /**
-   * A diferencia de la generación de lectura, `encolar` aquí exige
-   * `mejora.editar`: exportar sí muta. Por eso es opcional — quien la usa
-   * solo la pasa cuando el permiso lo permite, y sin ella los botones ni se
-   * pintan, en vez de dejar que el clic termine en un 403 silencioso.
+   * `encolar` exige `mejora.leer` (exportar es leer, igual que en Medición),
+   * no `mejora.editar`. Por eso es opcional — quien la usa solo la pasa
+   * cuando el permiso lo permite, y sin ella los botones ni se pintan, en
+   * vez de dejar que el clic termine en un 403 silencioso.
    */
   readonly onGenerar?: (tipo: TipoDocumentoMejora) => void;
   readonly onDescargar: (id: string) => void;
