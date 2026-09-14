@@ -254,6 +254,9 @@ export type EstadoImplementacion = (typeof ESTADOS_IMPLEMENTACION)[number];
 
 export type AspectoPlanMejora = 'CRITERIO_ACREDITACION' | 'OBJETIVO_EDUCACIONAL' | 'COMPETENCIA';
 
+/** RF-PJ-032 a RF-PJ-034: el mismo par PDF/Excel de medición y evaluación, del plan de mejora. */
+export type TipoDocumentoMejora = 'PLAN_MEJORA_PDF' | 'PLAN_MEJORA_EXCEL';
+
 export interface EvidenciaPlanMejora {
   readonly id: string;
   readonly planMejoraId: string;

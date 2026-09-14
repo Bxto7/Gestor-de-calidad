@@ -5,18 +5,35 @@
  * Los componentes no importan este archivo: hablan con `queries.ts`.
  */
 
-import { cliente } from '@/shared/api/cliente';
+import { cliente, type ArchivoDescargado } from '@/shared/api/cliente';
 
 import type {
   AspectoPlanMejora,
   EstadoImplementacion,
+  EstadoMedicion,
   EventoBitacora,
   EvidenciaPlanMejora,
   PlanMejora,
+  TipoDocumentoMejora,
+  TrabajoDocumento,
 } from '../domain/tipos';
 
-export async function listarPlanesMejora(carreraId: string): Promise<PlanMejora[]> {
-  return cliente.get<PlanMejora[]>('/planes-mejora', { carreraId });
+export interface FiltroMejora {
+  carreraId: string;
+  texto?: string;
+  aspecto?: AspectoPlanMejora;
+  estadoImplementacion?: EstadoImplementacion;
+  estado?: EstadoMedicion;
+}
+
+export async function listarPlanesMejora(filtro: FiltroMejora): Promise<PlanMejora[]> {
+  return cliente.get<PlanMejora[]>('/planes-mejora', {
+    carreraId: filtro.carreraId,
+    texto: filtro.texto,
+    aspecto: filtro.aspecto,
+    estadoImplementacion: filtro.estadoImplementacion,
+    estado: filtro.estado,
+  });
 }
 
 export async function obtenerPlanMejora(id: string): Promise<PlanMejora> {
@@ -52,7 +69,8 @@ export async function editarDefinicionMejora(
   return cliente.patch<PlanMejora>(`/planes-mejora/${id}/definicion`, datos);
 }
 
-export type AccionMejora = 'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
+export type AccionMejora =
+  'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
 
 export async function transicionarMejora(
   id: string,
@@ -109,4 +127,35 @@ export async function historialDeMejora(id: string): Promise<EventoBitacora[]> {
     entidadId: id,
     limite: 50,
   });
+}
+
+/* ── Versionado (RF-PJ-035, RF-PJ-037) ──────────────────────────────────── */
+
+export async function generarNuevaVersionMejora(id: string): Promise<PlanMejora> {
+  return cliente.post<PlanMejora>(`/planes-mejora/${id}/versiones`);
+}
+
+export async function versionesDeMejora(id: string): Promise<PlanMejora[]> {
+  return cliente.get<PlanMejora[]>(`/planes-mejora/${id}/versiones`);
+}
+
+/* ── Documentos (RF-PJ-032 a RF-PJ-034) ─────────────────────────────────── */
+
+export async function generarDocumentoMejora(
+  id: string,
+  tipo: TipoDocumentoMejora,
+): Promise<TrabajoDocumento<TipoDocumentoMejora>> {
+  return cliente.post<TrabajoDocumento<TipoDocumentoMejora>>(`/planes-mejora/${id}/documentos`, {
+    tipo,
+  });
+}
+
+export async function documentosDeMejora(
+  id: string,
+): Promise<TrabajoDocumento<TipoDocumentoMejora>[]> {
+  return cliente.get<TrabajoDocumento<TipoDocumentoMejora>[]>(`/planes-mejora/${id}/documentos`);
+}
+
+export async function descargarDocumentoMejora(id: string): Promise<ArchivoDescargado> {
+  return cliente.descargar(`/documentos-mejora/${id}/archivo`);
 }

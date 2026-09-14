@@ -45,7 +45,7 @@ export function PlanesMejoraPage() {
 
   const carreraId = elegida || (carreras?.[0]?.id ?? '');
 
-  const { data: planes, isLoading } = usePlanesMejora(carreraId);
+  const { data: planes, isLoading } = usePlanesMejora({ carreraId });
   const { data: criterios } = useCriterios(carreraId);
   const { data: objetivos } = useObjetivos();
   const { data: competencias } = useCompetencias();
@@ -104,18 +104,31 @@ export function PlanesMejoraPage() {
           <caption className="sr-only">Planes de mejora de la carrera elegida</caption>
           <thead>
             <tr className="border-b border-borde text-left text-tinta-suave">
-              <th scope="col" className="py-2 pr-4">Código</th>
-              <th scope="col" className="py-2 pr-4">Aspecto</th>
-              <th scope="col" className="py-2 pr-4">Elemento</th>
-              <th scope="col" className="py-2 pr-4">Estado</th>
-              <th scope="col" className="py-2 pr-4">Implementación</th>
+              <th scope="col" className="py-2 pr-4">
+                Código
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Aspecto
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Elemento
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Estado
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Implementación
+              </th>
             </tr>
           </thead>
           <tbody>
             {(planes ?? []).map((p) => (
               <tr key={p.id} className="border-b border-borde">
                 <td className="py-2 pr-4">
-                  <Link to={`/mejora-continua/mejora/${p.id}`} className="text-uc-primary hover:underline">
+                  <Link
+                    to={`/mejora-continua/mejora/${p.id}`}
+                    className="text-uc-primary hover:underline"
+                  >
                     {p.codigo}
                   </Link>
                 </td>

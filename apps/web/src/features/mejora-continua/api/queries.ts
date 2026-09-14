@@ -22,12 +22,8 @@ import * as evaluacionApi from './evaluacion.api';
 import type { FiltroEvaluaciones } from './evaluacion.api';
 import * as configuracionApi from './configuracion-evaluacion.api';
 import * as mejoraApi from './mejora.api';
-import type {
-  AccionMejora,
-  DatosCrearPlanMejora,
-  DefinicionPlanMejora,
-} from './mejora.api';
-import type { EstadoImplementacion } from '../domain/tipos';
+import type { AccionMejora, DatosCrearPlanMejora, DefinicionPlanMejora } from './mejora.api';
+import type { EstadoImplementacion, TipoDocumentoMejora } from '../domain/tipos';
 
 export const claves = {
   planes: (filtro?: api.FiltroPlanes) =>
@@ -415,7 +411,8 @@ export function useDocumentosEvaluacion(id: string) {
 export function useGenerarDocumentoEvaluacion(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (tipo: TipoDocumentoEvaluacion) => evaluacionApi.generarDocumentoEvaluacion(id, tipo),
+    mutationFn: (tipo: TipoDocumentoEvaluacion) =>
+      evaluacionApi.generarDocumentoEvaluacion(id, tipo),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: clavesEval.documentos(id) });
     },
@@ -557,16 +554,27 @@ export function useGuardarResultados(planId: string) {
 /* ── Plan de Mejora ────────────────────────────────────────────────────── */
 
 export const clavesMejora = {
-  lista: (carreraId: string) => ['mejora', 'lista', carreraId] as const,
+  lista: (f: mejoraApi.FiltroMejora) =>
+    [
+      'mejora',
+      'lista',
+      f.carreraId,
+      f.texto ?? '',
+      f.aspecto ?? 'todos',
+      f.estadoImplementacion ?? 'todos',
+      f.estado ?? 'todos',
+    ] as const,
   plan: (id: string) => ['mejora', 'plan', id] as const,
   historial: (id: string) => ['mejora', 'historial', id] as const,
+  versiones: (id: string) => ['mejora', id, 'versiones'] as const,
+  documentos: (id: string) => ['mejora', id, 'documentos'] as const,
 };
 
-export function usePlanesMejora(carreraId: string) {
+export function usePlanesMejora(filtro: mejoraApi.FiltroMejora) {
   return useQuery({
-    queryKey: clavesMejora.lista(carreraId),
-    queryFn: () => mejoraApi.listarPlanesMejora(carreraId),
-    enabled: !!carreraId,
+    queryKey: clavesMejora.lista(filtro),
+    queryFn: () => mejoraApi.listarPlanesMejora(filtro),
+    enabled: !!filtro.carreraId,
   });
 }
 
@@ -656,4 +664,50 @@ export function useActualizarRetroalimentacionMejora() {
       mejoraApi.actualizarRetroalimentacionMejora(v.id, v.logroMeta, v.impacto),
     (v) => v.id,
   );
+}
+
+/* ── Versionado y documentos (RF-PJ-032 a RF-PJ-037) ──────────────────────── */
+
+export function useVersionesMejora(id: string) {
+  return useQuery({
+    queryKey: clavesMejora.versiones(id),
+    queryFn: () => mejoraApi.versionesDeMejora(id),
+    enabled: !!id,
+  });
+}
+
+export function useNuevaVersionMejora(id: string) {
+  return useMutacionDePlanMejora(
+    () => mejoraApi.generarNuevaVersionMejora(id),
+    () => id,
+  );
+}
+
+/**
+ * RF-PJ-032 a RF-PJ-034: los documentos generados del plan.
+ *
+ * Mismo patrón de sondeo que `useDocumentos` (medición) y
+ * `useDocumentosEvaluacion`: mientras haya un trabajo «En cola» o
+ * «Generando» vuelve a preguntar sola cada 2 s.
+ */
+export function useDocumentosMejora(id: string) {
+  return useQuery({
+    queryKey: clavesMejora.documentos(id),
+    queryFn: () => mejoraApi.documentosDeMejora(id),
+    enabled: !!id,
+    refetchInterval: (consulta) =>
+      (consulta.state.data ?? []).some((t) => t.estado === 'En cola' || t.estado === 'Generando')
+        ? 2_000
+        : false,
+  });
+}
+
+export function useGenerarDocumentoMejora(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tipo: TipoDocumentoMejora) => mejoraApi.generarDocumentoMejora(id, tipo),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: clavesMejora.documentos(id) });
+    },
+  });
 }

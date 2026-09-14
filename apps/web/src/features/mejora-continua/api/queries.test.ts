@@ -48,9 +48,16 @@ describe('clavesEval.lista — Planes de Evaluación', () => {
 
 describe('clavesMejora.lista — Planes de Mejora', () => {
   it('cambia con la carrera', () => {
-    const a = clavesMejora.lista('carrera-a');
-    const b = clavesMejora.lista('carrera-b');
+    const a = clavesMejora.lista({ carreraId: 'carrera-a' });
+    const b = clavesMejora.lista({ carreraId: 'carrera-b' });
 
     expect(a).not.toEqual(b);
+  });
+
+  it('clavesMejora.lista distingue por filtro, como clavesEval', () => {
+    const sinFiltro = clavesMejora.lista({ carreraId: 'c1' });
+    const conTexto = clavesMejora.lista({ carreraId: 'c1', texto: 'renovar' });
+
+    expect(sinFiltro).not.toEqual(conTexto);
   });
 });
