@@ -166,6 +166,12 @@ export class PlanMejoraVersionado extends EventoMejora {
   }
 }
 
+/** Nombre legible de cada formato, para la bitácora y para los mensajes de error. */
+export const NOMBRE_DOCUMENTO_MEJORA: Readonly<Record<string, string>> = {
+  PLAN_MEJORA_PDF: 'PDF',
+  PLAN_MEJORA_EXCEL: 'Excel',
+};
+
 /**
  * RF-PJ-032. Se registra al pedirlo y no al terminarlo: lo que la
  * acreditación pregunta es quién se llevó la evidencia, y eso se sabe aquí.
@@ -184,6 +190,6 @@ export class DocumentoMejoraSolicitado extends EventoMejora {
     tipo: string,
   ) {
     super(actor);
-    this.detalle = `Documento ${tipo} solicitado para ${codigo}.`;
+    this.detalle = `Exportación de ${codigo} en ${NOMBRE_DOCUMENTO_MEJORA[tipo] ?? tipo}.`;
   }
 }
