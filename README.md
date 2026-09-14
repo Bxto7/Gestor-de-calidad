@@ -253,6 +253,18 @@ artefactos de compilación viven fuera del control de versiones.
   es lo que ocurrió en un periodo concreto y no se hereda; el linaje se
   consulta de la más reciente a la más antigua, y una versión histórica se abre
   en solo lectura.
+- Submódulo **Planes de Mejora, 39 de 47 (RF-PJ-001 a RF-PJ-038)**: acciones de
+  mejora sobre los tres aspectos —Criterio de Acreditación, Objetivo
+  Educacional y Competencia—, cada una con su propio ciclo de vida
+  (`mejora.*`) y bitácora; definición guardada campo por campo desde Borrador
+  (RF-PJ-006, sin exigir los seis campos de texto a la vez); seguimiento
+  —estado de implementación, evidencias, logro de meta e impacto— editable
+  también con el plan Vigente (RF-PJ-014 a RF-PJ-019); y, del ciclo 2c-J-C:
+  **documentos** (RF-PJ-032 a RF-PJ-034, PDF y Excel por la misma cola de
+  BullMQ que Medición y Evaluación), **versionado** (RF-PJ-034 a RF-PJ-037:
+  una sola operación que copia la definición pero no el seguimiento, y deja el
+  linaje en solo lectura) y **búsqueda y filtros** por texto, aspecto, estado
+  de implementación y estado documental (RF-PJ-038).
 - Pantallas de Atributos del Graduado y de Criterios de Acreditación, con el
   aviso de impacto al editar un atributo que ya usan competencias o planes
   (RF120–RF123, RF128–RF132).
@@ -261,10 +273,10 @@ artefactos de compilación viven fuera del control de versiones.
 - El frontend consume todo eso por HTTP con `@tanstack/react-query`: plan de
   estudios, mejora continua, reportes y usuarios trabajan contra la API. Ya no
   queda ningún almacén en memoria.
-- Pruebas en verde: 991 unitarias en la API, 239 en el frontend, 305 de
-  integración en dieciocho suites contra un PostgreSQL real y desechable, y 40
-  recorridos E2E con Playwright —nueve de ellos con `axe-core` sobre WCAG 2.1
-  AA—. Los guiones de carga k6 viven en `tests/carga/`.
+- Pruebas en verde: 1034 unitarias en la API, 264 en el frontend, 319 de
+  integración en diecinueve suites contra un PostgreSQL real y desechable, y
+  50 recorridos E2E con Playwright —trece de ellos con `axe-core` sobre WCAG
+  2.1 AA—. Los guiones de carga k6 viven en `tests/carga/`.
 - CI en GitHub Actions con los quality gates de §6.6: typecheck, lint, formato,
   cobertura, `npm audit` y Semgrep, más un job de E2E que levanta PostgreSQL,
   Redis, la API y el worker.
