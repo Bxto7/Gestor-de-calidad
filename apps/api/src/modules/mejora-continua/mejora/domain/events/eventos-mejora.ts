@@ -149,3 +149,19 @@ export class RetroalimentacionRegistrada extends EventoMejora {
     this.detalle = `Plan de mejora ${codigo}: retroalimentación registrada.`;
   }
 }
+
+/** RF-PJ-035. Acción propia: en el histórico se lee distinto que un alta. */
+export class PlanMejoraVersionado extends EventoMejora {
+  readonly nombre = 'mejora.version';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    codigoOrigen: string,
+  ) {
+    super(actor);
+    this.detalle = `Nueva versión ${codigo}, derivada de ${codigoOrigen}.`;
+  }
+}
