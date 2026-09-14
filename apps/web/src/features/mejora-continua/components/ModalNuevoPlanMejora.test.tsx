@@ -19,12 +19,29 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/features/acreditacion/api/queries', () => ({
   useCriterios: () => ({
-    data: [{ id: 'cri-1', carreraId: 'carrera-1', codigo: 'C-01', nombre: 'Estudiantes', activo: true, creadoEn: '' }],
+    data: [
+      {
+        id: 'cri-1',
+        carreraId: 'carrera-1',
+        codigo: 'C-01',
+        nombre: 'Estudiantes',
+        activo: true,
+        creadoEn: '',
+      },
+    ],
   }),
 }));
 vi.mock('@/features/plan-estudios/api/queries', () => ({
   useObjetivos: () => ({
-    data: [{ id: 'obj-1', codigo: 'OE-01', nombre: 'Formar profesionales', descripcion: '', estado: 'activo' }],
+    data: [
+      {
+        id: 'obj-1',
+        codigo: 'OE-01',
+        nombre: 'Formar profesionales',
+        descripcion: '',
+        estado: 'activo',
+      },
+    ],
   }),
 }));
 
@@ -34,7 +51,11 @@ function renderizar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ModalNuevoPlanMejora carreraId="carrera-1" onCerrar={() => undefined} onCreado={() => undefined} />
+      <ModalNuevoPlanMejora
+        carreraId="carrera-1"
+        onCerrar={() => undefined}
+        onCreado={() => undefined}
+      />
     </QueryClientProvider>,
   );
 }

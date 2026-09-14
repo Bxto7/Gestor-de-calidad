@@ -94,7 +94,14 @@ export function PlanMejoraPage() {
   const [comentario, setComentario] = useState('');
 
   useEffect(() => {
-    if (plan) publicar({ migas: [{ etiqueta: 'Planes de Mejora', a: '/mejora-continua/mejora' }, { etiqueta: plan.codigo }], acciones: null });
+    if (plan)
+      publicar({
+        migas: [
+          { etiqueta: 'Planes de Mejora', a: '/mejora-continua/mejora' },
+          { etiqueta: plan.codigo },
+        ],
+        acciones: null,
+      });
   }, [publicar, plan]);
 
   async function ejecutar(accion: () => Promise<unknown>) {
@@ -123,7 +130,10 @@ export function PlanMejoraPage() {
       <h1 className="text-lg font-semibold text-tinta">{plan.codigo}</h1>
 
       {error && (
-        <p role="alert" className="rounded-lg bg-estado-inactivo-bg px-3 py-2 text-sm text-estado-inactivo-fg">
+        <p
+          role="alert"
+          className="rounded-lg bg-estado-inactivo-bg px-3 py-2 text-sm text-estado-inactivo-fg"
+        >
           {error}
         </p>
       )}
@@ -157,7 +167,11 @@ export function PlanMejoraPage() {
             <div className="space-y-2">
               <Campo etiqueta="Comentario" requerido>
                 {(props) => (
-                  <AreaTexto {...props} value={comentario} onChange={(e) => setComentario(e.target.value)} />
+                  <AreaTexto
+                    {...props}
+                    value={comentario}
+                    onChange={(e) => setComentario(e.target.value)}
+                  />
                 )}
               </Campo>
               <div className="flex gap-2">
@@ -261,7 +275,10 @@ export function PlanMejoraPage() {
           </Campo>
 
           {plan.aspecto !== 'COMPETENCIA' && (
-            <Campo etiqueta="Input" ayuda="Texto libre — no aplica a planes de Competencia (RF-PJ-028).">
+            <Campo
+              etiqueta="Input"
+              ayuda="Texto libre — no aplica a planes de Competencia (RF-PJ-028)."
+            >
               {(props) => (
                 <AreaTexto
                   {...props}
@@ -416,7 +433,9 @@ export function PlanMejoraPage() {
             {editableSeguimiento && (
               <FormularioEvidencia
                 onAgregar={(referencia, nombreArchivo) =>
-                  void ejecutar(() => cargarEvidencia.mutateAsync({ id, referencia, nombreArchivo }))
+                  void ejecutar(() =>
+                    cargarEvidencia.mutateAsync({ id, referencia, nombreArchivo }),
+                  )
                 }
               />
             )}

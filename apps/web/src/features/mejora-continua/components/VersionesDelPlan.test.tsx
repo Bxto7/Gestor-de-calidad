@@ -86,9 +86,7 @@ describe('el linaje de versiones', () => {
     // `permiteVersionado` excluye Borrador: un borrador se edita directamente.
     montar({ versiones: LINAJE, estadoActual: 'Borrador' });
 
-    expect(
-      screen.queryByRole('button', { name: 'Generar nueva versión' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generar nueva versión' })).not.toBeInTheDocument();
   });
 
   it('el botón de generar versión sí aparece sobre un plan Vigente', () => {

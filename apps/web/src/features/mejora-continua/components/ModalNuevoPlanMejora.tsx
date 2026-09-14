@@ -34,11 +34,7 @@ export interface ModalNuevoPlanMejoraProps {
   readonly onCreado: (plan: PlanMejora) => void;
 }
 
-export function ModalNuevoPlanMejora({
-  carreraId,
-  onCerrar,
-  onCreado,
-}: ModalNuevoPlanMejoraProps) {
+export function ModalNuevoPlanMejora({ carreraId, onCerrar, onCreado }: ModalNuevoPlanMejoraProps) {
   const [aspecto, setAspecto] = useState<AspectoPlanMejora | ''>('');
   const [elementoId, setElementoId] = useState('');
   const [planEvaluacionId, setPlanEvaluacionId] = useState('');

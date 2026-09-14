@@ -103,9 +103,7 @@ export function VersionesDelPlan({
                   <td className="px-2 py-2">
                     <Badge tono={TONO_ESTADO[v.estado]}>{v.estado}</Badge>
                   </td>
-                  <td className="px-2 py-2 text-xs text-tinta-tenue">
-                    {v.creadoEn.slice(0, 10)}
-                  </td>
+                  <td className="px-2 py-2 text-xs text-tinta-tenue">{v.creadoEn.slice(0, 10)}</td>
                 </tr>
               );
             })}
