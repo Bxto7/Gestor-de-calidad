@@ -29,7 +29,8 @@ plan.observar, plan.nueva_version, plan.justificar, asignatura.gestionar,
 malla.editar,
 medicion.crear, medicion.editar, medicion.eliminar, medicion.aprobar,
 evaluacion.crear, evaluacion.editar, evaluacion.eliminar, evaluacion.aprobar,
-mejora.crear, mejora.editar, mejora.eliminar, mejora.aprobar
+mejora.crear, mejora.editar, mejora.eliminar, mejora.aprobar,
+actas.crear, actas.editar, actas.eliminar, actas.aprobar
 ```
 
 ---
@@ -47,6 +48,7 @@ decide nada académico**.
 | Planes de estudio | leer, ver histórico | crear, editar, eliminar, aprobar, observar, enviar a revisión, nueva versión |
 | Contenido curricular | leer todo (objetivos, competencias, atributos, criterios, asignaturas) | gestionar (crear/editar) contenido |
 | Mejora continua | leer planes de medición, evaluación y mejora | crear, editar, aprobar |
+| Actas de Aprobación | leer | crear, editar, eliminar, aprobar |
 | Auditoría | leer la bitácora entera | — |
 | Usuarios y roles | gestionar usuarios y sus roles, administrar roles/permisos | — |
 | Reportes | **no tiene `reporte.generar`** | generar PDF/Excel (responsabilidad académica) |
@@ -71,6 +73,7 @@ carrera**. Es el rol más poderoso en lo académico.
 | Plan de medición | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
 | Plan de evaluación | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
 | Plan de mejora | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
+| Actas de Aprobación | leer, crear, editar, eliminar, **aprobar** |
 | Reportes | generar PDF y Excel |
 | Auditoría | leer historial de cambios |
 
@@ -96,6 +99,7 @@ signifique algo en una auditoría.
 | Plan de medición | leer, crear, editar, eliminar | **aprobar** |
 | Plan de evaluación | leer, crear, editar, eliminar | **aprobar** |
 | Plan de mejora | leer, crear, editar, eliminar | **aprobar** |
+| Actas de Aprobación | leer, crear, editar, eliminar | **aprobar** |
 | Reportes | generar PDF y Excel | — |
 | Auditoría | solo historial de su entidad (`auditoria.leer_entidad`), no la bitácora entera | ver bitácora completa de accesos |
 
@@ -115,6 +119,7 @@ entidad que edita, RF-PM-032), y le falta `plan.eliminar` y `plan.nueva_version`
 | Planes de estudio | leer (detalle curricular y competencias de las asignaturas que dicta) |
 | Contenido curricular | leer objetivos, competencias, atributos del graduado, criterios, asignaturas |
 | Mejora continua | leer planes de medición, evaluación y mejora (ver en qué periodos se mide su competencia) |
+| Actas de Aprobación | leer |
 | Reportes | generar PDF y Excel |
 
 **No puede:** crear/editar nada, aprobar nada, gestionar usuarios, ver auditoría.
@@ -132,6 +137,7 @@ entidad que edita, RF-PM-032), y le falta `plan.eliminar` y `plan.nueva_version`
 | Planes de estudio | leer (solo vigentes) — sin histórico |
 | Contenido curricular | leer atributos y criterios |
 | Mejora continua | leer planes de medición, evaluación y mejora |
+| Actas de Aprobación | leer |
 
 **No puede:** ver planes históricos, ver detalle de competencias/asignaturas,
 generar reportes, ni nada de escritura.
