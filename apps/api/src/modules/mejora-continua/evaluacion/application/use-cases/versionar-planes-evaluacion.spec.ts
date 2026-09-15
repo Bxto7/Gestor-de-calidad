@@ -240,6 +240,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       planPorId: async () => planBase(),
       competenciasDelPlan: async () => [],
       asignaturasDelPlan: async () => [],
+      carreraPorId: async () => null,
     };
 
     configuracionPort = {

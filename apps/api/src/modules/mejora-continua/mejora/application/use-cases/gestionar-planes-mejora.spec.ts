@@ -312,6 +312,7 @@ function curricularDouble(sobre: Partial<ContenidoCurricularPort> = {}): Conteni
     planPorId: async () => planBase(),
     competenciasDelPlan: async () => [],
     asignaturasDelPlan: async () => [],
+    carreraPorId: async () => null,
     ...sobre,
   };
 }

@@ -148,6 +148,7 @@ function contenido(sobre: Partial<ContenidoCurricularPort> = {}): ContenidoCurri
     planPorId: async () => planBase(),
     competenciasDelPlan: async () => [competencia()],
     asignaturasDelPlan: async () => [],
+    carreraPorId: async () => null,
     ...sobre,
   };
 }
