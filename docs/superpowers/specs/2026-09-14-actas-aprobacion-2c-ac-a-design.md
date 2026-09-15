@@ -122,7 +122,6 @@ model ActaAprobacion {
   creadoEn          DateTime   @default(now()) @map("creado_en")
   actualizadoEn     DateTime   @updatedAt @map("actualizado_en")
 
-  carrera    Carrera         @relation(fields: [carreraId], references: [id], onDelete: Restrict)
   asistentes AsistenteActa[]
 
   /// RF-AC-002 RN2: el ámbito de unicidad es la carrera, igual que el
@@ -150,6 +149,18 @@ model AsistenteActa {
 en 2c-AC-B), pero el repositorio y el caso de uso de este ciclo solo
 escriben/leen `BORRADOR`.
 
+**Corrección tras verificar el código real de `mejora` (no una relación
+Prisma a `Carrera`):** `PlanMejora.carreraId` **no lleva `@relation` hacia
+`Carrera`** — confirmado en `plan-mejora.int.spec.ts:6-10`, con cita
+textual: *"`PlanMejora` no lleva clave foránea hacia `plan_estudios` ni
+hacia los criterios de acreditación (§3.2 de CLAUDE.md: los módulos no
+comparten tablas)"*. `plan_estudios` y `mejora_continua` son **schemas de
+Postgres separados** (`schema.prisma`, `schemas = [...]`), precisamente
+para que un cruce indebido se note a simple vista en el SQL. La versión
+original de este documento proponía `carrera Carrera @relation(...)`, lo
+cual rompía esa convención — ya corregido arriba: `carreraId` es un UUID
+suelto, sin relación Prisma, con `@@index([carreraId])`.
+
 ## 5. Puertos
 
 Nuevo `RepositorioActaAprobacionPort` en `actas/application/ports/acta-aprobacion.port.ts`:
@@ -166,10 +177,33 @@ export interface RepositorioActaAprobacionPort {
 export const REPOSITORIO_ACTA_APROBACION = Symbol('RepositorioActaAprobacionPort');
 ```
 
-Reutiliza el puerto ya existente que expone nombre/código de carrera hacia
-`mejora-continua` (el mismo que resuelve `carreraNombre` en
-`documentos-medicion.repository.ts`) para componer título/objetivo/código —
-sin puerto cross-módulo nuevo.
+**Corrección tras verificar el código real:** no existe un puerto que
+devuelva nombre+código de una `Carrera` por su `carreraId` directo. Lo que
+sí existe, `ContenidoCurricularPort.planPorId(planEstudiosId)`, trae
+`carreraNombre` pero está indexado por plan de estudios, no por carrera, y
+no expone el código de carrera. Hace falta un método nuevo en el puerto
+cross-módulo ya existente (`plan-estudios/application/ports/contenido-curricular.port.ts`):
+
+```ts
+export interface CarreraBase {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nombre: string;
+}
+
+export interface ContenidoCurricularPort {
+  // ...métodos existentes...
+  /** Nuevo en 2c-AC-A: para componer código/título/objetivo del acta. */
+  carreraPorId(carreraId: string): Promise<CarreraBase | null>;
+}
+```
+
+Implementado en `ContenidoCurricularAdapter`
+(`plan-estudios/infrastructure/contenido-curricular.adapter.ts`) con un
+`this.prisma.carrera.findUnique({ where: { id: carreraId }, select: { id, codigo, nombre } })`
+— mismo patrón que los otros métodos del adaptador. No es un puerto nuevo,
+es una ampliación de uno que ya cruza la frontera `mejora-continua` →
+`plan-estudios` para este propósito exacto.
 
 ## 6. Casos de uso
 
@@ -206,8 +240,9 @@ listado/búsqueda todavía (RF-AC-020 es 2c-AC-C).
 Sin pantalla dedicada en este ciclo. El contenido real del acta (tablas de
 acciones de mejora) necesita 2c-AC-B para ser útil — una pantalla ahora
 mostraría un formulario de cabecera vacío y habría que rehacerla ahí. Los
-endpoints de este ciclo quedan cubiertos por Supertest, sin UI todavía
-(mismo criterio que 2c-J-A §8).
+endpoints de este ciclo quedan cubiertos por las pruebas de caso de uso e
+integración de repositorio (ver §11), sin UI todavía — mismo criterio real
+que 2c-J-A.
 
 ## 9. Permisos y auditoría
 
@@ -244,10 +279,34 @@ existentes, sin necesidad de nuevas clases de error.
 
 ## 11. Pruebas
 
-Strict TDD. Unit: `correlativo-acta.spec.ts` (función pura),
-`gestionar-actas.spec.ts` (casos de uso, dobles de puerto — mismo estilo
-que `gestionar-planes-mejora.spec.ts`). Integración: repositorio Prisma vía
-Testcontainers, incluyendo el `@@unique([carreraId, correlativo])`.
+**Corrección tras verificar el repo real:** el runner es **Vitest**, no
+Jest (`import { describe, expect, it, vi } from 'vitest'` en todo
+`apps/api`), y **no existe capa Supertest/e2e HTTP** en el proyecto — cero
+resultados de `supertest`, sin carpeta `test/e2e/`. El patrón real de
+`mejora-continua` son dos capas: unit (`*.spec.ts` junto al caso de uso,
+dobles de puerto) e integración (`apps/api/test/integration/*.int.spec.ts`,
+contra el Postgres real del `docker-compose` de desarrollo — sin contenedor
+efímero por archivo; `beforeEach` hace `TRUNCATE ... RESTART IDENTITY
+CASCADE` y `afterAll` desconecta). Este ciclo sigue exactamente ese patrón,
+no uno nuevo:
+
+- Unit: `correlativo-acta.spec.ts` (función pura), `gestionar-actas.spec.ts`
+  (caso de uso, dobles de puerto — mismo estilo que
+  `gestionar-planes-mejora.spec.ts`: `permitirTodo()`/`denegarRegistrando()`
+  para `AuthorizationPort`, un `montar()` que arma el caso de uso).
+- Integración: `apps/api/test/integration/acta-aprobacion.int.spec.ts`,
+  mismo patrón que `plan-mejora.int.spec.ts` — `TRUNCATE
+  mejora_continua.asistentes_acta, mejora_continua.actas_aprobacion RESTART
+  IDENTITY CASCADE` en `beforeEach`, sin sembrar `Carrera` real (`carreraId`
+  es un UUID suelto, igual que en `PlanMejora`). Verifica en Postgres real
+  el `@@unique([carreraId, correlativo])` y el `onDelete: Cascade` de
+  asistentes.
+- Sin test de controller dedicado: mismo criterio real que 2c-J-A (el
+  comentario de cabecera de `planes-mejora.controller.ts` menciona
+  Supertest, pero esa capa no existe en la práctica — los endpoints quedan
+  cubiertos por el caso de uso + integración de repositorio, y por
+  Playwright una vez haya pantalla).
+
 Cobertura ≥80% en domain/application.
 
 ## 12. Decisiones tomadas en este diseño
@@ -273,6 +332,14 @@ Cobertura ≥80% en domain/application.
    (`@@unique([carreraId, correlativo])`), a diferencia del `codigo` de
    `PlanMejora` — aquí es puramente numérico y no hay prefijo de aspecto
    que ya lo distinga, así que vale la pena la garantía dura.
+6. `carreraId` es un UUID suelto sin `@relation` de Prisma hacia `Carrera`
+   — la primera versión de este diseño proponía la relación directa y
+   verificar el código real (`plan-mejora.int.spec.ts`) mostró que rompía
+   la separación de schemas `plan_estudios`/`mejora_continua`. Corregido.
+7. `ContenidoCurricularPort` gana un método nuevo, `carreraPorId`, en vez
+   de crear un puerto cross-módulo aparte solo para Actas — ya es la
+   frontera que `mejora-continua` usa hacia `plan-estudios`, y ningún
+   método existente cubría "nombre + código de una carrera por su id".
 
 ## 13. Lo que este diseño no resuelve
 
