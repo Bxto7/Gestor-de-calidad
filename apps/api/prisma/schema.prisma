@@ -1354,3 +1354,84 @@ model DocumentoMejora {
   @@map("documentos_mejora")
   @@schema("mejora_continua")
 }
+
+/// RF-AC-012: cinco estados, con nombres propios — NO es el mismo enum que
+/// `EstadoMedicion` (Medición/Evaluación/Mejora usan Aprobado/Vigente; el
+/// acta usa Aprobada/Emitida). Se persiste completo desde este ciclo aunque
+/// solo se use BORRADOR, para no migrar el tipo en 2c-AC-B.
+enum EstadoActa {
+  BORRADOR
+  EN_REVISION
+  APROBADA
+  EMITIDA
+  HISTORICA
+
+  @@schema("mejora_continua")
+}
+
+/// RF-AC-000 a RF-AC-006: el núcleo del acta de aprobación.
+///
+/// `carreraId` es un UUID suelto, SIN `@relation` de Prisma hacia `Carrera`
+/// — mismo criterio que `PlanMejora.carreraId`: los schemas
+/// `plan_estudios`/`mejora_continua` se mantienen separados a propósito
+/// (CLAUDE.md §3.2), y la validación de que la carrera exista vive en el
+/// caso de uso, vía `ContenidoCurricularPort.carreraPorId` (2c-AC-A, ver
+/// el diseño §5).
+///
+/// `periodoAcademico` (etiqueta libre, ej. "2025-10") y `periodoMedicionId`
+/// (referencia opcional a un `Periodo` real de Medición/Evaluación) son
+/// campos distintos — ver §2 del diseño: solo el aspecto Competencia tiene
+/// periodo propio, Criterio/Objetivo no.
+///
+/// `convocadaPor`, `fechaReunion` y `lugarReunion` nacen vacíos/con
+/// centinela (`''`/`new Date(0)`) al crear — mismo patrón que
+/// `PlanMejora.nombre`/`plazo` — y se completan con `editarCabecera`
+/// (RF-AC-004).
+model ActaAprobacion {
+  id                String     @id @default(uuid()) @db.Uuid
+  carreraId         String     @map("carrera_id") @db.Uuid
+  /// RF-AC-002 RN1/RN2: correlativo continuo por carrera, no editable.
+  correlativo       Int
+  /// RF-AC-002: denormalizado en creación ("ACTA N° 001 – EAP-ISI"); no se
+  /// recalcula si el código de la carrera cambia después.
+  codigo            String     @db.VarChar(80)
+  periodoAcademico  String     @map("periodo_academico") @db.VarChar(40)
+  periodoMedicionId String?    @map("periodo_medicion_id") @db.Uuid
+  titulo            String     @db.VarChar(300)
+  objetivo          String     @db.Text
+  convocadaPor      String     @map("convocada_por") @db.VarChar(200)
+  fechaReunion      DateTime   @map("fecha_reunion") @db.Timestamptz(6)
+  lugarReunion      String     @map("lugar_reunion") @db.VarChar(200)
+  comentario        String?    @db.Text
+  lugarEmision      String?    @map("lugar_emision") @db.VarChar(200)
+  fechaEmision      DateTime?  @map("fecha_emision") @db.Timestamptz(6)
+  estado            EstadoActa @default(BORRADOR)
+  creadoEn          DateTime   @default(now()) @map("creado_en") @db.Timestamptz(6)
+  actualizadoEn     DateTime   @updatedAt @map("actualizado_en") @db.Timestamptz(6)
+
+  asistentes AsistenteActa[]
+
+  /// RF-AC-002 RN2: el ámbito de unicidad del correlativo es la carrera.
+  @@unique([carreraId, correlativo])
+  @@index([carreraId])
+  @@map("actas_aprobacion")
+  @@schema("mejora_continua")
+}
+
+/// RF-AC-005: los asistentes como entradas individuales, no un campo de
+/// texto único. `orden` (y no `creadoEn`) decide el orden de la lista: un
+/// `createMany` en una sola transacción puede compartir el mismo
+/// `now()` de Postgres para todas las filas, así que un timestamp no
+/// distinguiría el orden de entrada — un entero explícito sí.
+model AsistenteActa {
+  id     String @id @default(uuid()) @db.Uuid
+  actaId String @map("acta_id") @db.Uuid
+  orden  Int
+  nombre String @db.VarChar(200)
+
+  acta ActaAprobacion @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@index([actaId])
+  @@map("asistentes_acta")
+  @@schema("mejora_continua")
+}
