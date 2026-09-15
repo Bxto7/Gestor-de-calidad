@@ -30,8 +30,8 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 14 de septiembre de 2026: **216 de 243 requisitos contables construidos**,
-> un 89 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> Al 15 de septiembre de 2026: **223 de 243 requisitos contables construidos**,
+> un 92 %. El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
 >
@@ -42,7 +42,7 @@ Se están construyendo **en paralelo**:
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
 > | Mejora Continua · Evaluación (`RF-PE`) | 49 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 47 | 47 |
-> | Mejora Continua · Actas (`RF-AC`) | 0 | 27 |
+> | Mejora Continua · Actas (`RF-AC`) | 7 | 27 |
 >
 > La cuenta sale de cruzar los `RF-` distintos del documento fuente con sus
 > citas en `apps/api/src` y `apps/web/src`, **pero el cruce no basta por sí
@@ -77,6 +77,15 @@ Se están construyendo **en paralelo**:
 >   construidos desde 2c-J-A/2c-J-B (vía `transicionar` y el patrón
 >   `exigir()`/bitácora que usa cada método), solo les faltaba el comentario
 >   que los nombrara. No queda ningún `RF-PJ` citado sin construir.
+> - **Arranca `RF-AC`.** El ciclo 2c-AC-A (15 de septiembre de 2026) construyó
+>   el núcleo del Acta de Aprobación — `RF-AC-000` a `006`: crear, correlativo
+>   por carrera, título/objetivo autogenerados, cabecera de reunión y lista de
+>   asistentes — en `mejora-continua/actas`, sin pantalla todavía. El código
+>   cita además `RF-AC-007`, `012`, `013`, `016`, `017`, `020`, `023`, `025` y
+>   `026`, pero son referencias adelantadas a lo que construirán 2c-AC-B (la
+>   máquina de estados y el flujo de aprobación) y 2c-AC-C (permisos/auditoría
+>   por operación y el listado): el propio comentario que las cita dice
+>   "(2c-AC-B)" o "(2c-AC-C)", así que no cuentan como construidas todavía.
 >
 > El cruce sirve además para detectar erratas: destapó una prueba que decía
 > cubrir un `RF-PM-080` que no existe en ningún documento.
