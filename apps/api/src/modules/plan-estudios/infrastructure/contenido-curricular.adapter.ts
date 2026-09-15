@@ -12,6 +12,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../platform/database/prisma.service.js';
 import type {
   AsignaturaBase,
+  CarreraBase,
   CompetenciaConAtributos,
   ContenidoCurricularPort,
   PlanBase,
@@ -138,5 +139,13 @@ export class ContenidoCurricularAdapter implements ContenidoCurricularPort {
       cicloNumero: f.ciclo?.numero ?? null,
       activa: f.estado === 'ACTIVO',
     }));
+  }
+
+  async carreraPorId(carreraId: string): Promise<CarreraBase | null> {
+    const fila = await this.prisma.carrera.findUnique({
+      where: { id: carreraId },
+      select: { id: true, codigo: true, nombre: true },
+    });
+    return fila;
   }
 }

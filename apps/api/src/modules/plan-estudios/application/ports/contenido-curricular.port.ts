@@ -52,6 +52,13 @@ export interface AsignaturaBase {
   readonly activa: boolean;
 }
 
+/** Nuevo en 2c-AC-A: lo que el submódulo `actas` necesita de una carrera. */
+export interface CarreraBase {
+  readonly id: string;
+  readonly codigo: string;
+  readonly nombre: string;
+}
+
 export interface ContenidoCurricularPort {
   /** RF-PM-001 RN2: los planes en estado Aprobado o Vigente. */
   planesElegibles(): Promise<PlanBase[]>;
@@ -61,6 +68,8 @@ export interface ContenidoCurricularPort {
   competenciasDelPlan(planEstudiosId: string): Promise<CompetenciaConAtributos[]>;
   /** RF-PE-016: las asignaturas sobre las que se puede evaluar. */
   asignaturasDelPlan(planEstudiosId: string): Promise<AsignaturaBase[]>;
+  /** RF-AC-002/003 (2c-AC-A): nombre y código para componer título/objetivo/correlativo del acta. */
+  carreraPorId(carreraId: string): Promise<CarreraBase | null>;
 }
 
 export const CONTENIDO_CURRICULAR = Symbol('ContenidoCurricularPort');
