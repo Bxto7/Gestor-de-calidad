@@ -94,6 +94,13 @@ const PERMISOS = [
   ['mejora.eliminar', 'Eliminar un plan de mejora en Borrador', 'mejora-continua'],
   ['mejora.aprobar', 'Aprobar, observar y dar vigencia a un plan de mejora', 'mejora-continua'],
 
+  // Mejora continua — Actas de Aprobación
+  ['actas.leer', 'Consultar actas de aprobación', 'mejora-continua'],
+  ['actas.crear', 'Crear un acta de aprobación', 'mejora-continua'],
+  ['actas.editar', 'Editar un acta de aprobación en Borrador', 'mejora-continua'],
+  ['actas.eliminar', 'Eliminar un acta de aprobación en Borrador', 'mejora-continua'],
+  ['actas.aprobar', 'Aprobar, rechazar u observar un acta de aprobación', 'mejora-continua'],
+
   // Transversales
   ['reporte.generar', 'Generar PDF y Excel del plan', 'plan-estudios'],
   ['auditoria.leer', 'Consultar el histórico de cambios', 'auditoria'],
@@ -151,6 +158,7 @@ const ROLES: {
       'medicion.leer',
       'evaluacion.leer',
       'mejora.leer',
+      'actas.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
@@ -210,6 +218,11 @@ const ROLES: {
       'mejora.editar',
       'mejora.eliminar',
       'mejora.aprobar',
+      'actas.leer',
+      'actas.crear',
+      'actas.editar',
+      'actas.eliminar',
+      'actas.aprobar',
       'reporte.generar',
       'auditoria.leer',
     ],
@@ -260,6 +273,10 @@ const ROLES: {
       'mejora.crear',
       'mejora.editar',
       'mejora.eliminar',
+      'actas.leer',
+      'actas.crear',
+      'actas.editar',
+      'actas.eliminar',
       // Solo el historial de una entidad concreta, no la bitácora entera: quien
       // edita un plan tiene que poder ver qué se hizo sobre él (RF-PM-032), y
       // eso no exige darle acceso a los accesos de todos ni a los demás módulos.
@@ -288,6 +305,7 @@ const ROLES: {
       'medicion.leer',
       'evaluacion.leer',
       'mejora.leer',
+      'actas.leer',
       'reporte.generar',
     ],
   },
@@ -308,6 +326,7 @@ const ROLES: {
       'medicion.leer',
       'evaluacion.leer',
       'mejora.leer',
+      'actas.leer',
     ],
   },
 ];

@@ -60,6 +60,10 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
   'mejora.editar',
   'mejora.eliminar',
   'mejora.aprobar',
+  'actas.crear',
+  'actas.editar',
+  'actas.eliminar',
+  'actas.aprobar',
 ]);
 
 export type Decision =
