@@ -194,6 +194,13 @@ import {
   DocumentosMejoraController,
 } from './modules/mejora-continua/mejora/infrastructure/http/documentos-mejora.controller.js';
 import {
+  REPOSITORIO_ACTA_APROBACION,
+  type RepositorioActaAprobacionPort,
+} from './modules/mejora-continua/actas/application/ports/acta-aprobacion.port.js';
+import { GestionarActas } from './modules/mejora-continua/actas/application/use-cases/gestionar-actas.use-case.js';
+import { ActaAprobacionRepositoryPrisma } from './modules/mejora-continua/actas/infrastructure/persistence/acta-aprobacion.repository.js';
+import { ActasController } from './modules/mejora-continua/actas/infrastructure/http/actas.controller.js';
+import {
   REPOSITORIO_CARRERA,
   REPOSITORIO_FACULTAD,
   type RepositorioCarreraPort,
@@ -344,6 +351,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     DocentesController,
     PlanesMejoraController,
     EvidenciasPlanMejoraController,
+    ActasController,
     DocumentosDelPlanMejoraController,
     DocumentosMejoraController,
     DocumentosDelPlanMedicionController,
@@ -392,6 +400,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       useClass: ConfiguracionEvaluacionRepositoryPrisma,
     },
     { provide: REPOSITORIO_PLAN_MEJORA, useClass: PlanMejoraRepositoryPrisma },
+    { provide: REPOSITORIO_ACTA_APROBACION, useClass: ActaAprobacionRepositoryPrisma },
     // 2c-J-B: la primera dependencia circular de primer nivel del proyecto
     // (§2f/§4 del diseño) — el mismo `PlanMejoraRepositoryPrisma` implementa
     // ambos puertos; `useExisting` reutiliza la instancia ya registrada
@@ -660,6 +669,16 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new VersionarPlanMejora(planes, autorizacion, eventos),
+    },
+    {
+      provide: GestionarActas,
+      inject: [REPOSITORIO_ACTA_APROBACION, CONTENIDO_CURRICULAR, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      useFactory: (
+        actas: RepositorioActaAprobacionPort,
+        curricular: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarActas(actas, curricular, autorizacion, eventos),
     },
     { provide: REPOSITORIO_DOCUMENTOS_MEJORA, useClass: DocumentoMejoraRepositoryPrisma },
     {
