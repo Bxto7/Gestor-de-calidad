@@ -18,8 +18,12 @@ import {
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
-import { ActaCreada } from '../../domain/events/eventos-actas.js';
-import type { DatosActa, RepositorioActaAprobacionPort } from '../ports/acta-aprobacion.port.js';
+import { ActaCabeceraEditada, ActaCreada } from '../../domain/events/eventos-actas.js';
+import type {
+  CabeceraActa,
+  DatosActa,
+  RepositorioActaAprobacionPort,
+} from '../ports/acta-aprobacion.port.js';
 
 /** RF-AC-001: lo que se pide al crear. */
 export interface DatosCrearActa {
@@ -78,6 +82,19 @@ export class GestionarActas {
 
     await this.eventos.publicar([new ActaCreada(actor, creada.id, creada.codigo)]);
     return creada;
+  }
+
+  /** RF-AC-003/004/006: reemplaza la cabecera entera. Solo en Borrador (RF-AC-017). */
+  async editarCabecera(actor: Actor, id: string, datos: CabeceraActa): Promise<DatosActa> {
+    const acta = await this.exigirActa(id);
+    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    if (acta.estado !== 'Borrador') {
+      throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
+    }
+
+    const editada = await this.actas.editarCabecera(id, datos);
+    await this.eventos.publicar([new ActaCabeceraEditada(actor, id, editada.codigo)]);
+    return editada;
   }
 
   private async exigirActa(id: string): Promise<DatosActa> {

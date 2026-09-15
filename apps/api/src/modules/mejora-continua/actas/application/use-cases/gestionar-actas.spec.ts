@@ -105,6 +105,20 @@ function capturarEventos(): { eventos: DomainEvent[]; publicador: PublicadorDeEv
   };
 }
 
+function cabecera(sobre: Partial<import('../ports/acta-aprobacion.port.js').CabeceraActa> = {}) {
+  return {
+    titulo: 'Acta de aprobación — Ingeniería de Software — 2025-10',
+    objetivo: 'Elaborar y aprobar el Plan de Mejora 2025-10',
+    convocadaPor: 'Directora de Escuela',
+    fechaReunion: new Date('2026-03-09'),
+    lugarReunion: 'Sala de reuniones',
+    comentario: null,
+    lugarEmision: null,
+    fechaEmision: null,
+    ...sobre,
+  };
+}
+
 function montar(opciones: {
   actas?: RepositorioActaAprobacionPort;
   curricular?: ContenidoCurricularPort;
@@ -170,5 +184,45 @@ describe('crear', () => {
 
     expect(eventos).toHaveLength(1);
     expect(eventos[0]?.nombre).toBe('actas.creada');
+  });
+});
+
+describe('editarCabecera', () => {
+  it('edita cuando el acta está en Borrador', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      editarCabecera: async (_id, datos) => acta({ ...datos }),
+    });
+    const casos = montar({ actas });
+
+    const editada = await casos.editarCabecera(ACTOR, 'acta-1', cabecera());
+
+    expect(editada.convocadaPor).toBe('Directora de Escuela');
+  });
+
+  it('rechaza editar un acta que no está en Borrador (RF-AC-017)', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'En revisión' }) });
+    const casos = montar({ actas });
+
+    await expect(casos.editarCabecera(ACTOR, 'acta-1', cabecera())).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('exige actas.editar acotado a la carrera del acta', async () => {
+    const pedidos: string[] = [];
+    const casos = montar({ autorizacion: denegarRegistrando(pedidos) });
+
+    await expect(casos.editarCabecera(ACTOR, 'acta-1', cabecera())).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toContain('actas.editar');
+  });
+
+  it('publica ActaCabeceraEditada', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const casos = montar({ eventos: publicador });
+
+    await casos.editarCabecera(ACTOR, 'acta-1', cabecera());
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.cabecera_editada']);
   });
 });
