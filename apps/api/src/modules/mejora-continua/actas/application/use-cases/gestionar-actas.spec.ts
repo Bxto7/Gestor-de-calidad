@@ -226,3 +226,80 @@ describe('editarCabecera', () => {
     expect(eventos.map((e) => e.nombre)).toEqual(['actas.cabecera_editada']);
   });
 });
+
+describe('reemplazarAsistentes', () => {
+  it('recorta espacios y descarta nombres vacíos', async () => {
+    let recibidos: readonly string[] = [];
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      reemplazarAsistentes: async (_id, nombres) => {
+        recibidos = nombres;
+        return acta({ asistentes: nombres.map((n, i) => ({ id: `a-${i}`, nombre: n })) });
+      },
+    });
+    const casos = montar({ actas });
+
+    await casos.reemplazarAsistentes(ACTOR, 'acta-1', ['  Ana Pérez  ', '', 'Luis Gómez']);
+
+    expect(recibidos).toEqual(['Ana Pérez', 'Luis Gómez']);
+  });
+
+  it('rechaza si el acta no está en Borrador (RF-AC-017)', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'Aprobada' }) });
+    const casos = montar({ actas });
+
+    await expect(casos.reemplazarAsistentes(ACTOR, 'acta-1', ['Ana Pérez'])).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('publica ActaAsistentesReemplazados', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const casos = montar({ eventos: publicador });
+
+    await casos.reemplazarAsistentes(ACTOR, 'acta-1', ['Ana Pérez']);
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.asistentes_reemplazados']);
+  });
+});
+
+describe('eliminar', () => {
+  it('elimina un acta en Borrador', async () => {
+    let eliminado = false;
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      eliminar: async () => {
+        eliminado = true;
+      },
+    });
+    const casos = montar({ actas });
+
+    await casos.eliminar(ACTOR, 'acta-1');
+
+    expect(eliminado).toBe(true);
+  });
+
+  it('rechaza eliminar un acta que no está en Borrador (RF-AC-017)', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'Emitida' }) });
+    const casos = montar({ actas });
+
+    await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('exige actas.eliminar acotado a la carrera del acta', async () => {
+    const pedidos: string[] = [];
+    const casos = montar({ autorizacion: denegarRegistrando(pedidos) });
+
+    await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toContain('actas.eliminar');
+  });
+
+  it('publica ActaEliminada', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const casos = montar({ eventos: publicador, actas: repoActas({ porId: async () => acta({ estado: 'Borrador' }) }) });
+
+    await casos.eliminar(ACTOR, 'acta-1');
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.eliminada']);
+  });
+});

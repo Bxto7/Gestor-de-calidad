@@ -18,7 +18,12 @@ import {
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
-import { ActaCabeceraEditada, ActaCreada } from '../../domain/events/eventos-actas.js';
+import {
+  ActaAsistentesReemplazados,
+  ActaCabeceraEditada,
+  ActaCreada,
+  ActaEliminada,
+} from '../../domain/events/eventos-actas.js';
 import type {
   CabeceraActa,
   DatosActa,
@@ -95,6 +100,39 @@ export class GestionarActas {
     const editada = await this.actas.editarCabecera(id, datos);
     await this.eventos.publicar([new ActaCabeceraEditada(actor, id, editada.codigo)]);
     return editada;
+  }
+
+  /** RF-AC-005: reemplaza el conjunto completo. Solo en Borrador (RF-AC-017). */
+  async reemplazarAsistentes(
+    actor: Actor,
+    id: string,
+    nombres: readonly string[],
+  ): Promise<DatosActa> {
+    const acta = await this.exigirActa(id);
+    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    if (acta.estado !== 'Borrador') {
+      throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
+    }
+
+    const limpios = nombres.map((n) => n.trim()).filter((n) => n.length > 0);
+    const actualizada = await this.actas.reemplazarAsistentes(id, limpios);
+    await this.eventos.publicar([
+      new ActaAsistentesReemplazados(actor, id, actualizada.codigo, limpios.length),
+    ]);
+    return actualizada;
+  }
+
+  async eliminar(actor: Actor, id: string): Promise<void> {
+    const acta = await this.exigirActa(id);
+    await this.exigir(actor, 'actas.eliminar', acta.carreraId);
+    if (acta.estado !== 'Borrador') {
+      throw new ReglaDeNegocioViolada(
+        'RF-AC-017: un acta que no está en Borrador no puede eliminarse.',
+      );
+    }
+
+    await this.actas.eliminar(id);
+    await this.eventos.publicar([new ActaEliminada(actor, id, acta.codigo)]);
   }
 
   private async exigirActa(id: string): Promise<DatosActa> {
