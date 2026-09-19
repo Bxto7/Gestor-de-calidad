@@ -99,7 +99,7 @@ export class AsistentesActaDto {
 /** RF-AC-008: un ítem de la selección manual. */
 export class ItemSeleccionAccionDto {
   @ApiProperty()
-  @IsUUID('4')
+  @IsUUID()
   planMejoraId!: string;
 
   @ApiProperty()
