@@ -672,13 +672,36 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarActas,
-      inject: [REPOSITORIO_ACTA_APROBACION, CONTENIDO_CURRICULAR, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_ACTA_APROBACION,
+        REPOSITORIO_PLAN_MEJORA,
+        REPOSITORIO_PLAN_EVALUACION,
+        REPOSITORIO_PLAN_MEDICION,
+        REPOSITORIO_CONFIGURACION_EVALUACION,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
       useFactory: (
         actas: RepositorioActaAprobacionPort,
+        planes: RepositorioPlanMejoraPort,
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        mediciones: RepositorioPlanMedicionPort,
+        configuraciones: RepositorioConfiguracionEvaluacionPort,
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarActas(actas, curricular, autorizacion, eventos),
+      ) =>
+        new GestionarActas(
+          actas,
+          planes,
+          evaluaciones,
+          mediciones,
+          configuraciones,
+          curricular,
+          autorizacion,
+          eventos,
+        ),
     },
     { provide: REPOSITORIO_DOCUMENTOS_MEJORA, useClass: DocumentoMejoraRepositoryPrisma },
     {

@@ -20,6 +20,10 @@ import type {
 } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { DatosActa, RepositorioActaAprobacionPort } from '../ports/acta-aprobacion.port.js';
 import { GestionarActas } from './gestionar-actas.use-case.js';
+import type { DatosPlanMejora, RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
+import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
+import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
+import type { RepositorioPlanMedicionPort } from '../../../medicion/application/ports/plan-medicion.port.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 const CARRERA = 'carrera-1';
@@ -85,6 +89,120 @@ function repoActas(overrides: Partial<RepositorioActaAprobacionPort> = {}): Repo
   };
 }
 
+const noUsado = (metodo: string) => async () => {
+  throw new Error(`${metodo} no se usa en este spec.`);
+};
+
+function planMejora(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
+  return {
+    id: 'plan-1',
+    codigo: 'CA-01',
+    aspecto: 'CRITERIO_ACREDITACION',
+    carreraId: CARRERA,
+    criterioAcreditacionId: 'crit-1',
+    objetivoEducacionalId: null,
+    competenciaId: null,
+    periodoId: null,
+    planEvaluacionId: null,
+    planMedicionAfectadoId: null,
+    estado: 'Aprobado',
+    estadoImplementacion: 'Pendiente',
+    nombre: 'Reforzar la bibliografía',
+    causaRaiz: 'x',
+    justificacion: 'x',
+    input: null,
+    plazo: new Date('2026-06-01'),
+    recursos: 'x',
+    metas: 'x',
+    responsable: 'x',
+    logroMeta: null,
+    impacto: null,
+    creadoEn: new Date('2026-01-01'),
+    evidencias: [],
+    version: 1,
+    derivadoDeId: null,
+    ...sobre,
+  };
+}
+
+function repoPlanesMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): RepositorioPlanMejoraPort {
+  return {
+    crear: noUsado('crear'),
+    porId: noUsado('porId'),
+    editarDefinicion: noUsado('editarDefinicion'),
+    eliminar: noUsado('eliminar'),
+    cambiarEstado: noUsado('cambiarEstado'),
+    actualizarImplementacion: noUsado('actualizarImplementacion'),
+    actualizarRetroalimentacion: noUsado('actualizarRetroalimentacion'),
+    agregarEvidencia: noUsado('agregarEvidencia'),
+    planDeEvidencia: noUsado('planDeEvidencia'),
+    eliminarEvidencia: noUsado('eliminarEvidencia'),
+    codigosDe: noUsado('codigosDe'),
+    parametros: noUsado('parametros'),
+    registrarImpactoEnMedicion: noUsado('registrarImpactoEnMedicion'),
+    copiar: noUsado('copiar'),
+    linajeDe: noUsado('linajeDe'),
+    listarDeCarrera: async () => [],
+    planesPorIds: async () => [],
+    ...sobre,
+  };
+}
+
+function repoEvaluaciones(sobre: Partial<RepositorioPlanEvaluacionPort> = {}): RepositorioPlanEvaluacionPort {
+  return {
+    listar: noUsado('listar'),
+    porId: noUsado('porId'),
+    vigenteDe: noUsado('vigenteDe'),
+    codigosDe: noUsado('codigosDe'),
+    crear: noUsado('crear'),
+    cambiarEstado: noUsado('cambiarEstado'),
+    eliminar: noUsado('eliminar'),
+    copiar: noUsado('copiar'),
+    linajeDe: noUsado('linajeDe'),
+    ...sobre,
+  };
+}
+
+function repoMediciones(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlanMedicionPort {
+  return {
+    listar: noUsado('listar'),
+    porId: noUsado('porId'),
+    vigenteDe: noUsado('vigenteDe'),
+    codigosDe: noUsado('codigosDe'),
+    crear: noUsado('crear'),
+    actualizar: noUsado('actualizar'),
+    cambiarEstado: noUsado('cambiarEstado'),
+    contenidoDe: noUsado('contenidoDe'),
+    copiar: noUsado('copiar'),
+    linajeDe: noUsado('linajeDe'),
+    marcarVigenteRelevando: noUsado('marcarVigenteRelevando'),
+    eliminar: noUsado('eliminar'),
+    declararCompetencias: noUsado('declararCompetencias'),
+    declararPeriodos: noUsado('declararPeriodos'),
+    matriz: noUsado('matriz'),
+    programar: noUsado('programar'),
+    marcarRealizada: noUsado('marcarRealizada'),
+    ...sobre,
+  };
+}
+
+function repoConfiguraciones(
+  sobre: Partial<RepositorioConfiguracionEvaluacionPort> = {},
+): RepositorioConfiguracionEvaluacionPort {
+  return {
+    del: noUsado('del'),
+    guardarCompetencia: noUsado('guardarCompetencia'),
+    reemplazarAsignaturas: noUsado('reemplazarAsignaturas'),
+    guardarPorcentaje: noUsado('guardarPorcentaje'),
+    reemplazarEvidencias: noUsado('reemplazarEvidencias'),
+    planDeAsignaturaEvaluada: noUsado('planDeAsignaturaEvaluada'),
+    reemplazarIndicaciones: noUsado('reemplazarIndicaciones'),
+    guardarResultados: noUsado('guardarResultados'),
+    planDeIndicacion: noUsado('planDeIndicacion'),
+    ...sobre,
+  };
+}
+
 function carreraBase(sobre: Partial<CarreraBase> = {}): CarreraBase {
   return { id: CARRERA, codigo: 'EAP-ISI', nombre: 'Ingeniería de Software', ...sobre };
 }
@@ -128,12 +246,20 @@ function cabecera(sobre: Partial<import('../ports/acta-aprobacion.port.js').Cabe
 
 function montar(opciones: {
   actas?: RepositorioActaAprobacionPort;
+  planes?: RepositorioPlanMejoraPort;
+  evaluaciones?: RepositorioPlanEvaluacionPort;
+  mediciones?: RepositorioPlanMedicionPort;
+  configuraciones?: RepositorioConfiguracionEvaluacionPort;
   curricular?: ContenidoCurricularPort;
   autorizacion?: AuthorizationPort;
   eventos?: PublicadorDeEventos;
 } = {}): GestionarActas {
   return new GestionarActas(
     opciones.actas ?? repoActas(),
+    opciones.planes ?? repoPlanesMejora(),
+    opciones.evaluaciones ?? repoEvaluaciones(),
+    opciones.mediciones ?? repoMediciones(),
+    opciones.configuraciones ?? repoConfiguraciones(),
     opciones.curricular ?? curricular(),
     opciones.autorizacion ?? permitirTodo(),
     opciones.eventos ?? { publicar: async () => {} },
@@ -321,5 +447,137 @@ describe('eliminar', () => {
     await casos.eliminar(ACTOR, 'acta-1');
 
     expect(eventos.map((e) => e.nombre)).toEqual(['actas.eliminada']);
+  });
+});
+
+describe('cargarAccionesDelPeriodo', () => {
+  it('carga candidatas Aprobado/Vigente de Criterio y Objetivo sin filtrar por periodo', async () => {
+    const filtrosRecibidos: unknown[] = [];
+    const planes = repoPlanesMejora({
+      listarDeCarrera: async (_carreraId, filtro) => {
+        filtrosRecibidos.push(filtro);
+        if (filtro?.aspecto === 'CRITERIO_ACREDITACION') return [planMejora({ id: 'plan-crit' })];
+        if (filtro?.aspecto === 'OBJETIVO_EDUCACIONAL') {
+          return [planMejora({ id: 'plan-obj', aspecto: 'OBJETIVO_EDUCACIONAL', criterioAcreditacionId: null, objetivoEducacionalId: 'obj-1' })];
+        }
+        return [];
+      },
+    });
+    const actas = repoActas({ porId: async () => acta({ estado: 'Borrador', periodoMedicionId: null }) });
+    const casos = montar({ actas, planes });
+
+    const cantidad = await casos.cargarAccionesDelPeriodo(ACTOR, 'acta-1');
+
+    expect(cantidad).toBe(2);
+    expect(filtrosRecibidos).toEqual([
+      { aspecto: 'CRITERIO_ACREDITACION', estado: ['Aprobado', 'Vigente'] },
+      { aspecto: 'OBJETIVO_EDUCACIONAL', estado: ['Aprobado', 'Vigente'] },
+    ]);
+  });
+
+  it('no consulta Competencia si el acta no tiene periodoMedicionId', async () => {
+    let seConsultoCompetencia = false;
+    const planes = repoPlanesMejora({
+      listarDeCarrera: async (_carreraId, filtro) => {
+        if (filtro?.aspecto === 'COMPETENCIA') seConsultoCompetencia = true;
+        return [];
+      },
+    });
+    const actas = repoActas({ porId: async () => acta({ estado: 'Borrador', periodoMedicionId: null }) });
+    const casos = montar({ actas, planes });
+
+    await casos.cargarAccionesDelPeriodo(ACTOR, 'acta-1');
+
+    expect(seConsultoCompetencia).toBe(false);
+  });
+
+  it('filtra Competencia por periodoMedicionId del acta y snapshotea el % de RF-PJ-028', async () => {
+    const planCompetencia = planMejora({
+      id: 'plan-comp',
+      aspecto: 'COMPETENCIA',
+      criterioAcreditacionId: null,
+      competenciaId: 'comp-1',
+      planEvaluacionId: 'eval-1',
+      periodoId: 'periodo-2',
+    });
+    const planes = repoPlanesMejora({
+      listarDeCarrera: async (_carreraId, filtro) =>
+        filtro?.aspecto === 'COMPETENCIA' ? [planCompetencia] : [],
+    });
+    const evaluaciones = repoEvaluaciones({ porId: async () => ({ id: 'eval-1', planMedicionId: 'medicion-1' }) as never });
+    const mediciones = repoMediciones({
+      porId: async () =>
+        ({
+          periodos: [
+            { id: 'periodo-1', orden: 1, etiqueta: '2025-05', fechaCierre: null },
+            { id: 'periodo-2', orden: 2, etiqueta: '2025-10', fechaCierre: null },
+          ],
+        }) as never,
+    });
+    const configuraciones = repoConfiguraciones({
+      del: async () => ({
+        competencias: [],
+        indicaciones: [],
+        mediciones: [{ competenciaId: 'comp-1', periodoId: 'periodo-1', porcentajeAlcanzado: 65, asignaturas: [] }],
+      }),
+    });
+    let agregadas: { porcentajeMedicionCompetencia: number | null }[] = [];
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador', periodoMedicionId: 'periodo-2' }),
+      agregarAcciones: async (_id, nuevas) => {
+        agregadas = [...nuevas];
+      },
+    });
+    const casos = montar({ actas, planes, evaluaciones, mediciones, configuraciones });
+
+    await casos.cargarAccionesDelPeriodo(ACTOR, 'acta-1');
+
+    expect(agregadas).toEqual([{ planMejoraId: 'plan-comp', aspecto: 'COMPETENCIA', porcentajeMedicionCompetencia: 65, orden: 0 }]);
+  });
+
+  it('excluye candidatas ya vinculadas o ya emitidas', async () => {
+    const planes = repoPlanesMejora({
+      listarDeCarrera: async (_carreraId, filtro) =>
+        filtro?.aspecto === 'CRITERIO_ACREDITACION'
+          ? [planMejora({ id: 'ya-vinculado' }), planMejora({ id: 'ya-emitido' }), planMejora({ id: 'nuevo' })]
+          : [],
+    });
+    let agregadas: { planMejoraId: string }[] = [];
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'ya-vinculado', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+      ],
+      planesYaEmitidos: async () => new Set(['ya-emitido']),
+      agregarAcciones: async (_id, nuevas) => {
+        agregadas = [...nuevas];
+      },
+    });
+    const casos = montar({ actas, planes });
+
+    await casos.cargarAccionesDelPeriodo(ACTOR, 'acta-1');
+
+    expect(agregadas.map((a) => a.planMejoraId)).toEqual(['nuevo']);
+  });
+
+  it('rechaza si el acta no está en Borrador (RF-AC-017)', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'En revisión' }) });
+    const casos = montar({ actas });
+
+    await expect(casos.cargarAccionesDelPeriodo(ACTOR, 'acta-1')).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('publica ActaAccionesCargadas con la cantidad agregada', async () => {
+    const planes = repoPlanesMejora({
+      listarDeCarrera: async (_carreraId, filtro) =>
+        filtro?.aspecto === 'CRITERIO_ACREDITACION' ? [planMejora({ id: 'plan-1' })] : [],
+    });
+    const actas = repoActas({ porId: async () => acta({ estado: 'Borrador' }) });
+    const { eventos, publicador } = capturarEventos();
+    const casos = montar({ actas, planes, eventos: publicador });
+
+    await casos.cargarAccionesDelPeriodo(ACTOR, 'acta-1');
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.acciones_cargadas']);
   });
 });

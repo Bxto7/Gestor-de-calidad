@@ -17,8 +17,15 @@ import {
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
+import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
+import type { RepositorioPlanMedicionPort } from '../../../medicion/application/ports/plan-medicion.port.js';
+import type { RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
+import { candidatasParaCargar } from '../../domain/services/candidatas-acciones-acta.js';
+import { calcularPorcentajeMedicionAnterior } from '../../../mejora/application/services/porcentaje-periodo-anterior.js';
 import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
 import {
+  ActaAccionesCargadas,
   ActaAsistentesReemplazados,
   ActaCabeceraEditada,
   ActaCreada,
@@ -27,6 +34,7 @@ import {
 import type {
   CabeceraActa,
   DatosActa,
+  NuevaAccionActa,
   RepositorioActaAprobacionPort,
 } from '../ports/acta-aprobacion.port.js';
 
@@ -40,6 +48,10 @@ export interface DatosCrearActa {
 export class GestionarActas {
   constructor(
     private readonly actas: RepositorioActaAprobacionPort,
+    private readonly planes: RepositorioPlanMejoraPort,
+    private readonly evaluaciones: RepositorioPlanEvaluacionPort,
+    private readonly mediciones: RepositorioPlanMedicionPort,
+    private readonly configuraciones: RepositorioConfiguracionEvaluacionPort,
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
@@ -131,6 +143,78 @@ export class GestionarActas {
       new ActaAsistentesReemplazados(actor, id, actualizada.codigo, limpios.length),
     ]);
     return actualizada;
+  }
+
+  /**
+   * RF-AC-007: carga automática de acciones de mejora aprobadas del periodo.
+   * Idempotente (RN de diseño §5): una recarga solo agrega candidatas
+   * nuevas, nunca reemplaza una `AccionActa` ya vinculada. Devuelve cuántas
+   * se agregaron.
+   */
+  async cargarAccionesDelPeriodo(actor: Actor, id: string): Promise<number> {
+    const acta = await this.exigirActa(id);
+    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    if (acta.estado !== 'Borrador') {
+      throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
+    }
+
+    const ESTADOS_ELEGIBLES = ['Aprobado', 'Vigente'] as const;
+    const [criterios, objetivos, competencias] = await Promise.all([
+      this.planes.listarDeCarrera(acta.carreraId, {
+        aspecto: 'CRITERIO_ACREDITACION',
+        estado: ESTADOS_ELEGIBLES,
+      }),
+      this.planes.listarDeCarrera(acta.carreraId, {
+        aspecto: 'OBJETIVO_EDUCACIONAL',
+        estado: ESTADOS_ELEGIBLES,
+      }),
+      acta.periodoMedicionId
+        ? this.planes.listarDeCarrera(acta.carreraId, {
+            aspecto: 'COMPETENCIA',
+            estado: ESTADOS_ELEGIBLES,
+            periodoId: acta.periodoMedicionId,
+          })
+        : Promise.resolve([]),
+    ]);
+    // RF-AC-007 RN2: orden fijo de secciones.
+    const todasLasCandidatas = [...criterios, ...objetivos, ...competencias];
+
+    const [existentes, yaEmitidos] = await Promise.all([
+      this.actas.accionesDe(id),
+      this.actas.planesYaEmitidos(todasLasCandidatas.map((c) => c.id)),
+    ]);
+    const yaVinculados = new Set(existentes.map((a) => a.planMejoraId));
+
+    const nuevasCandidatas = candidatasParaCargar(todasLasCandidatas, yaVinculados, yaEmitidos);
+
+    const nuevas: NuevaAccionActa[] = [];
+    let orden = existentes.length;
+    for (const candidata of nuevasCandidatas) {
+      const porcentaje =
+        candidata.aspecto === 'COMPETENCIA' &&
+        candidata.planEvaluacionId &&
+        candidata.competenciaId &&
+        candidata.periodoId
+          ? await calcularPorcentajeMedicionAnterior(
+              { evaluaciones: this.evaluaciones, mediciones: this.mediciones, configuraciones: this.configuraciones },
+              candidata.planEvaluacionId,
+              candidata.competenciaId,
+              candidata.periodoId,
+            )
+          : null;
+      nuevas.push({
+        planMejoraId: candidata.id,
+        aspecto: candidata.aspecto,
+        porcentajeMedicionCompetencia: porcentaje,
+        orden: orden++,
+      });
+    }
+
+    if (nuevas.length > 0) {
+      await this.actas.agregarAcciones(id, nuevas);
+    }
+    await this.eventos.publicar([new ActaAccionesCargadas(actor, id, acta.codigo, nuevas.length)]);
+    return nuevas.length;
   }
 
   async eliminar(actor: Actor, id: string): Promise<void> {
