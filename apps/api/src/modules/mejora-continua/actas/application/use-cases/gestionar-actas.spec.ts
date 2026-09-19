@@ -192,6 +192,19 @@ describe('crear', () => {
     expect(eventos).toHaveLength(1);
     expect(eventos[0]?.nombre).toBe('actas.creada');
   });
+
+  it('compone los textos institucionales de introducción y cierre (RF-AC-011)', async () => {
+    const actas = repoActas({
+      correlativosDe: async () => [],
+      crear: async (datos) => acta({ ...datos, id: 'acta-2' }),
+    });
+    const casos = montar({ actas });
+
+    const creada = await casos.crear(ACTOR, { periodoAcademico: '2025-10' });
+
+    expect(creada.textoIntroduccion).toContain('2025-10');
+    expect(creada.textoAcuerdoCierre).toContain('2025-10');
+  });
 });
 
 describe('editarCabecera', () => {

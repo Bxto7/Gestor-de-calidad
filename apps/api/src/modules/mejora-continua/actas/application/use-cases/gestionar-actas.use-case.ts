@@ -74,6 +74,15 @@ export class GestionarActas {
     // RF-AC-003: precarga editable, no un valor fijo — `editarCabecera` (Task 6) la puede cambiar.
     const titulo = `Acta de aprobación — ${carrera.nombre} — ${datos.periodoAcademico}`;
     const objetivo = `Elaborar y aprobar el Plan de Mejora ${datos.periodoAcademico}`;
+    // RF-AC-011: párrafos institucionales, autogenerados y editables
+    // (`editarTextosInstitucionales`, Task 11).
+    const textoIntroduccion =
+      `Se deja constancia de la revisión y deliberación de las acciones de mejora ` +
+      `correspondientes al periodo académico ${datos.periodoAcademico}, cuya aprobación se ` +
+      `resuelve a continuación.`;
+    const textoAcuerdoCierre =
+      `En virtud de lo expuesto, se resuelve aprobar las acciones de mejora del programa ` +
+      `correspondientes al periodo académico ${datos.periodoAcademico}.`;
 
     const creada = await this.actas.crear({
       carreraId,
@@ -83,6 +92,8 @@ export class GestionarActas {
       periodoMedicionId: datos.periodoMedicionId ?? null,
       titulo,
       objetivo,
+      textoIntroduccion,
+      textoAcuerdoCierre,
     });
 
     await this.eventos.publicar([new ActaCreada(actor, creada.id, creada.codigo)]);
