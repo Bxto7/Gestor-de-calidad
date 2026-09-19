@@ -81,6 +81,7 @@ import {
   type ResultadoConsistencia,
   validarConsistenciaMejora,
 } from '../../domain/services/motor-de-consistencia.js';
+import { calcularPorcentajeMedicionAnterior } from '../services/porcentaje-periodo-anterior.js';
 import type {
   AspectoPlanMejora,
   DatosEvidencia,
@@ -457,12 +458,8 @@ export class GestionarPlanesMejora {
     periodoId: string,
   ): Promise<number | null> {
     await this.exigir(actor, 'mejora.leer', null);
-    const planEvaluacion = await this.evaluaciones.porId(planEvaluacionId);
-    if (!planEvaluacion) {
-      throw new NoEncontrado('el plan de evaluación base', planEvaluacionId);
-    }
-    return this.calcularPorcentajePeriodoAnterior(
-      planEvaluacion.planMedicionId,
+    return calcularPorcentajeMedicionAnterior(
+      { evaluaciones: this.evaluaciones, mediciones: this.mediciones, configuraciones: this.configuraciones },
       planEvaluacionId,
       competenciaId,
       periodoId,
@@ -616,38 +613,6 @@ export class GestionarPlanesMejora {
     }
 
     return { planEvaluacion, planMedicion };
-  }
-
-  /**
-   * RF-PJ-028: §2e del diseño — no es un método directo del puerto, se
-   * ensambla a partir de tres lecturas: los periodos ordenados del plan de
-   * medición base, el periodo inmediatamente anterior al seleccionado, y el
-   * porcentaje registrado para esa competencia en ese periodo anterior.
-   */
-  private async calcularPorcentajePeriodoAnterior(
-    planMedicionId: string,
-    planEvaluacionId: string,
-    competenciaId: string,
-    periodoId: string,
-  ): Promise<number | null> {
-    const planMedicion = await this.mediciones.porId(planMedicionId);
-    if (!planMedicion) {
-      throw new NoEncontrado('el plan de medición', planMedicionId);
-    }
-
-    const periodos = [...planMedicion.periodos].sort((a, b) => a.orden - b.orden);
-    const actual = periodos.find((p) => p.id === periodoId);
-    if (!actual) return null;
-
-    // RF-PJ-028 RN3: el primer periodo no tiene input de medición disponible.
-    const anterior = periodos.find((p) => p.orden === actual.orden - 1);
-    if (!anterior) return null;
-
-    const configuracion = await this.configuraciones.del(planEvaluacionId);
-    const medicion = configuracion.mediciones.find(
-      (m) => m.competenciaId === competenciaId && m.periodoId === anterior.id,
-    );
-    return medicion?.porcentajeAlcanzado ?? null;
   }
 
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
