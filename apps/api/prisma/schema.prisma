@@ -1403,6 +1403,13 @@ model ActaAprobacion {
   fechaReunion      DateTime   @map("fecha_reunion") @db.Timestamptz(6)
   lugarReunion      String     @map("lugar_reunion") @db.VarChar(200)
   comentario        String?    @db.Text
+  /// RF-AC-011: párrafo previo a las tablas de acciones de mejora. Se
+  /// compone en `crear` (2c-AC-B) — a diferencia de
+  /// convocadaPor/fechaReunion/lugarReunion, el periodo académico ya existe
+  /// en ese momento, así que no hace falta el patrón de centinela.
+  textoIntroduccion  String @map("texto_introduccion") @db.Text
+  /// RF-AC-011: párrafo de cierre con la sección resolutiva.
+  textoAcuerdoCierre String @map("texto_acuerdo_cierre") @db.Text
   lugarEmision      String?    @map("lugar_emision") @db.VarChar(200)
   fechaEmision      DateTime?  @map("fecha_emision") @db.Timestamptz(6)
   estado            EstadoActa @default(BORRADOR)
@@ -1410,6 +1417,7 @@ model ActaAprobacion {
   actualizadoEn     DateTime   @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
   asistentes AsistenteActa[]
+  acciones   AccionActa[]
 
   /// RF-AC-002 RN2: el ámbito de unicidad del correlativo es la carrera.
   @@unique([carreraId, correlativo])
@@ -1433,5 +1441,41 @@ model AsistenteActa {
 
   @@index([actaId])
   @@map("asistentes_acta")
+  @@schema("mejora_continua")
+}
+
+/// RF-AC-007/008: qué planes de mejora entran en el acta y cuáles de esos
+/// quedan finalmente incluidos (2c-AC-B). `planMejoraId` es un UUID suelto,
+/// SIN `@relation` de Prisma hacia `PlanMejora` — mismo criterio que el resto
+/// de referencias cruzadas dentro de `mejora_continua` (ninguna usa
+/// `@relation` entre submódulos hermanos, ver `PlanMejora.planEvaluacionId`).
+/// Las columnas descriptivas (nombre, plazo, recursos, metas, responsable,
+/// elemento asociado) NO se snapshotean aquí — se leen en vivo de
+/// `PlanMejora` desde el caso de uso (decisión §8.1 del diseño). Solo
+/// `porcentajeMedicionCompetencia` se snapshotea, porque no tiene otro lugar
+/// donde vivir: es un cálculo (RF-PJ-028), no una columna propia de
+/// `PlanMejora`.
+model AccionActa {
+  id           String            @id @default(uuid()) @db.Uuid
+  actaId       String            @map("acta_id") @db.Uuid
+  planMejoraId String            @map("plan_mejora_id") @db.Uuid
+  aspecto      AspectoPlanMejora
+  /// RF-AC-008 RN1: incluida por defecto al cargarse.
+  incluida     Boolean           @default(true)
+  /// RF-PJ-028 / RF-AC-010: snapshot al momento de cargar. `null` si el
+  /// aspecto no es Competencia, o si "no disponible" (RF-PJ-028 RN3, primer
+  /// periodo). `SmallInt` y no `Decimal`: es el mismo tipo que
+  /// `DatosMedicion.porcentajeAlcanzado` (columna `porcentaje_alcanzado` de
+  /// `evaluacion`), un entero de 0 a 100 — no una fracción.
+  porcentajeMedicionCompetencia Int? @map("porcentaje_medicion_competencia") @db.SmallInt
+  /// RF-AC-007 RN2 (orden de secciones) y orden de llegada dentro de cada una.
+  orden        Int
+
+  acta ActaAprobacion @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  /// Un plan de mejora aparece a lo sumo una vez por acta.
+  @@unique([actaId, planMejoraId])
+  @@index([actaId])
+  @@map("acciones_acta")
   @@schema("mejora_continua")
 }
