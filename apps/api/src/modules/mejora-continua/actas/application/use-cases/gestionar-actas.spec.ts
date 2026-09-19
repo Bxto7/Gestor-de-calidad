@@ -707,4 +707,22 @@ describe('obtenerContenido', () => {
 
     expect(contenido.acciones).toEqual([]);
   });
+
+  it('omite silenciosamente las filas cuyo PlanMejora fue eliminado después de vincularse', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-vigente', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+        { id: 'aa-2', planMejoraId: 'plan-eliminado', aspecto: 'OBJETIVO_EDUCACIONAL', incluida: true, porcentajeMedicionCompetencia: null, orden: 1 },
+      ],
+    });
+    const planes = repoPlanesMejora({ planesPorIds: async () => [planMejora({ id: 'plan-vigente', nombre: 'Plan actual' })] });
+    const casos = montar({ actas, planes });
+
+    const contenido = await casos.obtenerContenido(ACTOR, 'acta-1');
+
+    expect(contenido.acciones).toHaveLength(1);
+    expect(contenido.acciones[0]?.id).toBe('aa-1');
+    expect(contenido.acciones[0]?.plan.id).toBe('plan-vigente');
+  });
 });
