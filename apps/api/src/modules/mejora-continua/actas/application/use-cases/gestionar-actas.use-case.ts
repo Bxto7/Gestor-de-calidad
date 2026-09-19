@@ -31,6 +31,7 @@ import {
   ActaCreada,
   ActaEliminada,
   ActaSeleccionDeAccionesActualizada,
+  ActaTextosEditados,
 } from '../../domain/events/eventos-actas.js';
 import type {
   CabeceraActa,
@@ -243,6 +244,23 @@ export class GestionarActas {
     await this.eventos.publicar([
       new ActaSeleccionDeAccionesActualizada(actor, id, acta.codigo, seleccion.length),
     ]);
+  }
+
+  /** RF-AC-011: reemplazo parcial, mismo criterio que `editarCabecera`. */
+  async editarTextosInstitucionales(
+    actor: Actor,
+    id: string,
+    datos: { textoIntroduccion: string; textoAcuerdoCierre: string },
+  ): Promise<DatosActa> {
+    const acta = await this.exigirActa(id);
+    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    if (acta.estado !== 'Borrador') {
+      throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
+    }
+
+    const editada = await this.actas.editarTextos(id, datos);
+    await this.eventos.publicar([new ActaTextosEditados(actor, id, editada.codigo)]);
+    return editada;
   }
 
   async eliminar(actor: Actor, id: string): Promise<void> {

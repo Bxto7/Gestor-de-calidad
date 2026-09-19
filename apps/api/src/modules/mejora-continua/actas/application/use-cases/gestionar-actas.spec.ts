@@ -637,3 +637,46 @@ describe('actualizarSeleccionDeAcciones', () => {
     expect(eventos.map((e) => e.nombre)).toEqual(['actas.seleccion_actualizada']);
   });
 });
+
+describe('editarTextosInstitucionales', () => {
+  it('reemplaza los textos enviados y deja el resto igual', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      editarTextos: async (_id, datos) => acta({ ...datos }),
+    });
+    const casos = montar({ actas });
+
+    const editada = await casos.editarTextosInstitucionales(ACTOR, 'acta-1', {
+      textoIntroduccion: 'nueva intro',
+      textoAcuerdoCierre: 'nuevo cierre',
+    });
+
+    expect(editada.textoIntroduccion).toBe('nueva intro');
+    expect(editada.textoAcuerdoCierre).toBe('nuevo cierre');
+  });
+
+  it('rechaza si el acta no está en Borrador (RF-AC-017)', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'Emitida' }) });
+    const casos = montar({ actas });
+
+    await expect(
+      casos.editarTextosInstitucionales(ACTOR, 'acta-1', {
+        textoIntroduccion: 'x',
+        textoAcuerdoCierre: 'y',
+      }),
+    ).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('publica ActaTextosEditados', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const actas = repoActas({ porId: async () => acta({ estado: 'Borrador' }) });
+    const casos = montar({ actas, eventos: publicador });
+
+    await casos.editarTextosInstitucionales(ACTOR, 'acta-1', {
+      textoIntroduccion: 'x',
+      textoAcuerdoCierre: 'y',
+    });
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.textos_editados']);
+  });
+});
