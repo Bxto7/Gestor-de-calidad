@@ -581,3 +581,59 @@ describe('cargarAccionesDelPeriodo', () => {
     expect(eventos.map((e) => e.nombre)).toEqual(['actas.acciones_cargadas']);
   });
 });
+
+describe('actualizarSeleccionDeAcciones', () => {
+  it('togglea incluida sobre acciones ya vinculadas', async () => {
+    let recibido: readonly { planMejoraId: string; incluida: boolean }[] = [];
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+      ],
+      actualizarSeleccion: async (_id, cambios) => {
+        recibido = cambios;
+      },
+    });
+    const casos = montar({ actas });
+
+    await casos.actualizarSeleccionDeAcciones(ACTOR, 'acta-1', [{ planMejoraId: 'plan-1', incluida: false }]);
+
+    expect(recibido).toEqual([{ planMejoraId: 'plan-1', incluida: false }]);
+  });
+
+  it('rechaza togglear un planMejoraId sin AccionActa previa', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [],
+    });
+    const casos = montar({ actas });
+
+    await expect(
+      casos.actualizarSeleccionDeAcciones(ACTOR, 'acta-1', [{ planMejoraId: 'sin-cargar', incluida: true }]),
+    ).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('rechaza si el acta no está en Borrador (RF-AC-017)', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'Aprobada' }) });
+    const casos = montar({ actas });
+
+    await expect(
+      casos.actualizarSeleccionDeAcciones(ACTOR, 'acta-1', [{ planMejoraId: 'plan-1', incluida: true }]),
+    ).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('publica ActaSeleccionDeAccionesActualizada', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+      ],
+    });
+    const { eventos, publicador } = capturarEventos();
+    const casos = montar({ actas, eventos: publicador });
+
+    await casos.actualizarSeleccionDeAcciones(ACTOR, 'acta-1', [{ planMejoraId: 'plan-1', incluida: false }]);
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.seleccion_actualizada']);
+  });
+});

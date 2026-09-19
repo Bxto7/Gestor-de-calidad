@@ -30,6 +30,7 @@ import {
   ActaCabeceraEditada,
   ActaCreada,
   ActaEliminada,
+  ActaSeleccionDeAccionesActualizada,
 } from '../../domain/events/eventos-actas.js';
 import type {
   CabeceraActa,
@@ -215,6 +216,33 @@ export class GestionarActas {
     }
     await this.eventos.publicar([new ActaAccionesCargadas(actor, id, acta.codigo, nuevas.length)]);
     return nuevas.length;
+  }
+
+  /** RF-AC-008: solo togglea filas ya cargadas por `cargarAccionesDelPeriodo`. */
+  async actualizarSeleccionDeAcciones(
+    actor: Actor,
+    id: string,
+    seleccion: readonly { planMejoraId: string; incluida: boolean }[],
+  ): Promise<void> {
+    const acta = await this.exigirActa(id);
+    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    if (acta.estado !== 'Borrador') {
+      throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
+    }
+
+    const existentes = new Set((await this.actas.accionesDe(id)).map((a) => a.planMejoraId));
+    for (const cambio of seleccion) {
+      if (!existentes.has(cambio.planMejoraId)) {
+        throw new ReglaDeNegocioViolada(
+          `RF-AC-008: el plan de mejora ${cambio.planMejoraId} no está cargado en esta acta.`,
+        );
+      }
+    }
+
+    await this.actas.actualizarSeleccion(id, seleccion);
+    await this.eventos.publicar([
+      new ActaSeleccionDeAccionesActualizada(actor, id, acta.codigo, seleccion.length),
+    ]);
   }
 
   async eliminar(actor: Actor, id: string): Promise<void> {
