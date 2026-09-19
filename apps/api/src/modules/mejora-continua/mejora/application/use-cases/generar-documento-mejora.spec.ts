@@ -164,6 +164,7 @@ function montar(dobles: Dobles = {}) {
     copiar: async () => plan(),
     linajeDe: async () => [],
     listarDeCarrera: async () => [],
+    planesPorIds: async () => [],
     ...dobles.planes,
   };
 

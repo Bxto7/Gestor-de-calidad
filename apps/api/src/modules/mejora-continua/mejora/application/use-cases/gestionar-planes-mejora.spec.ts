@@ -161,6 +161,7 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
     registrarImpactoEnMedicion: async (_id, planMedicionAfectadoId) =>
       plan({ planMedicionAfectadoId }),
     listarDeCarrera: async () => [],
+    planesPorIds: async () => [],
     copiar: noUsado('copiar'),
     linajeDe: noUsado('linajeDe'),
     ...sobre,
@@ -1152,5 +1153,21 @@ describe('el aspecto no es editable una vez creado (RF-PJ-001 RN1)', () => {
     });
 
     expect(actualizado.aspecto).toBe('CRITERIO_ACREDITACION');
+  });
+});
+
+describe('RepositorioPlanMejoraPort — contrato ampliado (2c-AC-B)', () => {
+  it('el doble de este spec ya expone listarDeCarrera con estado como arreglo y planesPorIds', () => {
+    // Este test es de compilación: si el tipo de `RepositorioPlanMejoraPort`
+    // no acepta `estado` como arreglo, o si `planesPorIds` no existe, el
+    // archivo entero deja de tipar y ningún test de este spec corre.
+    const _firmaEstadoArreglo: Parameters<
+      import('../ports/plan-mejora.port.js').RepositorioPlanMejoraPort['listarDeCarrera']
+    >[1] = { estado: ['Aprobado', 'Vigente'] };
+    const _firmaPlanesPorIds: ReturnType<
+      import('../ports/plan-mejora.port.js').RepositorioPlanMejoraPort['planesPorIds']
+    > = Promise.resolve([]);
+    expect(_firmaEstadoArreglo.estado).toEqual(['Aprobado', 'Vigente']);
+    void _firmaPlanesPorIds;
   });
 });

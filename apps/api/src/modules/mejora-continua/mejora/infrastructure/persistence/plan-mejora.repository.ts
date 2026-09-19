@@ -342,9 +342,20 @@ export class PlanMejoraRepositoryPrisma
       texto?: string;
       aspecto?: AspectoPlanMejora;
       estadoImplementacion?: EstadoImplementacion;
-      estado?: EstadoMedicion;
+      estado?: EstadoMedicion | readonly EstadoMedicion[];
+      periodoId?: string;
     },
   ): Promise<DatosPlanMejora[]> {
+    let estadoBd: { in: EstadoBd[] } | EstadoBd | undefined;
+    const { estado: estadoFiltro } = filtro ?? {};
+    if (estadoFiltro && Array.isArray(estadoFiltro)) {
+      estadoBd = { in: estadoFiltro.map((e) => A_BD[e as EstadoMedicion]) };
+    } else if (estadoFiltro) {
+      estadoBd = A_BD[estadoFiltro as EstadoMedicion];
+    } else {
+      estadoBd = undefined;
+    }
+
     const filas = await this.prisma.planMejora.findMany({
       where: {
         carreraId,
@@ -352,11 +363,8 @@ export class PlanMejoraRepositoryPrisma
         ...(filtro?.estadoImplementacion
           ? { estadoImplementacion: IMPLEMENTACION_A_BD[filtro.estadoImplementacion] }
           : {}),
-        ...(filtro?.estado ? { estado: A_BD[filtro.estado] } : {}),
-        // Sin `mode: 'insensitive'` en el nombre porque MySQL/algunos
-        // collations no lo soportan igual; Postgres con collation por
-        // defecto (`en_US.utf8`/`C`) sí, y es el motor único del proyecto
-        // (CLAUDE.md §4.3) — se usa sin reparo.
+        ...(estadoBd ? { estado: estadoBd } : {}),
+        ...(filtro?.periodoId ? { periodoId: filtro.periodoId } : {}),
         ...(filtro?.texto
           ? {
               OR: [
@@ -368,6 +376,16 @@ export class PlanMejoraRepositoryPrisma
       },
       select: SELECCION,
       orderBy: { creadoEn: 'desc' },
+    });
+    return filas.map(aDatos);
+  }
+
+  /** 2c-AC-B: resuelve varios planes por id en una sola consulta. */
+  async planesPorIds(ids: readonly string[]): Promise<DatosPlanMejora[]> {
+    if (ids.length === 0) return [];
+    const filas = await this.prisma.planMejora.findMany({
+      where: { id: { in: [...ids] } },
+      select: SELECCION,
     });
     return filas.map(aDatos);
   }

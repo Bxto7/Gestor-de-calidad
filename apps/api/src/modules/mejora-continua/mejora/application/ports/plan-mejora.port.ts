@@ -143,16 +143,22 @@ export interface RepositorioPlanMejoraPort {
   /** RF-PJ-037 RN1: el linaje completo, de más reciente a más antiguo. */
   linajeDe(id: string): Promise<DatosPlanMejora[]>;
 
-  /** RF-PJ-038: listado por carrera, con filtro opcional de texto/aspecto/estado. */
+  /** RF-PJ-038: listado por carrera, con filtro opcional de texto/aspecto/estado/periodo. */
   listarDeCarrera(
     carreraId: string,
     filtro?: {
       texto?: string;
       aspecto?: AspectoPlanMejora;
       estadoImplementacion?: EstadoImplementacion;
-      estado?: EstadoMedicion;
+      /** 2c-AC-B: acepta varios estados en una sola consulta (RF-AC-007: Aprobado o Vigente). */
+      estado?: EstadoMedicion | readonly EstadoMedicion[];
+      /** 2c-AC-B (RF-AC-007): solo tiene sentido para el aspecto Competencia. */
+      periodoId?: string;
     },
   ): Promise<readonly DatosPlanMejora[]>;
+
+  /** 2c-AC-B: resuelve varios planes por id en una sola consulta, para el contenido del acta. */
+  planesPorIds(ids: readonly string[]): Promise<readonly DatosPlanMejora[]>;
 }
 
 export const REPOSITORIO_PLAN_MEJORA = Symbol('RepositorioPlanMejoraPort');
