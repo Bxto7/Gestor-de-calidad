@@ -5,10 +5,28 @@
  */
 
 import type { EstadoActa } from '../../domain/value-objects/estado-acta.js';
+import type { AspectoPlanMejora } from '../../../mejora/application/ports/plan-mejora.port.js';
 
 export interface AsistenteActaDato {
   readonly id: string;
   readonly nombre: string;
+}
+
+export interface AccionActaDato {
+  readonly id: string;
+  readonly planMejoraId: string;
+  readonly aspecto: AspectoPlanMejora;
+  readonly incluida: boolean;
+  readonly porcentajeMedicionCompetencia: number | null;
+  readonly orden: number;
+}
+
+/** Lo que hace falta para vincular un plan de mejora nuevo al acta. */
+export interface NuevaAccionActa {
+  readonly planMejoraId: string;
+  readonly aspecto: AspectoPlanMejora;
+  readonly porcentajeMedicionCompetencia: number | null;
+  readonly orden: number;
 }
 
 export interface DatosActa {
@@ -21,6 +39,9 @@ export interface DatosActa {
   readonly periodoMedicionId: string | null;
   readonly titulo: string;
   readonly objetivo: string;
+  /** RF-AC-011 (2c-AC-B). */
+  readonly textoIntroduccion: string;
+  readonly textoAcuerdoCierre: string;
   readonly convocadaPor: string;
   readonly fechaReunion: Date;
   readonly lugarReunion: string;
@@ -41,6 +62,8 @@ export interface NuevaActa {
   readonly periodoMedicionId: string | null;
   readonly titulo: string;
   readonly objetivo: string;
+  readonly textoIntroduccion: string;
+  readonly textoAcuerdoCierre: string;
 }
 
 /** RF-AC-003/004/006: reemplaza el bloque de cabecera entero, quien llama decide siempre. */
@@ -61,6 +84,22 @@ export interface RepositorioActaAprobacionPort {
   editarCabecera(id: string, datos: CabeceraActa): Promise<DatosActa>;
   /** RF-AC-005: reemplaza el conjunto completo, en el orden recibido. */
   reemplazarAsistentes(id: string, nombres: readonly string[]): Promise<DatosActa>;
+  /** 2c-AC-B: las filas de vínculo de esta acta (sin datos descriptivos de PlanMejora). */
+  accionesDe(actaId: string): Promise<readonly AccionActaDato[]>;
+  /** RF-AC-007: agrega las candidatas nuevas; no toca las que ya existían. */
+  agregarAcciones(actaId: string, nuevas: readonly NuevaAccionActa[]): Promise<void>;
+  /** RF-AC-008: togglea `incluida` sobre filas ya existentes. */
+  actualizarSeleccion(
+    actaId: string,
+    cambios: readonly { planMejoraId: string; incluida: boolean }[],
+  ): Promise<void>;
+  /** RF-AC-011. */
+  editarTextos(
+    id: string,
+    datos: { textoIntroduccion: string; textoAcuerdoCierre: string },
+  ): Promise<DatosActa>;
+  /** Nota §2 de 2c-AC-A: planes ya incluidos en un acta en estado Emitida. */
+  planesYaEmitidos(planMejoraIds: readonly string[]): Promise<ReadonlySet<string>>;
   eliminar(id: string): Promise<void>;
   /** RF-AC-002 RN2: los correlativos ya usados dentro de esa carrera. */
   correlativosDe(carreraId: string): Promise<readonly number[]>;
