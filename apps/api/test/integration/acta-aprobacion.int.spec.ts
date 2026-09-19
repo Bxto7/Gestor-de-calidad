@@ -152,6 +152,42 @@ describe('contenido del acta (2c-AC-B)', () => {
     expect(acciones.find((a) => a.planMejoraId === plan2)?.incluida).toBe(true);
   });
 
+  it('accionesDe respeta RF-AC-007 RN2: Criterio → Objetivo → Competencia, sin importar el orden de carga', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const planCompetencia = randomUUID();
+    const planCriterio = randomUUID();
+    const planObjetivo = randomUUID();
+    const acta = await repo.crear({
+      carreraId: randomUUID(),
+      correlativo: 1,
+      codigo: 'ACTA N° 001 – EAP-ISI',
+      periodoAcademico: '2025-10',
+      periodoMedicionId: null,
+      titulo: 't',
+      objetivo: 'o',
+      textoIntroduccion: 'intro',
+      textoAcuerdoCierre: 'cierre',
+    });
+
+    // Se cargan deliberadamente en el orden Competencia, Criterio, Objetivo
+    // — el opuesto al que RF-AC-007 RN2 exige a la salida — para que la
+    // prueba no pueda pasar por casualidad de orden de inserción.
+    await repo.agregarAcciones(acta.id, [
+      { planMejoraId: planCompetencia, aspecto: 'COMPETENCIA', porcentajeMedicionCompetencia: 80, orden: 0 },
+      { planMejoraId: planCriterio, aspecto: 'CRITERIO_ACREDITACION', porcentajeMedicionCompetencia: null, orden: 0 },
+      { planMejoraId: planObjetivo, aspecto: 'OBJETIVO_EDUCACIONAL', porcentajeMedicionCompetencia: null, orden: 0 },
+    ]);
+
+    const acciones = await repo.accionesDe(acta.id);
+
+    expect(acciones.map((a) => a.aspecto)).toEqual([
+      'CRITERIO_ACREDITACION',
+      'OBJETIVO_EDUCACIONAL',
+      'COMPETENCIA',
+    ]);
+    expect(acciones.map((a) => a.planMejoraId)).toEqual([planCriterio, planObjetivo, planCompetencia]);
+  });
+
   it('planesYaEmitidos solo devuelve planes incluidos en un acta con estado EMITIDA', async () => {
     const repo = new ActaAprobacionRepositoryPrisma(prisma);
     const planEmitido = randomUUID();

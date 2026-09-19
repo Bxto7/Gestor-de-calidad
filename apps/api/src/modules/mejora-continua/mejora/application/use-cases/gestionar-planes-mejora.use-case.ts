@@ -36,8 +36,9 @@
  *   evaluación Directa base (`RepositorioPlanEvaluacionPort` +
  *   `RepositorioPlanMedicionPort`), su carrera (`ContenidoCurricularPort`),
  *   y que la competencia/periodo pertenezcan a esa base. El "% del periodo
- *   anterior" (RF-PJ-028) se ensambla en `calcularPorcentajePeriodoAnterior`
- *   y nunca se guarda como snapshot (decisión 5 del diseño).
+ *   anterior" (RF-PJ-028) se ensambla en `calcularPorcentajeMedicionAnterior`
+ *   (`mejora/application/services/porcentaje-periodo-anterior.ts`) y nunca
+ *   se guarda como snapshot (decisión 5 del diseño).
  */
 
 import type {
