@@ -10,9 +10,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
 import type { EstadoActa } from '../../domain/value-objects/estado-acta.js';
 import type {
+  AccionActaDato,
   AsistenteActaDato,
   CabeceraActa,
   DatosActa,
+  NuevaAccionActa,
   NuevaActa,
   RepositorioActaAprobacionPort,
 } from '../../application/ports/acta-aprobacion.port.js';
@@ -43,6 +45,8 @@ const SELECCION = {
   periodoMedicionId: true,
   titulo: true,
   objetivo: true,
+  textoIntroduccion: true,
+  textoAcuerdoCierre: true,
   convocadaPor: true,
   fechaReunion: true,
   lugarReunion: true,
@@ -68,6 +72,8 @@ interface Fila {
   periodoMedicionId: string | null;
   titulo: string;
   objetivo: string;
+  textoIntroduccion: string;
+  textoAcuerdoCierre: string;
   convocadaPor: string;
   fechaReunion: Date;
   lugarReunion: string;
@@ -93,6 +99,8 @@ function aDatos(fila: Fila): DatosActa {
     periodoMedicionId: fila.periodoMedicionId,
     titulo: fila.titulo,
     objetivo: fila.objetivo,
+    textoIntroduccion: fila.textoIntroduccion,
+    textoAcuerdoCierre: fila.textoAcuerdoCierre,
     convocadaPor: fila.convocadaPor,
     fechaReunion: fila.fechaReunion,
     lugarReunion: fila.lugarReunion,
@@ -119,6 +127,8 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
         periodoMedicionId: datos.periodoMedicionId,
         titulo: datos.titulo,
         objetivo: datos.objetivo,
+        textoIntroduccion: datos.textoIntroduccion,
+        textoAcuerdoCierre: datos.textoAcuerdoCierre,
         // RF-AC-004: la cabecera nace vacía, se completa con `editarCabecera`.
         convocadaPor: '',
         fechaReunion: new Date(0),
@@ -178,5 +188,84 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
     const a = await this.porId(id);
     if (!a) throw new Error(`El acta ${id} desapareció durante la operación.`);
     return a;
+  }
+
+  async accionesDe(actaId: string): Promise<AccionActaDato[]> {
+    const filas = await this.prisma.accionActa.findMany({
+      where: { actaId },
+      select: {
+        id: true,
+        planMejoraId: true,
+        aspecto: true,
+        incluida: true,
+        porcentajeMedicionCompetencia: true,
+        orden: true,
+      },
+      orderBy: [{ aspecto: 'asc' }, { orden: 'asc' }],
+    });
+    return filas.map((f) => ({
+      id: f.id,
+      planMejoraId: f.planMejoraId,
+      aspecto: f.aspecto,
+      incluida: f.incluida,
+      porcentajeMedicionCompetencia: f.porcentajeMedicionCompetencia,
+      orden: f.orden,
+    }));
+  }
+
+  async agregarAcciones(actaId: string, nuevas: readonly NuevaAccionActa[]): Promise<void> {
+    if (nuevas.length === 0) return;
+    // `skipDuplicates`: la carga es idempotente (RF-AC-007) — el
+    // `@@unique([actaId, planMejoraId])` hace que una candidata ya vinculada
+    // no se reinserte ni resetee su `incluida`.
+    await this.prisma.accionActa.createMany({
+      data: nuevas.map((n) => ({
+        actaId,
+        planMejoraId: n.planMejoraId,
+        aspecto: n.aspecto,
+        porcentajeMedicionCompetencia: n.porcentajeMedicionCompetencia,
+        orden: n.orden,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  async actualizarSeleccion(
+    actaId: string,
+    cambios: readonly { planMejoraId: string; incluida: boolean }[],
+  ): Promise<void> {
+    await this.prisma.$transaction(
+      cambios.map((c) =>
+        this.prisma.accionActa.updateMany({
+          where: { actaId, planMejoraId: c.planMejoraId },
+          data: { incluida: c.incluida },
+        }),
+      ),
+    );
+  }
+
+  async editarTextos(
+    id: string,
+    datos: { textoIntroduccion: string; textoAcuerdoCierre: string },
+  ): Promise<DatosActa> {
+    const fila = await this.prisma.actaAprobacion.update({
+      where: { id },
+      data: { textoIntroduccion: datos.textoIntroduccion, textoAcuerdoCierre: datos.textoAcuerdoCierre },
+      select: SELECCION,
+    });
+    return aDatos(fila);
+  }
+
+  async planesYaEmitidos(planMejoraIds: readonly string[]): Promise<ReadonlySet<string>> {
+    if (planMejoraIds.length === 0) return new Set();
+    const filas = await this.prisma.accionActa.findMany({
+      where: {
+        planMejoraId: { in: [...planMejoraIds] },
+        incluida: true,
+        acta: { estado: 'EMITIDA' },
+      },
+      select: { planMejoraId: true },
+    });
+    return new Set(filas.map((f) => f.planMejoraId));
   }
 }

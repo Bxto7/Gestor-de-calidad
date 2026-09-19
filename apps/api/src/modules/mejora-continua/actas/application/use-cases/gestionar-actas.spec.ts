@@ -53,6 +53,8 @@ function acta(sobre: Partial<DatosActa> = {}): DatosActa {
     periodoMedicionId: null,
     titulo: 'Acta de aprobación — Ingeniería de Software — 2025-10',
     objetivo: 'Elaborar y aprobar el Plan de Mejora 2025-10',
+    textoIntroduccion: 'Se deja constancia de la revisión y deliberación de las siguientes acciones.',
+    textoAcuerdoCierre: 'Se aprueban las acciones de mejora del programa para el periodo 2025-10.',
     convocadaPor: '',
     fechaReunion: new Date(0),
     lugarReunion: '',
@@ -74,6 +76,11 @@ function repoActas(overrides: Partial<RepositorioActaAprobacionPort> = {}): Repo
     reemplazarAsistentes: async () => acta(),
     eliminar: async () => {},
     correlativosDe: async () => [],
+    accionesDe: async () => [],
+    agregarAcciones: async () => {},
+    actualizarSeleccion: async () => {},
+    editarTextos: async (_id, datos) => acta(datos),
+    planesYaEmitidos: async () => new Set(),
     ...overrides,
   };
 }

@@ -18,7 +18,7 @@ const repo = new ActaAprobacionRepositoryPrisma(prisma);
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE mejora_continua.asistentes_acta, mejora_continua.actas_aprobacion
+    TRUNCATE mejora_continua.asistentes_acta, mejora_continua.acciones_acta, mejora_continua.actas_aprobacion
     RESTART IDENTITY CASCADE`);
 });
 
@@ -35,6 +35,8 @@ function nuevaActa(overrides: Partial<NuevaActa> = {}): NuevaActa {
     periodoMedicionId: null,
     titulo: 'Acta de aprobación — Ingeniería de Software — 2025-10',
     objetivo: 'Elaborar y aprobar el Plan de Mejora 2025-10',
+    textoIntroduccion: 'intro',
+    textoAcuerdoCierre: 'cierre',
     ...overrides,
   };
 }
@@ -114,5 +116,103 @@ describe('el repositorio', () => {
     await repo.crear(nuevaActa({ carreraId: carreraB, correlativo: 1, codigo: 'B-1' }));
 
     expect([...(await repo.correlativosDe(carreraA))].sort()).toEqual([1, 2]);
+  });
+});
+
+describe('contenido del acta (2c-AC-B)', () => {
+  it('agregarAcciones es idempotente: una segunda llamada no duplica ni resetea la selección', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const plan1 = randomUUID();
+    const plan2 = randomUUID();
+    const acta = await repo.crear({
+      carreraId: randomUUID(),
+      correlativo: 1,
+      codigo: 'ACTA N° 001 – EAP-ISI',
+      periodoAcademico: '2025-10',
+      periodoMedicionId: null,
+      titulo: 't',
+      objetivo: 'o',
+      textoIntroduccion: 'intro',
+      textoAcuerdoCierre: 'cierre',
+    });
+
+    await repo.agregarAcciones(acta.id, [
+      { planMejoraId: plan1, aspecto: 'CRITERIO_ACREDITACION', porcentajeMedicionCompetencia: null, orden: 0 },
+    ]);
+    await repo.actualizarSeleccion(acta.id, [{ planMejoraId: plan1, incluida: false }]);
+    // Recargar con la misma candidata no debe resetear `incluida` a true.
+    await repo.agregarAcciones(acta.id, [
+      { planMejoraId: plan1, aspecto: 'CRITERIO_ACREDITACION', porcentajeMedicionCompetencia: null, orden: 0 },
+      { planMejoraId: plan2, aspecto: 'CRITERIO_ACREDITACION', porcentajeMedicionCompetencia: null, orden: 1 },
+    ]);
+
+    const acciones = await repo.accionesDe(acta.id);
+    expect(acciones).toHaveLength(2);
+    expect(acciones.find((a) => a.planMejoraId === plan1)?.incluida).toBe(false);
+    expect(acciones.find((a) => a.planMejoraId === plan2)?.incluida).toBe(true);
+  });
+
+  it('planesYaEmitidos solo devuelve planes incluidos en un acta con estado EMITIDA', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const planEmitido = randomUUID();
+    const planBorrador = randomUUID();
+    const carreraId = randomUUID();
+    const emitida = await repo.crear({
+      carreraId,
+      correlativo: 1,
+      codigo: 'ACTA N° 001 – EAP-ISI',
+      periodoAcademico: '2025-10',
+      periodoMedicionId: null,
+      titulo: 't',
+      objetivo: 'o',
+      textoIntroduccion: 'intro',
+      textoAcuerdoCierre: 'cierre',
+    });
+    await prisma.actaAprobacion.update({ where: { id: emitida.id }, data: { estado: 'EMITIDA' } });
+    await repo.agregarAcciones(emitida.id, [
+      { planMejoraId: planEmitido, aspecto: 'CRITERIO_ACREDITACION', porcentajeMedicionCompetencia: null, orden: 0 },
+    ]);
+
+    const borrador = await repo.crear({
+      carreraId,
+      correlativo: 2,
+      codigo: 'ACTA N° 002 – EAP-ISI',
+      periodoAcademico: '2025-10',
+      periodoMedicionId: null,
+      titulo: 't',
+      objetivo: 'o',
+      textoIntroduccion: 'intro',
+      textoAcuerdoCierre: 'cierre',
+    });
+    await repo.agregarAcciones(borrador.id, [
+      { planMejoraId: planBorrador, aspecto: 'CRITERIO_ACREDITACION', porcentajeMedicionCompetencia: null, orden: 0 },
+    ]);
+
+    const yaEmitidos = await repo.planesYaEmitidos([planEmitido, planBorrador]);
+    expect(yaEmitidos.has(planEmitido)).toBe(true);
+    expect(yaEmitidos.has(planBorrador)).toBe(false);
+  });
+
+  it('editarTextos reemplaza los dos párrafos', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const acta = await repo.crear({
+      carreraId: randomUUID(),
+      correlativo: 1,
+      codigo: 'ACTA N° 001 – EAP-ISI',
+      periodoAcademico: '2025-10',
+      periodoMedicionId: null,
+      titulo: 't',
+      objetivo: 'o',
+      textoIntroduccion: 'intro original',
+      textoAcuerdoCierre: 'cierre original',
+    });
+
+    const editada = await repo.editarTextos(acta.id, {
+      textoIntroduccion: 'intro nueva',
+      textoAcuerdoCierre: 'cierre nuevo',
+    });
+
+    expect(editada.textoIntroduccion).toBe('intro nueva');
+    expect(editada.textoAcuerdoCierre).toBe('cierre nuevo');
   });
 });
