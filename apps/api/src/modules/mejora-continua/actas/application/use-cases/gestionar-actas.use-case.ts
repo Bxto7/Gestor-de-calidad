@@ -83,8 +83,6 @@ export class GestionarActas {
       periodoMedicionId: datos.periodoMedicionId ?? null,
       titulo,
       objetivo,
-      textoIntroduccion: '',
-      textoAcuerdoCierre: '',
     });
 
     await this.eventos.publicar([new ActaCreada(actor, creada.id, creada.codigo)]);
