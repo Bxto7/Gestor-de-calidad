@@ -1,13 +1,16 @@
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
 import { Recortado } from '../../../../../../platform/http/recortado.js';
@@ -91,4 +94,41 @@ export class AsistentesActaDto {
   @ArrayMaxSize(200)
   @IsString({ each: true })
   nombres!: string[];
+}
+
+/** RF-AC-008: un ítem de la selección manual. */
+export class ItemSeleccionAccionDto {
+  @ApiProperty()
+  @IsUUID('4')
+  planMejoraId!: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  incluida!: boolean;
+}
+
+export class ActualizarSeleccionAccionesDto {
+  @ApiProperty({ type: [ItemSeleccionAccionDto] })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => ItemSeleccionAccionDto)
+  seleccion!: ItemSeleccionAccionDto[];
+}
+
+/** RF-AC-011: reemplazo parcial — ambos campos opcionales, quien llama envía lo que cambia. */
+export class TextosActaDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Recortado()
+  @IsString()
+  @MaxLength(4000)
+  textoIntroduccion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Recortado()
+  @IsString()
+  @MaxLength(4000)
+  textoAcuerdoCierre?: string;
 }

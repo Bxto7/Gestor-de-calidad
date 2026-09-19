@@ -2,7 +2,13 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
-import { AsistentesActaDto, CabeceraActaDto, CrearActaDto } from './acta-aprobacion.dto.js';
+import {
+  ActualizarSeleccionAccionesDto,
+  AsistentesActaDto,
+  CabeceraActaDto,
+  CrearActaDto,
+  TextosActaDto,
+} from './acta-aprobacion.dto.js';
 
 function fallos<T extends object>(cls: new () => T, plano: Record<string, unknown>): string[] {
   return validateSync(plainToInstance(cls, plano)).map((e) => e.property);
@@ -69,5 +75,32 @@ describe('AsistentesActaDto', () => {
 
   it('rechaza un elemento que no sea texto', () => {
     expect(fallos(AsistentesActaDto, { nombres: [123] })).toContain('nombres');
+  });
+});
+
+describe('ActualizarSeleccionAccionesDto', () => {
+  it('acepta una selección válida', () => {
+    expect(
+      fallos(ActualizarSeleccionAccionesDto, {
+        seleccion: [{ planMejoraId: '11111111-1111-4111-8111-111111111111', incluida: false }],
+      }),
+    ).toEqual([]);
+  });
+
+  it('rechaza un planMejoraId que no es UUID', () => {
+    const errores = fallos(ActualizarSeleccionAccionesDto, {
+      seleccion: [{ planMejoraId: 'no-es-uuid', incluida: true }],
+    });
+    expect(errores).toContain('seleccion');
+  });
+});
+
+describe('TextosActaDto', () => {
+  it('acepta ambos campos opcionales', () => {
+    expect(fallos(TextosActaDto, { textoIntroduccion: 'x', textoAcuerdoCierre: 'y' })).toEqual([]);
+  });
+
+  it('acepta el objeto vacío (ningún campo es obligatorio)', () => {
+    expect(fallos(TextosActaDto, {})).toEqual([]);
   });
 });
