@@ -680,3 +680,31 @@ describe('editarTextosInstitucionales', () => {
     expect(eventos.map((e) => e.nombre)).toEqual(['actas.textos_editados']);
   });
 });
+
+describe('obtenerContenido', () => {
+  it('combina las AccionActa con los datos en vivo de PlanMejora', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+      ],
+    });
+    const planes = repoPlanesMejora({ planesPorIds: async () => [planMejora({ id: 'plan-1', nombre: 'Reforzar bibliografía' })] });
+    const casos = montar({ actas, planes });
+
+    const contenido = await casos.obtenerContenido(ACTOR, 'acta-1');
+
+    expect(contenido.acciones).toHaveLength(1);
+    expect(contenido.acciones[0]?.incluida).toBe(true);
+    expect(contenido.acciones[0]?.plan.nombre).toBe('Reforzar bibliografía');
+  });
+
+  it('acta sin acciones cargadas devuelve la lista vacía', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'Borrador' }), accionesDe: async () => [] });
+    const casos = montar({ actas });
+
+    const contenido = await casos.obtenerContenido(ACTOR, 'acta-1');
+
+    expect(contenido.acciones).toEqual([]);
+  });
+});

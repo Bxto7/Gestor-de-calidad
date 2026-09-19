@@ -39,12 +39,26 @@ import type {
   NuevaAccionActa,
   RepositorioActaAprobacionPort,
 } from '../ports/acta-aprobacion.port.js';
+import type { DatosPlanMejora } from '../../../mejora/application/ports/plan-mejora.port.js';
 
 /** RF-AC-001: lo que se pide al crear. */
 export interface DatosCrearActa {
   readonly periodoAcademico: string;
   /** RF-AC-007 (2c-AC-B): opcional, filtra el aspecto Competencia. */
   readonly periodoMedicionId?: string;
+}
+
+/** RF-AC-009: una fila de la tabla del acta, con los datos vivos de su plan de mejora. */
+export interface AccionDelActa {
+  readonly id: string;
+  readonly incluida: boolean;
+  readonly orden: number;
+  readonly porcentajeMedicionCompetencia: number | null;
+  readonly plan: DatosPlanMejora;
+}
+
+export interface ContenidoActa extends DatosActa {
+  readonly acciones: readonly AccionDelActa[];
 }
 
 export class GestionarActas {
@@ -62,6 +76,31 @@ export class GestionarActas {
   async porId(actor: Actor, id: string): Promise<DatosActa> {
     await this.exigir(actor, 'actas.leer', null);
     return this.exigirActa(id);
+  }
+
+  /** RF-AC-009: la cabecera del acta con sus acciones, cada una unida a su PlanMejora en vivo. */
+  async obtenerContenido(actor: Actor, id: string): Promise<ContenidoActa> {
+    await this.exigir(actor, 'actas.leer', null);
+    const acta = await this.exigirActa(id);
+    const vinculos = await this.actas.accionesDe(id);
+    const planes = await this.planes.planesPorIds(vinculos.map((v) => v.planMejoraId));
+    const planesPorId = new Map(planes.map((p) => [p.id, p]));
+
+    const acciones: AccionDelActa[] = vinculos.flatMap((v) => {
+      const plan = planesPorId.get(v.planMejoraId);
+      if (!plan) return []; // el plan de mejora se eliminó después de cargarse; se omite en vez de fallar
+      return [
+        {
+          id: v.id,
+          incluida: v.incluida,
+          orden: v.orden,
+          porcentajeMedicionCompetencia: v.porcentajeMedicionCompetencia,
+          plan,
+        },
+      ];
+    });
+
+    return { ...acta, acciones };
   }
 
   /** RF-AC-001 a RF-AC-003: alta con la carrera real del actor. */
