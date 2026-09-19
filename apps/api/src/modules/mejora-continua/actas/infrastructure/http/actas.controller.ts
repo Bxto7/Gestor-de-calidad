@@ -24,7 +24,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../../auth/infrastructure/http/jwt.guard.js';
 import { GestionarActas } from '../../application/use-cases/gestionar-actas.use-case.js';
-import { AsistentesActaDto, CabeceraActaDto, CrearActaDto } from './dto/acta-aprobacion.dto.js';
+import { ActualizarSeleccionAccionesDto, AsistentesActaDto, CabeceraActaDto, CrearActaDto, TextosActaDto } from './dto/acta-aprobacion.dto.js';
 
 @ApiTags('Actas de aprobación')
 @ApiBearerAuth()
@@ -43,6 +43,13 @@ export class ActasController {
   @ApiResponse({ status: 404, description: 'El acta no existe.' })
   async porId(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.casos.porId(actor, id);
+  }
+
+  @Get(':id/contenido')
+  @ApiOperation({ summary: 'El acta con sus acciones de mejora, enriquecidas con PlanMejora (RF-AC-009)' })
+  @ApiResponse({ status: 404, description: 'El acta no existe.' })
+  async contenido(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.casos.obtenerContenido(actor, id);
   }
 
   @Patch(':id')
@@ -74,6 +81,41 @@ export class ActasController {
     @Body() dto: AsistentesActaDto,
   ) {
     return this.casos.reemplazarAsistentes(actor, id, dto.nombres);
+  }
+
+  @Post(':id/acciones/cargar')
+  @ApiOperation({ summary: 'Cargar automáticamente las acciones de mejora del periodo (RF-AC-007)' })
+  @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
+  async cargarAcciones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    const cantidad = await this.casos.cargarAccionesDelPeriodo(actor, id);
+    return { cantidadCargada: cantidad };
+  }
+
+  @Put(':id/acciones/seleccion')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Incluir o excluir manualmente acciones de mejora (RF-AC-008)' })
+  @ApiResponse({ status: 409, description: 'El acta no está en Borrador, o alguna acción no está cargada.' })
+  async actualizarSeleccion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: ActualizarSeleccionAccionesDto,
+  ) {
+    await this.casos.actualizarSeleccionDeAcciones(actor, id, dto.seleccion);
+  }
+
+  @Patch(':id/textos')
+  @ApiOperation({ summary: 'Editar los textos institucionales de introducción y cierre (RF-AC-011)' })
+  @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
+  async editarTextos(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: TextosActaDto,
+  ) {
+    const actual = await this.casos.porId(actor, id);
+    return this.casos.editarTextosInstitucionales(actor, id, {
+      textoIntroduccion: dto.textoIntroduccion ?? actual.textoIntroduccion,
+      textoAcuerdoCierre: dto.textoAcuerdoCierre ?? actual.textoAcuerdoCierre,
+    });
   }
 
   @Delete(':id')
