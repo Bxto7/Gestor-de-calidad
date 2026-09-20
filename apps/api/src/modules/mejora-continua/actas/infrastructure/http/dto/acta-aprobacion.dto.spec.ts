@@ -7,6 +7,7 @@ import {
   AsistentesActaDto,
   CabeceraActaDto,
   CrearActaDto,
+  FiltroActasDto,
   TextosActaDto,
 } from './acta-aprobacion.dto.js';
 
@@ -103,5 +104,21 @@ describe('TextosActaDto', () => {
 
   it('acepta el objeto vacío (ningún campo es obligatorio)', () => {
     expect(fallos(TextosActaDto, {})).toEqual([]);
+  });
+});
+
+describe('FiltroActasDto', () => {
+  it('acepta el objeto vacío (los tres filtros son opcionales)', () => {
+    expect(fallos(FiltroActasDto, {})).toEqual([]);
+  });
+
+  it('acepta los tres filtros juntos', () => {
+    expect(
+      fallos(FiltroActasDto, { periodoAcademico: '2025-10', estado: 'Aprobada', texto: 'acta' }),
+    ).toEqual([]);
+  });
+
+  it('rechaza un estado fuera del enum de EstadoActa', () => {
+    expect(fallos(FiltroActasDto, { estado: 'Vigente' })).toContain('estado');
   });
 });

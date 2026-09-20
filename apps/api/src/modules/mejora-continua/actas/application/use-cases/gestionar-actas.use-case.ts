@@ -41,8 +41,10 @@ import {
   ActaTransicionada,
 } from '../../domain/events/eventos-actas.js';
 import type {
+  ActaResumen,
   CabeceraActa,
   DatosActa,
+  FiltroActas,
   NuevaAccionActa,
   RepositorioActaAprobacionPort,
 } from '../ports/acta-aprobacion.port.js';
@@ -83,6 +85,12 @@ export class GestionarActas {
   async porId(actor: Actor, id: string): Promise<DatosActa> {
     await this.exigir(actor, 'actas.leer', null);
     return this.exigirActa(id);
+  }
+
+  /** RF-AC-020: búsqueda/filtro, sin acotar a la carrera del actor (mismo criterio que medición/evaluación). */
+  async listar(actor: Actor, filtro?: FiltroActas): Promise<readonly ActaResumen[]> {
+    await this.exigir(actor, 'actas.leer', null);
+    return this.actas.listar(filtro);
   }
 
   /** RF-AC-009: la cabecera del acta con sus acciones, cada una unida a su PlanMejora en vivo. */

@@ -1,11 +1,8 @@
 /**
  * Endpoints del acta de aprobación: núcleo (2c-AC-A, RF-AC-000 a 006),
- * contenido (2c-AC-B, RF-AC-007 a 011) y transiciones (2c-AC-C, RF-AC-013 a
- * 016).
- *
- * Sin `GET /actas` (listado/búsqueda): RF-AC-020 es 2c-AC-D. Sin pantalla
- * dedicada tampoco (§8 del diseño) — ver la nota de este archivo sobre por
- * qué no hay test HTTP dedicado.
+ * contenido (2c-AC-B, RF-AC-007 a 011), transiciones (2c-AC-C, RF-AC-013 a
+ * 016) y listado (RF-AC-020). Sin pantalla dedicada todavía (§8 del diseño)
+ * — ver la nota de este archivo sobre por qué no hay test HTTP dedicado.
  */
 
 import {
@@ -20,6 +17,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -31,6 +29,7 @@ import {
   AsistentesActaDto,
   CabeceraActaDto,
   CrearActaDto,
+  FiltroActasDto,
   TextosActaDto,
   TransicionActaDto,
 } from './dto/acta-aprobacion.dto.js';
@@ -45,6 +44,15 @@ export class ActasController {
   @ApiOperation({ summary: 'Crear un acta de aprobación (RF-AC-001 a RF-AC-003)' })
   async crear(@ActorActual() actor: Actor, @Body() dto: CrearActaDto) {
     return this.casos.crear(actor, dto);
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Buscar y filtrar actas de aprobación',
+    description: 'RF-AC-020. Filtra por periodo académico y estado; busca texto en código y título.',
+  })
+  async listar(@ActorActual() actor: Actor, @Query() filtro: FiltroActasDto) {
+    return this.casos.listar(actor, filtro);
   }
 
   @Get(':id')

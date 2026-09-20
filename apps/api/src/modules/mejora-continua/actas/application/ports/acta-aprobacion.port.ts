@@ -56,6 +56,30 @@ export interface DatosActa {
   readonly aprobadoEn: Date | null;
 }
 
+/** RF-AC-020: filtros del listado. */
+export interface FiltroActas {
+  readonly periodoAcademico?: string;
+  readonly estado?: EstadoActa;
+  /** Búsqueda libre sobre código y título. */
+  readonly texto?: string;
+}
+
+/**
+ * RF-AC-020 RN1: lo que el listado necesita mostrar — no reutiliza
+ * `DatosActa` completo porque ese trae los asistentes cargados, que un
+ * listado no necesita.
+ */
+export interface ActaResumen {
+  readonly id: string;
+  readonly codigo: string;
+  readonly correlativo: number;
+  readonly titulo: string;
+  readonly periodoAcademico: string;
+  readonly estado: EstadoActa;
+  readonly carreraId: string;
+  readonly creadoEn: Date;
+}
+
 /** Lo que hace falta para dar de alta un acta — el caso de uso ya resolvió todo. */
 export interface NuevaActa {
   readonly carreraId: string;
@@ -84,6 +108,8 @@ export interface CabeceraActa {
 export interface RepositorioActaAprobacionPort {
   crear(datos: NuevaActa): Promise<DatosActa>;
   porId(id: string): Promise<DatosActa | null>;
+  /** RF-AC-020: listado con filtros, más reciente primero. */
+  listar(filtro?: FiltroActas): Promise<readonly ActaResumen[]>;
   editarCabecera(id: string, datos: CabeceraActa): Promise<DatosActa>;
   /** RF-AC-005: reemplaza el conjunto completo, en el orden recibido. */
   reemplazarAsistentes(id: string, nombres: readonly string[]): Promise<DatosActa>;

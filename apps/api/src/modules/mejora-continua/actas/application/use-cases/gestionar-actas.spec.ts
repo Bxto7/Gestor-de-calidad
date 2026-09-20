@@ -74,10 +74,25 @@ function acta(sobre: Partial<DatosActa> = {}): DatosActa {
   };
 }
 
+function actaResumen(sobre: Partial<import('../ports/acta-aprobacion.port.js').ActaResumen> = {}) {
+  return {
+    id: 'acta-1',
+    codigo: 'ACTA N° 001 – EAP-ISI',
+    correlativo: 1,
+    titulo: 'Acta de aprobación — Ingeniería de Software — 2025-10',
+    periodoAcademico: '2025-10',
+    estado: 'Borrador' as const,
+    carreraId: CARRERA,
+    creadoEn: new Date('2026-03-01'),
+    ...sobre,
+  };
+}
+
 function repoActas(overrides: Partial<RepositorioActaAprobacionPort> = {}): RepositorioActaAprobacionPort {
   return {
     crear: async () => acta(),
     porId: async () => acta(),
+    listar: async () => [actaResumen()],
     editarCabecera: async () => acta(),
     reemplazarAsistentes: async () => acta(),
     eliminar: async () => {},
@@ -731,6 +746,48 @@ describe('obtenerContenido', () => {
     expect(contenido.acciones).toHaveLength(1);
     expect(contenido.acciones[0]?.id).toBe('aa-1');
     expect(contenido.acciones[0]?.plan.id).toBe('plan-vigente');
+  });
+});
+
+describe('listar', () => {
+  it('exige actas.leer sin acotar a carrera', async () => {
+    const pedidos: string[] = [];
+    const casos = montar({ autorizacion: denegarRegistrando(pedidos) });
+
+    await expect(casos.listar(ACTOR)).rejects.toThrow(AccesoDenegado);
+    expect(pedidos).toContain('actas.leer');
+  });
+
+  it('pasa el filtro tal cual al repositorio', async () => {
+    let recibido: unknown;
+    const actas = repoActas({
+      listar: async (filtro) => {
+        recibido = filtro;
+        return [actaResumen()];
+      },
+    });
+    const casos = montar({ actas });
+
+    const filtro = { periodoAcademico: '2025-10', estado: 'Aprobada' as const, texto: 'ingeniería' };
+    const resultado = await casos.listar(ACTOR, filtro);
+
+    expect(recibido).toEqual(filtro);
+    expect(resultado).toEqual([actaResumen()]);
+  });
+
+  it('sin filtro, delega un listado sin restricciones', async () => {
+    let recibido: unknown = 'no-llamado';
+    const actas = repoActas({
+      listar: async (filtro) => {
+        recibido = filtro;
+        return [];
+      },
+    });
+    const casos = montar({ actas });
+
+    await casos.listar(ACTOR);
+
+    expect(recibido).toBeUndefined();
   });
 });
 

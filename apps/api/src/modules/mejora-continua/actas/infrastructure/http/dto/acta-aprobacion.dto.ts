@@ -134,6 +134,25 @@ export class TextosActaDto {
   textoAcuerdoCierre?: string;
 }
 
+/** RF-AC-020: filtros del listado — todos opcionales, se combinan con AND. */
+export class FiltroActasDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  periodoAcademico?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsIn(['Borrador', 'En revisión', 'Aprobada', 'Emitida', 'Histórica'])
+  estado?: 'Borrador' | 'En revisión' | 'Aprobada' | 'Emitida' | 'Histórica';
+
+  /** Búsqueda libre sobre número (código) y título (RF-AC-020). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  texto?: string;
+}
+
 /** RF-AC-013: cambio de estado. */
 export class TransicionActaDto {
   @ApiProperty()

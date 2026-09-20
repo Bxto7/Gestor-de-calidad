@@ -11,9 +11,11 @@ import { PrismaService } from '../../../../../platform/database/prisma.service.j
 import type { EstadoActa } from '../../domain/value-objects/estado-acta.js';
 import type {
   AccionActaDato,
+  ActaResumen,
   AsistenteActaDato,
   CabeceraActa,
   DatosActa,
+  FiltroActas,
   NuevaAccionActa,
   NuevaActa,
   RepositorioActaAprobacionPort,
@@ -33,6 +35,42 @@ const A_DOMINIO = Object.fromEntries(Object.entries(A_BD).map(([k, v]) => [v, k]
   EstadoActaBd,
   EstadoActa
 >;
+
+/** RF-AC-020: solo lo que el listado muestra — nada de asistentes ni acciones. */
+const SELECCION_RESUMEN = {
+  id: true,
+  codigo: true,
+  correlativo: true,
+  titulo: true,
+  periodoAcademico: true,
+  estado: true,
+  carreraId: true,
+  creadoEn: true,
+} as const;
+
+interface FilaResumen {
+  id: string;
+  codigo: string;
+  correlativo: number;
+  titulo: string;
+  periodoAcademico: string;
+  estado: string;
+  carreraId: string;
+  creadoEn: Date;
+}
+
+function aResumen(fila: FilaResumen): ActaResumen {
+  return {
+    id: fila.id,
+    codigo: fila.codigo,
+    correlativo: fila.correlativo,
+    titulo: fila.titulo,
+    periodoAcademico: fila.periodoAcademico,
+    estado: A_DOMINIO[fila.estado as EstadoActaBd] ?? 'Borrador',
+    carreraId: fila.carreraId,
+    creadoEn: fila.creadoEn,
+  };
+}
 
 const SELECCION_ASISTENTE = { id: true, nombre: true } as const;
 
@@ -148,6 +186,28 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
   async porId(id: string): Promise<DatosActa | null> {
     const fila = await this.prisma.actaAprobacion.findUnique({ where: { id }, select: SELECCION });
     return fila ? aDatos(fila) : null;
+  }
+
+  /** RF-AC-020: periodoAcademico y estado son exactos; texto busca en código y título. */
+  async listar(filtro?: FiltroActas): Promise<readonly ActaResumen[]> {
+    const texto = filtro?.texto?.trim();
+    const filas = await this.prisma.actaAprobacion.findMany({
+      where: {
+        ...(filtro?.periodoAcademico ? { periodoAcademico: filtro.periodoAcademico } : {}),
+        ...(filtro?.estado ? { estado: A_BD[filtro.estado] } : {}),
+        ...(texto
+          ? {
+              OR: [
+                { codigo: { contains: texto, mode: 'insensitive' as const } },
+                { titulo: { contains: texto, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      select: SELECCION_RESUMEN,
+      orderBy: { creadoEn: 'desc' },
+    });
+    return filas.map(aResumen);
   }
 
   async editarCabecera(id: string, datos: CabeceraActa): Promise<DatosActa> {
