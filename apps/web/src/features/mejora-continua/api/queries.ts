@@ -24,6 +24,8 @@ import * as configuracionApi from './configuracion-evaluacion.api';
 import * as mejoraApi from './mejora.api';
 import type { AccionMejora, DatosCrearPlanMejora, DefinicionPlanMejora } from './mejora.api';
 import type { EstadoImplementacion, TipoDocumentoMejora } from '../domain/tipos';
+import * as actasApi from './actas.api';
+import type { AccionActaTransicion } from '../domain/estado-acta';
 
 export const claves = {
   planes: (filtro?: api.FiltroPlanes) =>
@@ -715,4 +717,110 @@ export function useGenerarDocumentoMejora(id: string) {
       await qc.invalidateQueries({ queryKey: clavesMejora.documentos(id) });
     },
   });
+}
+
+/* ── Actas de Aprobación ──────────────────────────────────────────────── */
+
+export const clavesActas = {
+  lista: (filtro?: actasApi.FiltroActas) =>
+    [
+      'actas',
+      'lista',
+      filtro?.periodoAcademico ?? '',
+      filtro?.estado ?? 'todos',
+      filtro?.texto ?? '',
+    ] as const,
+  acta: (id: string) => ['actas', id] as const,
+  contenido: (id: string) => ['actas', id, 'contenido'] as const,
+};
+
+const LISTA_ACTAS = ['actas', 'lista'] as const;
+
+export function useActas(filtro?: actasApi.FiltroActas) {
+  return useQuery({
+    queryKey: clavesActas.lista(filtro),
+    queryFn: () => actasApi.listarActas(filtro),
+  });
+}
+
+export function useActa(id: string) {
+  return useQuery({
+    queryKey: clavesActas.acta(id),
+    queryFn: () => actasApi.obtenerActa(id),
+    enabled: !!id,
+  });
+}
+
+export function useContenidoActa(id: string) {
+  return useQuery({
+    queryKey: clavesActas.contenido(id),
+    queryFn: () => actasApi.obtenerContenidoActa(id),
+    enabled: !!id,
+  });
+}
+
+export function useCrearActa() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (datos: actasApi.DatosNuevaActa) => actasApi.crearActa(datos),
+    onSuccess: () => qc.invalidateQueries({ queryKey: LISTA_ACTAS }),
+  });
+}
+
+/**
+ * Escrituras sobre la misma acta van en fila, nunca en paralelo — mismo
+ * motivo que `useMutacionDeEvaluacion`: todas son lee-modifica-escribe sobre
+ * el acta entera.
+ */
+function useMutacionDeActa<TVars, TDatos>(id: string, fn: (v: TVars) => Promise<TDatos>) {
+  const qc = useQueryClient();
+  return useMutation({
+    scope: { id: `acta:${id}` },
+    mutationFn: fn,
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: clavesActas.acta(id) });
+      await qc.invalidateQueries({ queryKey: clavesActas.contenido(id) });
+      await qc.invalidateQueries({ queryKey: LISTA_ACTAS });
+    },
+  });
+}
+
+export function useEditarCabeceraActa(id: string) {
+  return useMutacionDeActa(id, (datos: actasApi.DatosCabeceraActa) =>
+    actasApi.editarCabeceraActa(id, datos),
+  );
+}
+
+export function useReemplazarAsistentesActa(id: string) {
+  return useMutacionDeActa(id, (nombres: readonly string[]) =>
+    actasApi.reemplazarAsistentesActa(id, nombres),
+  );
+}
+
+export function useCargarAccionesActa(id: string) {
+  return useMutacionDeActa(id, () => actasApi.cargarAccionesActa(id));
+}
+
+export function useActualizarSeleccionActa(id: string) {
+  return useMutacionDeActa(
+    id,
+    (seleccion: readonly { planMejoraId: string; incluida: boolean }[]) =>
+      actasApi.actualizarSeleccionActa(id, seleccion),
+  );
+}
+
+export function useEditarTextosActa(id: string) {
+  return useMutacionDeActa(id, (datos: actasApi.DatosTextosActa) =>
+    actasApi.editarTextosActa(id, datos),
+  );
+}
+
+export function useTransicionarActa(id: string) {
+  return useMutacionDeActa(id, (v: { accion: AccionActaTransicion; comentario?: string }) =>
+    actasApi.transicionarActa(id, v.accion, v.comentario),
+  );
+}
+
+export function useEliminarActa(id: string) {
+  return useMutacionDeActa(id, () => actasApi.eliminarActa(id));
 }

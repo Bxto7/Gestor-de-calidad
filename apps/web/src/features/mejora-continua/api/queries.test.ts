@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 /**
  * Las claves de React Query de los listados filtrados.
  *
@@ -8,11 +10,22 @@
  * ese síntoma: que dos filtros distintos por cualquier campo que la pantalla
  * envía producen claves distintas. Si alguien vuelve a omitir un campo al
  * construir la clave, la prueba correspondiente se pone roja.
+ *
+ * `useActas` sí se ejercita contra React Query real (ver el describe al
+ * final): ahí lo que importa es que el hook reenvíe el filtro a la función de
+ * API, algo que una prueba de clave sola no puede demostrar. El entorno del
+ * archivo se declara `jsdom` (arriba) porque `renderHook` monta con
+ * ReactDOM y necesita `document`; las pruebas de clave, al ser funciones
+ * puras, no se ven afectadas por correr bajo `jsdom` en vez de `node`.
  */
 
-import { describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import { createElement, type ReactNode } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { claves, clavesEval, clavesMejora } from './queries';
+import * as actasApi from './actas.api';
+import { claves, clavesEval, clavesMejora, useActas } from './queries';
 
 describe('claves.planes — Planes de Medición', () => {
   it('cambia con el tipo, aunque el resto del filtro sea igual', () => {
@@ -76,5 +89,29 @@ describe('clavesMejora.plan — jerarquía con versiones y documentos', () => {
 
     expect(versiones.slice(0, plan.length)).toEqual(plan);
     expect(documentos.slice(0, plan.length)).toEqual(plan);
+  });
+});
+
+function envoltorio(cliente: QueryClient) {
+  return function Envoltorio({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client: cliente }, children);
+  };
+}
+
+describe('useActas', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('pasa el filtro a listarActas', async () => {
+    const espia = vi.spyOn(actasApi, 'listarActas').mockResolvedValue([]);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const { result } = renderHook(() => useActas({ estado: 'Borrador' }), {
+      wrapper: envoltorio(qc),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(espia).toHaveBeenCalledWith({ estado: 'Borrador' });
   });
 });
