@@ -292,3 +292,73 @@ export interface PlanMejora {
   readonly creadoEn: string;
   readonly evidencias: readonly EvidenciaPlanMejora[];
 }
+
+/* ── Actas de Aprobación (RF-AC-000 y siguientes) ─────────────────────── */
+
+import type { EstadoActa } from './estado-acta';
+
+export interface AsistenteActa {
+  readonly id: string;
+  readonly nombre: string;
+}
+
+export interface Acta {
+  readonly id: string;
+  readonly carreraId: string;
+  readonly correlativo: number;
+  readonly codigo: string;
+  readonly periodoAcademico: string;
+  /** RF-AC-007: opcional, filtra el aspecto Competencia al cargar acciones. */
+  readonly periodoMedicionId: string | null;
+  readonly titulo: string;
+  readonly objetivo: string;
+  /** RF-AC-011. */
+  readonly textoIntroduccion: string;
+  readonly textoAcuerdoCierre: string;
+  readonly convocadaPor: string;
+  readonly fechaReunion: string;
+  readonly lugarReunion: string;
+  readonly comentario: string | null;
+  readonly lugarEmision: string | null;
+  readonly fechaEmision: string | null;
+  readonly estado: EstadoActa;
+  readonly creadoEn: string;
+  readonly asistentes: readonly AsistenteActa[];
+  /** RF-AC-014 RN2: quién aprobó y cuándo. Nulos mientras no se haya aprobado. */
+  readonly aprobadoPorId: string | null;
+  readonly aprobadoEn: string | null;
+}
+
+/**
+ * RF-AC-020 RN1: lo que el listado necesita mostrar. No reutiliza `Acta`
+ * completa porque esa trae los asistentes, que un listado no necesita —
+ * mismo criterio que `ActaResumen` del backend.
+ */
+export interface ActaResumen {
+  readonly id: string;
+  readonly codigo: string;
+  readonly correlativo: number;
+  readonly titulo: string;
+  readonly periodoAcademico: string;
+  readonly estado: EstadoActa;
+  readonly carreraId: string;
+  readonly creadoEn: string;
+}
+
+/**
+ * RF-AC-009: una fila de la tabla de acciones del acta, con los datos vivos
+ * de su plan de mejora. Reutiliza `PlanMejora` en vez de duplicar sus campos
+ * — el backend ya une en vivo (`obtenerContenido`) y el shape coincide.
+ */
+export interface AccionDelActa {
+  readonly id: string;
+  readonly incluida: boolean;
+  readonly orden: number;
+  readonly porcentajeMedicionCompetencia: number | null;
+  readonly plan: PlanMejora;
+}
+
+/** RF-AC-009: el acta con sus acciones, tal como la devuelve `/actas/:id/contenido`. */
+export interface ContenidoActa extends Acta {
+  readonly acciones: readonly AccionDelActa[];
+}
