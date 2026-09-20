@@ -117,3 +117,83 @@ describe('RF-AC-005 — asistentes', () => {
     });
   });
 });
+
+describe('RF-AC-007/008 — acciones del periodo', () => {
+  it('cargar acciones llama a cargarAccionesActa', async () => {
+    const cargar = vi.spyOn(actasApi, 'cargarAccionesActa').mockResolvedValue({ cantidadCargada: 2 });
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(screen.getByRole('button', { name: /cargar acciones del periodo/i }));
+
+    await waitFor(() => expect(cargar).toHaveBeenCalledWith('acta-1'));
+  });
+
+  it('togglear la inclusión de una acción llama a actualizarSeleccionActa', async () => {
+    vi.spyOn(actasApi, 'obtenerContenidoActa').mockResolvedValue({
+      ...actaDePrueba,
+      acciones: [
+        {
+          id: 'accion-1',
+          incluida: true,
+          orden: 0,
+          porcentajeMedicionCompetencia: null,
+          plan: {
+            id: 'plan-1',
+            codigo: 'PJ-001',
+            aspecto: 'CRITERIO_ACREDITACION',
+            carreraId: 'carrera-1',
+            criterioAcreditacionId: 'criterio-1',
+            objetivoEducacionalId: null,
+            competenciaId: null,
+            periodoId: null,
+            planEvaluacionId: null,
+            planMedicionAfectadoId: null,
+            estado: 'Aprobado',
+            estadoImplementacion: 'Pendiente',
+            nombre: 'Reforzar el syllabus',
+            causaRaiz: 'Causa de prueba',
+            justificacion: 'Justificación de prueba',
+            input: null,
+            plazo: '2026-12-31T00:00:00.000Z',
+            recursos: 'Recursos de prueba',
+            metas: 'Metas de prueba',
+            responsable: 'Responsable de prueba',
+            logroMeta: null,
+            impacto: null,
+            creadoEn: '2026-01-01T00:00:00.000Z',
+            evidencias: [],
+          },
+        },
+      ],
+    });
+    const actualizar = vi.spyOn(actasApi, 'actualizarSeleccionActa').mockResolvedValue(undefined);
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(await screen.findByRole('checkbox', { name: /reforzar el syllabus/i }));
+
+    await waitFor(() => {
+      expect(actualizar).toHaveBeenCalledWith('acta-1', [{ planMejoraId: 'plan-1', incluida: false }]);
+    });
+  });
+});
+
+describe('RF-AC-011 — textos institucionales', () => {
+  it('editar los textos llama a editarTextosActa', async () => {
+    const editar = vi.spyOn(actasApi, 'editarTextosActa').mockResolvedValue(actaDePrueba);
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.clear(screen.getByLabelText(/introducción/i));
+    await userEvent.type(screen.getByLabelText(/introducción/i), 'Nuevo texto de introducción');
+    await userEvent.click(screen.getByRole('button', { name: /guardar textos/i }));
+
+    await waitFor(() => {
+      expect(editar).toHaveBeenCalledWith('acta-1', {
+        textoIntroduccion: 'Nuevo texto de introducción',
+        textoAcuerdoCierre: actaDePrueba.textoAcuerdoCierre,
+      });
+    });
+  });
+});

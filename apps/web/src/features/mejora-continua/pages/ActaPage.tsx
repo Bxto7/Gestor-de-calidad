@@ -14,11 +14,28 @@ import { useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
-import { Badge, Boton, CabeceraSeccion, Campo, Cargando, Entrada, Tarjeta } from '@/shared/components/ui';
+import {
+  AreaTexto,
+  Badge,
+  Boton,
+  CabeceraSeccion,
+  Campo,
+  Cargando,
+  Entrada,
+  Tarjeta,
+} from '@/shared/components/ui';
 
-import { useActa, useEditarCabeceraActa, useReemplazarAsistentesActa } from '../api/queries';
+import {
+  useActa,
+  useActualizarSeleccionActa,
+  useCargarAccionesActa,
+  useContenidoActa,
+  useEditarCabeceraActa,
+  useEditarTextosActa,
+  useReemplazarAsistentesActa,
+} from '../api/queries';
 import { permiteEdicion, TONO_ESTADO_ACTA } from '../domain/estado-acta';
-import type { Acta } from '../domain/tipos';
+import type { Acta, AccionDelActa } from '../domain/tipos';
 
 export function ActaPage() {
   const { id = '' } = useParams();
@@ -71,6 +88,8 @@ export function ActaPage() {
 
       <CabeceraActaForm acta={acta} editable={editable} onError={setError} ejecutar={ejecutar} />
       <AsistentesActaSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
+      <AccionesDelPeriodoSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
+      <TextosInstitucionalesSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
     </div>
   );
 }
@@ -272,6 +291,165 @@ function AsistentesActaSeccion({
               {reemplazar.isPending ? 'Guardando…' : 'Guardar asistentes'}
             </Boton>
           </div>
+        )}
+      </div>
+    </Tarjeta>
+  );
+}
+
+const ETIQUETA_ASPECTO: Record<AccionDelActa['plan']['aspecto'], string> = {
+  CRITERIO_ACREDITACION: 'Criterio de acreditación',
+  OBJETIVO_EDUCACIONAL: 'Objetivo educacional',
+  COMPETENCIA: 'Competencia',
+};
+
+/** RF-AC-007/008/009: las acciones de mejora del acta, agrupadas por aspecto. */
+function AccionesDelPeriodoSeccion({
+  acta,
+  editable,
+  ejecutar,
+}: {
+  acta: Acta;
+  editable: boolean;
+  ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const { data: contenido } = useContenidoActa(acta.id);
+  const cargar = useCargarAccionesActa(acta.id);
+  const actualizarSeleccion = useActualizarSeleccionActa(acta.id);
+
+  const acciones = contenido?.acciones ?? [];
+
+  function toggle(accion: AccionDelActa) {
+    void ejecutar(() =>
+      actualizarSeleccion.mutateAsync([
+        { planMejoraId: accion.plan.id, incluida: !accion.incluida },
+      ]),
+    );
+  }
+
+  return (
+    <Tarjeta>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-tinta">Acciones del periodo</h2>
+        {editable && (
+          <Boton
+            variante="secundario"
+            tamano="sm"
+            disabled={cargar.isPending}
+            onClick={() => void ejecutar(() => cargar.mutateAsync(undefined))}
+          >
+            {cargar.isPending ? 'Cargando…' : 'Cargar acciones del periodo'}
+          </Boton>
+        )}
+      </div>
+
+      {acciones.length === 0 ? (
+        <p className="text-sm text-tinta-suave">
+          Todavía no hay acciones cargadas. Usa &quot;Cargar acciones del periodo&quot; para traer
+          las acciones de mejora aprobadas o vigentes de la carrera.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-sm">
+            <caption className="sr-only">Acciones de mejora incluidas en el acta</caption>
+            <thead className="bg-slate-50 text-left">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-semibold">
+                  Incluida
+                </th>
+                <th scope="col" className="px-4 py-3 font-semibold">
+                  Aspecto
+                </th>
+                <th scope="col" className="px-4 py-3 font-semibold">
+                  Código
+                </th>
+                <th scope="col" className="px-4 py-3 font-semibold">
+                  Acción
+                </th>
+                <th scope="col" className="px-4 py-3 font-semibold">
+                  Responsable
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {acciones.map((a) => (
+                <tr key={a.id} className="border-t border-slate-100">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label={a.plan.nombre}
+                      checked={a.incluida}
+                      disabled={!editable}
+                      onChange={() => toggle(a)}
+                    />
+                  </td>
+                  <td className="px-4 py-3">{ETIQUETA_ASPECTO[a.plan.aspecto]}</td>
+                  <td className="px-4 py-3">{a.plan.codigo}</td>
+                  <td className="px-4 py-3">{a.plan.nombre}</td>
+                  <td className="px-4 py-3">{a.plan.responsable}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Tarjeta>
+  );
+}
+
+/** RF-AC-011: reemplazo parcial de los textos institucionales. */
+function TextosInstitucionalesSeccion({
+  acta,
+  editable,
+  ejecutar,
+}: {
+  acta: Acta;
+  editable: boolean;
+  ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const editarTextos = useEditarTextosActa(acta.id);
+  const [textoIntroduccion, setTextoIntroduccion] = useState(acta.textoIntroduccion);
+  const [textoAcuerdoCierre, setTextoAcuerdoCierre] = useState(acta.textoAcuerdoCierre);
+
+  return (
+    <Tarjeta>
+      <h2 className="mb-4 text-sm font-semibold text-tinta">Textos institucionales</h2>
+      <div className="space-y-4">
+        <Campo etiqueta="Introducción" requerido>
+          {(props) => (
+            <AreaTexto
+              {...props}
+              rows={4}
+              value={textoIntroduccion}
+              disabled={!editable}
+              onChange={(e) => setTextoIntroduccion(e.target.value)}
+            />
+          )}
+        </Campo>
+        <Campo etiqueta="Acuerdo de cierre" requerido>
+          {(props) => (
+            <AreaTexto
+              {...props}
+              rows={4}
+              value={textoAcuerdoCierre}
+              disabled={!editable}
+              onChange={(e) => setTextoAcuerdoCierre(e.target.value)}
+            />
+          )}
+        </Campo>
+
+        {editable && (
+          <Boton
+            variante="primario"
+            disabled={editarTextos.isPending}
+            onClick={() =>
+              void ejecutar(() =>
+                editarTextos.mutateAsync({ textoIntroduccion, textoAcuerdoCierre }),
+              )
+            }
+          >
+            {editarTextos.isPending ? 'Guardando…' : 'Guardar textos'}
+          </Boton>
         )}
       </div>
     </Tarjeta>
