@@ -51,6 +51,9 @@ export interface DatosActa {
   readonly estado: EstadoActa;
   readonly creadoEn: Date;
   readonly asistentes: readonly AsistenteActaDato[];
+  /** RF-AC-014 RN2: quién aprobó y cuándo. Nulos mientras no se haya aprobado. */
+  readonly aprobadoPorId: string | null;
+  readonly aprobadoEn: Date | null;
 }
 
 /** Lo que hace falta para dar de alta un acta — el caso de uso ya resolvió todo. */
@@ -100,6 +103,13 @@ export interface RepositorioActaAprobacionPort {
   ): Promise<DatosActa>;
   /** Nota §2 de 2c-AC-A: planes ya incluidos en un acta en estado Emitida. */
   planesYaEmitidos(planMejoraIds: readonly string[]): Promise<ReadonlySet<string>>;
+  /** RF-AC-013. */
+  cambiarEstado(
+    id: string,
+    estado: EstadoActa,
+    /** RF-AC-014 RN2. Solo al aprobar; una transición posterior no debe pisarlos. */
+    aprobacion?: { actorId: string; fecha: Date },
+  ): Promise<DatosActa>;
   eliminar(id: string): Promise<void>;
   /** RF-AC-002 RN2: los correlativos ya usados dentro de esa carrera. */
   correlativosDe(carreraId: string): Promise<readonly number[]>;

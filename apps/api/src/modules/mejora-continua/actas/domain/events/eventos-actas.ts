@@ -110,3 +110,22 @@ export class ActaTextosEditados extends EventoActa {
     this.detalle = `Acta de aprobación ${codigo}: textos institucionales editados.`;
   }
 }
+
+/** RF-AC-013: cambio de estado. RF-AC-015 RN2: el motivo del rechazo queda en el detalle. */
+export class ActaTransicionada extends EventoActa {
+  readonly nombre = 'actas.transicion';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    desde: string,
+    hacia: string,
+    comentario?: string,
+  ) {
+    super(actor);
+    const base = `Acta de aprobación ${codigo}: ${desde} → ${hacia}`;
+    this.detalle = comentario?.trim() ? `${base}. Motivo: «${comentario.trim()}».` : `${base}.`;
+  }
+}

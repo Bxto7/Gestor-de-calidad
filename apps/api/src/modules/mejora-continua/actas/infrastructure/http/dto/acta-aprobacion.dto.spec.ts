@@ -43,7 +43,8 @@ describe('CabeceraActaDto', () => {
    * Sin `@MinLength(1)` a propósito, igual que `DefinicionPlanMejoraDto`:
    * `convocadaPor`/`lugarReunion` nacen vacíos al crear el acta (Task 1) y
    * se completan luego con esta misma edición — la completitud real es
-   * RF-AC-016, en 2c-AC-B.
+   * RF-AC-016, exigida por `validarCompletitudActa` al transicionar, no por
+   * este DTO.
    */
   it('acepta el objeto recién creado, todo vacío salvo el campo que se guarda', () => {
     expect(fallos(CabeceraActaDto, { ...BASE, convocadaPor: 'Directora de Escuela' })).toEqual([]);

@@ -1,7 +1,9 @@
 /**
- * Endpoints del núcleo del acta de aprobación (2c-AC-A, RF-AC-000 a 006).
+ * Endpoints del acta de aprobación: núcleo (2c-AC-A, RF-AC-000 a 006),
+ * contenido (2c-AC-B, RF-AC-007 a 011) y transiciones (2c-AC-C, RF-AC-013 a
+ * 016).
  *
- * Sin `GET /actas` (listado/búsqueda): RF-AC-020 es 2c-AC-C. Sin pantalla
+ * Sin `GET /actas` (listado/búsqueda): RF-AC-020 es 2c-AC-D. Sin pantalla
  * dedicada tampoco (§8 del diseño) — ver la nota de este archivo sobre por
  * qué no hay test HTTP dedicado.
  */
@@ -24,7 +26,14 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../../auth/infrastructure/http/jwt.guard.js';
 import { GestionarActas } from '../../application/use-cases/gestionar-actas.use-case.js';
-import { ActualizarSeleccionAccionesDto, AsistentesActaDto, CabeceraActaDto, CrearActaDto, TextosActaDto } from './dto/acta-aprobacion.dto.js';
+import {
+  ActualizarSeleccionAccionesDto,
+  AsistentesActaDto,
+  CabeceraActaDto,
+  CrearActaDto,
+  TextosActaDto,
+  TransicionActaDto,
+} from './dto/acta-aprobacion.dto.js';
 
 @ApiTags('Actas de aprobación')
 @ApiBearerAuth()
@@ -124,5 +133,19 @@ export class ActasController {
   @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
   async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     await this.casos.eliminar(actor, id);
+  }
+
+  @Post(':id/transiciones')
+  @ApiOperation({
+    summary: 'Cambiar el estado del acta',
+    description: 'RF-AC-013 a 016. Solo hasta Aprobada; Emitida/Histórica llegan con la exportación.',
+  })
+  @ApiResponse({ status: 409, description: 'La transición no aplica desde el estado actual, o hay bloqueos de completitud.' })
+  async transicionar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: TransicionActaDto,
+  ) {
+    return this.casos.transicionar(actor, id, dto.accion, { comentario: dto.comentario });
   }
 }

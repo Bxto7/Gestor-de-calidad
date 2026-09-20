@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -131,4 +132,24 @@ export class TextosActaDto {
   @IsString()
   @MaxLength(4000)
   textoAcuerdoCierre?: string;
+}
+
+/** RF-AC-013: cambio de estado. */
+export class TransicionActaDto {
+  @ApiProperty()
+  @IsIn(['enviar-a-revision', 'aprobar', 'rechazar'])
+  accion!: 'enviar-a-revision' | 'aprobar' | 'rechazar';
+
+  /**
+   * RF-AC-015 RN1: obligatorio al rechazar.
+   *
+   * No se marca como requerido aquí porque solo lo es para una de las tres
+   * acciones. Lo exige la máquina de estados, que sí sabe cuál.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Recortado()
+  @IsString()
+  @MaxLength(2000)
+  comentario?: string;
 }

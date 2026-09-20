@@ -25,6 +25,12 @@ import { candidatasParaCargar } from '../../domain/services/candidatas-acciones-
 import { calcularPorcentajeMedicionAnterior } from '../../../mejora/application/services/porcentaje-periodo-anterior.js';
 import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
 import {
+  describirTransicion,
+  intentarTransicion,
+  type AccionActaTransicion,
+} from '../../domain/value-objects/transiciones-acta.js';
+import { validarCompletitudActa } from '../../domain/services/validar-completitud-acta.js';
+import {
   ActaAccionesCargadas,
   ActaAsistentesReemplazados,
   ActaCabeceraEditada,
@@ -32,6 +38,7 @@ import {
   ActaEliminada,
   ActaSeleccionDeAccionesActualizada,
   ActaTextosEditados,
+  ActaTransicionada,
 } from '../../domain/events/eventos-actas.js';
 import type {
   CabeceraActa,
@@ -300,6 +307,42 @@ export class GestionarActas {
     const editada = await this.actas.editarTextos(id, datos);
     await this.eventos.publicar([new ActaTextosEditados(actor, id, editada.codigo)]);
     return editada;
+  }
+
+  /** RF-AC-013: transición con su permiso y su validación previa (RF-AC-016). */
+  async transicionar(
+    actor: Actor,
+    id: string,
+    accion: AccionActaTransicion,
+    contexto: { comentario?: string },
+  ): Promise<DatosActa> {
+    const acta = await this.exigirActa(id);
+    const transicion = describirTransicion(accion);
+    await this.exigir(actor, `actas.${transicion.permiso}`, acta.carreraId);
+
+    // RF-AC-016 RN1: requisito previo, solo para las transiciones que lo exigen.
+    const tieneBloqueos = transicion.exigeSinBloqueos
+      ? validarCompletitudActa({ ...acta, acciones: await this.actas.accionesDe(id) })
+          .tieneBloqueos
+      : false;
+
+    const r = intentarTransicion(acta.estado, accion, {
+      tieneBloqueos,
+      comentario: contexto.comentario,
+    });
+    if (!r.ok) throw new ReglaDeNegocioViolada(r.motivo);
+
+    // RF-AC-014. El instante lo pone la aplicación y no la base, para que la
+    // fecha de la columna y la del evento de bitácora sean la misma.
+    const actualizada =
+      accion === 'aprobar'
+        ? await this.actas.cambiarEstado(id, r.nuevoEstado, { actorId: actor.id, fecha: new Date() })
+        : await this.actas.cambiarEstado(id, r.nuevoEstado);
+
+    await this.eventos.publicar([
+      new ActaTransicionada(actor, id, acta.codigo, acta.estado, r.nuevoEstado, contexto.comentario),
+    ]);
+    return actualizada;
   }
 
   async eliminar(actor: Actor, id: string): Promise<void> {

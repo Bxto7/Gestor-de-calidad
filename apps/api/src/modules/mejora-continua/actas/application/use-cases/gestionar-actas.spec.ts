@@ -65,6 +65,8 @@ function acta(sobre: Partial<DatosActa> = {}): DatosActa {
     comentario: null,
     lugarEmision: null,
     fechaEmision: null,
+    aprobadoPorId: null,
+    aprobadoEn: null,
     estado: 'Borrador',
     creadoEn: new Date('2026-03-01'),
     asistentes: [],
@@ -85,6 +87,11 @@ function repoActas(overrides: Partial<RepositorioActaAprobacionPort> = {}): Repo
     actualizarSeleccion: async () => {},
     editarTextos: async (_id, datos) => acta(datos),
     planesYaEmitidos: async () => new Set(),
+    cambiarEstado: async (_id, estado, aprobacion) =>
+      acta({
+        estado,
+        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+      }),
     ...overrides,
   };
 }
@@ -724,5 +731,172 @@ describe('obtenerContenido', () => {
     expect(contenido.acciones).toHaveLength(1);
     expect(contenido.acciones[0]?.id).toBe('aa-1');
     expect(contenido.acciones[0]?.plan.id).toBe('plan-vigente');
+  });
+});
+
+describe('transicionar', () => {
+  /** Cabecera + emisión completas y ≥1 asistente: sin bloqueos de RF-AC-016. */
+  function actaCompleta(sobre: Partial<DatosActa> = {}): DatosActa {
+    return acta({
+      convocadaPor: 'Directora de Escuela',
+      fechaReunion: new Date('2026-03-09'),
+      lugarReunion: 'Sala de reuniones',
+      lugarEmision: 'Huancayo',
+      fechaEmision: new Date('2026-03-20'),
+      asistentes: [{ id: 'as-1', nombre: 'Ana Pérez' }],
+      ...sobre,
+    });
+  }
+
+  const unaAccionIncluida = [
+    { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+  ];
+
+  it('enviar-a-revision: Borrador → En revisión', async () => {
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'Borrador' }),
+      accionesDe: async () => unaAccionIncluida,
+    });
+    const casos = montar({ actas });
+
+    const resultado = await casos.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {});
+
+    expect(resultado.estado).toBe('En revisión');
+  });
+
+  it('aprobar: En revisión → Aprobada, fija aprobadoPorId/aprobadoEn', async () => {
+    let aprobacionRecibida: { actorId: string; fecha: Date } | undefined;
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => unaAccionIncluida,
+      cambiarEstado: async (_id, estado, aprobacion) => {
+        aprobacionRecibida = aprobacion;
+        return actaCompleta({
+          estado,
+          aprobadoPorId: aprobacion?.actorId ?? null,
+          aprobadoEn: aprobacion?.fecha ?? null,
+        });
+      },
+    });
+    const casos = montar({ actas });
+
+    const resultado = await casos.transicionar(ACTOR, 'acta-1', 'aprobar', {});
+
+    expect(resultado.estado).toBe('Aprobada');
+    expect(resultado.aprobadoPorId).toBe(ACTOR.id);
+    expect(aprobacionRecibida?.actorId).toBe(ACTOR.id);
+  });
+
+  it('rechazar: En revisión → Borrador, no toca aprobadoPorId/aprobadoEn', async () => {
+    let aprobacionRecibida: unknown = 'sin-invocar';
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => unaAccionIncluida,
+      cambiarEstado: async (_id, estado, aprobacion) => {
+        aprobacionRecibida = aprobacion;
+        return actaCompleta({ estado });
+      },
+    });
+    const casos = montar({ actas });
+
+    const resultado = await casos.transicionar(ACTOR, 'acta-1', 'rechazar', {
+      comentario: 'Falta el lugar de emisión.',
+    });
+
+    expect(resultado.estado).toBe('Borrador');
+    expect(aprobacionRecibida).toBeUndefined();
+  });
+
+  it('rechaza rechazar sin comentario (RF-AC-015 RN1)', async () => {
+    const actas = repoActas({ porId: async () => actaCompleta({ estado: 'En revisión' }) });
+    const casos = montar({ actas });
+
+    await expect(casos.transicionar(ACTOR, 'acta-1', 'rechazar', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('rechaza una transición fuera de secuencia', async () => {
+    const actas = repoActas({ porId: async () => actaCompleta({ estado: 'Borrador' }) });
+    const casos = montar({ actas });
+
+    await expect(casos.transicionar(ACTOR, 'acta-1', 'aprobar', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('RF-AC-016: enviar-a-revision bloqueada por completitud (sin asistentes)', async () => {
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'Borrador', asistentes: [] }),
+      accionesDe: async () => unaAccionIncluida,
+    });
+    const casos = montar({ actas });
+
+    await expect(casos.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('RF-AC-016: aprobar bloqueada por completitud (sin acciones incluidas)', async () => {
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => [],
+    });
+    const casos = montar({ actas });
+
+    await expect(casos.transicionar(ACTOR, 'acta-1', 'aprobar', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('rechazar no exige completitud, aunque el acta tenga bloqueos', async () => {
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión', asistentes: [] }),
+      accionesDe: async () => [],
+    });
+    const casos = montar({ actas });
+
+    const resultado = await casos.transicionar(ACTOR, 'acta-1', 'rechazar', {
+      comentario: 'Corrige la cabecera.',
+    });
+
+    expect(resultado.estado).toBe('Borrador');
+  });
+
+  it('exige actas.editar para enviar-a-revision y actas.aprobar para aprobar/rechazar', async () => {
+    const pedidos: string[] = [];
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'Borrador' }),
+      accionesDe: async () => unaAccionIncluida,
+    });
+    const casos = montar({ actas, autorizacion: denegarRegistrando(pedidos) });
+
+    await expect(casos.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {})).rejects.toThrow(
+      AccesoDenegado,
+    );
+    expect(pedidos).toContain('actas.editar');
+
+    const actasEnRevision = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => unaAccionIncluida,
+    });
+    const casosAprobar = montar({ actas: actasEnRevision, autorizacion: denegarRegistrando(pedidos) });
+    await expect(casosAprobar.transicionar(ACTOR, 'acta-1', 'aprobar', {})).rejects.toThrow(
+      AccesoDenegado,
+    );
+    expect(pedidos).toContain('actas.aprobar');
+  });
+
+  it('publica ActaTransicionada', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'Borrador' }),
+      accionesDe: async () => unaAccionIncluida,
+    });
+    const casos = montar({ actas, eventos: publicador });
+
+    await casos.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {});
+
+    expect(eventos.map((e) => e.nombre)).toEqual(['actas.transicion']);
   });
 });

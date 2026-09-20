@@ -53,6 +53,8 @@ const SELECCION = {
   comentario: true,
   lugarEmision: true,
   fechaEmision: true,
+  aprobadoPorId: true,
+  aprobadoEn: true,
   estado: true,
   creadoEn: true,
   asistentes: { select: SELECCION_ASISTENTE, orderBy: { orden: 'asc' as const } },
@@ -80,6 +82,8 @@ interface Fila {
   comentario: string | null;
   lugarEmision: string | null;
   fechaEmision: Date | null;
+  aprobadoPorId: string | null;
+  aprobadoEn: Date | null;
   estado: string;
   creadoEn: Date;
   asistentes: FilaAsistente[];
@@ -107,6 +111,8 @@ function aDatos(fila: Fila): DatosActa {
     comentario: fila.comentario,
     lugarEmision: fila.lugarEmision,
     fechaEmision: fila.fechaEmision,
+    aprobadoPorId: fila.aprobadoPorId,
+    aprobadoEn: fila.aprobadoEn,
     estado: A_DOMINIO[fila.estado as EstadoActaBd] ?? 'Borrador',
     creadoEn: fila.creadoEn,
     asistentes: fila.asistentes.map(aAsistente),
@@ -170,6 +176,25 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
       }),
     ]);
     return this.exigir(id);
+  }
+
+  /** RF-AC-013. */
+  async cambiarEstado(
+    id: string,
+    estado: EstadoActa,
+    aprobacion?: { actorId: string; fecha: Date },
+  ): Promise<DatosActa> {
+    const fila = await this.prisma.actaAprobacion.update({
+      where: { id },
+      data: {
+        estado: A_BD[estado],
+        // RF-AC-014 RN2: solo se escriben cuando llegan — una transición
+        // posterior (rechazar, por ejemplo) no debe borrar quién aprobó ni cuándo.
+        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+      },
+      select: SELECCION,
+    });
+    return aDatos(fila);
   }
 
   async eliminar(id: string): Promise<void> {

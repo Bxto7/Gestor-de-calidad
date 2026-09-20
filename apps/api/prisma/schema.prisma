@@ -1412,6 +1412,10 @@ model ActaAprobacion {
   textoAcuerdoCierre String @map("texto_acuerdo_cierre") @db.Text
   lugarEmision      String?    @map("lugar_emision") @db.VarChar(200)
   fechaEmision      DateTime?  @map("fecha_emision") @db.Timestamptz(6)
+  /// RF-AC-014 RN2: quién aprobó y cuándo. Inmutables una vez fijados — el
+  /// caso de uso nunca los reescribe fuera de la transición `aprobar`.
+  aprobadoPorId     String?    @map("aprobado_por_id") @db.Uuid
+  aprobadoEn        DateTime?  @map("aprobado_en") @db.Timestamptz(6)
   estado            EstadoActa @default(BORRADOR)
   creadoEn          DateTime   @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn     DateTime   @updatedAt @map("actualizado_en") @db.Timestamptz(6)
