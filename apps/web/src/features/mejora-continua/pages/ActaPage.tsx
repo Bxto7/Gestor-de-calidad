@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
@@ -22,6 +22,7 @@ import {
   Campo,
   Cargando,
   Entrada,
+  Modal,
   Tarjeta,
 } from '@/shared/components/ui';
 
@@ -32,9 +33,17 @@ import {
   useContenidoActa,
   useEditarCabeceraActa,
   useEditarTextosActa,
+  useEliminarActa,
   useReemplazarAsistentesActa,
+  useTransicionarActa,
 } from '../api/queries';
-import { permiteEdicion, TONO_ESTADO_ACTA } from '../domain/estado-acta';
+import {
+  describirTransicion,
+  permiteEdicion,
+  TONO_ESTADO_ACTA,
+  transicionesDisponibles,
+  type AccionActaTransicion,
+} from '../domain/estado-acta';
 import type { Acta, AccionDelActa } from '../domain/tipos';
 
 export function ActaPage() {
@@ -90,6 +99,8 @@ export function ActaPage() {
       <AsistentesActaSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
       <AccionesDelPeriodoSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
       <TextosInstitucionalesSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
+      <EstadoActaSeccion acta={acta} ejecutar={ejecutar} />
+      {editable && <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />}
     </div>
   );
 }
@@ -451,6 +462,142 @@ function TextosInstitucionalesSeccion({
             {editarTextos.isPending ? 'Guardando…' : 'Guardar textos'}
           </Boton>
         )}
+      </div>
+    </Tarjeta>
+  );
+}
+
+/** RF-AC-013 a 016: la fila de transición, mismo patrón que `PlanMedicionPage`. */
+function EstadoActaSeccion({
+  acta,
+  ejecutar,
+}: {
+  acta: Acta;
+  ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const transicionar = useTransicionarActa(acta.id);
+  const [enTransicion, setEnTransicion] = useState<AccionActaTransicion | null>(null);
+
+  const disponibles = transicionesDisponibles(acta.estado);
+
+  return (
+    <Tarjeta>
+      <h2 className="mb-4 text-sm font-semibold text-tinta">Estado del acta</h2>
+      <div className="flex flex-wrap gap-2">
+        {disponibles.map((accion) => {
+          const t = describirTransicion(accion);
+          return (
+            <Boton
+              key={accion}
+              variante={accion === 'rechazar' ? 'secundario' : 'primario'}
+              onClick={() =>
+                t.exigeComentario
+                  ? setEnTransicion(accion)
+                  : void ejecutar(() => transicionar.mutateAsync({ accion }))
+              }
+            >
+              {t.etiqueta}
+            </Boton>
+          );
+        })}
+        {disponibles.length === 0 && (
+          <p className="text-sm text-slate-500">
+            Un acta {acta.estado.toLowerCase()} no admite más cambios de estado.
+          </p>
+        )}
+      </div>
+
+      {enTransicion && (
+        <ModalObservacion
+          etiqueta={describirTransicion(enTransicion).etiqueta}
+          onCerrar={() => setEnTransicion(null)}
+          onConfirmar={(comentario) => {
+            void ejecutar(() => transicionar.mutateAsync({ accion: enTransicion, comentario }));
+            setEnTransicion(null);
+          }}
+        />
+      )}
+    </Tarjeta>
+  );
+}
+
+/** RF-AC-015 RN1: el rechazo obliga a comentario. */
+function ModalObservacion({
+  etiqueta,
+  onCerrar,
+  onConfirmar,
+}: {
+  etiqueta: string;
+  onCerrar: () => void;
+  onConfirmar: (comentario: string) => void;
+}) {
+  const [comentario, setComentario] = useState('');
+
+  return (
+    <Modal
+      abierto
+      titulo={etiqueta}
+      descripcion="El motivo queda en la bitácora junto al cambio de estado."
+      onCerrar={onCerrar}
+      pie={
+        <>
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton
+            variante="primario"
+            disabled={!comentario.trim()}
+            onClick={() => onConfirmar(comentario)}
+          >
+            Confirmar
+          </Boton>
+        </>
+      }
+    >
+      <Campo etiqueta="Motivo del rechazo" requerido>
+        {(props) => (
+          <AreaTexto
+            {...props}
+            rows={4}
+            value={comentario}
+            onChange={(e) => setComentario(e.target.value)}
+          />
+        )}
+      </Campo>
+    </Modal>
+  );
+}
+
+/** RF-AC-017 RN2: solo un acta en Borrador puede eliminarse. */
+function EliminarActaSeccion({
+  acta,
+  ejecutar,
+}: {
+  acta: Acta;
+  ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const navegar = useNavigate();
+  const eliminar = useEliminarActa(acta.id);
+
+  return (
+    <Tarjeta>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-tinta">Eliminar acta</h2>
+          <p className="text-sm text-tinta-suave">Solo posible mientras el acta está en Borrador.</p>
+        </div>
+        <Boton
+          variante="peligro"
+          disabled={eliminar.isPending}
+          onClick={() =>
+            void ejecutar(async () => {
+              await eliminar.mutateAsync(undefined);
+              void navegar('/mejora-continua/actas');
+            })
+          }
+        >
+          {eliminar.isPending ? 'Eliminando…' : 'Eliminar acta'}
+        </Boton>
       </div>
     </Tarjeta>
   );

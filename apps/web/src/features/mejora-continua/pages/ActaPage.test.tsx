@@ -6,7 +6,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CtxEncabezado } from '@/app/encabezado';
 import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto-sesion';
@@ -59,6 +59,16 @@ const sesionDePrueba: ValorSesion = {
   entrar: () => undefined,
   salir: () => Promise.resolve(),
 };
+
+// Varias pruebas de este archivo (transición/eliminar) reasignan
+// `obtenerActa` con `vi.spyOn(...).mockResolvedValue(...)` para simular un
+// acta en otro estado. Sin restaurar el valor por defecto, esa reasignación
+// queda vigente para la prueba siguiente —no hay `restoreMocks` global (ver
+// `src/pruebas/preparar.ts`)— y una prueba que no toca `obtenerActa` hereda
+// el acta de la prueba anterior en vez de `actaDePrueba`.
+afterEach(() => {
+  vi.mocked(actasApi.obtenerActa).mockResolvedValue(actaDePrueba);
+});
 
 function montar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -195,5 +205,59 @@ describe('RF-AC-011 — textos institucionales', () => {
         textoAcuerdoCierre: actaDePrueba.textoAcuerdoCierre,
       });
     });
+  });
+});
+
+describe('RF-AC-013/014 — transición de estado', () => {
+  it('enviar a revisión (sin comentario) transiciona directo', async () => {
+    const transicionar = vi.spyOn(actasApi, 'transicionarActa').mockResolvedValue({
+      ...actaDePrueba,
+      estado: 'En revisión',
+    });
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(screen.getByRole('button', { name: /enviar a revisión/i }));
+
+    await waitFor(() => {
+      expect(transicionar).toHaveBeenCalledWith('acta-1', 'enviar-a-revision', undefined);
+    });
+  });
+
+  it('rechazar abre el modal y exige comentario', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado: 'En revisión' });
+    const transicionar = vi.spyOn(actasApi, 'transicionarActa').mockResolvedValue(actaDePrueba);
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(screen.getByRole('button', { name: /^rechazar$/i }));
+    expect(screen.getByRole('button', { name: /confirmar/i })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText(/motivo del rechazo/i), 'Falta un asistente.');
+    await userEvent.click(screen.getByRole('button', { name: /confirmar/i }));
+
+    await waitFor(() => {
+      expect(transicionar).toHaveBeenCalledWith('acta-1', 'rechazar', 'Falta un asistente.');
+    });
+  });
+
+  it('un acta Histórica no ofrece ninguna transición', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado: 'Histórica' });
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    expect(screen.getByText(/no admite más cambios de estado/i)).toBeInTheDocument();
+  });
+});
+
+describe('RF-AC-017 RN2 — eliminar', () => {
+  it('eliminar en Borrador llama a eliminarActa', async () => {
+    const eliminar = vi.spyOn(actasApi, 'eliminarActa').mockResolvedValue(undefined);
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(screen.getByRole('button', { name: /eliminar acta/i }));
+
+    await waitFor(() => expect(eliminar).toHaveBeenCalledWith('acta-1'));
   });
 });
