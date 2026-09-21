@@ -1422,6 +1422,7 @@ model ActaAprobacion {
 
   asistentes AsistenteActa[]
   acciones   AccionActa[]
+  documentos DocumentoActa[]
 
   /// RF-AC-002 RN2: el ámbito de unicidad del correlativo es la carrera.
   @@unique([carreraId, correlativo])
@@ -1451,14 +1452,19 @@ model AsistenteActa {
 /// RF-AC-007/008: qué planes de mejora entran en el acta y cuáles de esos
 /// quedan finalmente incluidos (2c-AC-B). `planMejoraId` es un UUID suelto,
 /// SIN `@relation` de Prisma hacia `PlanMejora` — mismo criterio que el resto
-/// de referencias cruzadas dentro de `mejora_continua` (ninguna usa
-/// `@relation` entre submódulos hermanos, ver `PlanMejora.planEvaluacionId`).
-/// Las columnas descriptivas (nombre, plazo, recursos, metas, responsable,
-/// elemento asociado) NO se snapshotean aquí — se leen en vivo de
-/// `PlanMejora` desde el caso de uso (decisión §8.1 del diseño). Solo
-/// `porcentajeMedicionCompetencia` se snapshotea, porque no tiene otro lugar
-/// donde vivir: es un cálculo (RF-PJ-028), no una columna propia de
-/// `PlanMejora`.
+/// de referencias cruzadas dentro de `mejora_continua`.
+///
+/// Las columnas `*Snapshot` SÍ se congelan, a diferencia de la decisión
+/// original de este modelo (ver el historial de este comentario): mientras
+/// el acta está en Borrador/En revisión se sigue leyendo `PlanMejora` en
+/// vivo (`GestionarActas.obtenerContenido`), pero al transicionar a
+/// `aprobar` el caso de uso copia aquí `nombre`/`plazo`/`recursos`/`metas`/
+/// `responsable` (y, para Competencia, el resultado LOGRADO/NO LOGRADO ya
+/// resuelto). RNF24 exige que el contenido de un acta ya aprobada no cambie
+/// aunque el `PlanMejora` de origen se edite después (RF-AC-018/019, plan de
+/// exportación 2026-09-20) — la unión en vivo permitía justo eso.
+/// `porcentajeMedicionCompetencia` sigue siendo el único campo que ya se
+/// congelaba desde 2c-AC-B (RF-PJ-028), sin cambios.
 model AccionActa {
   id           String            @id @default(uuid()) @db.Uuid
   actaId       String            @map("acta_id") @db.Uuid
@@ -1468,12 +1474,27 @@ model AccionActa {
   incluida     Boolean           @default(true)
   /// RF-PJ-028 / RF-AC-010: snapshot al momento de cargar. `null` si el
   /// aspecto no es Competencia, o si "no disponible" (RF-PJ-028 RN3, primer
-  /// periodo). `SmallInt` y no `Decimal`: es el mismo tipo que
-  /// `DatosMedicion.porcentajeAlcanzado` (columna `porcentaje_alcanzado` de
-  /// `evaluacion`), un entero de 0 a 100 — no una fracción.
+  /// periodo).
   porcentajeMedicionCompetencia Int? @map("porcentaje_medicion_competencia") @db.SmallInt
   /// RF-AC-007 RN2 (orden de secciones) y orden de llegada dentro de cada una.
   orden        Int
+
+  /// Snapshot al aprobar (ver comentario del modelo). `null` mientras el
+  /// acta sigue en Borrador/En revisión — recién se llenan en la transición
+  /// `aprobar`, nunca antes. `codigoSnapshot` se congela también aunque el
+  /// código de un PlanMejora no se edite hoy: así el camino de lectura de un
+  /// acta Aprobada/Emitida no depende de que el PlanMejora siga existiendo.
+  codigoSnapshot       String?   @map("codigo_snapshot") @db.VarChar(80)
+  nombreSnapshot       String?   @map("nombre_snapshot") @db.VarChar(300)
+  plazoSnapshot        DateTime? @map("plazo_snapshot") @db.Date
+  recursosSnapshot     String?   @map("recursos_snapshot") @db.Text
+  metasSnapshot        String?   @map("metas_snapshot") @db.Text
+  responsableSnapshot  String?   @map("responsable_snapshot") @db.VarChar(300)
+  /// Solo Competencia: la meta (en el mismo entero 0-100 que
+  /// `porcentajeMedicionCompetencia`) contra la que se comparó al aprobar,
+  /// para que LOGRADO/NO LOGRADO no cambie si la meta del plan de medición
+  /// cambia después.
+  metaCompetenciaSnapshot Int? @map("meta_competencia_snapshot") @db.SmallInt
 
   acta ActaAprobacion @relation(fields: [actaId], references: [id], onDelete: Cascade)
 
@@ -1481,5 +1502,42 @@ model AccionActa {
   @@unique([actaId, planMejoraId])
   @@index([actaId])
   @@map("acciones_acta")
+  @@schema("mejora_continua")
+}
+
+/// RF-AC-018/RF-AC-019.
+enum TipoDocumentoActa {
+  ACTA_PDF
+  ACTA_EXCEL
+
+  @@schema("mejora_continua")
+}
+
+/// RF-AC-018/019: el acta generada como archivo. Reutiliza
+/// `EstadoDocumentoMedicion` para el ciclo de vida del trabajo (EN_COLA →
+/// GENERANDO → LISTO/FALLIDO) — mismo criterio que ya sigue `DocumentoMejora`:
+/// los cuatro valores son idénticos, y declarar un cuarto enum solo para
+/// repetirlos sería puro ruido.
+model DocumentoActa {
+  id     String                  @id @default(uuid()) @db.Uuid
+  actaId String                  @map("acta_id") @db.Uuid
+  tipo   TipoDocumentoActa
+  estado EstadoDocumentoMedicion @default(EN_COLA)
+
+  nombreArchivo String? @map("nombre_archivo") @db.VarChar(200)
+  tipoMime      String? @map("tipo_mime") @db.VarChar(120)
+  bytes         Int?
+  /// Opaca a propósito, igual que en `DocumentoMejora`.
+  ubicacion     String? @db.VarChar(500)
+  error         String? @db.Text
+
+  solicitadoPor String    @map("solicitado_por") @db.Uuid
+  solicitadoEn  DateTime  @default(now()) @map("solicitado_en") @db.Timestamptz(6)
+  terminadoEn   DateTime? @map("terminado_en") @db.Timestamptz(6)
+
+  acta ActaAprobacion @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@index([actaId, solicitadoEn])
+  @@map("documentos_acta")
   @@schema("mejora_continua")
 }
