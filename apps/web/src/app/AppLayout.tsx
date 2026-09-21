@@ -68,6 +68,13 @@ const ENLACES: {
     permiso: 'mejora.leer',
   },
   {
+    a: '/mejora-continua/actas',
+    etiqueta: 'Actas de Aprobación',
+    icono: IconoPlan,
+    exacto: false,
+    permiso: 'actas.leer',
+  },
+  {
     a: '/reportes',
     etiqueta: 'Reportes',
     icono: IconoReportes,
