@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
   AreaTexto,
@@ -49,6 +50,7 @@ import type { Acta, AccionDelActa } from '../domain/tipos';
 export function ActaPage() {
   const { id = '' } = useParams();
   const { publicar } = useEncabezado();
+  const { puede } = useSesion();
 
   const { data: acta, isLoading } = useActa(id);
 
@@ -67,7 +69,7 @@ export function ActaPage() {
 
   if (isLoading || !acta) return <Cargando etiqueta="Cargando el acta de aprobación…" />;
 
-  const editable = permiteEdicion(acta.estado);
+  const editable = permiteEdicion(acta.estado) && puede('actas.editar');
 
   async function ejecutar(fn: () => Promise<unknown>) {
     setError(null);
@@ -95,12 +97,51 @@ export function ActaPage() {
         </p>
       )}
 
-      <CabeceraActaForm acta={acta} editable={editable} onError={setError} ejecutar={ejecutar} />
-      <AsistentesActaSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
+      {/*
+        La `key` reinicia el editor cuando el servidor confirma el guardado.
+        Sin ella, la cabecera seguiría mostrando el borrador local aunque el
+        backend hubiera normalizado o rechazado los cambios (RF-AC-015).
+      */}
+      <CabeceraActaForm
+        key={[
+          acta.titulo,
+          acta.objetivo,
+          acta.convocadaPor,
+          acta.fechaReunion,
+          acta.lugarReunion,
+          acta.lugarEmision ?? '',
+          acta.fechaEmision ?? '',
+        ].join('|')}
+        acta={acta}
+        editable={editable}
+        onError={setError}
+        ejecutar={ejecutar}
+      />
+      {/*
+        La `key` reinicia la lista cuando el servidor confirma el guardado.
+        Sin ella, una fila de asistente en blanco que el backend filtró al
+        guardar seguiría visible en pantalla.
+      */}
+      <AsistentesActaSeccion
+        key={acta.asistentes.map((a) => a.nombre).join('|')}
+        acta={acta}
+        editable={editable}
+        ejecutar={ejecutar}
+      />
       <AccionesDelPeriodoSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
-      <TextosInstitucionalesSeccion acta={acta} editable={editable} ejecutar={ejecutar} />
-      <EstadoActaSeccion acta={acta} ejecutar={ejecutar} />
-      {editable && <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />}
+      {/*
+        La `key` reinicia el editor cuando el servidor confirma el guardado.
+        Sin ella, los textos institucionales seguirían mostrando el borrador
+        local aunque el backend hubiera normalizado el contenido.
+      */}
+      <TextosInstitucionalesSeccion
+        key={[acta.textoIntroduccion, acta.textoAcuerdoCierre].join('|')}
+        acta={acta}
+        editable={editable}
+        ejecutar={ejecutar}
+      />
+      <EstadoActaSeccion acta={acta} ejecutar={ejecutar} puede={puede} />
+      {editable && puede('actas.eliminar') && <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />}
     </div>
   );
 }
@@ -132,6 +173,17 @@ function CabeceraActaForm({
   return (
     <Tarjeta>
       <h2 className="mb-4 text-sm font-semibold text-tinta">Cabecera del acta</h2>
+
+      {/* RF-AC-015: el motivo del último rechazo, para que el autor sepa qué corregir. */}
+      {acta.estado === 'Borrador' && acta.comentario && (
+        <p
+          role="status"
+          className="mb-4 rounded-lg bg-estado-progreso-bg px-3 py-2 text-sm text-estado-progreso-fg"
+        >
+          Motivo del último rechazo: {acta.comentario}
+        </p>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo etiqueta="Título" requerido>
           {(props) => (
@@ -471,36 +523,38 @@ function TextosInstitucionalesSeccion({
 function EstadoActaSeccion({
   acta,
   ejecutar,
+  puede,
 }: {
   acta: Acta;
   ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
+  puede: (permiso: string) => boolean;
 }) {
   const transicionar = useTransicionarActa(acta.id);
   const [enTransicion, setEnTransicion] = useState<AccionActaTransicion | null>(null);
-
-  const disponibles = transicionesDisponibles(acta.estado);
 
   return (
     <Tarjeta>
       <h2 className="mb-4 text-sm font-semibold text-tinta">Estado del acta</h2>
       <div className="flex flex-wrap gap-2">
-        {disponibles.map((accion) => {
-          const t = describirTransicion(accion);
-          return (
-            <Boton
-              key={accion}
-              variante={accion === 'rechazar' ? 'secundario' : 'primario'}
-              onClick={() =>
-                t.exigeComentario
-                  ? setEnTransicion(accion)
-                  : void ejecutar(() => transicionar.mutateAsync({ accion }))
-              }
-            >
-              {t.etiqueta}
-            </Boton>
-          );
-        })}
-        {disponibles.length === 0 && (
+        {transicionesDisponibles(acta.estado)
+          .filter((a) => puede(`actas.${describirTransicion(a).permiso}`))
+          .map((accion) => {
+            const t = describirTransicion(accion);
+            return (
+              <Boton
+                key={accion}
+                variante={accion === 'rechazar' ? 'secundario' : 'primario'}
+                onClick={() =>
+                  t.exigeComentario
+                    ? setEnTransicion(accion)
+                    : void ejecutar(() => transicionar.mutateAsync({ accion }))
+                }
+              >
+                {t.etiqueta}
+              </Boton>
+            );
+          })}
+        {transicionesDisponibles(acta.estado).length === 0 && (
           <p className="text-sm text-tinta-suave">
             Un acta {acta.estado.toLowerCase()} no admite más cambios de estado.
           </p>
@@ -578,6 +632,15 @@ function EliminarActaSeccion({
 }) {
   const navegar = useNavigate();
   const eliminar = useEliminarActa(acta.id);
+  const [confirmando, setConfirmando] = useState(false);
+
+  async function confirmarEliminacion() {
+    setConfirmando(false);
+    await ejecutar(async () => {
+      await eliminar.mutateAsync(undefined);
+      void navegar('/mejora-continua/actas');
+    });
+  }
 
   return (
     <Tarjeta>
@@ -586,19 +649,34 @@ function EliminarActaSeccion({
           <h2 className="text-sm font-semibold text-tinta">Eliminar acta</h2>
           <p className="text-sm text-tinta-suave">Solo posible mientras el acta está en Borrador.</p>
         </div>
-        <Boton
-          variante="peligro"
-          disabled={eliminar.isPending}
-          onClick={() =>
-            void ejecutar(async () => {
-              await eliminar.mutateAsync(undefined);
-              void navegar('/mejora-continua/actas');
-            })
-          }
-        >
+        <Boton variante="peligro" disabled={eliminar.isPending} onClick={() => setConfirmando(true)}>
           {eliminar.isPending ? 'Eliminando…' : 'Eliminar acta'}
         </Boton>
       </div>
+
+      {confirmando && (
+        <Modal
+          abierto
+          ancho="sm"
+          titulo="Eliminar acta"
+          descripcion="Esta acción no se puede deshacer."
+          onCerrar={() => setConfirmando(false)}
+          pie={
+            <>
+              <Boton variante="secundario" onClick={() => setConfirmando(false)}>
+                Cancelar
+              </Boton>
+              <Boton variante="peligro" onClick={() => void confirmarEliminacion()}>
+                Eliminar
+              </Boton>
+            </>
+          }
+        >
+          <p className="text-sm text-tinta-suave">
+            ¿Eliminar el acta {acta.codigo}? Esta acción no se puede deshacer.
+          </p>
+        </Modal>
+      )}
     </Tarjeta>
   );
 }

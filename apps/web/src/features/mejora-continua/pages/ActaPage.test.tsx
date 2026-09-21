@@ -70,12 +70,14 @@ afterEach(() => {
   vi.mocked(actasApi.obtenerActa).mockResolvedValue(actaDePrueba);
 });
 
-function montar() {
+// `sesion` es opcional para las pruebas de permisos (RF-AC-*), que necesitan
+// un `puede` que niegue un permiso concreto en vez del que todo lo permite.
+function montar(sesion: ValorSesion = sesionDePrueba) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={['/mejora-continua/actas/acta-1']}>
-        <ContextoSesion.Provider value={sesionDePrueba}>
+        <ContextoSesion.Provider value={sesion}>
           <CtxEncabezado.Provider value={{ migas: [], acciones: null, publicar: () => undefined }}>
             <Routes>
               <Route path="/mejora-continua/actas/:id" element={<ActaPage />} />
@@ -251,13 +253,92 @@ describe('RF-AC-013/014 — transición de estado', () => {
 });
 
 describe('RF-AC-017 RN2 — eliminar', () => {
-  it('eliminar en Borrador llama a eliminarActa', async () => {
+  it('eliminar en Borrador exige confirmar en un modal antes de llamar a eliminarActa', async () => {
     const eliminar = vi.spyOn(actasApi, 'eliminarActa').mockResolvedValue(undefined);
     montar();
     await screen.findByDisplayValue(actaDePrueba.titulo);
 
     await userEvent.click(screen.getByRole('button', { name: /eliminar acta/i }));
+    expect(eliminar).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: /^eliminar$/i }));
 
     await waitFor(() => expect(eliminar).toHaveBeenCalledWith('acta-1'));
+  });
+
+  it('cancelar el modal de confirmación no llama a eliminarActa', async () => {
+    // `mockClear()`: la prueba anterior de este mismo describe ya dejó una
+    // llamada registrada en este spy (no hay `restoreMocks` global — ver el
+    // comentario de `afterEach` más arriba), y aquí se comprueba justamente
+    // que NO se llama.
+    const eliminar = vi.spyOn(actasApi, 'eliminarActa').mockResolvedValue(undefined);
+    eliminar.mockClear();
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(screen.getByRole('button', { name: /eliminar acta/i }));
+    await userEvent.click(screen.getByRole('button', { name: /cancelar/i }));
+
+    expect(eliminar).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Permisos — controles ocultos sin el permiso correspondiente', () => {
+  it('sin actas.editar no ofrece guardar cabecera ni enviar a revisión', async () => {
+    const sesionSinEditar: ValorSesion = {
+      ...sesionDePrueba,
+      puede: (permiso) => permiso !== 'actas.editar',
+    };
+    montar(sesionSinEditar);
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    expect(screen.queryByRole('button', { name: /guardar cabecera/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /enviar a revisión/i })).not.toBeInTheDocument();
+  });
+
+  it('sin actas.aprobar no ofrece aprobar ni rechazar en revisión', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado: 'En revisión' });
+    const sesionSinAprobar: ValorSesion = {
+      ...sesionDePrueba,
+      puede: (permiso) => permiso !== 'actas.aprobar',
+    };
+    montar(sesionSinAprobar);
+    await screen.findByText(actaDePrueba.codigo);
+
+    expect(screen.queryByRole('button', { name: /^aprobar$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^rechazar$/i })).not.toBeInTheDocument();
+  });
+
+  it('sin actas.eliminar no ofrece la sección de eliminar', async () => {
+    const sesionSinEliminar: ValorSesion = {
+      ...sesionDePrueba,
+      puede: (permiso) => permiso !== 'actas.eliminar',
+    };
+    montar(sesionSinEliminar);
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    expect(screen.queryByRole('button', { name: /eliminar acta/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('RF-AC-015 — motivo del último rechazo', () => {
+  it('muestra el comentario del último rechazo cuando el acta está en Borrador', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({
+      ...actaDePrueba,
+      comentario: 'Falta un asistente.',
+    });
+    montar();
+
+    expect(
+      await screen.findByText(/motivo del último rechazo: falta un asistente\./i),
+    ).toBeInTheDocument();
+  });
+
+  it('no muestra el aviso cuando no hay comentario', async () => {
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    expect(screen.queryByText(/motivo del último rechazo/i)).not.toBeInTheDocument();
   });
 });
