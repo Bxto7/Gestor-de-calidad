@@ -32,13 +32,10 @@ function accion(
   sobre: Partial<DatosParaActaDocumento['acciones'][number]> = {},
 ): DatosParaActaDocumento['acciones'][number] {
   return {
-    id: 'aa-1',
     incluida: true,
-    orden: 0,
     porcentajeMedicionCompetencia: null,
     metaCompetenciaSnapshot: null,
     plan: {
-      id: 'plan-1',
       codigo: 'CA-01',
       aspecto,
       nombre: 'Reforzar bibliografía',
@@ -65,9 +62,9 @@ describe('armarActaParaDocumento', () => {
     const resultado = armarActaParaDocumento(
       datos({
         acciones: [
-          accion('CRITERIO_ACREDITACION', { id: 'aa-1' }),
-          accion('OBJETIVO_EDUCACIONAL', { id: 'aa-2' }),
-          accion('COMPETENCIA', { id: 'aa-3' }),
+          accion('CRITERIO_ACREDITACION'),
+          accion('OBJETIVO_EDUCACIONAL'),
+          accion('COMPETENCIA'),
         ],
       }),
     );
@@ -128,9 +125,9 @@ describe('armarActaParaDocumento', () => {
     const resultado = armarActaParaDocumento(
       datos({
         acciones: [
-          accion('CRITERIO_ACREDITACION', { id: 'aa-1' }),
-          accion('CRITERIO_ACREDITACION', { id: 'aa-2' }),
-          accion('OBJETIVO_EDUCACIONAL', { id: 'aa-3' }),
+          accion('CRITERIO_ACREDITACION'),
+          accion('CRITERIO_ACREDITACION'),
+          accion('OBJETIVO_EDUCACIONAL'),
         ],
       }),
     );
