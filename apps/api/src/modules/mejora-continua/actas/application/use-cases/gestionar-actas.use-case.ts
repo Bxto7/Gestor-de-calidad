@@ -21,6 +21,7 @@ import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion
 import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
 import type { RepositorioPlanMedicionPort } from '../../../medicion/application/ports/plan-medicion.port.js';
 import type { RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
+import { porcentajeDeMeta } from '../../../medicion/domain/value-objects/meta.js';
 import { candidatasParaCargar } from '../../domain/services/candidatas-acciones-acta.js';
 import { calcularPorcentajeMedicionAnterior } from '../../../mejora/application/services/porcentaje-periodo-anterior.js';
 import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
@@ -41,14 +42,16 @@ import {
   ActaTransicionada,
 } from '../../domain/events/eventos-actas.js';
 import type {
+  AccionActaDato,
   ActaResumen,
   CabeceraActa,
   DatosActa,
   FiltroActas,
   NuevaAccionActa,
+  PlanResumenParaActa,
   RepositorioActaAprobacionPort,
+  SnapshotAccionActa,
 } from '../ports/acta-aprobacion.port.js';
-import type { DatosPlanMejora } from '../../../mejora/application/ports/plan-mejora.port.js';
 
 /** RF-AC-001: lo que se pide al crear. */
 export interface DatosCrearActa {
@@ -57,13 +60,16 @@ export interface DatosCrearActa {
   readonly periodoMedicionId?: string;
 }
 
-/** RF-AC-009: una fila de la tabla del acta, con los datos vivos de su plan de mejora. */
+/** RF-AC-009: una fila de la tabla del acta. `plan` viene en vivo (Borrador/En
+ * revisión) o del snapshot (Aprobada en adelante) — ver `obtenerContenido`. */
 export interface AccionDelActa {
   readonly id: string;
   readonly incluida: boolean;
   readonly orden: number;
   readonly porcentajeMedicionCompetencia: number | null;
-  readonly plan: DatosPlanMejora;
+  /** Solo tiene valor una vez que el acta se aprobó (RF-AC-018/019). */
+  readonly metaCompetenciaSnapshot: number | null;
+  readonly plan: PlanResumenParaActa;
 }
 
 export interface ContenidoActa extends DatosActa {
@@ -93,15 +99,26 @@ export class GestionarActas {
     return this.actas.listar(filtro);
   }
 
-  /** RF-AC-009: la cabecera del acta con sus acciones, cada una unida a su PlanMejora en vivo. */
+  /** RF-AC-009: la cabecera del acta con sus acciones. */
   async obtenerContenido(actor: Actor, id: string): Promise<ContenidoActa> {
     await this.exigir(actor, 'actas.leer', null);
     const acta = await this.exigirActa(id);
     const vinculos = await this.actas.accionesDe(id);
+
+    const acciones =
+      acta.estado === 'Borrador' || acta.estado === 'En revisión'
+        ? await this.accionesEnVivo(vinculos)
+        : this.accionesDesdeSnapshot(vinculos);
+
+    return { ...acta, acciones };
+  }
+
+  /** Mientras el acta es editable, cada fila lee su PlanMejora en vivo. */
+  private async accionesEnVivo(vinculos: readonly AccionActaDato[]): Promise<AccionDelActa[]> {
     const planes = await this.planes.planesPorIds(vinculos.map((v) => v.planMejoraId));
     const planesPorId = new Map(planes.map((p) => [p.id, p]));
 
-    const acciones: AccionDelActa[] = vinculos.flatMap((v) => {
+    return vinculos.flatMap((v) => {
       const plan = planesPorId.get(v.planMejoraId);
       if (!plan) return []; // el plan de mejora se eliminó después de cargarse; se omite en vez de fallar
       return [
@@ -110,12 +127,60 @@ export class GestionarActas {
           incluida: v.incluida,
           orden: v.orden,
           porcentajeMedicionCompetencia: v.porcentajeMedicionCompetencia,
-          plan,
+          metaCompetenciaSnapshot: null,
+          plan: {
+            id: plan.id,
+            codigo: plan.codigo,
+            aspecto: plan.aspecto,
+            nombre: plan.nombre,
+            plazo: plan.plazo,
+            recursos: plan.recursos,
+            metas: plan.metas,
+            responsable: plan.responsable,
+          },
         },
       ];
     });
+  }
 
-    return { ...acta, acciones };
+  /**
+   * RNF24: una vez Aprobada, el contenido se lee de las columnas `*Snapshot`
+   * de `AccionActa` — nunca de `PlanMejora` en vivo. Una fila sin snapshot
+   * completo se omite, mismo criterio que `accionesEnVivo` con un plan
+   * eliminado.
+   */
+  private accionesDesdeSnapshot(vinculos: readonly AccionActaDato[]): AccionDelActa[] {
+    return vinculos.flatMap((v) => {
+      if (
+        v.codigoSnapshot === null ||
+        v.nombreSnapshot === null ||
+        v.plazoSnapshot === null ||
+        v.recursosSnapshot === null ||
+        v.metasSnapshot === null ||
+        v.responsableSnapshot === null
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: v.id,
+          incluida: v.incluida,
+          orden: v.orden,
+          porcentajeMedicionCompetencia: v.porcentajeMedicionCompetencia,
+          metaCompetenciaSnapshot: v.metaCompetenciaSnapshot,
+          plan: {
+            id: v.planMejoraId,
+            codigo: v.codigoSnapshot,
+            aspecto: v.aspecto,
+            nombre: v.nombreSnapshot,
+            plazo: v.plazoSnapshot,
+            recursos: v.recursosSnapshot,
+            metas: v.metasSnapshot,
+            responsable: v.responsableSnapshot,
+          },
+        },
+      ];
+    });
   }
 
   /** RF-AC-001 a RF-AC-003: alta con la carrera real del actor. */
@@ -328,10 +393,11 @@ export class GestionarActas {
     const transicion = describirTransicion(accion);
     await this.exigir(actor, `actas.${transicion.permiso}`, acta.carreraId);
 
+    const vinculos = await this.actas.accionesDe(id);
+
     // RF-AC-016 RN1: requisito previo, solo para las transiciones que lo exigen.
     const tieneBloqueos = transicion.exigeSinBloqueos
-      ? validarCompletitudActa({ ...acta, acciones: await this.actas.accionesDe(id) })
-          .tieneBloqueos
+      ? validarCompletitudActa({ ...acta, acciones: vinculos }).tieneBloqueos
       : false;
 
     const r = intentarTransicion(acta.estado, accion, {
@@ -340,17 +406,70 @@ export class GestionarActas {
     });
     if (!r.ok) throw new ReglaDeNegocioViolada(r.motivo);
 
-    // RF-AC-014. El instante lo pone la aplicación y no la base, para que la
-    // fecha de la columna y la del evento de bitácora sean la misma.
+    // RF-AC-014. El instante lo pone la aplicación y no la base. RNF24: solo
+    // al aprobar se congela el contenido de las acciones incluidas.
     const actualizada =
       accion === 'aprobar'
-        ? await this.actas.cambiarEstado(id, r.nuevoEstado, { actorId: actor.id, fecha: new Date() })
+        ? await this.actas.cambiarEstado(id, r.nuevoEstado, {
+            aprobacion: { actorId: actor.id, fecha: new Date() },
+            snapshots: await this.construirSnapshots(vinculos),
+          })
         : await this.actas.cambiarEstado(id, r.nuevoEstado);
 
     await this.eventos.publicar([
       new ActaTransicionada(actor, id, acta.codigo, acta.estado, r.nuevoEstado, contexto.comentario),
     ]);
     return actualizada;
+  }
+
+  /**
+   * RNF24: congela nombre/plazo/recursos/metas/responsable (y, para
+   * Competencia, la meta contra la que se comparó) de cada acción incluida,
+   * en el momento exacto de aprobar.
+   */
+  private async construirSnapshots(
+    vinculos: readonly AccionActaDato[],
+  ): Promise<SnapshotAccionActa[]> {
+    const incluidas = vinculos.filter((v) => v.incluida);
+    if (incluidas.length === 0) return [];
+
+    const planes = await this.planes.planesPorIds(incluidas.map((v) => v.planMejoraId));
+    const planesPorId = new Map(planes.map((p) => [p.id, p]));
+
+    const snapshots: SnapshotAccionActa[] = [];
+    for (const v of incluidas) {
+      const plan = planesPorId.get(v.planMejoraId);
+      // El plan de mejora desapareció entre "cargar acciones" y "aprobar":
+      // no hay nada que congelar, se omite la fila huérfana.
+      if (!plan) continue;
+
+      const metaCompetenciaSnapshot =
+        plan.aspecto === 'COMPETENCIA' && v.porcentajeMedicionCompetencia !== null
+          ? await this.metaDeCompetencia(plan.planEvaluacionId)
+          : null;
+
+      snapshots.push({
+        accionActaId: v.id,
+        codigo: plan.codigo,
+        nombre: plan.nombre,
+        plazo: plan.plazo,
+        recursos: plan.recursos,
+        metas: plan.metas,
+        responsable: plan.responsable,
+        metaCompetenciaSnapshot,
+      });
+    }
+    return snapshots;
+  }
+
+  /** La meta del plan de medición base de esa competencia, como entero 0-100. */
+  private async metaDeCompetencia(planEvaluacionId: string | null): Promise<number | null> {
+    if (!planEvaluacionId) return null;
+    const planEvaluacion = await this.evaluaciones.porId(planEvaluacionId);
+    if (!planEvaluacion) return null;
+    const planMedicion = await this.mediciones.porId(planEvaluacion.planMedicionId);
+    if (!planMedicion) return null;
+    return Math.round(porcentajeDeMeta(planMedicion.meta));
   }
 
   async eliminar(actor: Actor, id: string): Promise<void> {
