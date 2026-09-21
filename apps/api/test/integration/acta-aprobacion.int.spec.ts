@@ -307,4 +307,33 @@ describe('cambiarEstado — snapshot al aprobar (RNF24)', () => {
     const [vinculo] = await repo.accionesDe(creada.id);
     expect(vinculo?.nombreSnapshot).toBe('Ya estaba congelado');
   });
+
+  it('rechaza la transición si un snapshot referencia un accionActaId inexistente, sin aprobar a medias', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const creada = await repo.crear(nuevaActa());
+
+    await expect(
+      repo.cambiarEstado(creada.id, 'Aprobada', {
+        aprobacion: { actorId: randomUUID(), fecha: new Date('2026-09-20T12:00:00Z') },
+        snapshots: [
+          {
+            accionActaId: randomUUID(), // no corresponde a ninguna AccionActa real
+            codigo: 'CA-01',
+            nombre: 'Nombre congelado',
+            plazo: new Date('2026-12-01'),
+            recursos: 'recursos congelados',
+            metas: 'metas congeladas',
+            responsable: 'responsable congelado',
+            metaCompetenciaSnapshot: null,
+          },
+        ],
+      }),
+    ).rejects.toThrow();
+
+    // RNF24: el fallo en un snapshot no debe dejar el acta a medio aprobar —
+    // el `$transaction` completo debe haberse revertido.
+    const releida = await repo.porId(creada.id);
+    expect(releida?.estado).toBe('Borrador');
+    expect(releida?.aprobadoPorId).toBeNull();
+  });
 });

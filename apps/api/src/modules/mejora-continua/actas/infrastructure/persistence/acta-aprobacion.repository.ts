@@ -312,13 +312,16 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
         },
       }),
       // RNF24: cada snapshot se escribe en la fila de `AccionActa` que le
-      // corresponde. `updateMany` con un `where` de un solo id, no `update`,
-      // porque `$transaction` con un arreglo de promesas no puede mezclar el
-      // resultado tipado de `update` con el de `updateMany` en el mismo
-      // arreglo sin perder el tipo de la primera — y aquí no se necesita el
-      // resultado de ninguna de las dos, solo que las dos ejecuten.
+      // corresponde. `update`, no `updateMany`, a propósito: `accionActaId`
+      // es la clave primaria de `AccionActa`, así que `update` puede apuntar
+      // a ella con un `where` único — y a diferencia de `updateMany`, que
+      // completa en silencio con 0 filas afectadas si el id no existe,
+      // `update` lanza `P2025` ahí mismo. Eso aborta el `$transaction`
+      // completo (nada de acta aprobada con un snapshot a medio congelar),
+      // sin tener que inspeccionar manualmente cuántas filas afectó cada
+      // escritura.
       ...(opciones?.snapshots ?? []).map((s) =>
-        this.prisma.accionActa.updateMany({
+        this.prisma.accionActa.update({
           where: { id: s.accionActaId },
           data: {
             codigoSnapshot: s.codigo,
