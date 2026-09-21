@@ -6,9 +6,10 @@
  * `estado-acta.ts`), y las transiciones de un submódulo hermano no aplican a
  * este.
  *
- * Solo llega hasta Aprobada. Emitida e Histórica no tienen todavía un RF que
- * describa qué las dispara — esa mecánica está atada a la exportación
- * (RF-AC-018/019) y se diseña junto con ella.
+ * Llega hasta Aprobada por botón de usuario. Emitida se alcanza por un
+ * efecto interno de la exportación (`intentarMarcarEmitida`, más abajo,
+ * fuera de `TRANSICIONES`) — ver el plan de exportación 2026-09-20. Qué
+ * dispara Histórica sigue sin definirse.
  *
  * Archivo puro: no importa NestJS, ni Prisma, ni nada de infraestructura.
  */
@@ -112,4 +113,21 @@ export function intentarTransicion(
   }
 
   return { ok: true, nuevoEstado: t.hacia };
+}
+
+/**
+ * RF-AC-018/019: Aprobada → Emitida no es una transición de botón (no tiene
+ * `etiqueta`, `permiso` ni entra en `transicionesDisponibles`) — la dispara
+ * `GenerarDocumentoActa.ejecutar` la primera vez que una exportación termina
+ * con éxito. Vive aquí y no en el caso de uso porque sigue siendo una regla
+ * de la máquina de estados: qué transiciones son válidas y desde dónde.
+ */
+export function intentarMarcarEmitida(estadoActual: EstadoActa): ResultadoTransicionActa {
+  if (estadoActual !== 'Aprobada') {
+    return {
+      ok: false,
+      motivo: `Solo un acta Aprobada puede pasar a Emitida; el acta está en ${estadoActual}.`,
+    };
+  }
+  return { ok: true, nuevoEstado: 'Emitida' };
 }
