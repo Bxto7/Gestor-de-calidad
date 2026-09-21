@@ -501,7 +501,7 @@ function EstadoActaSeccion({
           );
         })}
         {disponibles.length === 0 && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-tinta-suave">
             Un acta {acta.estado.toLowerCase()} no admite más cambios de estado.
           </p>
         )}
