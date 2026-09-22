@@ -29,7 +29,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua"]
+  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua", "academico"]
 }
 
 // ============================================================================
@@ -251,7 +251,7 @@ model Facultad {
   carreras Carrera[]
 
   @@map("facultades")
-  @@schema("plan_estudios")
+  @@schema("academico")
 }
 
 model Carrera {
@@ -277,7 +277,7 @@ model Carrera {
   @@unique([facultadId, nombre])
   @@index([facultadId])
   @@map("carreras")
-  @@schema("plan_estudios")
+  @@schema("academico")
 }
 
 /// Ciclo académico. §3.3 lo lista como entidad propia y no como un simple
@@ -300,7 +300,7 @@ model Ciclo {
 
   @@unique([carreraId, numero])
   @@map("ciclos")
-  @@schema("plan_estudios")
+  @@schema("academico")
 }
 
 model PlanEstudios {
