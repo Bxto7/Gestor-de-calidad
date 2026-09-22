@@ -19,6 +19,32 @@ export interface AccionActaDato {
   readonly incluida: boolean;
   readonly porcentajeMedicionCompetencia: number | null;
   readonly orden: number;
+  /** `null` hasta que el acta se aprueba — ver `SnapshotAccionActa`. */
+  readonly codigoSnapshot: string | null;
+  readonly nombreSnapshot: string | null;
+  readonly plazoSnapshot: Date | null;
+  readonly recursosSnapshot: string | null;
+  readonly metasSnapshot: string | null;
+  readonly responsableSnapshot: string | null;
+  readonly metaCompetenciaSnapshot: number | null;
+}
+
+/**
+ * Lo que se congela al aprobar (RNF24, plan de exportación 2026-09-20).
+ * `metaCompetenciaSnapshot` es la meta (0-100, mismo entero que
+ * `porcentajeMedicionCompetencia`) contra la que se comparó ese resultado
+ * en ese momento — `null` si el aspecto no es Competencia o si el propio
+ * porcentaje era `null`.
+ */
+export interface SnapshotAccionActa {
+  readonly accionActaId: string;
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly plazo: Date;
+  readonly recursos: string;
+  readonly metas: string;
+  readonly responsable: string;
+  readonly metaCompetenciaSnapshot: number | null;
 }
 
 /** Lo que hace falta para vincular un plan de mejora nuevo al acta. */
@@ -105,6 +131,26 @@ export interface CabeceraActa {
   readonly fechaEmision: Date | null;
 }
 
+/**
+ * Lo mínimo de un `PlanMejora` que el Acta necesita mostrar — deliberadamente
+ * más angosto que `DatosPlanMejora` (que trae `causaRaiz`/`justificacion`/
+ * `estado`/`evidencias`/etc., nada de lo cual el acta usa). Con esto,
+ * `GestionarActas.obtenerContenido` puede devolver la misma forma tanto en
+ * el camino en vivo (Borrador/En revisión) como en el camino de snapshot
+ * (Aprobada/Emitida/Histórica) sin inventar valores para campos que ninguna
+ * de las dos fuentes tiene sentido de dar.
+ */
+export interface PlanResumenParaActa {
+  readonly id: string;
+  readonly codigo: string;
+  readonly aspecto: AspectoPlanMejora;
+  readonly nombre: string;
+  readonly plazo: Date;
+  readonly recursos: string;
+  readonly metas: string;
+  readonly responsable: string;
+}
+
 export interface RepositorioActaAprobacionPort {
   crear(datos: NuevaActa): Promise<DatosActa>;
   porId(id: string): Promise<DatosActa | null>;
@@ -129,12 +175,17 @@ export interface RepositorioActaAprobacionPort {
   ): Promise<DatosActa>;
   /** Nota §2 de 2c-AC-A: planes ya incluidos en un acta en estado Emitida. */
   planesYaEmitidos(planMejoraIds: readonly string[]): Promise<ReadonlySet<string>>;
-  /** RF-AC-013. */
+  /**
+   * RF-AC-013/014. `snapshots` solo viaja al aprobar (Task 4 lo arma); una
+   * transición posterior no debe volver a escribirlos ni borrarlos.
+   */
   cambiarEstado(
     id: string,
     estado: EstadoActa,
-    /** RF-AC-014 RN2. Solo al aprobar; una transición posterior no debe pisarlos. */
-    aprobacion?: { actorId: string; fecha: Date },
+    opciones?: {
+      readonly aprobacion?: { readonly actorId: string; readonly fecha: Date };
+      readonly snapshots?: readonly SnapshotAccionActa[];
+    },
   ): Promise<DatosActa>;
   eliminar(id: string): Promise<void>;
   /** RF-AC-002 RN2: los correlativos ya usados dentro de esa carrera. */
