@@ -124,6 +124,110 @@ describe('RenderizadorExcelActaJs — hoja ACTA', () => {
     expect(hoja.views.some((v) => v.state === 'frozen' && v.ySplit === 1)).toBe(true);
   });
 
+  it('C-1: Estado escribe el texto literal "—" (sin fórmula) cuando falta resultado o meta', async () => {
+    const xlsx = await new RenderizadorExcelActaJs().render(
+      acta({
+        competencias: [
+          {
+            codigo: 'SIN-01', nombre: 'Sin resultado', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: null, meta: 70, logrado: null,
+          },
+          {
+            codigo: 'SIN-02', nombre: 'Sin meta', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 80, meta: null, logrado: null,
+          },
+        ],
+      }),
+    );
+    const libro = await abrir(xlsx);
+    const hoja = libro.getWorksheet('ACTA')!;
+
+    function filaDe(codigo: string): ExcelJS.Row | undefined {
+      let encontrada: ExcelJS.Row | undefined;
+      hoja.eachRow((fila) => {
+        if (fila.getCell(1).value === codigo) encontrada = fila;
+      });
+      return encontrada;
+    }
+
+    expect(filaDe('SIN-01')?.getCell(6).value).toBe('—');
+    expect(filaDe('SIN-02')?.getCell(6).value).toBe('—');
+  });
+
+  it('C-1: dos competencias con metas distintas producen fórmulas IF distintas, cada una con su propia celda de Meta', async () => {
+    const xlsx = await new RenderizadorExcelActaJs().render(
+      acta({
+        competencias: [
+          {
+            codigo: 'COMP-A', nombre: 'Competencia A', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 60, meta: 50, logrado: true,
+          },
+          {
+            codigo: 'COMP-B', nombre: 'Competencia B', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 60, meta: 80, logrado: false,
+          },
+        ],
+      }),
+    );
+    const libro = await abrir(xlsx);
+    const hoja = libro.getWorksheet('ACTA')!;
+
+    function filaDe(codigo: string): ExcelJS.Row | undefined {
+      let encontrada: ExcelJS.Row | undefined;
+      hoja.eachRow((fila) => {
+        if (fila.getCell(1).value === codigo) encontrada = fila;
+      });
+      return encontrada;
+    }
+
+    const filaA = filaDe('COMP-A')!;
+    const filaB = filaDe('COMP-B')!;
+    const estadoA = filaA.getCell(6).value as ExcelJS.CellFormulaValue;
+    const estadoB = filaB.getCell(6).value as ExcelJS.CellFormulaValue;
+
+    expect(String(estadoA.formula)).toContain(`E${filaA.number}`);
+    expect(String(estadoB.formula)).toContain(`E${filaB.number}`);
+    expect(String(estadoA.formula)).not.toBe(String(estadoB.formula));
+  });
+
+  it('C-1: la columna Meta lleva la meta propia de cada fila, no una única celda compartida', async () => {
+    const xlsx = await new RenderizadorExcelActaJs().render(
+      acta({
+        competencias: [
+          {
+            codigo: 'COMP-A', nombre: 'Competencia A', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 60, meta: 50, logrado: true,
+          },
+          {
+            codigo: 'COMP-B', nombre: 'Competencia B', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 60, meta: 80, logrado: false,
+          },
+        ],
+      }),
+    );
+    const libro = await abrir(xlsx);
+    const hoja = libro.getWorksheet('ACTA')!;
+
+    function filaDe(codigo: string): ExcelJS.Row | undefined {
+      let encontrada: ExcelJS.Row | undefined;
+      hoja.eachRow((fila) => {
+        if (fila.getCell(1).value === codigo) encontrada = fila;
+      });
+      return encontrada;
+    }
+
+    expect(filaDe('COMP-A')?.getCell(5).value).toBeCloseTo(0.5);
+    expect(filaDe('COMP-B')?.getCell(5).value).toBeCloseTo(0.8);
+  });
+
+  it('M-2: la cabecera de la hoja ACTA lleva el código de verificación', async () => {
+    const libro = await abrir(await new RenderizadorExcelActaJs().render(acta({ codigoVerificacion: 'zzz999yyy888' })));
+    const hoja = libro.getWorksheet('ACTA')!;
+    const valores = (hoja.getSheetValues() as unknown[]).flat().filter((v): v is string => typeof v === 'string');
+
+    expect(valores.some((v) => v.includes('zzz999yyy888'))).toBe(true);
+  });
+
   it('la hoja de datos trae una fila por acción, con periodo, tipo y responsable', async () => {
     const libro = await abrir(await new RenderizadorExcelActaJs().render(acta()));
     const hoja = libro.getWorksheet('ACCIONES (datos)')!;

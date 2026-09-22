@@ -346,9 +346,16 @@ export interface ActaResumen {
 }
 
 /**
- * RF-AC-009: una fila de la tabla de acciones del acta, con los datos vivos
- * de su plan de mejora. Reutiliza `PlanMejora` en vez de duplicar sus campos
- * — el backend ya une en vivo (`obtenerContenido`) y el shape coincide.
+ * RF-AC-009: una fila de la tabla de acciones del acta. Reutiliza
+ * `PlanMejora` por conveniencia en vez de duplicar sus campos, pero desde
+ * este ciclo (exportación PDF/Excel) el backend ya NO garantiza el shape
+ * completo en todos los estados: en Aprobada/Emitida/Histórica lee de un
+ * snapshot más angosto (`PlanResumenParaActa`, no `DatosPlanMejora`), al que
+ * le falta por ejemplo `metaCompetenciaSnapshot`. Hoy no hay ruptura de
+ * runtime porque `ActaPage.tsx` solo lee `id/nombre/aspecto/codigo/responsable`
+ * — los cinco presentes en ambas formas —, pero el tipo no lo refleja. El
+ * estrechamiento real de `AccionDelActa`/`PlanMejora` queda pendiente para un
+ * ciclo de frontend futuro.
  */
 export interface AccionDelActa {
   readonly id: string;

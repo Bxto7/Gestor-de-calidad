@@ -15,6 +15,7 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import { ActaTransicionada } from '../../domain/events/eventos-actas.js';
 import type { DatosPlanMejora, RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
 import type {
   DatosActa,
@@ -39,10 +40,20 @@ function permitirTodo(): AuthorizationPort {
 function denegar(): AuthorizationPort {
   return { puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }), permisosDe: async () => new Set(), carreraACargoDe: async () => null };
 }
+/** I-2: actor con `actas.leer` pero sin `actas.aprobar` — un rol de solo lectura. */
+function soloLeer(): AuthorizationPort {
+  return {
+    puede: async (_id, permiso) =>
+      permiso === 'actas.leer' ? { permitido: true } : { permitido: false, motivo: 'Falta el permiso.' },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+  };
+}
 
 function trabajo(sobre: Partial<TrabajoDocumentoActa> = {}): TrabajoDocumentoActa {
   return {
     id: 't-1', actaId: 'acta-1', tipo: 'ACTA_PDF', estado: 'En cola',
+    solicitadoPor: 'u-1',
     nombreArchivo: null, tipoMime: null, bytes: null, error: null,
     solicitadoEn: new Date('2026-09-20'), terminadoEn: null,
     ...sobre,
@@ -191,6 +202,40 @@ describe('RF-AC-018/019 — encolar', () => {
     await expect(caso.encolar(ACTOR, 'acta-desconocida', 'ACTA_PDF')).rejects.toThrow(NoEncontrado);
     expect(encolados).toEqual([]);
   });
+
+  it('I-2: exportar un acta Aprobada con solo actas.leer se rechaza — puede disparar Emitida', async () => {
+    const { caso } = montar({
+      actas: { porId: async () => acta({ estado: 'Aprobada' }) },
+      autorizacion: soloLeer(),
+    });
+
+    await expect(caso.encolar(ACTOR, 'acta-1', 'ACTA_PDF')).rejects.toThrow(AccesoDenegado);
+  });
+
+  it('I-2: exportar un acta Aprobada con actas.leer + actas.aprobar funciona (camino feliz)', async () => {
+    const { caso } = montar({
+      actas: { porId: async () => acta({ estado: 'Aprobada' }) },
+      autorizacion: permitirTodo(),
+    });
+
+    await expect(caso.encolar(ACTOR, 'acta-1', 'ACTA_PDF')).resolves.toBeDefined();
+  });
+
+  it('I-2: exportar un acta en otro estado con solo actas.leer no exige actas.aprobar', async () => {
+    const { caso } = montar({
+      actas: { porId: async () => acta({ estado: 'Emitida' }) },
+      autorizacion: soloLeer(),
+    });
+
+    await expect(caso.encolar(ACTOR, 'acta-1', 'ACTA_PDF')).resolves.toBeDefined();
+
+    const { caso: casoBorrador } = montar({
+      actas: { porId: async () => acta({ estado: 'Borrador' }) },
+      autorizacion: soloLeer(),
+    });
+
+    await expect(casoBorrador.encolar(ACTOR, 'acta-1', 'ACTA_PDF')).resolves.toBeDefined();
+  });
 });
 
 describe('RF-AC-018/019 — generar', () => {
@@ -225,6 +270,18 @@ describe('RF-AC-018/019 — generar', () => {
     await caso.ejecutar('t-1');
 
     expect(estadoCambiadoA()).toBe('Emitida');
+  });
+
+  it('I-1: la transición Aprobada→Emitida publica ActaTransicionada en la bitácora', async () => {
+    const { caso, publicados } = montar({ actas: { porId: async () => acta({ estado: 'Aprobada' }) } });
+
+    await caso.ejecutar('t-1');
+
+    const transicion = publicados.find((e): e is ActaTransicionada => e instanceof ActaTransicionada);
+    expect(transicion).toBeDefined();
+    expect(transicion?.detalle).toContain('Aprobada');
+    expect(transicion?.detalle).toContain('Emitida');
+    expect(transicion?.entidadId).toBe('acta-1');
   });
 
   it('un acta ya Emitida no vuelve a transicionar', async () => {

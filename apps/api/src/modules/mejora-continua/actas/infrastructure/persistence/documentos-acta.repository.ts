@@ -82,6 +82,7 @@ function aTrabajo(fila: {
   actaId: string;
   tipo: string;
   estado: string;
+  solicitadoPor: string;
   nombreArchivo: string | null;
   tipoMime: string | null;
   bytes: number | null;
@@ -94,6 +95,7 @@ function aTrabajo(fila: {
     actaId: fila.actaId,
     tipo: fila.tipo as TipoDocActa,
     estado: A_DOMINIO[fila.estado] ?? 'En cola',
+    solicitadoPor: fila.solicitadoPor,
     nombreArchivo: fila.nombreArchivo,
     tipoMime: fila.tipoMime,
     bytes: fila.bytes,

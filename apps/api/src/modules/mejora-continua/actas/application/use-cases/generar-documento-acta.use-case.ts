@@ -32,7 +32,7 @@ import {
   armarActaParaDocumento,
   type AccionParaDocumento,
 } from '../../domain/documentos/armar-acta-para-documento.js';
-import { DocumentoActaSolicitado } from '../../domain/events/eventos-actas.js';
+import { ActaTransicionada, DocumentoActaSolicitado } from '../../domain/events/eventos-actas.js';
 import { intentarMarcarEmitida } from '../../domain/value-objects/transiciones-acta.js';
 import type {
   AccionActaDato,
@@ -78,6 +78,20 @@ export class GenerarDocumentoActa {
     const acta = await this.exigirActa(actaId);
     await this.exigir(actor, 'actas.leer', null);
 
+    // I-2: la primera exportación exitosa de un acta Aprobada la pasa a
+    // Emitida (ver `ejecutar`) — un efecto permanente e irreversible, así que
+    // exigimos el mismo permiso que aprobarla, no solo leerla.
+    //
+    // Carrera residual conocida y aceptada: si el acta pasa a Aprobada
+    // *después* de este chequeo pero *antes* de que el worker procese el
+    // job, ese job puede emitirla sin haber pasado esta puerta. Ventana de
+    // segundos, requiere coincidencia exacta; cerrarla del todo exigiría
+    // llevar la decisión de permiso en el payload de la cola, desproporcionado
+    // frente al riesgo real.
+    if (acta.estado === 'Aprobada') {
+      await this.exigir(actor, 'actas.aprobar', acta.carreraId);
+    }
+
     const trabajo = await this.documentos.crear({ actaId, tipo, solicitadoPor: actor.id });
     await this.cola.encolar(trabajo.id, 'mejora-continua-actas');
 
@@ -91,11 +105,12 @@ export class GenerarDocumentoActa {
     if (trabajo.estado === 'Listo') return;
 
     const { extension, tipoMime, nombre } = FORMATO[trabajo.tipo];
+    let acta: DatosActa | null = null;
 
     try {
       await this.documentos.marcarGenerando(trabajoId);
 
-      const acta = await this.actas.porId(trabajo.actaId);
+      acta = await this.actas.porId(trabajo.actaId);
       if (acta === null) throw new Error('El acta ya no existe.');
 
       const acciones = await this.armarContenido(acta);
@@ -131,14 +146,37 @@ export class GenerarDocumentoActa {
         bytes: bytes.byteLength,
         ubicacion,
       });
-
-      if (acta.estado === 'Aprobada') {
-        const r = intentarMarcarEmitida(acta.estado);
-        if (r.ok) await this.actas.cambiarEstado(acta.id, r.nuevoEstado);
-      }
     } catch (error) {
       const motivo = error instanceof Error ? error.message : 'Error desconocido.';
       await this.documentos.marcarFallido(trabajoId, `No se pudo generar ${nombre}: ${motivo}`);
+      return;
+    }
+
+    if (acta === null) return; // inalcanzable en la práctica: si lo fuera, el try ya habría lanzado.
+
+    // M-4: fuera del try principal a propósito. El trabajo ya quedó Listo, con
+    // su archivo real en disco — un fallo de aquí en adelante no debe
+    // sobrescribirlo como Fallido (el archivo quedaría huérfano e
+    // indescargable, y `ejecutar` nunca relanza, así que BullMQ no reintenta).
+    if (acta.estado === 'Aprobada') {
+      try {
+        const r = intentarMarcarEmitida(acta.estado);
+        if (r.ok) {
+          await this.actas.cambiarEstado(acta.id, r.nuevoEstado);
+          await this.eventos.publicar([
+            new ActaTransicionada(
+              { id: trabajo.solicitadoPor, nombre: 'Emisión automática al exportar' },
+              acta.id,
+              acta.codigo,
+              'Aprobada',
+              'Emitida',
+            ),
+          ]);
+        }
+      } catch {
+        // El documento ya está Listo; un fallo aquí no debe volver a marcar el
+        // trabajo como Fallido. El acta simplemente no transiciona esta vez.
+      }
     }
   }
 

@@ -31,6 +31,7 @@ export interface TrabajoDocumentoActa {
   readonly actaId: string;
   readonly tipo: TipoDocActa;
   readonly estado: EstadoDocActa;
+  readonly solicitadoPor: string;
   readonly nombreArchivo: string | null;
   readonly tipoMime: string | null;
   readonly bytes: number | null;

@@ -66,7 +66,11 @@ function hojaActa(libro: ExcelJS.Workbook, acta: ActaParaDocumento): void {
   fila++;
   hoja.mergeCells(fila, 1, fila, 12);
   celda(hoja, fila, 1, 'SISTEMA DE GESTIÓN DE LA CALIDAD', { negrita: true, color: COLOR.blue, alineacion: 'center' });
-  fila += 2;
+  fila++;
+  celda(hoja, fila, 1, acta.numeroActa, { tamano: 8, color: COLOR.muted });
+  celda(hoja, fila, 5, `Código de verificación: ${acta.codigoVerificacion}`, { tamano: 8, color: COLOR.muted });
+  celda(hoja, fila, 9, `Generado: ${formatearFecha(acta.generadoEn)}`, { tamano: 8, color: COLOR.muted });
+  fila++;
 
   fila = barraDeSeccion(hoja, fila, 'I. DATOS DE LA REUNIÓN');
   fila = tablaClaveValor(hoja, fila, [
@@ -182,8 +186,13 @@ function subtabla(
 
 /**
  * §6: el Resultado se toma de la medición (no se digita) y el Estado es una
- * fórmula `=IF(...)` con la meta en una celda de entrada aparte (fondo
- * distinto), no un `0.70` fijo en la fórmula.
+ * fórmula `=IF(...)` con la meta en una celda de entrada propia de CADA fila
+ * (fondo distinto) — no una meta institucional única ni un `0.70` fijo en la
+ * fórmula. Cada competencia se congela con su propia meta al aprobar el acta
+ * (`metaCompetenciaSnapshot`, RNF24), y puede diferir entre competencias con
+ * planes de medición distintos: comparar todas contra la meta de la primera
+ * fila producía un veredicto LOGRADO/NO LOGRADO distinto del que calcula el
+ * PDF a partir del mismo dato (hallazgo C-1 de la revisión final de rama).
  */
 function subtablaCompetencias(
   hoja: ExcelJS.Worksheet,
@@ -194,18 +203,8 @@ function subtablaCompetencias(
   celda(hoja, fila, 1, `4.3 Competencias del Perfil de Egreso (${filas.length})`, { negrita: true, color: COLOR.navy });
   fila++;
 
-  const filaMeta = fila;
-  celda(hoja, filaMeta, 1, 'Meta institucional', { negrita: true, fondo: COLOR.light });
-  celda(hoja, filaMeta, 2, filas[0]?.meta !== null && filas[0]?.meta !== undefined ? filas[0].meta / 100 : 0.7, {
-    fondo: COLOR.entrada,
-    color: COLOR.navy,
-  });
-  hoja.getCell(filaMeta, 2).numFmt = '0%';
-  fila++;
-
-  const columnas = ['Código', 'Competencia', 'Acción de mejora', 'Resultado', 'Estado', 'Plazo', 'Recursos', 'Metas establecidas', 'Responsable'];
+  const columnas = ['Código', 'Competencia', 'Acción de mejora', 'Resultado', 'Meta', 'Estado', 'Plazo', 'Recursos', 'Metas establecidas', 'Responsable'];
   columnas.forEach((c, i) => celda(hoja, fila, i + 1, c, { negrita: true, fondo: COLOR.blue, color: COLOR.blanco }));
-  const filaEncabezado = fila;
   fila++;
 
   if (filas.length === 0) {
@@ -215,37 +214,48 @@ function subtablaCompetencias(
   }
 
   filas.forEach((f, i) => {
-    void filaEncabezado;
     const zebra = i % 2 === 1 ? COLOR.zebra : undefined;
     celda(hoja, fila, 1, f.codigo, { fondo: zebra });
     celda(hoja, fila, 2, f.codigo, { fondo: zebra });
     celda(hoja, fila, 3, f.nombre, { fondo: zebra });
+
     const celdaResultado = hoja.getCell(fila, 4);
     celdaResultado.value = f.resultado === null ? null : f.resultado / 100;
     celdaResultado.numFmt = '0%';
     celdaResultado.border = BORDE_FINO;
     if (zebra) celdaResultado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebra } };
 
-    const celdaEstado = hoja.getCell(fila, 5);
-    celdaEstado.value = { formula: `IF(D${fila}>=$B$${filaMeta},"LOGRADO","NO LOGRADO")` };
-    celdaEstado.border = BORDE_FINO;
-    hoja.addConditionalFormatting({
-      ref: celdaEstado.address,
-      rules: [
-        { type: 'containsText', operator: 'containsText', text: 'NO LOGRADO', priority: 1, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.koBg } }, font: { color: { argb: COLOR.koFg } } } },
-        { type: 'containsText', operator: 'containsText', text: 'LOGRADO', priority: 2, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.okBg } }, font: { color: { argb: COLOR.okFg } } } },
-      ],
-    });
+    const celdaMeta = hoja.getCell(fila, 5);
+    celdaMeta.value = f.meta === null ? null : f.meta / 100;
+    celdaMeta.numFmt = '0%';
+    celdaMeta.font = { bold: false, size: 9.5, color: { argb: 'FF1A1526' } };
+    celdaMeta.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR.entrada } };
+    celdaMeta.border = BORDE_FINO;
 
-    celda(hoja, fila, 6, formatearFecha(f.plazo), { fondo: zebra });
-    celda(hoja, fila, 7, f.recursos, { fondo: zebra });
-    celda(hoja, fila, 8, f.metas, { fondo: zebra });
-    celda(hoja, fila, 9, f.responsable, { fondo: zebra });
+    const celdaEstado = hoja.getCell(fila, 6);
+    if (f.resultado === null || f.meta === null) {
+      celdaEstado.value = '—';
+    } else {
+      celdaEstado.value = { formula: `IF(D${fila}>=E${fila},"LOGRADO","NO LOGRADO")` };
+      hoja.addConditionalFormatting({
+        ref: celdaEstado.address,
+        rules: [
+          { type: 'containsText', operator: 'containsText', text: 'NO LOGRADO', priority: 1, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.koBg } }, font: { color: { argb: COLOR.koFg } } } },
+          { type: 'containsText', operator: 'containsText', text: 'LOGRADO', priority: 2, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.okBg } }, font: { color: { argb: COLOR.okFg } } } },
+        ],
+      });
+    }
+    celdaEstado.border = BORDE_FINO;
+
+    celda(hoja, fila, 7, formatearFecha(f.plazo), { fondo: zebra });
+    celda(hoja, fila, 8, f.recursos, { fondo: zebra });
+    celda(hoja, fila, 9, f.metas, { fondo: zebra });
+    celda(hoja, fila, 10, f.responsable, { fondo: zebra });
     fila++;
   });
 
   hoja.mergeCells(fila, 1, fila, columnas.length);
-  celda(hoja, fila, 1, 'El resultado corresponde a la medición directa del periodo anterior. Meta institucional: ver celda B' + filaMeta + '.', { color: COLOR.muted, tamano: 7.5 });
+  celda(hoja, fila, 1, 'El resultado corresponde a la medición directa del periodo anterior. La meta se congela por competencia al aprobar el acta.', { color: COLOR.muted, tamano: 7.5 });
   fila++;
 
   return fila + 1;

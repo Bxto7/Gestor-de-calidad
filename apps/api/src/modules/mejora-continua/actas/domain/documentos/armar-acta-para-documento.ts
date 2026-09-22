@@ -69,12 +69,12 @@ export interface ActaParaDocumento {
  * directamente desde los puertos, sin pasar por `GestionarActas`.
  *
  * `id`/`orden` y `plan.id` no los usa `armarActaParaDocumento` — ninguno
- * aparece en `ActaParaDocumento` — pero se conservan en el tipo de entrada
- * porque son exactamente la forma de `AccionDelActa`/`PlanResumenParaActa`
- * (`application/use-cases/gestionar-actas.use-case.ts`,
- * `application/ports/acta-aprobacion.port.ts`), que es de donde Task 12 los
- * va a tomar. Omitirlos aquí obligaría a esa tarea a reconstruir un tipo
- * distinto a mano solo para descartar dos campos sin uso.
+ * aparece en `ActaParaDocumento` — y tampoco los lee ningún consumidor hoy:
+ * Task 12 (`generar-documento-acta.use-case.ts`) reconstruye este objeto
+ * campo por campo en sus dos ramas (en vivo y desde snapshot) y nunca toca
+ * esos tres campos, así que no hay paso por referencia que los reutilice. Se
+ * conservan en el tipo por si un futuro consumidor los necesita, no porque
+ * alguno ya los use.
  */
 export interface AccionParaDocumento {
   readonly id: string;

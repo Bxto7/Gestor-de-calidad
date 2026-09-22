@@ -152,17 +152,6 @@ function dibujarCabeceraInstitucional(doc: PDFKit.PDFDocument, acta: ActaParaDoc
       .text(valor, xControl + mm(20), yFila + 2, { width: anchoControl - mm(20) - 2 });
     yFila += altoFila;
   }
-  doc.rect(xControl, yFila, mm(20), altoFila).fill(COLOR.light);
-  doc
-    .fillColor(COLOR.texto)
-    .font('Helvetica-Bold')
-    .fontSize(6.5)
-    .text('Página', xControl + 2, yFila + 2, { width: mm(20) - 4 });
-  // Hoy esta celda solo dice "Página", sin número: `dibujarPieEnTodasLasPaginas`
-  // nunca toca esta caja de cabecera (solo escribe en la franja del pie), así
-  // que nada rellena el número aquí. Queda pendiente para quien construya el
-  // cuerpo del documento (Task 9), si la especificación visual exige el
-  // número también en la cabecera.
 
   doc.restore();
   doc.font('Helvetica').fillColor(COLOR.texto);
