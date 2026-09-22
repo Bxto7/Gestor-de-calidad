@@ -10,9 +10,13 @@
  *     pobre y no alcanza para la cabecera en 3 zonas, las barras de
  *     sección con color, el zebra ni las fórmulas de Excel que pide RF-AC-018).
  *   - No hay puerto de "datos del documento" aparte: `GenerarDocumentoActa`
- *     llama directamente a `GestionarActas.obtenerContenido` y a
- *     `armarActaParaDocumento`, igual que su gemelo de Mejora lee
- *     `RepositorioPlanMejoraPort` directo.
+ *     no llama a `GestionarActas.obtenerContenido` (ese método exige un
+ *     `Actor` y comprueba `actas.leer` en cada llamada; `ejecutar` corre en
+ *     el worker, sin sesión). En su lugar lee `RepositorioPlanMejoraPort`
+ *     directo y arma sus propios `AccionParaDocumento` repitiendo, en chico,
+ *     la misma ramificación en vivo/snapshot — igual que su gemelo de
+ *     Mejora (`GenerarDocumentoMejora`) lee `RepositorioPlanMejoraPort`
+ *     directo en vez de pasar por `GestionarPlanesMejora`.
  */
 
 import type { ActaParaDocumento } from '../../domain/documentos/armar-acta-para-documento.js';
