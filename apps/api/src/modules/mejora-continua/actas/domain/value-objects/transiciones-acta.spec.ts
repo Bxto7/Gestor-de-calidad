@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   describirTransicion,
+  intentarMarcarEmitida,
   intentarTransicion,
   transicionesDisponibles,
 } from './transiciones-acta.js';
@@ -85,5 +86,25 @@ describe('RF-AC-013 — transiciones válidas', () => {
     expect([...transicionesDisponibles('En revisión')].sort()).toEqual(['aprobar', 'rechazar']);
     expect(transicionesDisponibles('Emitida')).toEqual([]);
     expect(transicionesDisponibles('Histórica')).toEqual([]);
+  });
+});
+
+describe('intentarMarcarEmitida — RF-AC-018/019', () => {
+  it('permite Aprobada → Emitida', () => {
+    const r = intentarMarcarEmitida('Aprobada');
+    expect(r).toEqual({ ok: true, nuevoEstado: 'Emitida' });
+  });
+
+  it('rechaza marcar Emitida desde cualquier otro estado', () => {
+    for (const estado of ['Borrador', 'En revisión', 'Emitida', 'Histórica'] as const) {
+      const r = intentarMarcarEmitida(estado);
+      expect(r.ok).toBe(false);
+    }
+  });
+
+  it('el motivo del rechazo nombra el estado actual', () => {
+    const r = intentarMarcarEmitida('Borrador');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toContain('Borrador');
   });
 });
