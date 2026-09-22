@@ -10,17 +10,20 @@ ciclo — se descompuso en sub-proyectos, cada uno con su propio
 spec → plan → implementación:
 
 - **Fase 0** (este documento): la fundación que comparten las tres
-  vistas — rol expuesto en `auth`, un módulo `academico` nuevo para
-  Facultad/Carrera, y el AppShell del frontend (navegación agrupada,
-  `ScopeSelector`, tokens de color reconciliados).
+  vistas — rol expuesto en `auth`, tres módulos nuevos
+  (`academico` para Facultad/Carrera, `objetivos-educacionales` y
+  `atributos-graduado` para los Criterios 02 y 03), y el AppShell del
+  frontend (navegación agrupada, `ScopeSelector`, tokens de color
+  reconciliados).
 - **Fases 1–3**: una por cada vista de rol (Admin, Director, Docente),
   construidas sobre esta fundación.
 - **Fase 4**: el motor de acciones recomendadas, al final, porque
   necesita los KPIs reales que las fases 1-3 exponen.
 
 Este ciclo **no construye ninguna pantalla de inicio todavía**. Termina
-cuando: (a) el login expone los roles del usuario, (b) Facultad/Carrera
-viven en su propio módulo backend con el mismo aislamiento que ya tienen
+cuando: (a) el login expone los roles del usuario, (b) Facultad/Carrera,
+Objetivo Educacional y Atributo del Graduado viven cada uno en su propio
+módulo backend con el mismo aislamiento que ya tienen
 `plan-estudios`/`mejora-continua` entre sí, y (c) el `AppLayout` del
 frontend soporta un árbol de navegación agrupado por secciones con el
 `ScopeSelector`, aunque los ítems que cuelguen de él por ahora sigan
@@ -45,27 +48,54 @@ discusión en la fase de implementación:
    códigos de rol, sin resolverlo a uno solo en el backend. El frontend
    decide qué vista mostrar con una función de prioridad pura y
    testeada — ver §4.
-3. **Alcance de `ObjetivoEducacional`**: se queda como catálogo global,
-   sin `carreraId` propio (ya documentado en el código como regla de
-   negocio explícita, RF-PJ-023 RN1). La futura pantalla "Criterio 02"
-   (Fase 2, Director) filtra ese catálogo por lo ya vinculado al plan
-   vigente de la carrera vía la tabla puente existente — no se toca el
-   modelo de datos de Objetivo en esta fase ni en las siguientes.
-4. **Límite del módulo nuevo**: Facultad + Carrera (+ Ciclo, que hoy
-   vive agrupado con ellas) pasan a un módulo `academico` de primer
-   nivel. Objetivo se queda dentro de `plan-estudios`, junto a
-   Competencia — mismo patrón que ya tiene `AtributoGraduado` hoy
-   (separación de fachada, no de módulo backend).
-5. **Integridad referencial Carrera↔Plan**: `PlanEstudios.carreraId`
-   mantiene una FK real de Postgres, cruzando schemas
-   (`academico`↔`plan_estudios`) — Prisma `multiSchema` y Postgres lo
-   soportan. No se degrada a un id suelto como sí es el caso,
-   correctamente, entre `auth`/`mejora-continua` y `plan-estudios`: ahí
-   la relación es genuinamente débil, aquí un Plan sin una Carrera
-   válida no tiene sentido de negocio. El aislamiento de **código**
-   (nunca acceder al repositorio ajeno directamente, solo por puerto)
-   se mantiene igual con o sin la FK de base de datos — son
-   preocupaciones distintas.
+3. **Alcance de `ObjetivoEducacional` y `AtributoGraduado`**: ambos se
+   quedan como catálogo institucional, sin `carreraId` propio (Objetivo
+   ya lo documenta así explícitamente en el código, RF-PJ-023 RN1;
+   Atributo nunca tuvo ese campo). Lo que cambia es **dónde vive el
+   código, no el modelo de datos**: cada uno pasa a su propio módulo
+   backend (§2.4). Las futuras pantallas "Criterio 02" y "Criterio 03"
+   (Fase 2, Director) filtran/muestran lo ya vinculado a la carrera
+   activa vía las tablas puente existentes (`PlanObjetivo`,
+   `CompetenciaAtributo`/`PlanAtributo`) — no se agrega ninguna columna
+   nueva a ninguno de los dos.
+4. **Límite de los módulos nuevos**: tres módulos de primer nivel,
+   cada uno con su propio puerto cross-módulo hacia `plan-estudios`
+   (mismo molde ya usado entre `mejora-continua` y `plan-estudios`):
+   `academico` (Facultad + Carrera + Ciclo, que hoy viven agrupados),
+   `objetivos-educacionales` (ObjetivoEducacional) y
+   `atributos-graduado` (AtributoGraduado). Los tres van más lejos que
+   el único precedente que existía en el código (`AtributoGraduado`
+   hoy solo tiene fachada de frontend separada, sin módulo backend
+   propio) — decisión explícita del usuario, confirmada dos veces
+   durante el brainstorming.
+5. **Acceso restringido por carrera** a los dos módulos de criterio: el
+   sidebar del mockup del usuario los ubica bajo "MI CARRERA", visibles
+   solo para el Director de la carrera activa. Se implementa con el
+   mecanismo ya establecido en el proyecto —
+   `AuthorizationPort.puede(actorId, permiso, carreraId)`, acotado a
+   `carreraACargoDe` — **no** convirtiendo Objetivo/Atributo en
+   entidades propias de una carrera. Es una restricción de acceso
+   (quién puede gestionarlos desde estas pantallas), no un cambio de
+   modelo (§2.3): las filas siguen siendo catálogo institucional
+   compartido. Atributo ya tiene los permisos `atributo.leer`/
+   `atributo.gestionar` en el seed; falta confirmar si Objetivo ya
+   tiene su propio par o hay que agregarlo — se verifica al arrancar
+   la implementación, no es una decisión de diseño pendiente.
+6. **Integridad referencial Carrera↔Plan, Objetivo↔Plan,
+   Atributo↔Competencia/Plan**: las FKs reales de Postgres
+   (`PlanEstudios.carreraId`, `PlanObjetivo`, `CompetenciaAtributo`,
+   `PlanAtributo`) se mantienen tal cual, cruzando schemas donde haga
+   falta (`academico`↔`plan_estudios`,
+   `objetivos-educacionales`↔`plan_estudios`,
+   `atributos-graduado`↔`plan_estudios`) — Prisma `multiSchema` y
+   Postgres lo soportan. No se degradan a ids sueltos como sí es el
+   caso, correctamente, entre `auth`/`mejora-continua` y
+   `plan-estudios`: ahí la relación es genuinamente débil; aquí un
+   Plan sin una Carrera válida, o un vínculo a un Objetivo/Atributo que
+   ya no existe, no tienen sentido de negocio. El aislamiento de
+   **código** (nunca acceder al repositorio ajeno directamente, solo
+   por puerto) se mantiene igual con o sin la FK de base de datos —
+   son preocupaciones distintas.
 
 ## 3. Arquitectura — pieza 1: rol en `auth`
 
@@ -92,9 +122,9 @@ discusión en la fase de implementación:
   orden de prioridad `ADMIN_SISTEMA > DIRECTOR_CARRERA >
   COORDINADOR_ACADEMICO > DOCENTE > USUARIO_CONSULTOR`. Devuelve
   `null` si el array viene vacío (caso defensivo, no debería ocurrir
-  con un usuario activo). Con tests unitarios que cubran: un solo rol,
-  varios roles (gana el de mayor prioridad), rol desconocido/no
-  mapeado (se ignora, no rompe), array vacío.
+  con un usuario activo). Tests unitarios en §6: un solo rol, varios
+  roles (gana el de mayor prioridad), rol desconocido/no mapeado (se
+  ignora, no rompe), array vacío.
 - `hooks/ProveedorSesion.tsx` — expone `roles` y `vistaPrincipal` en
   `ValorSesion`, calculado una vez al cargar la sesión.
 - Si el usuario tiene más de un rol real, un selector simple (no es
@@ -102,72 +132,137 @@ discusión en la fase de implementación:
   `ValorSesion` permita cambiar la vista activa en memoria; las Fases
   1-3 son las que le dan una superficie visual).
 
-## 4. Arquitectura — pieza 2: módulo `academico`
+## 4. Arquitectura — pieza 2: los tres módulos nuevos
 
-Calca el molde ya usado para el aislamiento entre `plan-estudios` y
-`mejora-continua`: puerto cross-módulo + adaptador + test de guardia.
+Los tres (`academico`, `objetivos-educacionales`, `atributos-graduado`)
+calcan el mismo molde ya usado para el aislamiento entre
+`plan-estudios` y `mejora-continua`: puerto cross-módulo + adaptador +
+test de guardia, en una sola dirección (`plan-estudios` consulta al
+módulo nuevo, nunca al revés). Ninguno inventa lógica de dominio nueva
+— el CRUD de las tres entidades es hoy anémico y se mantiene así, solo
+cambia de casa.
 
-**Nuevo módulo** `apps/api/src/modules/academico/`:
+### 4.1 `academico` (Facultad + Carrera + Ciclo)
 
-- `domain/` — sin entidades ricas nuevas (el CRUD actual de
-  Facultad/Carrera/Ciclo es anémico, se mantiene así; no se inventa
-  lógica de dominio que no exista hoy).
+`apps/api/src/modules/academico/`:
+
 - `application/use-cases/gestionar-facultades.use-case.ts` y
-  `gestionar-carreras.use-case.ts` — se separan del actual
+  `gestionar-carreras.use-case.ts` — separadas del actual
   `gestionar-estructura.use-case.ts` (que hoy mezcla ambas clases en
-  un archivo), moviéndolas tal cual, sin reescribir su lógica.
+  un archivo), movidas tal cual, sin reescribir su lógica.
 - `application/ports/academico.port.ts` — `RepositorioFacultadPort`,
   `RepositorioCarreraPort`, `DatosFacultad`, `DatosCarreraCompleta`
   (movidos desde `plan-estudios/application/ports/estructura.port.ts`
   sin cambiar su forma).
 - `application/ports/academico-cross-modulo.port.ts` (nuevo) — lo que
-  `plan-estudios` puede seguir consultando de `academico`:
-  `carreraPorId(id): Promise<DatosCarreraResumen | null>`,
-  `carrerasActivas(): Promise<DatosCarreraResumen[]>` — DTOs planos,
-  nunca la entidad completa. Mismo criterio que
-  `acreditacion-cross-modulo.port.ts` ya usa desde `mejora-continua`
-  hacia `plan-estudios`.
-- `infrastructure/persistence/academico.repository.ts` — implementa
-  los dos puertos de arriba, movido desde
-  `estructura.repository.ts`.
-- `infrastructure/http/academico.controller.ts` +
-  `dto/academico.dto.ts` — movidos desde `estructura.controller.ts`/
-  `estructura.dto.ts`.
-- `domain/events/eventos-academico.ts` — movido desde
-  `eventos-estructura.ts`.
+  `plan-estudios` puede seguir consultando: `carreraPorId(id):
+  Promise<DatosCarreraResumen | null>`, `carrerasActivas():
+  Promise<DatosCarreraResumen[]>` — DTOs planos, nunca la entidad
+  completa. Mismo criterio que `acreditacion-cross-modulo.port.ts` ya
+  usa desde `mejora-continua` hacia `plan-estudios`.
+- `infrastructure/persistence/academico.repository.ts`,
+  `infrastructure/http/academico.controller.ts` +
+  `dto/academico.dto.ts`, `domain/events/eventos-academico.ts` —
+  movidos desde `estructura.repository.ts`/`.controller.ts`/
+  `.dto.ts`/`eventos-estructura.ts` respectivamente.
 
-**`plan-estudios`**:
+### 4.2 `objetivos-educacionales`
 
-- Dejan de vivir ahí `Facultad`/`Carrera`/`Ciclo` y su CRUD. Donde
-  `plan-estudios` necesite datos de una carrera (crear un plan, listar
-  planes por carrera), consume `AcademicoCrossModuloPort` en vez de su
-  propio repositorio — igual que ya hace con `AcreditacionPort` en
-  dirección inversa.
-- `PlanEstudios.carreraId` conserva su FK real (§2.5) — el cambio es
-  de propiedad de código/módulo, no de integridad de datos.
+`apps/api/src/modules/objetivos-educacionales/`:
 
-**Prisma** (`apps/api/prisma/schema.prisma`):
+- `application/use-cases/gestionar-objetivos.use-case.ts` — separado
+  de `gestionar-catalogo.use-case.ts` (que hoy mezcla `GestionarObjetivos`
+  con `GestionarCompetencias`), movido tal cual.
+- `application/ports/objetivos.port.ts` — `RepositorioObjetivoPort`
+  (movido desde `plan-estudios/application/ports/catalogo.port.ts`).
+- `application/ports/objetivos-cross-modulo.port.ts` (nuevo) —
+  reemplaza la parte de `AcreditacionCrossModuloPort` (hoy en
+  `plan-estudios`) que expone `objetivosEducacionales()`/
+  `objetivoPorId(id)` hacia `mejora-continua`. `mejora-continua` pasa a
+  consumir este puerto nuevo en vez del de `plan-estudios` para esos
+  dos métodos — el resto de `AcreditacionCrossModuloPort` (lo que sí
+  es de `plan-estudios`) no se toca.
+- `infrastructure/persistence/objetivos.repository.ts`,
+  `infrastructure/http/objetivos.controller.ts` + `dto/objetivos.dto.ts`
+  — movidos desde `catalogo.repository.ts`/`catalogo.controller.ts`
+  (la porción de `ObjetivosController`)/`catalogo.dto.ts`.
 
-- Nuevo `@@schema("academico")`, agregado a la lista de schemas del
-  datasource.
-- `Facultad`, `Carrera`, `Ciclo` migran de `@@schema("plan_estudios")`
-  a `@@schema("academico")`. La FK `PlanEstudios.carreraId → Carrera.id`
-  se mantiene explícita en el modelo (Prisma `multiSchema` la soporta
-  cruzando schemas).
-- Migración generada con `prisma migrate dev`, revisada a mano antes
-  de aplicar — mover tablas entre schemas de Postgres es
+### 4.3 `atributos-graduado`
+
+`apps/api/src/modules/atributos-graduado/`:
+
+- `application/use-cases/gestionar-atributos.use-case.ts` — movido tal
+  cual desde `plan-estudios/application/use-cases/`.
+- `application/ports/atributos.port.ts` — `RepositorioAtributoPort`
+  (movido desde `plan-estudios/application/ports/acreditacion.port.ts`
+  — el nombre del archivo actual es engañoso, no tiene relación con
+  `AcreditacionCrossModuloPort` de §4.2, revisar al mover).
+- `application/ports/atributos-cross-modulo.port.ts` (nuevo) — lo que
+  `plan-estudios` necesita para seguir calculando cobertura de
+  competencias por atributo (`CompetenciaAtributo` es una tabla puente
+  con FK real a ambos lados — el puerto expone lectura, la escritura
+  de la relación se decide durante el plan de implementación según
+  qué módulo "posee" hoy esa tabla puente en el código).
+- `infrastructure/persistence/atributos.repository.ts` — movido desde
+  `atributo.repository.ts`.
+- `infrastructure/http/atributos.controller.ts` + `dto/atributos.dto.ts`
+  — nuevo controller propio; hoy las rutas de Atributos cuelgan de
+  `CompetenciasController` (`/competencias/atributos`,
+  `/competencias/cobertura`) dentro de `catalogo.controller.ts` — se
+  extraen a rutas propias (`/atributos-graduado`, a confirmar el
+  prefijo exacto durante el plan).
+
+### `plan-estudios`, después de los tres movimientos
+
+- Dejan de vivir ahí `Facultad`/`Carrera`/`Ciclo`, `ObjetivoEducacional`
+  y `AtributoGraduado`, junto con su CRUD. Donde `plan-estudios`
+  necesite datos de cualquiera de los tres, consume el puerto
+  cross-módulo correspondiente — igual que ya hace con
+  `AcreditacionPort` en dirección inversa (recibido desde
+  `mejora-continua`).
+- Las FKs reales que cruzan hacia estos tres módulos se mantienen
+  (§2.6) — el cambio es de propiedad de código/módulo, no de
+  integridad de datos.
+
+### Prisma (`apps/api/prisma/schema.prisma`)
+
+- Tres schemas nuevos: `@@schema("academico")`,
+  `@@schema("objetivos_educacionales")`,
+  `@@schema("atributos_graduado")`, agregados a la lista de schemas
+  del datasource.
+- `Facultad`/`Carrera`/`Ciclo` migran a `academico`;
+  `ObjetivoEducacional` a `objetivos_educacionales`; `AtributoGraduado`
+  (+ sus tablas puente `CompetenciaAtributo`/`PlanAtributo`, a decidir
+  durante el plan si migran con él o se quedan como tabla compartida)
+  a `atributos_graduado`. Las FKs cruzadas (§2.6) se mantienen
+  explícitas en el modelo.
+- Tres migraciones generadas con `prisma migrate dev`, revisadas a
+  mano antes de aplicar — mover tablas entre schemas de Postgres es
   `ALTER TABLE ... SET SCHEMA`, no un `DROP`/`CREATE`, así que no hay
-  pérdida de datos, pero conviene verificar el SQL generado.
+  pérdida de datos, pero conviene verificar el SQL generado en los
+  tres casos, especialmente las tablas puente de Atributo.
 
-**Test de guardia** (`apps/api/src/modules/plan-estudios/aislamiento.spec.ts`
-y uno nuevo `apps/api/src/modules/academico/aislamiento.spec.ts`):
+### Test de guardia
 
-- `plan-estudios` solo puede importar de `academico` el archivo
-  `ports/academico-cross-modulo.port.js` — mismo patrón que la regla
-  ya existente para `mejora-continua`.
-- `academico` no importa nada de `plan-estudios` (la relación es de
-  un solo sentido: `plan-estudios` consulta a `academico`, no al
-  revés).
+Tres archivos nuevos (`apps/api/src/modules/academico/aislamiento.spec.ts`,
+`.../objetivos-educacionales/aislamiento.spec.ts`,
+`.../atributos-graduado/aislamiento.spec.ts`) + actualización de
+`apps/api/src/modules/plan-estudios/aislamiento.spec.ts`:
+
+- `plan-estudios` solo puede importar, de cada módulo nuevo, su
+  archivo `*-cross-modulo.port.js` — mismo patrón que la regla ya
+  existente para `mejora-continua`.
+- Ninguno de los tres módulos nuevos importa nada de `plan-estudios`
+  (relación de un solo sentido).
+
+### RBAC por carrera (`objetivos-educacionales`, `atributos-graduado`)
+
+Los casos de uso de estos dos módulos (no `academico`, que es de
+alcance institucional/Admin) exigen permiso acotado a la carrera
+activa del actor — `AuthorizationPort.puede(actorId, 'objetivo.gestionar'
+| 'objetivo.leer', carreraId)` y su equivalente `atributo.*` (ya
+existente en el seed). §2.5 tiene el detalle de qué falta verificar
+sobre los permisos de Objetivo.
 
 ## 5. Arquitectura — pieza 3: AppShell del frontend
 
@@ -182,6 +277,17 @@ y uno nuevo `apps/api/src/modules/academico/aislamiento.spec.ts`):
   pantalla real, solo cambia cómo se agrupan visualmente.
 - El sidebar renderiza secciones colapsables/agrupadas en vez de una
   lista plana.
+- **Precisión sobre Objetivos/Atributos**: el backend de estos dos
+  (§4.2, §4.3) se mueve en esta fase; el frontend, en cambio, solo
+  repunta `ObjetivosPage.tsx`/`AtributosPage.tsx` a las rutas nuevas
+  (`api/*.api.ts`) sin reconstruirlas — siguen siendo las mismas
+  pantallas de hoy, solo hablando con el backend nuevo. El sidebar
+  agrupado "01-08 · Criterios de Acreditación" completo (como en el
+  mockup del usuario) es contenido de la **Fase 2 (Director)**, que es
+  donde se decide de verdad cómo se navega por carrera activa — acá
+  alcanza con que la estructura de árbol del sidebar ya soporte
+  agrupar así, sin que Fase 0 tenga que resolver el detalle de cada
+  criterio.
 
 **`ScopeSelector`** (nuevo, `shared/components/ui/ScopeSelector.tsx`):
 
@@ -217,14 +323,20 @@ fase — Fase 4.
 ## 6. Testing
 
 - `vista-principal.spec.ts` (frontend) — los 4 casos de §3.
-- `academico.aislamiento.spec.ts` + actualización de
+- Tres `aislamiento.spec.ts` nuevos (`academico`,
+  `objetivos-educacionales`, `atributos-graduado`) + actualización de
   `plan-estudios/aislamiento.spec.ts` (backend) — igual rigor que el ya
   existente para `mejora-continua`.
-- Specs de integración de `academico.repository.ts` contra Postgres
+- Specs de integración de los tres repositorios nuevos contra Postgres
   real, mismo patrón que el resto del proyecto (Testcontainers/DB
-  desechable).
-- Cobertura `domain/`+`application/` de `academico` ≥80%, mismo RNF de
-  siempre.
+  desechable) — con foco especial en las tablas puente de Atributo
+  (`CompetenciaAtributo`/`PlanAtributo`), que son las únicas con FK en
+  ambos sentidos cruzando schema.
+- Tests del permiso acotado por carrera en `GestionarObjetivos`/
+  `GestionarAtributos` (§4, "RBAC por carrera"): un Director sin
+  `carreraACargo` sobre esa carrera es rechazado, uno con ella puede.
+- Cobertura `domain/`+`application/` de los tres módulos ≥80%, mismo
+  RNF de siempre.
 - Sin test E2E nuevo en esta fase — el AppShell reorganiza navegación
   existente, no agrega flujos de usuario nuevos que verificar.
 
@@ -238,4 +350,10 @@ fase — Fase 4.
   específica — la función de prioridad de §3 los deja fuera de las 3
   vistas nombradas por el usuario; decidir qué ven es una decisión de
   producto para cuando se diseñe esa vista, no de esta fase.
-- Cualquier cambio al modelo de `ObjetivoEducacional` (§2.3).
+- Cualquier cambio al **modelo de datos** de `ObjetivoEducacional` o
+  `AtributoGraduado` (§2.3) — ambos se mueven de módulo, ninguno gana
+  `carreraId` ni deja de ser catálogo institucional compartido.
+- La pantalla completa "Criterio 02"/"Criterio 03" tal como aparece en
+  el mockup del usuario (sidebar agrupado por los 8 criterios,
+  navegación por carrera activa) — eso es Fase 2 (Director). Fase 0
+  solo repunta las páginas actuales al backend nuevo (§5).
