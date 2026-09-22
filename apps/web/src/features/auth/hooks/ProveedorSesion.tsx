@@ -16,6 +16,7 @@ import {
   type Identidad,
 } from '../api/auth.api';
 import { ContextoSesion, type ValorSesion } from './contexto-sesion';
+import { vistaPrincipalDe, type RolVista } from '../domain/vista-principal';
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [identidad, setIdentidad] = useState<Identidad | null>(null);
@@ -61,6 +62,25 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   const permisos = useMemo(() => new Set(identidad?.permisos ?? []), [identidad]);
 
+  const vistaPrincipal = useMemo(
+    () => (identidad ? vistaPrincipalDe(identidad.roles) : null),
+    [identidad],
+  );
+
+  const [vistaManual, setVistaManual] = useState<RolVista | null>(null);
+
+  // Un login nuevo (identidad distinta) descarta cualquier elección manual
+  // anterior — la próxima vista activa vuelve a ser la de mayor prioridad.
+  useEffect(() => {
+    setVistaManual(null);
+  }, [identidad?.id]);
+
+  const vistaActiva = vistaManual ?? vistaPrincipal;
+
+  const cambiarVista = useCallback((vista: RolVista) => {
+    setVistaManual(vista);
+  }, []);
+
   const puede = useCallback((permiso: string) => permisos.has(permiso), [permisos]);
 
   const dirigeCarrera = useCallback(
@@ -93,8 +113,19 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   const valor = useMemo<ValorSesion>(
-    () => ({ identidad, cargando, puede, dirigeCarrera, puedeEn, entrar, salir }),
-    [identidad, cargando, puede, dirigeCarrera, puedeEn, entrar, salir],
+    () => ({
+      identidad,
+      cargando,
+      puede,
+      dirigeCarrera,
+      puedeEn,
+      roles: identidad?.roles ?? [],
+      vistaActiva,
+      cambiarVista,
+      entrar,
+      salir,
+    }),
+    [identidad, cargando, puede, dirigeCarrera, puedeEn, vistaActiva, cambiarVista, entrar, salir],
   );
 
   return <ContextoSesion.Provider value={valor}>{children}</ContextoSesion.Provider>;

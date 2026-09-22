@@ -20,6 +20,8 @@ export interface Identidad {
   id: string;
   nombre: string;
   permisos: string[];
+  /** Códigos de rol asignados (N-M real — ver `vista-principal.ts`). */
+  roles: string[];
   /** La carrera que dirige, si su rol está acotado a una. */
   carreraACargo: string | null;
 }

@@ -10,6 +10,7 @@
 import { createContext, useContext } from 'react';
 
 import type { Identidad } from '../api/auth.api';
+import type { RolVista } from '../domain/vista-principal';
 
 export interface ValorSesion {
   identidad: Identidad | null;
@@ -37,6 +38,16 @@ export interface ValorSesion {
    * no lo está, la carrera no lo limita.
    */
   puedeEn: (permiso: string, carreraId: string | null | undefined) => boolean;
+  /** Roles reales del usuario (puede tener más de uno — N-M). */
+  roles: readonly string[];
+  /**
+   * Vista de inicio activa: la de mayor prioridad por defecto
+   * (`vistaPrincipalDe`), o la que el usuario haya elegido con
+   * `cambiarVista` si tiene más de un rol real.
+   */
+  vistaActiva: RolVista | null;
+  /** Cambia la vista activa en memoria (sin persistir, sin pedir nada al backend). */
+  cambiarVista: (vista: RolVista) => void;
   entrar: (identidad: Identidad) => void;
   salir: () => Promise<void>;
 }
