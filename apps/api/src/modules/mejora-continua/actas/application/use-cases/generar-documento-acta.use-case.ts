@@ -163,9 +163,10 @@ export class GenerarDocumentoActa {
         const r = intentarMarcarEmitida(acta.estado);
         if (r.ok) {
           await this.actas.cambiarEstado(acta.id, r.nuevoEstado);
+          const solicitadoPor = await this.documentos.solicitadoPorDe(trabajoId);
           await this.eventos.publicar([
             new ActaTransicionada(
-              { id: trabajo.solicitadoPor, nombre: 'Emisión automática al exportar' },
+              { id: solicitadoPor ?? 'sistema', nombre: 'Emisión automática al exportar' },
               acta.id,
               acta.codigo,
               'Aprobada',

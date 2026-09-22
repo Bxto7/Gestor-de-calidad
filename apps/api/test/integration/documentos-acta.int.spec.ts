@@ -68,6 +68,16 @@ describe('DocumentoActaRepositoryPrisma', () => {
     expect(releido?.tipo).toBe('ACTA_PDF');
   });
 
+  it('solicitadoPorDe devuelve quién lo pidió, sin exponerlo en el trabajo mismo', async () => {
+    const actaId = await crearActaDePrueba();
+    const usuarioId = randomUUID();
+
+    const creado = await repo.crear({ actaId, tipo: 'ACTA_PDF', solicitadoPor: usuarioId });
+
+    expect(await repo.solicitadoPorDe(creado.id)).toBe(usuarioId);
+    expect(creado).not.toHaveProperty('solicitadoPor');
+  });
+
   it('marcarGenerando → marcarListo deja el trabajo Listo con su ubicación', async () => {
     const actaId = await crearActaDePrueba();
     const creado = await repo.crear({ actaId, tipo: 'ACTA_EXCEL', solicitadoPor: randomUUID() });

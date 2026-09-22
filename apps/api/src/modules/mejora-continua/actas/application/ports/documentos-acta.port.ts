@@ -26,12 +26,21 @@ export type TipoDocActa = 'ACTA_PDF' | 'ACTA_EXCEL';
 /** El estado viaja en el vocabulario del dominio, no en el enum de la base. */
 export type EstadoDocActa = 'En cola' | 'Generando' | 'Listo' | 'Fallido';
 
+/**
+ * Lo que viaja al navegador.
+ *
+ * Sin `solicitadoPor`, a propósito — mismo criterio que `ubicacion` en el
+ * gemelo de Mejora: es un id de usuario ajeno a quien consulta el trabajo, y
+ * exponerlo en `GET /actas/:id/documentos`/`GET /documentos-acta/:id`
+ * filtraría quién pidió qué a cualquiera con `actas.leer`. `ejecutar` (el
+ * worker, sin sesión HTTP) lo necesita solo para auditar la transición a
+ * Emitida — lo obtiene por `solicitadoPorDe`, igual que `ubicacionDe`.
+ */
 export interface TrabajoDocumentoActa {
   readonly id: string;
   readonly actaId: string;
   readonly tipo: TipoDocActa;
   readonly estado: EstadoDocActa;
-  readonly solicitadoPor: string;
   readonly nombreArchivo: string | null;
   readonly tipoMime: string | null;
   readonly bytes: number | null;
@@ -51,6 +60,7 @@ export interface RepositorioDocumentosActaPort {
   ): Promise<void>;
   marcarFallido(id: string, error: string): Promise<void>;
   ubicacionDe(id: string): Promise<string | null>;
+  solicitadoPorDe(id: string): Promise<string | null>;
 }
 
 export interface RenderizadorPdfActaPort {

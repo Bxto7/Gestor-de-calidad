@@ -53,7 +53,6 @@ function soloLeer(): AuthorizationPort {
 function trabajo(sobre: Partial<TrabajoDocumentoActa> = {}): TrabajoDocumentoActa {
   return {
     id: 't-1', actaId: 'acta-1', tipo: 'ACTA_PDF', estado: 'En cola',
-    solicitadoPor: 'u-1',
     nombreArchivo: null, tipoMime: null, bytes: null, error: null,
     solicitadoEn: new Date('2026-09-20'), terminadoEn: null,
     ...sobre,
@@ -134,6 +133,7 @@ function montar(dobles: Dobles = {}) {
     marcarListo: async () => {},
     marcarFallido: async () => {},
     ubicacionDe: async () => null,
+    solicitadoPorDe: async () => 'u-1',
     ...dobles.repo,
   };
 
@@ -332,6 +332,7 @@ describe('RF-AC-018/019 — consultar y descargar', () => {
       crear: async () => trabajo(), porId: async () => trabajo(), listarDeActa: async () => [],
       marcarGenerando: async () => {}, marcarListo: async () => {}, marcarFallido: async () => {},
       ubicacionDe: async () => '/documentos/t-1.pdf',
+      solicitadoPorDe: async () => 'u-1',
       ...dobles.repo,
     };
     return new ConsultarDocumentoActa(

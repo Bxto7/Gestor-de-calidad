@@ -75,6 +75,11 @@ export class DocumentoActaRepositoryPrisma implements RepositorioDocumentosActaP
     const fila = await this.prisma.documentoActa.findUnique({ where: { id }, select: { ubicacion: true } });
     return fila?.ubicacion ?? null;
   }
+
+  async solicitadoPorDe(id: string): Promise<string | null> {
+    const fila = await this.prisma.documentoActa.findUnique({ where: { id }, select: { solicitadoPor: true } });
+    return fila?.solicitadoPor ?? null;
+  }
 }
 
 function aTrabajo(fila: {
@@ -82,7 +87,6 @@ function aTrabajo(fila: {
   actaId: string;
   tipo: string;
   estado: string;
-  solicitadoPor: string;
   nombreArchivo: string | null;
   tipoMime: string | null;
   bytes: number | null;
@@ -95,7 +99,6 @@ function aTrabajo(fila: {
     actaId: fila.actaId,
     tipo: fila.tipo as TipoDocActa,
     estado: A_DOMINIO[fila.estado] ?? 'En cola',
-    solicitadoPor: fila.solicitadoPor,
     nombreArchivo: fila.nombreArchivo,
     tipoMime: fila.tipoMime,
     bytes: fila.bytes,
