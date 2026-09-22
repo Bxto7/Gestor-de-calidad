@@ -102,10 +102,12 @@ function repoActas(overrides: Partial<RepositorioActaAprobacionPort> = {}): Repo
     actualizarSeleccion: async () => {},
     editarTextos: async (_id, datos) => acta(datos),
     planesYaEmitidos: async () => new Set(),
-    cambiarEstado: async (_id, estado, aprobacion) =>
+    cambiarEstado: async (_id, estado, opciones) =>
       acta({
         estado,
-        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+        ...(opciones?.aprobacion
+          ? { aprobadoPorId: opciones.aprobacion.actorId, aprobadoEn: opciones.aprobacion.fecha }
+          : {}),
       }),
     ...overrides,
   };
@@ -568,7 +570,12 @@ describe('cargarAccionesDelPeriodo', () => {
     const actas = repoActas({
       porId: async () => acta({ estado: 'Borrador' }),
       accionesDe: async () => [
-        { id: 'aa-1', planMejoraId: 'ya-vinculado', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+        {
+          id: 'aa-1', planMejoraId: 'ya-vinculado', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+          metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+        },
       ],
       planesYaEmitidos: async () => new Set(['ya-emitido']),
       agregarAcciones: async (_id, nuevas) => {
@@ -610,7 +617,12 @@ describe('actualizarSeleccionDeAcciones', () => {
     const actas = repoActas({
       porId: async () => acta({ estado: 'Borrador' }),
       accionesDe: async () => [
-        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+        {
+          id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+          metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+        },
       ],
       actualizarSeleccion: async (_id, cambios) => {
         recibido = cambios;
@@ -648,7 +660,12 @@ describe('actualizarSeleccionDeAcciones', () => {
     const actas = repoActas({
       porId: async () => acta({ estado: 'Borrador' }),
       accionesDe: async () => [
-        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+        {
+          id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+          metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+        },
       ],
     });
     const { eventos, publicador } = capturarEventos();
@@ -708,7 +725,12 @@ describe('obtenerContenido', () => {
     const actas = repoActas({
       porId: async () => acta({ estado: 'Borrador' }),
       accionesDe: async () => [
-        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+        {
+          id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+          metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+        },
       ],
     });
     const planes = repoPlanesMejora({ planesPorIds: async () => [planMejora({ id: 'plan-1', nombre: 'Reforzar bibliografía' })] });
@@ -734,8 +756,18 @@ describe('obtenerContenido', () => {
     const actas = repoActas({
       porId: async () => acta({ estado: 'Borrador' }),
       accionesDe: async () => [
-        { id: 'aa-1', planMejoraId: 'plan-vigente', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
-        { id: 'aa-2', planMejoraId: 'plan-eliminado', aspecto: 'OBJETIVO_EDUCACIONAL', incluida: true, porcentajeMedicionCompetencia: null, orden: 1 },
+        {
+          id: 'aa-1', planMejoraId: 'plan-vigente', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+          metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+        },
+        {
+          id: 'aa-2', planMejoraId: 'plan-eliminado', aspecto: 'OBJETIVO_EDUCACIONAL' as const, incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 1,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+          metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+        },
       ],
     });
     const planes = repoPlanesMejora({ planesPorIds: async () => [planMejora({ id: 'plan-vigente', nombre: 'Plan actual' })] });
@@ -746,6 +778,53 @@ describe('obtenerContenido', () => {
     expect(contenido.acciones).toHaveLength(1);
     expect(contenido.acciones[0]?.id).toBe('aa-1');
     expect(contenido.acciones[0]?.plan.id).toBe('plan-vigente');
+  });
+
+  it('RNF24: un acta Aprobada lee del snapshot, no de PlanMejora en vivo', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Aprobada' }),
+      accionesDe: async () => [
+        {
+          id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: 'CA-01', nombreSnapshot: 'Nombre congelado', plazoSnapshot: new Date('2026-12-01'),
+          recursosSnapshot: 'recursos congelados', metasSnapshot: 'metas congeladas', responsableSnapshot: 'resp congelado',
+          metaCompetenciaSnapshot: null,
+        },
+      ],
+    });
+    // `planesPorIds` no se llama en absoluto para un acta Aprobada — si el
+    // caso de uso todavía leyera en vivo, este doble lo delataría.
+    const planes = repoPlanesMejora({
+      planesPorIds: noUsado('planesPorIds') as unknown as RepositorioPlanMejoraPort['planesPorIds'],
+    });
+    const casos = montar({ actas, planes });
+
+    const contenido = await casos.obtenerContenido(ACTOR, 'acta-1');
+
+    expect(contenido.acciones[0]?.plan.nombre).toBe('Nombre congelado');
+    expect(contenido.acciones[0]?.plan.codigo).toBe('CA-01');
+    expect(contenido.acciones[0]?.plan.responsable).toBe('resp congelado');
+  });
+
+  it('RNF24: una fila Aprobada sin snapshot completo se omite (no debería ocurrir, pero no debe reventar)', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Aprobada' }),
+      accionesDe: async () => [
+        {
+          id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true,
+          porcentajeMedicionCompetencia: null, orden: 0,
+          codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null,
+          recursosSnapshot: null, metasSnapshot: null, responsableSnapshot: null,
+          metaCompetenciaSnapshot: null,
+        },
+      ],
+    });
+    const casos = montar({ actas });
+
+    const contenido = await casos.obtenerContenido(ACTOR, 'acta-1');
+
+    expect(contenido.acciones).toEqual([]);
   });
 });
 
@@ -806,7 +885,12 @@ describe('transicionar', () => {
   }
 
   const unaAccionIncluida = [
-    { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true, porcentajeMedicionCompetencia: null, orden: 0 },
+    {
+      id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true,
+      porcentajeMedicionCompetencia: null, orden: 0,
+      codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null,
+      metasSnapshot: null, responsableSnapshot: null, metaCompetenciaSnapshot: null,
+    },
   ];
 
   it('enviar-a-revision: Borrador → En revisión', async () => {
@@ -826,12 +910,12 @@ describe('transicionar', () => {
     const actas = repoActas({
       porId: async () => actaCompleta({ estado: 'En revisión' }),
       accionesDe: async () => unaAccionIncluida,
-      cambiarEstado: async (_id, estado, aprobacion) => {
-        aprobacionRecibida = aprobacion;
+      cambiarEstado: async (_id, estado, opciones) => {
+        aprobacionRecibida = opciones?.aprobacion;
         return actaCompleta({
           estado,
-          aprobadoPorId: aprobacion?.actorId ?? null,
-          aprobadoEn: aprobacion?.fecha ?? null,
+          aprobadoPorId: opciones?.aprobacion?.actorId ?? null,
+          aprobadoEn: opciones?.aprobacion?.fecha ?? null,
         });
       },
     });
@@ -844,13 +928,124 @@ describe('transicionar', () => {
     expect(aprobacionRecibida?.actorId).toBe(ACTOR.id);
   });
 
+  it('aprobar: congela nombre/plazo/recursos/metas/responsable de cada acción incluida', async () => {
+    let snapshotsRecibidos: readonly { accionActaId: string; codigo: string; nombre: string }[] = [];
+    const dosAcciones = [
+      { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true, porcentajeMedicionCompetencia: null, orden: 0, codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null, responsableSnapshot: null, metasSnapshot: null, metaCompetenciaSnapshot: null },
+      { id: 'aa-2', planMejoraId: 'plan-2', aspecto: 'OBJETIVO_EDUCACIONAL' as const, incluida: true, porcentajeMedicionCompetencia: null, orden: 1, codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null, responsableSnapshot: null, metasSnapshot: null, metaCompetenciaSnapshot: null },
+    ];
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => dosAcciones,
+      cambiarEstado: async (_id, estado, opciones) => {
+        snapshotsRecibidos = opciones?.snapshots ?? [];
+        return actaCompleta({ estado });
+      },
+    });
+    const planes = repoPlanesMejora({
+      planesPorIds: async () => [
+        planMejora({ id: 'plan-1', codigo: 'CA-01', nombre: 'Reforzar bibliografía', plazo: new Date('2026-12-01'), recursos: 'r1', metas: 'm1', responsable: 'resp-1' }),
+        planMejora({ id: 'plan-2', aspecto: 'OBJETIVO_EDUCACIONAL', codigo: 'OE-01', nombre: 'Ajustar el syllabus', plazo: new Date('2026-11-01'), recursos: 'r2', metas: 'm2', responsable: 'resp-2' }),
+      ],
+    });
+    const casos = montar({ actas, planes });
+
+    await casos.transicionar(ACTOR, 'acta-1', 'aprobar', {});
+
+    expect(snapshotsRecibidos).toHaveLength(2);
+    expect(snapshotsRecibidos.find((s) => s.accionActaId === 'aa-1')).toMatchObject({
+      codigo: 'CA-01',
+      nombre: 'Reforzar bibliografía',
+    });
+    expect(snapshotsRecibidos.find((s) => s.accionActaId === 'aa-2')).toMatchObject({
+      codigo: 'OE-01',
+      nombre: 'Ajustar el syllabus',
+    });
+  });
+
+  it('aprobar: no congela las acciones descartadas (incluida: false)', async () => {
+    let snapshotsRecibidos: readonly { accionActaId: string }[] = [];
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true, porcentajeMedicionCompetencia: null, orden: 0, codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null, responsableSnapshot: null, metasSnapshot: null, metaCompetenciaSnapshot: null },
+        { id: 'aa-2', planMejoraId: 'plan-2', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: false, porcentajeMedicionCompetencia: null, orden: 1, codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null, responsableSnapshot: null, metasSnapshot: null, metaCompetenciaSnapshot: null },
+      ],
+      cambiarEstado: async (_id, estado, opciones) => {
+        snapshotsRecibidos = opciones?.snapshots ?? [];
+        return actaCompleta({ estado });
+      },
+    });
+    const planes = repoPlanesMejora({ planesPorIds: async () => [planMejora({ id: 'plan-1' })] });
+    const casos = montar({ actas, planes });
+
+    await casos.transicionar(ACTOR, 'acta-1', 'aprobar', {});
+
+    expect(snapshotsRecibidos).toEqual([expect.objectContaining({ accionActaId: 'aa-1' })]);
+  });
+
+  it('aprobar: congela la meta de Competencia resuelta en ese momento (0-100)', async () => {
+    let snapshotsRecibidos: readonly { metaCompetenciaSnapshot: number | null }[] = [];
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-comp', aspecto: 'COMPETENCIA' as const, incluida: true, porcentajeMedicionCompetencia: 65, orden: 0, codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null, responsableSnapshot: null, metasSnapshot: null, metaCompetenciaSnapshot: null },
+      ],
+      cambiarEstado: async (_id, estado, opciones) => {
+        snapshotsRecibidos = opciones?.snapshots ?? [];
+        return actaCompleta({ estado });
+      },
+    });
+    const planes = repoPlanesMejora({
+      planesPorIds: async () => [
+        planMejora({ id: 'plan-comp', aspecto: 'COMPETENCIA', planEvaluacionId: 'pe-1' }),
+      ],
+    });
+    const evaluaciones = repoEvaluaciones({
+      porId: async () => ({
+        id: 'pe-1',
+        planMedicionId: 'pm-1',
+      }) as Awaited<ReturnType<RepositorioPlanEvaluacionPort['porId']>>,
+    });
+    const mediciones = repoMediciones({
+      porId: async () =>
+        ({ id: 'pm-1', meta: 0.7 }) as Awaited<ReturnType<RepositorioPlanMedicionPort['porId']>>,
+    });
+    const casos = montar({ actas, planes, evaluaciones, mediciones });
+
+    await casos.transicionar(ACTOR, 'acta-1', 'aprobar', {});
+
+    expect(snapshotsRecibidos[0]?.metaCompetenciaSnapshot).toBe(70);
+  });
+
+  it('aprobar: una acción cuyo plan de mejora ya no existe se omite del snapshot sin bloquear la aprobación', async () => {
+    let snapshotsRecibidos: readonly { accionActaId: string }[] = [];
+    const actas = repoActas({
+      porId: async () => actaCompleta({ estado: 'En revisión' }),
+      accionesDe: async () => [
+        { id: 'aa-1', planMejoraId: 'plan-borrado', aspecto: 'CRITERIO_ACREDITACION' as const, incluida: true, porcentajeMedicionCompetencia: null, orden: 0, codigoSnapshot: null, nombreSnapshot: null, plazoSnapshot: null, recursosSnapshot: null, responsableSnapshot: null, metasSnapshot: null, metaCompetenciaSnapshot: null },
+      ],
+      cambiarEstado: async (_id, estado, opciones) => {
+        snapshotsRecibidos = opciones?.snapshots ?? [];
+        return actaCompleta({ estado });
+      },
+    });
+    const planes = repoPlanesMejora({ planesPorIds: async () => [] });
+    const casos = montar({ actas, planes });
+
+    const resultado = await casos.transicionar(ACTOR, 'acta-1', 'aprobar', {});
+
+    expect(resultado.estado).toBe('Aprobada');
+    expect(snapshotsRecibidos).toEqual([]);
+  });
+
   it('rechazar: En revisión → Borrador, no toca aprobadoPorId/aprobadoEn', async () => {
     let aprobacionRecibida: unknown = 'sin-invocar';
     const actas = repoActas({
       porId: async () => actaCompleta({ estado: 'En revisión' }),
       accionesDe: async () => unaAccionIncluida,
-      cambiarEstado: async (_id, estado, aprobacion) => {
-        aprobacionRecibida = aprobacion;
+      cambiarEstado: async (_id, estado, opciones) => {
+        aprobacionRecibida = opciones?.aprobacion;
         return actaCompleta({ estado });
       },
     });

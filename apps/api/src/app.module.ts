@@ -194,6 +194,25 @@ import {
   DocumentosMejoraController,
 } from './modules/mejora-continua/mejora/infrastructure/http/documentos-mejora.controller.js';
 import {
+  REPOSITORIO_DOCUMENTOS_ACTA,
+  RENDERIZADOR_PDF_ACTA,
+  RENDERIZADOR_EXCEL_ACTA,
+  type RepositorioDocumentosActaPort,
+  type RenderizadorPdfActaPort,
+  type RenderizadorExcelActaPort,
+} from './modules/mejora-continua/actas/application/ports/documentos-acta.port.js';
+import { DocumentoActaRepositoryPrisma } from './modules/mejora-continua/actas/infrastructure/persistence/documentos-acta.repository.js';
+import {
+  ConsultarDocumentoActa,
+  GenerarDocumentoActa,
+} from './modules/mejora-continua/actas/application/use-cases/generar-documento-acta.use-case.js';
+import { RenderizadorPdfActaKit } from './modules/mejora-continua/actas/infrastructure/documentos/pdfkit-acta.renderer.js';
+import { RenderizadorExcelActaJs } from './modules/mejora-continua/actas/infrastructure/documentos/exceljs-acta.renderer.js';
+import {
+  DocumentosDelActaController,
+  DocumentosActaController,
+} from './modules/mejora-continua/actas/infrastructure/http/documentos-acta.controller.js';
+import {
   REPOSITORIO_ACTA_APROBACION,
   type RepositorioActaAprobacionPort,
 } from './modules/mejora-continua/actas/application/ports/acta-aprobacion.port.js';
@@ -354,6 +373,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     ActasController,
     DocumentosDelPlanMejoraController,
     DocumentosMejoraController,
+    DocumentosDelActaController,
+    DocumentosActaController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
     DocumentosDelPlanEvaluacionController,
@@ -746,6 +767,43 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
       ) => new ConsultarDocumentoMejora(documentos, almacen, autorizacion),
     },
+    { provide: RENDERIZADOR_PDF_ACTA, useClass: RenderizadorPdfActaKit },
+    { provide: RENDERIZADOR_EXCEL_ACTA, useClass: RenderizadorExcelActaJs },
+    { provide: REPOSITORIO_DOCUMENTOS_ACTA, useClass: DocumentoActaRepositoryPrisma },
+    {
+      provide: GenerarDocumentoActa,
+      inject: [
+        REPOSITORIO_DOCUMENTOS_ACTA,
+        REPOSITORIO_ACTA_APROBACION,
+        REPOSITORIO_PLAN_MEJORA,
+        COLA_DOCUMENTOS,
+        ALMACEN_ARCHIVOS,
+        RENDERIZADOR_PDF_ACTA,
+        RENDERIZADOR_EXCEL_ACTA,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        documentos: RepositorioDocumentosActaPort,
+        actas: RepositorioActaAprobacionPort,
+        planes: RepositorioPlanMejoraPort,
+        cola: ColaDeDocumentosPort,
+        almacen: AlmacenDeArchivosPort,
+        pdf: RenderizadorPdfActaPort,
+        excel: RenderizadorExcelActaPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GenerarDocumentoActa(documentos, actas, planes, cola, almacen, pdf, excel, autorizacion, eventos),
+    },
+    {
+      provide: ConsultarDocumentoActa,
+      inject: [REPOSITORIO_DOCUMENTOS_ACTA, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      useFactory: (
+        documentos: RepositorioDocumentosActaPort,
+        almacen: AlmacenDeArchivosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarDocumentoActa(documentos, almacen, autorizacion),
+    },
     {
       provide: VersionarPlanesMedicion,
       inject: [
@@ -1022,17 +1080,20 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         GenerarDocumentoMedicion,
         GenerarDocumentoEvaluacion,
         GenerarDocumentoMejora,
+        GenerarDocumentoActa,
       ],
       useFactory: (
         planEstudios: GenerarDocumento,
         medicion: GenerarDocumentoMedicion,
         evaluacion: GenerarDocumentoEvaluacion,
         mejora: GenerarDocumentoMejora,
+        actas: GenerarDocumentoActa,
       ) => ({
         'plan-estudios': planEstudios,
         'mejora-continua': medicion,
         'mejora-continua-evaluacion': evaluacion,
         'mejora-continua-mejora': mejora,
+        'mejora-continua-actas': actas,
       }),
     },
     {
