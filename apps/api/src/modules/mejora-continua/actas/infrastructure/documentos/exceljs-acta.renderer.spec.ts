@@ -114,4 +114,26 @@ describe('RenderizadorExcelActaJs — hoja ACTA', () => {
     });
     expect(formulas.some((f) => f.includes('COUNTA') || f.includes('SUM'))).toBe(true);
   });
+
+  it('agrega una segunda hoja ACCIONES (datos), plana y con autofiltro', async () => {
+    const libro = await abrir(await new RenderizadorExcelActaJs().render(acta()));
+    expect(libro.worksheets.map((h) => h.name)).toEqual(['ACTA', 'ACCIONES (datos)']);
+
+    const hoja = libro.getWorksheet('ACCIONES (datos)')!;
+    expect(hoja.autoFilter).toBeDefined();
+    expect(hoja.views.some((v) => v.state === 'frozen' && v.ySplit === 1)).toBe(true);
+  });
+
+  it('la hoja de datos trae una fila por acción, con periodo, tipo y responsable', async () => {
+    const libro = await abrir(await new RenderizadorExcelActaJs().render(acta()));
+    const hoja = libro.getWorksheet('ACCIONES (datos)')!;
+    const valores = hoja
+      .getSheetValues()
+      .slice(1)
+      .flatMap((fila) => (Array.isArray(fila) ? fila : []));
+
+    expect(valores).toContain('CA-01');
+    expect(valores).toContain('COMP-01');
+    expect(valores).toContain('2025-10');
+  });
 });

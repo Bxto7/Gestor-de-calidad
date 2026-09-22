@@ -40,6 +40,7 @@ export class RenderizadorExcelActaJs implements RenderizadorExcelActaPort {
     libro.created = new Date();
 
     hojaActa(libro, acta);
+    hojaAccionesDatos(libro, acta);
 
     const bytes = await libro.xlsx.writeBuffer();
     return Buffer.from(bytes);
@@ -271,4 +272,52 @@ function formatearFecha(fecha: Date): string {
   const dd = String(fecha.getUTCDate()).padStart(2, '0');
   const mm = String(fecha.getUTCMonth() + 1).padStart(2, '0');
   return `${dd}/${mm}/${fecha.getUTCFullYear()}`;
+}
+
+const ETIQUETA_ASPECTO = {
+  CRITERIO_ACREDITACION: 'Criterio de acreditación',
+  OBJETIVO_EDUCACIONAL: 'Objetivo educacional',
+  COMPETENCIA: 'Competencia',
+} as const;
+
+/** §7: tabla plana para análisis externo (RF073) — no es una réplica visual. */
+function hojaAccionesDatos(libro: ExcelJS.Workbook, acta: ActaParaDocumento): void {
+  const hoja = libro.addWorksheet('ACCIONES (datos)', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+
+  const columnas = [
+    'N.º', 'Acta', 'Periodo', 'Tipo', 'Código', 'Entidad evaluada', 'Acción',
+    'Resultado medición', 'Plazo', 'Recursos', 'Metas', 'Responsable',
+  ];
+  columnas.forEach((c, i) => celda(hoja, 1, i + 1, c, { negrita: true, fondo: COLOR.navy, color: COLOR.blanco }));
+
+  const filas: { tipo: keyof typeof ETIQUETA_ASPECTO; datos: ActaParaDocumento['criterios'][number]; resultado: string }[] = [
+    ...acta.criterios.map((c) => ({ tipo: 'CRITERIO_ACREDITACION' as const, datos: c, resultado: '' })),
+    ...acta.objetivos.map((o) => ({ tipo: 'OBJETIVO_EDUCACIONAL' as const, datos: o, resultado: '' })),
+    ...acta.competencias.map((c) => ({
+      tipo: 'COMPETENCIA' as const,
+      datos: c,
+      resultado: c.resultado === null ? '' : `${c.resultado}%`,
+    })),
+  ];
+
+  filas.forEach((f, i) => {
+    const fila = i + 2;
+    celda(hoja, fila, 1, i + 1, {});
+    celda(hoja, fila, 2, acta.numeroActa, {});
+    celda(hoja, fila, 3, acta.periodoAcademico, {});
+    celda(hoja, fila, 4, ETIQUETA_ASPECTO[f.tipo], {});
+    celda(hoja, fila, 5, f.datos.codigo, {});
+    celda(hoja, fila, 6, f.datos.codigo, {});
+    celda(hoja, fila, 7, f.datos.nombre, {});
+    celda(hoja, fila, 8, f.resultado, {});
+    celda(hoja, fila, 9, formatearFecha(f.datos.plazo), {});
+    celda(hoja, fila, 10, f.datos.recursos, {});
+    celda(hoja, fila, 11, f.datos.metas, {});
+    celda(hoja, fila, 12, f.datos.responsable, {});
+  });
+
+  hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
+  hoja.columns.forEach((c) => (c.width = 18));
 }
