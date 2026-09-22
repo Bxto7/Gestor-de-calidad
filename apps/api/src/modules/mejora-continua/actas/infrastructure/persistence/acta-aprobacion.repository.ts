@@ -9,6 +9,7 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
 import type { EstadoActa } from '../../domain/value-objects/estado-acta.js';
+import type { AspectoPlanMejora } from '../../../mejora/application/ports/plan-mejora.port.js';
 import type {
   AccionActaDato,
   ActaResumen,
@@ -19,6 +20,7 @@ import type {
   NuevaAccionActa,
   NuevaActa,
   RepositorioActaAprobacionPort,
+  SnapshotAccionActa,
 } from '../../application/ports/acta-aprobacion.port.js';
 
 type EstadoActaBd = 'BORRADOR' | 'EN_REVISION' | 'APROBADA' | 'EMITIDA' | 'HISTORICA';
@@ -73,6 +75,57 @@ function aResumen(fila: FilaResumen): ActaResumen {
 }
 
 const SELECCION_ASISTENTE = { id: true, nombre: true } as const;
+
+/** 2c-AC-B / RNF24: incluye las columnas `*Snapshot` congeladas al aprobar. */
+const SELECCION_ACCION = {
+  id: true,
+  planMejoraId: true,
+  aspecto: true,
+  incluida: true,
+  porcentajeMedicionCompetencia: true,
+  orden: true,
+  codigoSnapshot: true,
+  nombreSnapshot: true,
+  plazoSnapshot: true,
+  recursosSnapshot: true,
+  metasSnapshot: true,
+  responsableSnapshot: true,
+  metaCompetenciaSnapshot: true,
+} as const;
+
+interface FilaAccion {
+  id: string;
+  planMejoraId: string;
+  aspecto: AspectoPlanMejora;
+  incluida: boolean;
+  porcentajeMedicionCompetencia: number | null;
+  orden: number;
+  codigoSnapshot: string | null;
+  nombreSnapshot: string | null;
+  plazoSnapshot: Date | null;
+  recursosSnapshot: string | null;
+  metasSnapshot: string | null;
+  responsableSnapshot: string | null;
+  metaCompetenciaSnapshot: number | null;
+}
+
+function aAccion(fila: FilaAccion): AccionActaDato {
+  return {
+    id: fila.id,
+    planMejoraId: fila.planMejoraId,
+    aspecto: fila.aspecto,
+    incluida: fila.incluida,
+    porcentajeMedicionCompetencia: fila.porcentajeMedicionCompetencia,
+    orden: fila.orden,
+    codigoSnapshot: fila.codigoSnapshot,
+    nombreSnapshot: fila.nombreSnapshot,
+    plazoSnapshot: fila.plazoSnapshot,
+    recursosSnapshot: fila.recursosSnapshot,
+    metasSnapshot: fila.metasSnapshot,
+    responsableSnapshot: fila.responsableSnapshot,
+    metaCompetenciaSnapshot: fila.metaCompetenciaSnapshot,
+  };
+}
 
 const SELECCION = {
   id: true,
@@ -238,23 +291,49 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
     return this.exigir(id);
   }
 
-  /** RF-AC-013. */
+  /** RF-AC-013. `opciones.snapshots` solo llega al aprobar (Task 4). */
   async cambiarEstado(
     id: string,
     estado: EstadoActa,
-    aprobacion?: { actorId: string; fecha: Date },
+    opciones?: {
+      readonly aprobacion?: { readonly actorId: string; readonly fecha: Date };
+      readonly snapshots?: readonly SnapshotAccionActa[];
+    },
   ): Promise<DatosActa> {
-    const fila = await this.prisma.actaAprobacion.update({
-      where: { id },
-      data: {
-        estado: A_BD[estado],
-        // RF-AC-014 RN2: solo se escriben cuando llegan — una transición
-        // posterior (rechazar, por ejemplo) no debe borrar quién aprobó ni cuándo.
-        ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
-      },
-      select: SELECCION,
-    });
-    return aDatos(fila);
+    await this.prisma.$transaction([
+      this.prisma.actaAprobacion.update({
+        where: { id },
+        data: {
+          estado: A_BD[estado],
+          // RF-AC-014 RN2: solo se escriben cuando llegan — una transición
+          // posterior (rechazar, por ejemplo) no debe borrar quién aprobó ni cuándo.
+          ...(opciones?.aprobacion
+            ? { aprobadoPorId: opciones.aprobacion.actorId, aprobadoEn: opciones.aprobacion.fecha }
+            : {}),
+        },
+      }),
+      // RNF24: cada snapshot se escribe en la fila de `AccionActa` que le
+      // corresponde. `updateMany` con un `where` de un solo id, no `update`,
+      // porque `$transaction` con un arreglo de promesas no puede mezclar el
+      // resultado tipado de `update` con el de `updateMany` en el mismo
+      // arreglo sin perder el tipo de la primera — y aquí no se necesita el
+      // resultado de ninguna de las dos, solo que las dos ejecuten.
+      ...(opciones?.snapshots ?? []).map((s) =>
+        this.prisma.accionActa.updateMany({
+          where: { id: s.accionActaId },
+          data: {
+            codigoSnapshot: s.codigo,
+            nombreSnapshot: s.nombre,
+            plazoSnapshot: s.plazo,
+            recursosSnapshot: s.recursos,
+            metasSnapshot: s.metas,
+            responsableSnapshot: s.responsable,
+            metaCompetenciaSnapshot: s.metaCompetenciaSnapshot,
+          },
+        }),
+      ),
+    ]);
+    return this.exigir(id);
   }
 
   async eliminar(id: string): Promise<void> {
@@ -278,24 +357,10 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
   async accionesDe(actaId: string): Promise<AccionActaDato[]> {
     const filas = await this.prisma.accionActa.findMany({
       where: { actaId },
-      select: {
-        id: true,
-        planMejoraId: true,
-        aspecto: true,
-        incluida: true,
-        porcentajeMedicionCompetencia: true,
-        orden: true,
-      },
+      select: SELECCION_ACCION,
       orderBy: [{ aspecto: 'asc' }, { orden: 'asc' }],
     });
-    return filas.map((f) => ({
-      id: f.id,
-      planMejoraId: f.planMejoraId,
-      aspecto: f.aspecto,
-      incluida: f.incluida,
-      porcentajeMedicionCompetencia: f.porcentajeMedicionCompetencia,
-      orden: f.orden,
-    }));
+    return filas.map(aAccion);
   }
 
   async agregarAcciones(actaId: string, nuevas: readonly NuevaAccionActa[]): Promise<void> {

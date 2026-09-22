@@ -252,3 +252,59 @@ describe('contenido del acta (2c-AC-B)', () => {
     expect(editada.textoAcuerdoCierre).toBe('cierre nuevo');
   });
 });
+
+describe('cambiarEstado — snapshot al aprobar (RNF24)', () => {
+  it('escribe las columnas *Snapshot y las relee tal cual quedaron', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const creada = await repo.crear(nuevaActa());
+    await prisma.accionActa.create({
+      data: {
+        actaId: creada.id,
+        planMejoraId: randomUUID(),
+        aspecto: 'CRITERIO_ACREDITACION',
+        orden: 0,
+      },
+    });
+    const [vinculo] = await repo.accionesDe(creada.id);
+
+    await repo.cambiarEstado(creada.id, 'Aprobada', {
+      aprobacion: { actorId: randomUUID(), fecha: new Date('2026-09-20T12:00:00Z') },
+      snapshots: [
+        {
+          accionActaId: vinculo!.id,
+          codigo: 'CA-01',
+          nombre: 'Nombre congelado',
+          plazo: new Date('2026-12-01'),
+          recursos: 'recursos congelados',
+          metas: 'metas congeladas',
+          responsable: 'responsable congelado',
+          metaCompetenciaSnapshot: null,
+        },
+      ],
+    });
+
+    const [releido] = await repo.accionesDe(creada.id);
+    expect(releido?.codigoSnapshot).toBe('CA-01');
+    expect(releido?.nombreSnapshot).toBe('Nombre congelado');
+    expect(releido?.responsableSnapshot).toBe('responsable congelado');
+  });
+
+  it('una transición sin snapshots (rechazar) no toca las columnas snapshot existentes', async () => {
+    const repo = new ActaAprobacionRepositoryPrisma(prisma);
+    const creada = await repo.crear(nuevaActa());
+    await prisma.accionActa.create({
+      data: {
+        actaId: creada.id,
+        planMejoraId: randomUUID(),
+        aspecto: 'CRITERIO_ACREDITACION',
+        orden: 0,
+        nombreSnapshot: 'Ya estaba congelado',
+      },
+    });
+
+    await repo.cambiarEstado(creada.id, 'Borrador');
+
+    const [vinculo] = await repo.accionesDe(creada.id);
+    expect(vinculo?.nombreSnapshot).toBe('Ya estaba congelado');
+  });
+});
