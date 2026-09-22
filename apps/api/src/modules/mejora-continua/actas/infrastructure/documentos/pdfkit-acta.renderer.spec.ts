@@ -74,4 +74,20 @@ describe('RenderizadorPdfActaKit', () => {
     expect(texto).toContain('abc123def456');
     expect(texto).toContain('Página 1 de');
   });
+
+  it('produce exactamente 1 página — el pie no debe generar páginas fantasma', async () => {
+    // Regresión: `dibujarPieEnTodasLasPaginas` escribía el pie dentro de la
+    // franja del margen inferior sin levantar `doc.page.margins.bottom`
+    // primero. PDFKit interpreta cualquier escritura por debajo del margen
+    // como "hay que añadir una página", así que el `render()` actual —solo
+    // marco, cabecera + pie, sin cuerpo— terminaba con 3 páginas en vez de 1,
+    // con el pie partido en páginas huérfanas sin cabecera con sentido. Los
+    // otros tests de este archivo comprueban texto sobre el PDF completo sin
+    // distinguir de qué página sale, así que no detectaban esta regresión:
+    // solo un conteo real de páginas la atrapa.
+    const pdf = await new RenderizadorPdfActaKit().render(acta());
+    const crudo = pdf.toString('latin1');
+    const paginas = crudo.match(/\/Type\s*\/Page[^s]/g) ?? [];
+    expect(paginas).toHaveLength(1);
+  });
 });

@@ -159,7 +159,11 @@ function dibujarCabeceraInstitucional(doc: PDFKit.PDFDocument, acta: ActaParaDoc
     .font('Helvetica-Bold')
     .fontSize(6.5)
     .text('Página', xControl + 2, yFila + 2, { width: mm(20) - 4 });
-  // El número de página real se rellena en el pase final de `dibujarPieEnTodasLasPaginas`.
+  // Hoy esta celda solo dice "Página", sin número: `dibujarPieEnTodasLasPaginas`
+  // nunca toca esta caja de cabecera (solo escribe en la franja del pie), así
+  // que nada rellena el número aquí. Queda pendiente para quien construya el
+  // cuerpo del documento (Task 9), si la especificación visual exige el
+  // número también en la cabecera.
 
   doc.restore();
   doc.font('Helvetica').fillColor(COLOR.texto);
@@ -180,6 +184,14 @@ function dibujarPieEnTodasLasPaginas(
   const rango = doc.bufferedPageRange();
   for (let i = 0; i < rango.count; i++) {
     doc.switchToPage(rango.start + i);
+
+    // El margen inferior del documento hace que PDFKit añada una página nueva
+    // en cuanto se escribe por debajo de él. Se levanta mientras se escribe el
+    // pie y se restaura después, o cada pie generaría una página fantasma —
+    // mismo fix que `pieEnTodasLasPaginas` en `platform/documentos/pdfkit.renderer.ts`.
+    const margenOriginal = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+
     const y = doc.page.height - MARGEN - ALTO_PIE + mm(2);
     const anchoUtil = doc.page.width - MARGEN * 2;
 
@@ -205,6 +217,8 @@ function dibujarPieEnTodasLasPaginas(
       width: anchoUtil * 0.3,
       align: 'right',
     });
+
+    doc.page.margins.bottom = margenOriginal;
   }
 }
 
