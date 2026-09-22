@@ -73,6 +73,7 @@ function permitirTodo(): AuthorizationPort {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -81,6 +82,7 @@ function denegar(): AuthorizationPort {
     puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -477,7 +479,12 @@ describe('RF-PE-032 — encolar', () => {
 
   it('pasa la carrera del plan a puede(), no null', async () => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);
-    autorizacion = { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null };
+    autorizacion = {
+      puede,
+      permisosDe: async () => new Set(),
+      carreraACargoDe: async () => null,
+      rolesDe: async () => [],
+    };
     curricular = contenido({ planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) });
     generador = new GenerarDocumentoEvaluacion(
       documentos,
@@ -778,6 +785,7 @@ describe('RF-PE-032 — consultar y descargar', () => {
       puede,
       permisosDe: async () => new Set(),
       carreraACargoDe: async () => null,
+      rolesDe: async () => [],
     };
     const consultaEspia = new ConsultarDocumentoEvaluacion(documentos, disco, autorizacionEspia);
 

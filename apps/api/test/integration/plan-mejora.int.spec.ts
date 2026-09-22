@@ -452,6 +452,7 @@ describe('RF-PJ-035 — ramificación real contra Postgres', () => {
     puede: async () => ({ permitido: true }) as const,
     permisosDe: async () => new Set<string>(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
   const eventos: PublicadorDeEventos = { async publicar() {} };
   const casoVersionar = new VersionarPlanMejora(repo, autorizacionPermiteTodo, eventos);

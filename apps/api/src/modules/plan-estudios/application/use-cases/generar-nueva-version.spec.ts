@@ -86,6 +86,7 @@ function montar(opciones: {
     puede: async () => opciones.decision ?? PERMITE,
     permisosDe: async () => new Set<string>(),
     carreraACargoDe: async () => ISI,
+    rolesDe: async () => [],
   };
 
   const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };

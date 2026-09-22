@@ -15,6 +15,11 @@
  *
  * La lista de permisos **no** es la autorización: es una copia para pintar la
  * pantalla. Quien decide sigue siendo el backend en cada petición.
+ *
+ * `roles` (Fase 0 del dashboard por rol) tampoco resuelve nada por sí sola:
+ * un usuario puede tener varios roles reales (`UsuarioRol` es N-M), y decidir
+ * qué vista de inicio le corresponde es responsabilidad del frontend
+ * (`vista-principal.ts`), no de este caso de uso.
  */
 
 import type { AuthorizationPort } from '../ports/authorization.port.js';
@@ -23,6 +28,7 @@ export interface SesionActual {
   readonly id: string;
   readonly nombre: string;
   readonly permisos: readonly string[];
+  readonly roles: readonly string[];
   /** La carrera que dirige, si su rol está acotado a una (§3.5). */
   readonly carreraACargo: string | null;
 }
@@ -31,8 +37,9 @@ export class ConsultarSesion {
   constructor(private readonly autorizacion: AuthorizationPort) {}
 
   async ejecutar(usuarioId: string, nombre: string): Promise<SesionActual> {
-    const [permisos, carreraACargo] = await Promise.all([
+    const [permisos, roles, carreraACargo] = await Promise.all([
       this.autorizacion.permisosDe(usuarioId),
+      this.autorizacion.rolesDe(usuarioId),
       this.autorizacion.carreraACargoDe(usuarioId),
     ]);
 
@@ -42,6 +49,7 @@ export class ConsultarSesion {
       // Ordenados para que la respuesta sea estable entre llamadas: facilita
       // comparar y cachear, y hace legible el listado al depurar.
       permisos: [...permisos].sort(),
+      roles: [...roles].sort(),
       carreraACargo,
     };
   }

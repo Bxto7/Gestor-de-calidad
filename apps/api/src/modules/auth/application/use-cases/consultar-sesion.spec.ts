@@ -1,8 +1,9 @@
 /**
  * Pruebas de la consulta de sesión.
  *
- * Poco código, pero es el que decide qué botones ve cada rol. Lo que se fija
- * aquí es que no invente ni omita: la interfaz confía en esta respuesta para
+ * Poco código, pero es el que decide qué botones ve cada rol, y ahora
+ * también qué vista de inicio corresponde (Fase 0). Lo que se fija aquí es
+ * que no invente ni omita: la interfaz confía en esta respuesta para
  * ofrecer solo lo que el backend va a permitir.
  */
 
@@ -11,7 +12,11 @@ import { describe, expect, it } from 'vitest';
 import type { AuthorizationPort } from '../ports/authorization.port.js';
 import { ConsultarSesion } from './consultar-sesion.use-case.js';
 
-function montar(permisos: string[], carreraACargo: string | null = null) {
+function montar(
+  permisos: string[],
+  carreraACargo: string | null = null,
+  roles: string[] = [],
+) {
   const consultas: string[] = [];
 
   const autorizacion: AuthorizationPort = {
@@ -21,6 +26,7 @@ function montar(permisos: string[], carreraACargo: string | null = null) {
       return new Set(permisos);
     },
     carreraACargoDe: async () => carreraACargo,
+    rolesDe: async () => roles,
   };
 
   return { caso: new ConsultarSesion(autorizacion), consultas };
@@ -68,5 +74,31 @@ describe('Identidad y permisos', () => {
     // en ninguna, y la interfaz debe tratarlo así.
     const { caso } = montar(['facultad.crear']);
     expect((await caso.ejecutar('u-1', 'Administrador')).carreraACargo).toBeNull();
+  });
+
+  it('devuelve los roles del usuario, ordenados', async () => {
+    const { caso } = montar([], null, ['DOCENTE', 'ADMIN_SISTEMA']);
+    const sesion = await caso.ejecutar('u-1', 'Alguien');
+    expect(sesion.roles).toEqual(['ADMIN_SISTEMA', 'DOCENTE']);
+  });
+
+  it('un usuario sin roles devuelve lista vacía, no null', async () => {
+    const { caso } = montar([]);
+    expect((await caso.ejecutar('u-1', 'Alguien')).roles).toEqual([]);
+  });
+
+  it('los roles se piden para el mismo usuario que los permisos', async () => {
+    const consultas: string[] = [];
+    const autorizacion: AuthorizationPort = {
+      puede: async () => ({ permitido: true }),
+      permisosDe: async () => new Set(),
+      carreraACargoDe: async () => null,
+      rolesDe: async (usuarioId) => {
+        consultas.push(usuarioId);
+        return ['DOCENTE'];
+      },
+    };
+    await new ConsultarSesion(autorizacion).ejecutar('u-9', 'Alguien');
+    expect(consultas).toEqual(['u-9']);
   });
 });

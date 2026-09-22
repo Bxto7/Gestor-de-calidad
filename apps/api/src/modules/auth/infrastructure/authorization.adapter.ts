@@ -59,6 +59,14 @@ export class AuthorizationAdapter implements AuthorizationPort {
     return fila?.carreraId ?? null;
   }
 
+  async rolesDe(usuarioId: string): Promise<readonly string[]> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { roles: { select: { rol: { select: { codigo: true } } } } },
+    });
+    return usuario?.roles.map((ur) => ur.rol.codigo) ?? [];
+  }
+
   /**
    * Reúne permisos y alcance en una sola ida a la base.
    *

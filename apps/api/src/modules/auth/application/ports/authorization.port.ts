@@ -29,6 +29,14 @@ export interface AuthorizationPort {
 
   /** Carrera que dirige, o `null`. Una sola: un director dirige una carrera. */
   carreraACargoDe(usuarioId: string): Promise<string | null>;
+
+  /**
+   * Códigos de rol asignados al usuario (`Rol.codigo`), sin resolver a uno
+   * solo: el modelo es N-M real (§3.5, `UsuarioRol`). Quien decide qué vista
+   * mostrar con más de uno es el frontend (Fase 0 del dashboard por rol,
+   * `vista-principal.ts`), no este puerto.
+   */
+  rolesDe(usuarioId: string): Promise<readonly string[]>;
 }
 
 /** Token de inyección. Evita depender de la clase concreta en los módulos. */

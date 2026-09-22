@@ -88,6 +88,7 @@ function montar(opciones: {
         : { permitido: false, motivo: `Falta el permiso ${permiso}.` },
     permisosDe: async () => new Set(opciones.permisos ?? []),
     carreraACargoDe: async () => ISI,
+    rolesDe: async () => [],
   };
 
   return new ConsultarPlan(planes, contenido, autorizacion);

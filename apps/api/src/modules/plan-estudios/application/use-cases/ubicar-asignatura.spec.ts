@@ -101,6 +101,7 @@ function montar(opciones: {
         : { permitido: true },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => ISI,
+    rolesDe: async () => [],
   };
 
   const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };

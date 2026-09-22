@@ -33,6 +33,7 @@ function permitirTodo(): AuthorizationPort {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => CARRERA,
+    rolesDe: async () => [],
   };
 }
 
@@ -44,6 +45,7 @@ function denegarRegistrando(pedidos: string[]): AuthorizationPort {
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => CARRERA,
+    rolesDe: async () => [],
   };
 }
 
@@ -310,6 +312,7 @@ describe('crear', () => {
       puede: async () => ({ permitido: true }),
       permisosDe: async () => new Set(),
       carreraACargoDe: async () => null,
+      rolesDe: async () => [],
     };
     const casos = montar({ autorizacion });
 

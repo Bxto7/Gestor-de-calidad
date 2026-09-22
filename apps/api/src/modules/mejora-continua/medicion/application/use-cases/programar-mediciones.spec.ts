@@ -42,6 +42,7 @@ function permitirTodo(): AuthorizationPort {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -50,6 +51,7 @@ function denegar(): AuthorizationPort {
     puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -438,7 +440,12 @@ describe('el alcance por carrera (2c-C)', () => {
     );
     const { caso } = montar({
       contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
-      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+      autorizacion: {
+        puede,
+        permisosDe: async () => new Set(),
+        carreraACargoDe: async () => null,
+        rolesDe: async () => [],
+      },
     });
 
     await expect(
@@ -461,7 +468,12 @@ describe('el alcance por carrera (2c-C)', () => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);
     const { caso } = montar({
       contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
-      autorizacion: { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+      autorizacion: {
+        puede,
+        permisosDe: async () => new Set(),
+        carreraACargoDe: async () => null,
+        rolesDe: async () => [],
+      },
     });
 
     await ejecutar(caso).catch(() => undefined);

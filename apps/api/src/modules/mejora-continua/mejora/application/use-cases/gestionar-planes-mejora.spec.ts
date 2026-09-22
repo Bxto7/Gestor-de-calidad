@@ -63,6 +63,7 @@ function permitirTodo(): AuthorizationPort {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => CARRERA,
+    rolesDe: async () => [],
   };
 }
 
@@ -74,6 +75,7 @@ function denegarRegistrando(pedidos: string[]): AuthorizationPort {
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => CARRERA,
+    rolesDe: async () => [],
   };
 }
 
@@ -425,6 +427,7 @@ describe('RF-PJ-001 a RF-PJ-003 y §2a del diseño de 2c-J-B — el alta', () =>
         puede: async () => ({ permitido: true }),
         permisosDe: async () => new Set(),
         carreraACargoDe: async () => null,
+        rolesDe: async () => [],
       },
     });
 
@@ -884,6 +887,7 @@ describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
         },
         permisosDe: async () => new Set(),
         carreraACargoDe: async () => CARRERA,
+        rolesDe: async () => [],
       },
     });
 

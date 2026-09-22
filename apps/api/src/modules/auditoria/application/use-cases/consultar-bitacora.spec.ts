@@ -40,6 +40,7 @@ function montar(permitido = true) {
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 
   return { caso: new ConsultarBitacora(repo, autorizacion), recibidos, accesosPedidos, permisos };

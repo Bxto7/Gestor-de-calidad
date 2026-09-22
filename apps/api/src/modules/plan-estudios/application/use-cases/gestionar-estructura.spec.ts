@@ -58,6 +58,7 @@ function permitirTodo(): AuthorizationPort {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -66,6 +67,7 @@ function denegar(): AuthorizationPort {
     puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 

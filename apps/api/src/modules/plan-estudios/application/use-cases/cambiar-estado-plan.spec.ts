@@ -90,6 +90,7 @@ function autorizacion(decision: Decision): AuthorizationPort {
     },
     permisosDe: async () => new Set<string>(),
     carreraACargoDe: async () => ISI,
+    rolesDe: async () => [],
   };
 }
 

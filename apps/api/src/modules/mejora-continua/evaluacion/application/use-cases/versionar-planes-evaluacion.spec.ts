@@ -51,6 +51,7 @@ function permitirTodo(): AuthorizationPort {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -62,6 +63,7 @@ function denegarRegistrando(pedidos: string[]): AuthorizationPort {
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
+    rolesDe: async () => [],
   };
 }
 
@@ -366,7 +368,12 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       mediciones,
       curricular,
       configuracionPort,
-      { puede, permisosDe: async () => new Set(), carreraACargoDe: async () => null },
+      {
+        puede,
+        permisosDe: async () => new Set(),
+        carreraACargoDe: async () => null,
+        rolesDe: async () => [],
+      },
       { publicar: async () => undefined },
     );
 
