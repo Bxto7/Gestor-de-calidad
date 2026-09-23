@@ -14,10 +14,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
-import {
-  CompetenciaRepositoryPrisma,
-  ObjetivoRepositoryPrisma,
-} from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
+import { CompetenciaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
+import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
 
 const prisma = new PrismaService();
 const objetivos = new ObjetivoRepositoryPrisma(prisma);
