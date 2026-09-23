@@ -33,7 +33,7 @@ beforeEach(async () => {
              plan_estudios.plan_competencia, plan_estudios.plan_objetivo,
              plan_estudios.dependencias, plan_estudios.asignaturas,
              plan_estudios.competencia_atributo, plan_estudios.competencias,
-             plan_estudios.objetivos_educacionales, academico.ciclos,
+             objetivos_educacionales.objetivos_educacionales, academico.ciclos,
              plan_estudios.planes_estudio, academico.carreras,
              academico.facultades
     RESTART IDENTITY CASCADE`);

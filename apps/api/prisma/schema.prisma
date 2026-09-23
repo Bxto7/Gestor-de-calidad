@@ -29,7 +29,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua", "academico"]
+  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua", "academico", "objetivos_educacionales"]
 }
 
 // ============================================================================
@@ -355,7 +355,7 @@ model ObjetivoEducacional {
   planes PlanObjetivo[]
 
   @@map("objetivos_educacionales")
-  @@schema("plan_estudios")
+  @@schema("objetivos_educacionales")
 }
 
 /// Atributo del graduado de un marco de acreditación (CLAUDE.md §1, §6.2).

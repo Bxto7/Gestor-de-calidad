@@ -624,7 +624,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
                mejora_continua.periodos_medicion, mejora_continua.planes_medicion
       RESTART IDENTITY CASCADE`);
     await prisma.$executeRawUnsafe(`
-      TRUNCATE plan_estudios.criterios_acreditacion, plan_estudios.objetivos_educacionales,
+      TRUNCATE plan_estudios.criterios_acreditacion, objetivos_educacionales.objetivos_educacionales,
                plan_estudios.planes_estudio, academico.carreras, academico.facultades
       RESTART IDENTITY CASCADE`);
     await prisma.$executeRawUnsafe(
