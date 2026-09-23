@@ -44,6 +44,20 @@ function dondeEstado(activo: boolean | undefined) {
     : { estado: activo ? ('ACTIVO' as const) : ('INACTIVO' as const) };
 }
 
+/**
+ * Excepción deliberada de aislamiento (Fase 0d, dashboard por rol):
+ * este repositorio sigue consultando `AtributoGraduado`/`CompetenciaAtributo`
+ * por Prisma directo (`listar`, `porId`, `crear`, `actualizar`,
+ * `cambiarEstado`, `cobertura`, `atributos`) aunque `AtributoGraduado`
+ * vive en su propio módulo (`atributos-graduado`) desde esa fase. Aislar
+ * esto de verdad exigiría refactorizar `GestionarCompetencias` entero
+ * para resolver atributos vía un puerto cross-módulo en lote — decisión
+ * consciente de no hacerlo: el costo de tocar código de Competencia que
+ * funciona hoy no se justificaba frente al beneficio, dado que la
+ * consulta sigue siendo correcta (misma base de datos, mismo cliente
+ * Prisma). El test de guardia de `atributos-graduado` no detecta esto a
+ * propósito — vigila imports de TypeScript, no consultas de Prisma.
+ */
 @Injectable()
 export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
   constructor(private readonly prisma: PrismaService) {}

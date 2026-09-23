@@ -1,26 +1,12 @@
 /**
- * Puertos de las entidades de acreditación: atributos del graduado y criterios.
+ * Puertos de las entidades de acreditación: criterios.
  *
- * El atributo del graduado es catálogo del **marco** (ICACIT, SINEACE…), no del
- * plan: su código es único dentro del marco y varios planes adoptan el mismo
- * registro. `PlanAtributo` declara cuáles aplican a cada plan. El criterio de
- * acreditación, en cambio, sí pertenece a una carrera concreta y su código es
- * único dentro de ella (RF129).
+ * El criterio de acreditación pertenece a una carrera concreta y su código es
+ * único dentro de ella (RF129). El atributo del graduado —catálogo del
+ * **marco** (ICACIT, SINEACE…), compartido entre planes— se movió a su propio
+ * módulo en la Fase 0d: ver
+ * `atributos-graduado/application/ports/atributos.port.ts`.
  */
-
-/** Atributo del graduado con lo que la gestión necesita saber (RF122). */
-export interface DatosAtributoCompleto {
-  readonly id: string;
-  readonly marco: string;
-  readonly codigo: string;
-  readonly nombre: string;
-  readonly orden: number;
-  readonly activo: boolean;
-  /** RF123: cuántas competencias lo desarrollan. El aviso de impacto los cuenta. */
-  readonly competenciasVinculadas: number;
-  /** RF123: cuántos planes lo declaran. */
-  readonly planesVinculados: number;
-}
 
 /** Criterio de acreditación de una carrera (RF129–RF132). */
 export interface DatosCriterio {
@@ -38,48 +24,10 @@ export interface FiltroAcreditacion {
   readonly activo?: boolean;
 }
 
-/**
- * Qué se lleva por delante inactivar un atributo (RF123).
- *
- * Se consulta antes de escribir para poder advertir. El recuento de planes de
- * medición vigentes que menciona RF123 entra cuando exista esa entidad; hasta
- * entonces el aviso cubre competencias y planes de estudios.
- */
-export interface ImpactoAtributo {
-  readonly competenciasVinculadas: number;
-  readonly planesVinculados: number;
-}
-
 /** Qué se lleva por delante inactivar un criterio (RF132). */
 export interface ImpactoCriterio {
   /** Planes de mejora asociados. Cero mientras ese submódulo no exista. */
   readonly planesMejoraVinculados: number;
-}
-
-export interface RepositorioAtributoPort {
-  listar(marco: string, filtro?: FiltroAcreditacion): Promise<DatosAtributoCompleto[]>;
-  porId(id: string): Promise<DatosAtributoCompleto | null>;
-  /** Unicidad de RF120 y RF121, dentro del marco. `exceptoId` excluye el propio al editar. */
-  codigoExiste(marco: string, codigo: string, exceptoId?: string): Promise<boolean>;
-  /** Mayor `orden` usado en el marco, para colocar el nuevo al final. Cero si no hay ninguno. */
-  ultimoOrden(marco: string): Promise<number>;
-
-  crear(
-    marco: string,
-    codigo: string,
-    nombre: string,
-    orden: number,
-  ): Promise<DatosAtributoCompleto>;
-  actualizar(id: string, codigo: string, nombre: string): Promise<DatosAtributoCompleto>;
-  cambiarEstado(id: string, activo: boolean): Promise<DatosAtributoCompleto>;
-  impactoDeInactivar(id: string): Promise<ImpactoAtributo>;
-
-  /** RF122: los atributos declarados por un plan, ordenados por código. */
-  delPlan(planId: string): Promise<DatosAtributoCompleto[]>;
-  /** Reemplaza el conjunto completo, de forma atómica. */
-  declararEnPlan(planId: string, atributoIds: readonly string[]): Promise<DatosAtributoCompleto[]>;
-  /** Cuáles de estos identificadores no existen o están inactivos. */
-  inexistentesOInactivos(ids: readonly string[]): Promise<string[]>;
 }
 
 export interface RepositorioCriterioPort {
@@ -93,5 +41,4 @@ export interface RepositorioCriterioPort {
   impactoDeInactivar(id: string): Promise<ImpactoCriterio>;
 }
 
-export const REPOSITORIO_ATRIBUTO = Symbol('RepositorioAtributoPort');
 export const REPOSITORIO_CRITERIO = Symbol('RepositorioCriterioPort');
