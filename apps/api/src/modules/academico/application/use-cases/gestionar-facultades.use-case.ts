@@ -16,7 +16,11 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
-import { FacultadCreada, FacultadEditada, FacultadEstadoCambiada } from '../../domain/events/eventos-academico.js';
+import {
+  FacultadCreada,
+  FacultadEditada,
+  FacultadEstadoCambiada,
+} from '../../domain/events/eventos-academico.js';
 import { limpiarNombre } from '../../domain/value-objects/codigos.js';
 import type { DatosFacultad, RepositorioFacultadPort } from '../ports/academico.port.js';
 
