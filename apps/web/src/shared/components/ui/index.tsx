@@ -20,13 +20,14 @@ import { cn } from '@/shared/lib/cn';
 /* ── Badge de estado ──────────────────────────────────────────────────── */
 
 /** Tonos del §2 "Estados": texto sobre fondo, ya emparejados. */
-export type TonoBadge = 'activo' | 'progreso' | 'inactivo' | 'aprobado' | 'neutro';
+export type TonoBadge = 'activo' | 'progreso' | 'inactivo' | 'aprobado' | 'encurso' | 'neutro';
 
 const TONOS: Record<TonoBadge, string> = {
   activo: 'text-estado-activo-fg bg-estado-activo-bg',
   progreso: 'text-estado-progreso-fg bg-estado-progreso-bg',
   inactivo: 'text-estado-inactivo-fg bg-estado-inactivo-bg',
   aprobado: 'text-estado-aprobado-fg bg-estado-aprobado-bg',
+  encurso: 'text-estado-encurso-fg bg-estado-encurso-bg',
   neutro: 'text-uc-primary bg-uc-lila-claro',
 };
 
@@ -369,6 +370,26 @@ export function CabeceraSeccion({
         {descripcion && <p className="mt-1 text-sm text-tinta-suave">{descripcion}</p>}
       </div>
       {acciones && <div className="flex flex-wrap gap-2">{acciones}</div>}
+    </div>
+  );
+}
+
+/* ── Selector de ámbito ───────────────────────────────────────────────── */
+
+/**
+ * Caja del sidebar que muestra el ámbito activo (la carrera a cargo, o
+ * la universidad entera para roles sin carrera). Fase 0: solo la pieza
+ * visual — el dropdown real para cambiar de ámbito es contenido de las
+ * Fases 1-3, que son quienes definen qué significa "cambiar de ámbito"
+ * para cada rol.
+ */
+export function ScopeSelector({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="mx-3 mb-2 rounded-xl bg-white/10 px-3 py-2.5">
+      <span className="block text-[10px] font-bold tracking-wide text-uc-lila uppercase">
+        {etiqueta}
+      </span>
+      <span className="mt-0.5 block truncate text-sm font-bold text-white">{valor}</span>
     </div>
   );
 }

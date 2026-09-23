@@ -46,6 +46,9 @@
   /* §2 decía #1a7fc0 — 3.80:1. */
   --color-estado-aprobado-fg: #1771ab;
   --color-estado-aprobado-bg: #e7f1fb;
+  /* Morado / en curso — contraste verificado 7.74:1 sobre su fondo (AA exige 4.5:1). */
+  --color-estado-encurso-fg: #6802c1;
+  --color-estado-encurso-bg: #f3edfb;
 
   /* Neutros con sesgo hacia el morado institucional: un gris puro
      desentona contra la paleta.
