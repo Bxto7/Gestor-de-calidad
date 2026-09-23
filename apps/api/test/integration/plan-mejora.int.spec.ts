@@ -35,6 +35,8 @@ import { VersionarPlanMejora } from '../../src/modules/mejora-continua/mejora/ap
 import { PlanEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
 import { ConfiguracionEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
 import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
+import { AcademicoCrossModuloAdapter } from '../../src/modules/academico/infrastructure/academico-cross-modulo.adapter.js';
+import { CarreraRepositoryPrisma } from '../../src/modules/academico/infrastructure/persistence/academico.repository.js';
 import { AcreditacionAdapter } from '../../src/modules/plan-estudios/infrastructure/acreditacion-cross-modulo.adapter.js';
 import { ContenidoCurricularAdapter } from '../../src/modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
 import { CriterioRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
@@ -593,7 +595,8 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
   const evaluaciones = new PlanEvaluacionRepositoryPrisma(prisma);
   const mediciones = new PlanMedicionRepositoryPrisma(prisma);
   const configuraciones = new ConfiguracionEvaluacionRepositoryPrisma(prisma);
-  const curricular = new ContenidoCurricularAdapter(prisma);
+  const academico = new AcademicoCrossModuloAdapter(new CarreraRepositoryPrisma(prisma));
+  const curricular = new ContenidoCurricularAdapter(prisma, academico);
   const autorizacion = new AuthorizationAdapter(prisma);
   const eventos: PublicadorDeEventos = { async publicar() {} };
   const casos = new GestionarPlanesMejora(

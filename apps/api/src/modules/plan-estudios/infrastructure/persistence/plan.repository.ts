@@ -187,6 +187,21 @@ export class PlanRepositoryPrisma implements RepositorioPlanPort {
   }
 }
 
+/**
+ * Excepción deliberada de aislamiento (Fase 0b, dashboard por rol): esta
+ * clase sigue consultando `Carrera` por Prisma directo (`carreraDe`,
+ * `carreraPorId`) aunque `Carrera` vive en su propio módulo (`academico`)
+ * desde esa fase. Aislar esto de verdad exigiría, para `carreraDe`,
+ * partir una consulta de una sola vez (JOIN anidado, usada en caliente
+ * por 4 casos de uso) en dos round-trips solo para pasar por
+ * `AcademicoCrossModuloPort` — y ese puerto tampoco expone
+ * `duracionAnios`, que ambos métodos necesitan. El costo de tocar código
+ * de Contenido Curricular que funciona hoy no se justificaba frente al
+ * beneficio, dado que la consulta sigue siendo correcta (misma base de
+ * datos, mismo cliente Prisma). El test de guardia de `academico` no
+ * detecta esto a propósito — vigila imports de TypeScript, no consultas
+ * de Prisma.
+ */
 @Injectable()
 export class ContenidoRepositoryPrisma implements RepositorioContenidoPort {
   constructor(private readonly prisma: PrismaService) {}

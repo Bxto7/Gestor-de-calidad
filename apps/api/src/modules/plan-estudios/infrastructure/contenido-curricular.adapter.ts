@@ -7,9 +7,13 @@
  * su propio servicio— sin que el consumidor se entere.
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../platform/database/prisma.service.js';
+import {
+  ACADEMICO_CROSS_MODULO,
+  type AcademicoCrossModuloPort,
+} from '../../academico/application/ports/academico-cross-modulo.port.js';
 import type {
   AsignaturaBase,
   CarreraBase,
@@ -55,7 +59,10 @@ function aPlanBase(fila: FilaPlan): PlanBase {
 
 @Injectable()
 export class ContenidoCurricularAdapter implements ContenidoCurricularPort {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ACADEMICO_CROSS_MODULO) private readonly academico: AcademicoCrossModuloPort,
+  ) {}
 
   async planesElegibles(): Promise<PlanBase[]> {
     const filas = await this.prisma.planEstudios.findMany({
@@ -142,10 +149,7 @@ export class ContenidoCurricularAdapter implements ContenidoCurricularPort {
   }
 
   async carreraPorId(carreraId: string): Promise<CarreraBase | null> {
-    const fila = await this.prisma.carrera.findUnique({
-      where: { id: carreraId },
-      select: { id: true, codigo: true, nombre: true },
-    });
-    return fila;
+    const carrera = await this.academico.carreraPorId(carreraId);
+    return carrera ? { id: carrera.id, codigo: carrera.codigo, nombre: carrera.nombre } : null;
   }
 }

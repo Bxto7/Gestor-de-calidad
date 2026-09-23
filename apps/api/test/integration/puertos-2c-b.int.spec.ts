@@ -8,12 +8,15 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { AcademicoCrossModuloAdapter } from '../../src/modules/academico/infrastructure/academico-cross-modulo.adapter.js';
+import { CarreraRepositoryPrisma } from '../../src/modules/academico/infrastructure/persistence/academico.repository.js';
 import { DirectorioDeUsuariosAdapter } from '../../src/modules/auth/infrastructure/directorio-usuarios.adapter.js';
 import { ContenidoCurricularAdapter } from '../../src/modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
-const curricular = new ContenidoCurricularAdapter(prisma);
+const academico = new AcademicoCrossModuloAdapter(new CarreraRepositoryPrisma(prisma));
+const curricular = new ContenidoCurricularAdapter(prisma, academico);
 const directorio = new DirectorioDeUsuariosAdapter(prisma);
 
 let carreraId: string;

@@ -46,6 +46,20 @@ const TIPO: Readonly<Record<string, 'General' | 'Transversal' | 'Especialidad'>>
   ESPECIALIDAD: 'Especialidad',
 };
 
+/**
+ * Excepción deliberada de aislamiento (Fase 0b, dashboard por rol): esta
+ * clase sigue consultando `Facultad`/`Carrera` por Prisma directo dentro
+ * de `panel()` (conteos y listado de carreras sin plan vigente), aunque
+ * ambas viven en su propio módulo (`academico`) desde esa fase. Son
+ * agregaciones de un panel estadístico (conteos, `groupBy`) en paralelo
+ * con las del resto del dominio — no encajan en la forma CRUD de
+ * `AcademicoCrossModuloPort` sin construir un puerto de reportes aparte,
+ * que hoy no se justifica para un solo consumidor. El costo de
+ * refactorizar `panel()` no se justificaba frente al beneficio, dado que
+ * la consulta sigue siendo correcta (misma base de datos, mismo cliente
+ * Prisma). El test de guardia de `academico` no detecta esto a propósito
+ * — vigila imports de TypeScript, no consultas de Prisma.
+ */
 @Injectable()
 export class ReportesRepositoryPrisma implements RepositorioReportesPort {
   constructor(private readonly prisma: PrismaService) {}
