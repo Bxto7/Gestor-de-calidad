@@ -65,8 +65,31 @@ describe('aislamiento de plan-estudios hacia mejora-continua', () => {
 
   it('reconoce un import prohibido escrito en relativo', () => {
     expect(
-      DE_MEJORA_CONTINUA.test('../../mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js'),
+      DE_MEJORA_CONTINUA.test(
+        '../../mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js',
+      ),
     ).toBe(true);
     expect(DE_MEJORA_CONTINUA.test('./mejora-continua-legacy.js')).toBe(false);
+  });
+});
+
+describe('aislamiento de plan-estudios hacia academico', () => {
+  const DE_ACADEMICO = /(^|\/)academico\//;
+  const PUERTO_PERMITIDO_ACADEMICO = 'ports/academico-cross-modulo.port.js';
+
+  it('solo importa de academico el puerto cross-módulo', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_ACADEMICO.test(importado));
+    const infractores = vistos
+      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_ACADEMICO))
+      .map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+    expect(vistos).not.toEqual([]);
+  });
+
+  it('reconoce un import prohibido de academico escrito en relativo', () => {
+    expect(
+      DE_ACADEMICO.test('../../academico/infrastructure/persistence/academico.repository.js'),
+    ).toBe(true);
   });
 });
