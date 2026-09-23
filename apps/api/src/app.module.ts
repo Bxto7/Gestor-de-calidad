@@ -635,7 +635,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         ),
     },
     {
-      // 2c-J-B añade `ACREDITACION_PORT` (Criterio/Objetivo) y los tres
+      // 2c-J-B añade `ACREDITACION_PORT` (Criterio) y los tres
       // puertos que ya usaba `evaluacion`/`medicion` (Competencia, §2d y §2e
       // del diseño) — a diferencia de 2c-J-A, este caso de uso ya sí cruza a
       // `plan-estudios`, ahora que RF-PJ-002 valida existencia y pertenencia

@@ -224,3 +224,39 @@ describe('aislamiento de mejora-continua hacia objetivos-educacionales', () => {
     ).toBe(true);
   });
 });
+
+describe('aislamiento de mejora-continua hacia academico', () => {
+  const DE_ACADEMICO = /(^|\/)academico\//;
+
+  it('no importa nada de academico', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_ACADEMICO.test(importado));
+    const infractores = vistos.map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+  });
+
+  it('reconoce un import de academico escrito en relativo', () => {
+    expect(
+      DE_ACADEMICO.test('../../academico/infrastructure/persistence/academico.repository.js'),
+    ).toBe(true);
+  });
+});
+
+describe('aislamiento de mejora-continua hacia atributos-graduado', () => {
+  const DE_ATRIBUTOS = /(^|\/)atributos-graduado\//;
+
+  it('no importa nada de atributos-graduado', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_ATRIBUTOS.test(importado));
+    const infractores = vistos.map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+  });
+
+  it('reconoce un import de atributos-graduado escrito en relativo', () => {
+    expect(
+      DE_ATRIBUTOS.test(
+        '../../atributos-graduado/infrastructure/persistence/atributos.repository.js',
+      ),
+    ).toBe(true);
+  });
+});
