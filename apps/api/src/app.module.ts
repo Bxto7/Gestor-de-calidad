@@ -78,9 +78,7 @@ import {
 import { ObjetivoRepositoryPrisma } from './modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
 import { ObjetivosCrossModuloAdapter } from './modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import {
-  REPOSITORIO_ATRIBUTO,
   REPOSITORIO_CRITERIO,
-  type RepositorioAtributoPort,
   type RepositorioCriterioPort,
 } from './modules/plan-estudios/application/ports/acreditacion.port.js';
 import {
@@ -88,16 +86,22 @@ import {
   type AcreditacionPort,
 } from './modules/plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
 import { AcreditacionAdapter } from './modules/plan-estudios/infrastructure/acreditacion-cross-modulo.adapter.js';
-import { GestionarAtributos } from './modules/plan-estudios/application/use-cases/gestionar-atributos.use-case.js';
 import { GestionarCriterios } from './modules/plan-estudios/application/use-cases/gestionar-criterios.use-case.js';
-import { AtributoRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/atributo.repository.js';
 import { CriterioRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
 import {
-  AtributosController,
-  AtributosDelPlanController,
   CriteriosController,
   CriteriosDeCarreraController,
 } from './modules/plan-estudios/infrastructure/http/acreditacion.controller.js';
+import {
+  REPOSITORIO_ATRIBUTO,
+  type RepositorioAtributoPort,
+} from './modules/atributos-graduado/application/ports/atributos.port.js';
+import { GestionarAtributos } from './modules/atributos-graduado/application/use-cases/gestionar-atributos.use-case.js';
+import { AtributoRepositoryPrisma } from './modules/atributos-graduado/infrastructure/persistence/atributos.repository.js';
+import {
+  AtributosController,
+  AtributosDelPlanController,
+} from './modules/atributos-graduado/infrastructure/http/atributos.controller.js';
 
 /* ── Mejora continua ─────────────────────────────────────────────────────── */
 import {
