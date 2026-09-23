@@ -31,9 +31,9 @@ beforeEach(async () => {
     TRUNCATE plan_estudios.asignatura_competencia, plan_estudios.plan_competencia,
              plan_estudios.plan_objetivo, plan_estudios.dependencias,
              plan_estudios.asignaturas, plan_estudios.competencias,
-             plan_estudios.objetivos_educacionales, plan_estudios.ciclos,
-             plan_estudios.planes_estudio, plan_estudios.carreras,
-             plan_estudios.facultades
+             plan_estudios.objetivos_educacionales, academico.ciclos,
+             plan_estudios.planes_estudio, academico.carreras,
+             academico.facultades
     RESTART IDENTITY CASCADE`);
 
   // Los atributos de ICACIT no se tocan: los siembra `prisma/seed.ts` y son el

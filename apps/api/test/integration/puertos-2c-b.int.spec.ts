@@ -26,8 +26,8 @@ beforeEach(async () => {
              mejora_continua.periodos_medicion, mejora_continua.planes_medicion
     RESTART IDENTITY CASCADE`);
   await prisma.$executeRawUnsafe(`
-    TRUNCATE plan_estudios.asignaturas, plan_estudios.ciclos, plan_estudios.planes_estudio,
-             plan_estudios.carreras, plan_estudios.facultades
+    TRUNCATE plan_estudios.asignaturas, academico.ciclos, plan_estudios.planes_estudio,
+             academico.carreras, academico.facultades
     RESTART IDENTITY CASCADE`);
   // No está en el beforeEach que copia el pliego (plan-evaluacion.int.spec.ts
   // no toca usuarios), pero RF-PE-018 sí crea usuarios con email fijo en cada

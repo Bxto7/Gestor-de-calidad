@@ -30,7 +30,7 @@ beforeEach(async () => {
              mejora_continua.periodos_medicion, mejora_continua.planes_medicion
     RESTART IDENTITY CASCADE`);
   await prisma.$executeRawUnsafe(`
-    TRUNCATE plan_estudios.planes_estudio, plan_estudios.carreras, plan_estudios.facultades
+    TRUNCATE plan_estudios.planes_estudio, academico.carreras, academico.facultades
     RESTART IDENTITY CASCADE`);
   await prisma.$executeRawUnsafe(`
     TRUNCATE auth.usuarios

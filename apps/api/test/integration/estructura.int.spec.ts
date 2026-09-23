@@ -35,9 +35,9 @@ beforeEach(async () => {
   // Orden inverso al de las dependencias. `asignaturas` antes que `ciclos`
   // porque una asignatura ubicada referencia su ciclo.
   await prisma.$executeRawUnsafe(`
-    TRUNCATE plan_estudios.asignaturas, plan_estudios.ciclos,
-             plan_estudios.planes_estudio, plan_estudios.carreras,
-             plan_estudios.facultades RESTART IDENTITY CASCADE`);
+    TRUNCATE plan_estudios.asignaturas, academico.ciclos,
+             plan_estudios.planes_estudio, academico.carreras,
+             academico.facultades RESTART IDENTITY CASCADE`);
 });
 
 afterAll(async () => {

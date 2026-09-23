@@ -21,8 +21,8 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
     TRUNCATE plan_estudios.plan_atributo, plan_estudios.plan_competencia,
              plan_estudios.competencia_atributo, plan_estudios.competencias,
-             plan_estudios.planes_estudio, plan_estudios.carreras,
-             plan_estudios.facultades
+             plan_estudios.planes_estudio, academico.carreras,
+             academico.facultades
     RESTART IDENTITY CASCADE`);
 
   const facultad = await prisma.facultad.create({ data: { nombre: 'Ingeniería' } });

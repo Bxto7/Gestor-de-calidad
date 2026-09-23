@@ -31,8 +31,8 @@ beforeEach(async () => {
              plan_estudios.dependencias, plan_estudios.asignaturas,
              plan_estudios.grupos_electivos, plan_estudios.competencias,
              plan_estudios.objetivos_educacionales, plan_estudios.eventos_aprobacion,
-             plan_estudios.ciclos, plan_estudios.planes_estudio,
-             plan_estudios.carreras, plan_estudios.facultades
+             academico.ciclos, plan_estudios.planes_estudio,
+             academico.carreras, academico.facultades
     RESTART IDENTITY CASCADE`);
 
   // Los atributos de ICACIT los siembra `prisma/seed.ts` y no se tocan. Sí se

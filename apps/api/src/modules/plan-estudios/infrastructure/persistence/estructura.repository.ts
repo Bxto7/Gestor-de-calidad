@@ -114,7 +114,7 @@ export class FacultadRepositoryPrisma implements RepositorioFacultadPort {
   /** RF006, con la expresión del índice para que no puedan discrepar. */
   async existeNombre(nombre: string, idIgnorado?: string): Promise<boolean> {
     const filas = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM plan_estudios.facultades
+      SELECT id FROM academico.facultades
       WHERE ${NOMBRE_NORMALIZADO} = ${textoNormalizado(nombre)}
         AND (${idIgnorado ?? null}::uuid IS NULL OR id <> ${idIgnorado ?? null}::uuid)
       LIMIT 1`;
@@ -193,7 +193,7 @@ export class CarreraRepositoryPrisma implements RepositorioCarreraPort {
     idIgnorado?: string,
   ): Promise<boolean> {
     const filas = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM plan_estudios.carreras
+      SELECT id FROM academico.carreras
       WHERE facultad_id = ${facultadId}::uuid
         AND ${NOMBRE_NORMALIZADO} = ${textoNormalizado(nombre)}
         AND (${idIgnorado ?? null}::uuid IS NULL OR id <> ${idIgnorado ?? null}::uuid)
@@ -203,7 +203,7 @@ export class CarreraRepositoryPrisma implements RepositorioCarreraPort {
 
   async existeCodigo(codigo: string, idIgnorado?: string): Promise<boolean> {
     const filas = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM plan_estudios.carreras
+      SELECT id FROM academico.carreras
       WHERE upper(btrim(codigo)) = upper(btrim(${codigo}))
         AND (${idIgnorado ?? null}::uuid IS NULL OR id <> ${idIgnorado ?? null}::uuid)
       LIMIT 1`;

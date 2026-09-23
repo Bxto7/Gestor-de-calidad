@@ -10,7 +10,7 @@ const adapter = new ContenidoCurricularAdapter(prisma);
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE plan_estudios.carreras, plan_estudios.facultades RESTART IDENTITY CASCADE`);
+    TRUNCATE academico.carreras, academico.facultades RESTART IDENTITY CASCADE`);
 });
 
 afterAll(async () => {

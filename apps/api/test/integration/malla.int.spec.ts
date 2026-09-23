@@ -21,9 +21,9 @@ const cicloIds = new Map<number, string>();
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE plan_estudios.asignaturas, plan_estudios.ciclos,
-             plan_estudios.planes_estudio, plan_estudios.carreras,
-             plan_estudios.facultades RESTART IDENTITY CASCADE`);
+    TRUNCATE plan_estudios.asignaturas, academico.ciclos,
+             plan_estudios.planes_estudio, academico.carreras,
+             academico.facultades RESTART IDENTITY CASCADE`);
 
   const facultad = await prisma.facultad.create({ data: { nombre: 'Ingeniería' } });
   const carrera = await prisma.carrera.create({
