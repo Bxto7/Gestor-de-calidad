@@ -53,6 +53,7 @@ import {
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { AcreditacionPort } from '../../../../plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import type { ObjetivosCrossModuloPort } from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
 import {
   type AccionMedicion,
   type EstadoMedicion,
@@ -133,6 +134,7 @@ export class GestionarPlanesMejora {
   constructor(
     private readonly planes: RepositorioPlanMejoraPort,
     private readonly acreditacion: AcreditacionPort,
+    private readonly objetivos: ObjetivosCrossModuloPort,
     private readonly evaluaciones: RepositorioPlanEvaluacionPort,
     private readonly mediciones: RepositorioPlanMedicionPort,
     private readonly configuraciones: RepositorioConfiguracionEvaluacionPort,
@@ -198,7 +200,7 @@ export class GestionarPlanesMejora {
       case 'OBJETIVO_EDUCACIONAL': {
         // RF-PJ-023 RN1: catálogo institucional sin carrera propia — solo se
         // confirma que existe, sin chequeo de consistencia con la carrera.
-        const objetivo = await this.acreditacion.objetivoPorId(datos.elementoId);
+        const objetivo = await this.objetivos.objetivoPorId(datos.elementoId);
         if (!objetivo) {
           throw new NoEncontrado('el objetivo educacional', datos.elementoId);
         }
@@ -460,7 +462,11 @@ export class GestionarPlanesMejora {
   ): Promise<number | null> {
     await this.exigir(actor, 'mejora.leer', null);
     return calcularPorcentajeMedicionAnterior(
-      { evaluaciones: this.evaluaciones, mediciones: this.mediciones, configuraciones: this.configuraciones },
+      {
+        evaluaciones: this.evaluaciones,
+        mediciones: this.mediciones,
+        configuraciones: this.configuraciones,
+      },
       planEvaluacionId,
       competenciaId,
       periodoId,
@@ -497,7 +503,7 @@ export class GestionarPlanesMejora {
   async alertasMinimoObjetivo(actor: Actor): Promise<AlertaMinimoAcciones[]> {
     await this.exigir(actor, 'mejora.leer', null);
     const [objetivos, parametros] = await Promise.all([
-      this.acreditacion.objetivosEducacionales(),
+      this.objetivos.objetivosEducacionales(),
       this.planes.parametros(),
     ]);
 

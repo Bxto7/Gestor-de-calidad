@@ -28,12 +28,15 @@ import type { AuthorizationPort } from '../../../../auth/application/ports/autho
 import type {
   AcreditacionPort,
   DatosCriterioMejora,
-  DatosObjetivoMejora,
 } from '../../../../plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
 import type {
   ContenidoCurricularPort,
   PlanBase,
 } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import type {
+  DatosObjetivoMejora,
+  ObjetivosCrossModuloPort,
+} from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
 import type {
   ConfiguracionDelPlan,
@@ -182,6 +185,12 @@ function acreditacionDouble(sobre: Partial<AcreditacionPort> = {}): Acreditacion
   return {
     criteriosActivosDe: async () => [criterioMejora()],
     criterioPorId: async () => criterioMejora(),
+    ...sobre,
+  };
+}
+
+function objetivosDouble(sobre: Partial<ObjetivosCrossModuloPort> = {}): ObjetivosCrossModuloPort {
+  return {
     objetivosEducacionales: async () => [objetivoMejora()],
     objetivoPorId: async () => objetivoMejora(),
     ...sobre,
@@ -326,6 +335,7 @@ function montar(
     autorizacion?: AuthorizationPort;
     planes?: Partial<RepositorioPlanMejoraPort>;
     acreditacion?: Partial<AcreditacionPort>;
+    objetivos?: Partial<ObjetivosCrossModuloPort>;
     evaluaciones?: Partial<RepositorioPlanEvaluacionPort>;
     mediciones?: Partial<RepositorioPlanMedicionPort>;
     configuraciones?: Partial<RepositorioConfiguracionEvaluacionPort>;
@@ -353,6 +363,7 @@ function montar(
   const caso = new GestionarPlanesMejora(
     planes,
     acreditacionDouble(opciones.acreditacion),
+    objetivosDouble(opciones.objetivos),
     evaluacionesDouble(opciones.evaluaciones),
     medicionesDouble(opciones.mediciones),
     configuracionesDouble(opciones.configuraciones),
@@ -532,7 +543,7 @@ describe('RF-PJ-020 a RF-PJ-022 — el aspecto Criterio de acreditación', () =>
 
 describe('RF-PJ-023 a RF-PJ-025 — el aspecto Objetivo educacional', () => {
   it('rechaza un objetivo que no existe', async () => {
-    const { caso } = montar({ acreditacion: { objetivoPorId: async () => null } });
+    const { caso } = montar({ objetivos: { objetivoPorId: async () => null } });
 
     await expect(
       caso.crear(ACTOR, { aspecto: 'OBJETIVO_EDUCACIONAL', elementoId: 'inexistente' }),
@@ -552,7 +563,7 @@ describe('RF-PJ-023 a RF-PJ-025 — el aspecto Objetivo educacional', () => {
 
   it('RF-PJ-025: alerta cuando el objetivo no alcanza el mínimo de acciones', async () => {
     const { caso } = montar({
-      acreditacion: {
+      objetivos: {
         objetivosEducacionales: async () => [objetivoMejora({ id: 'obj-1', codigo: 'OE-01' })],
       },
       planes: {

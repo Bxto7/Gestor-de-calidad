@@ -40,7 +40,8 @@ import { CarreraRepositoryPrisma } from '../../src/modules/academico/infrastruct
 import { AcreditacionAdapter } from '../../src/modules/plan-estudios/infrastructure/acreditacion-cross-modulo.adapter.js';
 import { ContenidoCurricularAdapter } from '../../src/modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
 import { CriterioRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
-import { ObjetivoRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
+import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
+import { ObjetivosCrossModuloAdapter } from '../../src/modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { ReglaDeNegocioViolada } from '../../src/shared-kernel/errors/errores.js';
@@ -590,8 +591,9 @@ describe('RF-PJ-032 — los documentos', () => {
  */
 describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () => {
   const criterios = new CriterioRepositoryPrisma(prisma, repo);
-  const objetivos = new ObjetivoRepositoryPrisma(prisma);
-  const acreditacion = new AcreditacionAdapter(criterios, objetivos);
+  const objetivosRepo = new ObjetivoRepositoryPrisma(prisma);
+  const acreditacion = new AcreditacionAdapter(criterios);
+  const objetivos = new ObjetivosCrossModuloAdapter(objetivosRepo);
   const evaluaciones = new PlanEvaluacionRepositoryPrisma(prisma);
   const mediciones = new PlanMedicionRepositoryPrisma(prisma);
   const configuraciones = new ConfiguracionEvaluacionRepositoryPrisma(prisma);
@@ -602,6 +604,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
   const casos = new GestionarPlanesMejora(
     repo,
     acreditacion,
+    objetivos,
     evaluaciones,
     mediciones,
     configuraciones,
