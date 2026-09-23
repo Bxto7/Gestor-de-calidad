@@ -1,12 +1,14 @@
 /**
  * Pruebas del `AcreditacionAdapter` (2c-J-B, §4 del diseño): traduce forma
- * sobre `RepositorioCriterioPort`/`RepositorioObjetivoPort`, con dobles.
+ * sobre `RepositorioCriterioPort`, con dobles.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import type { DatosCriterio, RepositorioCriterioPort } from '../application/ports/acreditacion.port.js';
-import type { DatosObjetivo, RepositorioObjetivoPort } from '../application/ports/catalogo.port.js';
+import type {
+  DatosCriterio,
+  RepositorioCriterioPort,
+} from '../application/ports/acreditacion.port.js';
 import { AcreditacionAdapter } from './acreditacion-cross-modulo.adapter.js';
 
 function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
@@ -16,19 +18,6 @@ function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
     codigo: 'C-01',
     nombre: 'Estudiantes',
     activo: true,
-    creadoEn: new Date('2026-01-01'),
-    ...sobre,
-  };
-}
-
-function objetivo(sobre: Partial<DatosObjetivo> = {}): DatosObjetivo {
-  return {
-    id: 'obj-1',
-    codigo: 'OE-01',
-    nombre: 'Formar profesionales íntegros',
-    descripcion: 'Descripción del objetivo',
-    activo: true,
-    planesVinculados: 0,
     creadoEn: new Date('2026-01-01'),
     ...sobre,
   };
@@ -47,20 +36,6 @@ function repoCriterio(sobre: Partial<RepositorioCriterioPort> = {}): Repositorio
   };
 }
 
-function repoObjetivo(sobre: Partial<RepositorioObjetivoPort> = {}): RepositorioObjetivoPort {
-  return {
-    listar: async () => [objetivo()],
-    porId: async () => objetivo(),
-    codigos: async () => [],
-    crear: async () => objetivo(),
-    actualizar: async () => objetivo(),
-    cambiarEstado: async () => objetivo(),
-    eliminar: async () => undefined,
-    existeNombre: async () => false,
-    ...sobre,
-  };
-}
-
 describe('criteriosActivosDe', () => {
   it('RF-PJ-020 RN1: filtra por activo=true', async () => {
     let filtroVisto: unknown;
@@ -71,7 +46,6 @@ describe('criteriosActivosDe', () => {
           return [criterio()];
         },
       }),
-      repoObjetivo(),
     );
 
     const resultado = await adapter.criteriosActivosDe('carrera-1');
@@ -85,7 +59,7 @@ describe('criteriosActivosDe', () => {
 
 describe('criterioPorId', () => {
   it('traduce la forma, sin el campo activo', async () => {
-    const adapter = new AcreditacionAdapter(repoCriterio(), repoObjetivo());
+    const adapter = new AcreditacionAdapter(repoCriterio());
 
     const resultado = await adapter.criterioPorId('cri-1');
 
@@ -98,46 +72,8 @@ describe('criterioPorId', () => {
   });
 
   it('null cuando no existe', async () => {
-    const adapter = new AcreditacionAdapter(repoCriterio({ porId: async () => null }), repoObjetivo());
+    const adapter = new AcreditacionAdapter(repoCriterio({ porId: async () => null }));
 
     expect(await adapter.criterioPorId('inexistente')).toBeNull();
-  });
-});
-
-describe('objetivosEducacionales', () => {
-  it('RF-PJ-023 RN1: sin filtro de estado', async () => {
-    let filtroVisto: unknown = 'no-llamado';
-    const adapter = new AcreditacionAdapter(
-      repoCriterio(),
-      repoObjetivo({
-        listar: async (filtro) => {
-          filtroVisto = filtro;
-          return [objetivo()];
-        },
-      }),
-    );
-
-    const resultado = await adapter.objetivosEducacionales();
-
-    expect(filtroVisto).toBeUndefined();
-    expect(resultado).toEqual([{ id: 'obj-1', codigo: 'OE-01', nombre: 'Formar profesionales íntegros' }]);
-  });
-});
-
-describe('objetivoPorId', () => {
-  it('traduce la forma', async () => {
-    const adapter = new AcreditacionAdapter(repoCriterio(), repoObjetivo());
-
-    expect(await adapter.objetivoPorId('obj-1')).toEqual({
-      id: 'obj-1',
-      codigo: 'OE-01',
-      nombre: 'Formar profesionales íntegros',
-    });
-  });
-
-  it('null cuando no existe', async () => {
-    const adapter = new AcreditacionAdapter(repoCriterio(), repoObjetivo({ porId: async () => null }));
-
-    expect(await adapter.objetivoPorId('inexistente')).toBeNull();
   });
 });

@@ -1,28 +1,17 @@
 /**
- * Puertos del catálogo institucional: objetivos educacionales y competencias.
+ * Puertos del catálogo institucional: competencias.
  *
- * Son catálogos **globales**, no contenido de un plan: su código es único en
+ * Es un catálogo **global**, no contenido de un plan: su código es único en
  * todo el sistema y varios planes comparten los mismos registros. Por eso su
  * gestión no está acotada a una carrera —a diferencia de las asignaturas— y
- * quien los administra lo hace para toda la universidad.
+ * quien lo administra lo hace para toda la universidad.
  *
- * Objetivo y competencia comparten casi toda la forma; se declaran por separado
- * porque el objetivo lleva descripción y la competencia no, y porque sus
- * vínculos son distintos: el objetivo solo cuelga de planes, la competencia
- * cuelga de planes y de asignaturas.
+ * Objetivos educacionales tenía este mismo diseño y vivía aquí, pero desde la
+ * Fase 0c es su propio módulo (`objetivos-educacionales`), con su propio
+ * puerto (`objetivos.port.ts`) — allí porque su gestión no comparte código con
+ * el de otro módulo, a diferencia de competencias, que sigue viviendo dentro
+ * de `plan-estudios` junto al resto del catálogo académico.
  */
-
-export interface DatosObjetivo {
-  readonly id: string;
-  /** RF034: correlativo OE-01, OE-02… No editable. */
-  readonly codigo: string;
-  readonly nombre: string;
-  readonly descripcion: string;
-  readonly activo: boolean;
-  /** RF038: cuántos planes lo usan. Cero habilita el borrado. */
-  readonly planesVinculados: number;
-  readonly creadoEn: Date;
-}
 
 /** Un atributo del graduado del marco de acreditación vigente (§6.2). */
 export interface DatosAtributo {
@@ -69,19 +58,6 @@ export interface FiltroCatalogo {
   readonly activo?: boolean;
 }
 
-export interface RepositorioObjetivoPort {
-  listar(filtro?: FiltroCatalogo): Promise<DatosObjetivo[]>;
-  porId(id: string): Promise<DatosObjetivo | null>;
-  codigos(): Promise<string[]>;
-
-  crear(codigo: string, nombre: string, descripcion: string): Promise<DatosObjetivo>;
-  actualizar(id: string, nombre: string, descripcion: string): Promise<DatosObjetivo>;
-  cambiarEstado(id: string, activo: boolean): Promise<DatosObjetivo>;
-  eliminar(id: string): Promise<void>;
-
-  existeNombre(nombre: string, idIgnorado?: string): Promise<boolean>;
-}
-
 export interface RepositorioCompetenciaPort {
   listar(filtro?: FiltroCatalogo): Promise<DatosCompetencia[]>;
 
@@ -102,5 +78,4 @@ export interface RepositorioCompetenciaPort {
   existeNombre(nombre: string, idIgnorado?: string): Promise<boolean>;
 }
 
-export const REPOSITORIO_OBJETIVO = Symbol('RepositorioObjetivoPort');
 export const REPOSITORIO_COMPETENCIA = Symbol('RepositorioCompetenciaPort');

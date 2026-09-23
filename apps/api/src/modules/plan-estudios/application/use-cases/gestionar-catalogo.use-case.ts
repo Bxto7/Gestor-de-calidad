@@ -33,148 +33,14 @@ import {
   ElementoCatalogoEliminado,
   ElementoCatalogoEstadoCambiado,
 } from '../../domain/events/eventos-catalogo.js';
-import {
-  limpiarNombre,
-  siguienteCodigoCompetencia,
-  siguienteCodigoObjetivo,
-} from '../../domain/value-objects/codigos.js';
+import { limpiarNombre, siguienteCodigoCompetencia } from '../../domain/value-objects/codigos.js';
 import type {
   CoberturaAtributo,
   DatosAtributo,
   DatosCompetencia,
-  DatosObjetivo,
   FiltroCatalogo,
   RepositorioCompetenciaPort,
-  RepositorioObjetivoPort,
 } from '../ports/catalogo.port.js';
-
-/* ── Objetivos educacionales ──────────────────────────────────────────── */
-
-export class GestionarObjetivos {
-  constructor(
-    private readonly objetivos: RepositorioObjetivoPort,
-    private readonly autorizacion: AuthorizationPort,
-    private readonly eventos: PublicadorDeEventos,
-  ) {}
-
-  /** RF035 y RF039: listado con búsqueda sobre nombre y código. */
-  async listar(actor: Actor, filtro?: FiltroCatalogo): Promise<DatosObjetivo[]> {
-    await exigir(this.autorizacion, actor, 'objetivo.leer');
-    return this.objetivos.listar(filtro);
-  }
-
-  async porId(actor: Actor, id: string): Promise<DatosObjetivo> {
-    await exigir(this.autorizacion, actor, 'objetivo.leer');
-    const objetivo = await this.objetivos.porId(id);
-    if (!objetivo) throw new NoEncontrado('el objetivo educacional', id);
-    return objetivo;
-  }
-
-  /** RF033 y RF034: alta con código correlativo generado por el sistema. */
-  async crear(actor: Actor, nombre: string, descripcion: string): Promise<DatosObjetivo> {
-    await exigir(this.autorizacion, actor, 'objetivo.gestionar');
-    const limpio = await this.validar(nombre, descripcion);
-
-    const codigo = siguienteCodigoObjetivo(await this.objetivos.codigos());
-    const creado = await this.objetivos.crear(codigo, limpio.nombre, limpio.descripcion);
-
-    await this.eventos.publicar([
-      new ElementoCatalogoCreado(actor, 'Objetivo', creado.id, creado.codigo, creado.nombre),
-    ]);
-    return creado;
-  }
-
-  /** RF036: RN1 dice que el código no cambia al editar, y por eso no se toca. */
-  async editar(
-    actor: Actor,
-    id: string,
-    nombre: string,
-    descripcion: string,
-  ): Promise<DatosObjetivo> {
-    await exigir(this.autorizacion, actor, 'objetivo.gestionar');
-
-    const actual = await this.objetivos.porId(id);
-    if (!actual) throw new NoEncontrado('el objetivo educacional', id);
-
-    const limpio = await this.validar(nombre, descripcion, id);
-    const editado = await this.objetivos.actualizar(id, limpio.nombre, limpio.descripcion);
-
-    await this.eventos.publicar([
-      new ElementoCatalogoEditado(
-        actor,
-        'Objetivo',
-        id,
-        actual.codigo,
-        actual.nombre,
-        limpio.nombre,
-        actual.descripcion !== limpio.descripcion,
-      ),
-    ]);
-    return editado;
-  }
-
-  /** RF037: RN1 prohíbe el borrado físico por esta vía. */
-  async cambiarEstado(actor: Actor, id: string, activo: boolean): Promise<DatosObjetivo> {
-    await exigir(this.autorizacion, actor, 'objetivo.gestionar');
-
-    const actual = await this.objetivos.porId(id);
-    if (!actual) throw new NoEncontrado('el objetivo educacional', id);
-
-    const cambiado = await this.objetivos.cambiarEstado(id, activo);
-
-    await this.eventos.publicar([
-      new ElementoCatalogoEstadoCambiado(
-        actor,
-        'Objetivo',
-        id,
-        actual.codigo,
-        activo,
-        actual.planesVinculados,
-      ),
-    ]);
-    return cambiado;
-  }
-
-  /** RF038: solo lo que no está vinculado a ningún plan. */
-  async eliminar(actor: Actor, id: string): Promise<void> {
-    await exigir(this.autorizacion, actor, 'objetivo.gestionar');
-
-    const actual = await this.objetivos.porId(id);
-    if (!actual) throw new NoEncontrado('el objetivo educacional', id);
-
-    if (actual.planesVinculados > 0) {
-      throw new ReglaDeNegocioViolada(
-        `No se puede eliminar: ${actual.planesVinculados} plan(es) lo tienen asociado. ` +
-          'Inactívalo si ya no debe usarse en planes nuevos.',
-      );
-    }
-
-    // El evento se emite antes de borrar: después, el código y el nombre que
-    // necesita el detalle ya no existirían en ninguna parte.
-    await this.eventos.publicar([
-      new ElementoCatalogoEliminado(actor, 'Objetivo', id, actual.codigo, actual.nombre),
-    ]);
-    await this.objetivos.eliminar(id);
-  }
-
-  private async validar(
-    nombre: string,
-    descripcion: string,
-    idIgnorado?: string,
-  ): Promise<{ nombre: string; descripcion: string }> {
-    const limpio = limpiarNombre(nombre);
-    const sumilla = descripcion.trim();
-
-    // RF033 RN1: ambos obligatorios.
-    if (!limpio) throw new ReglaDeNegocioViolada('El nombre del objetivo es obligatorio.');
-    if (!sumilla) throw new ReglaDeNegocioViolada('La descripción del objetivo es obligatoria.');
-
-    if (await this.objetivos.existeNombre(limpio, idIgnorado)) {
-      throw new ReglaDeNegocioViolada('Ya existe otro objetivo educacional con ese nombre.');
-    }
-    return { nombre: limpio, descripcion: sumilla };
-  }
-}
 
 /**
  * Marco de acreditación vigente (§1).
