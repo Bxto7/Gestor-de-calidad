@@ -15,6 +15,8 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 
+import { Link } from 'react-router-dom';
+
 import { cn } from '@/shared/lib/cn';
 
 /* ── Badge de estado ──────────────────────────────────────────────────── */
@@ -391,5 +393,293 @@ export function ScopeSelector({ etiqueta, valor }: { etiqueta: string; valor: st
       </span>
       <span className="mt-0.5 block truncate text-sm font-bold text-white">{valor}</span>
     </div>
+  );
+}
+
+/* ── Tarjeta de KPI ───────────────────────────────────────────────────── */
+
+/**
+ * Una cifra destacada con su etiqueta, para la fila de indicadores de
+ * cada vista de inicio (Fases 1-3). `tendencia` es opcional: no todo KPI
+ * tiene una comparación temporal con sentido (ej. "Facultades activas"
+ * no sube ni baja de un periodo a otro de forma significativa).
+ */
+export function KpiCard({
+  etiqueta,
+  valor,
+  tendencia,
+  className,
+}: {
+  etiqueta: string;
+  valor: string | number;
+  tendencia?: { texto: string; positiva: boolean };
+  className?: string;
+}) {
+  return (
+    <Tarjeta className={cn('flex flex-col gap-1.5', className)}>
+      <span className="text-xs font-semibold tracking-wide text-tinta-tenue uppercase">
+        {etiqueta}
+      </span>
+      <span className="text-3xl font-extrabold tracking-tight text-tinta">{valor}</span>
+      {tendencia && (
+        <span
+          className={cn(
+            'text-xs font-semibold',
+            tendencia.positiva ? 'text-estado-activo-fg' : 'text-alerta-fg',
+          )}
+        >
+          {tendencia.texto}
+        </span>
+      )}
+    </Tarjeta>
+  );
+}
+
+/* ── Panel de tabla principal ─────────────────────────────────────────── */
+
+/** Una fila del panel de tabla: tag/título/meta/barra de progreso/chip. */
+export interface FilaDataPanel {
+  readonly id: string;
+  readonly tag?: string;
+  readonly titulo: string;
+  readonly meta?: string;
+  /** 0-100. Sin barra si se omite (no toda fila representa un avance). */
+  readonly progreso?: number;
+  readonly chip?: { texto: string; tono: TonoBadge };
+  readonly href?: string;
+}
+
+/**
+ * Panel de tabla principal de una vista de inicio (Fases 1-3) — filas
+ * con tag/título/meta/barra/chip, cada una opcionalmente enlazada. Sin
+ * paginación ni orden propios en esta fase: quien lo use decide cuántas
+ * filas pasar y en qué orden.
+ */
+export function DataPanel({
+  titulo,
+  filas,
+  vacio,
+  className,
+}: {
+  titulo: string;
+  filas: readonly FilaDataPanel[];
+  /** Mensaje cuando `filas` está vacío — sin valor por defecto: cada consumidor lo redacta según su contexto. */
+  vacio: string;
+  className?: string;
+}) {
+  return (
+    <Tarjeta className={cn('flex flex-col gap-4', className)}>
+      <h2 className="text-sm font-extrabold tracking-tight text-tinta">{titulo}</h2>
+      {filas.length === 0 ? (
+        <p className="py-6 text-center text-sm text-tinta-suave">{vacio}</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-borde">
+          {filas.map((fila) => (
+            <li key={fila.id}>
+              {fila.href ? (
+                <Link
+                  to={fila.href}
+                  className="flex items-center gap-3 py-3 transition hover:bg-superficie-tenue"
+                >
+                  <ContenidoFilaDataPanel fila={fila} />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-3 py-3">
+                  <ContenidoFilaDataPanel fila={fila} />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Tarjeta>
+  );
+}
+
+/**
+ * Contenido interno de una fila de `DataPanel`, compartido entre la
+ * variante enlazada (`Link`) y la simple (`div`) — evita el patrón de
+ * "componente polimórfico" (`const Elemento = href ? Link : 'div'`),
+ * que TypeScript estricto no tipa de forma segura en JSX: `Link` y
+ * `'div'` no aceptan el mismo conjunto de props, así que hay que
+ * bifurcar el elemento contenedor y no el "tipo de componente" en sí.
+ */
+function ContenidoFilaDataPanel({ fila }: { fila: FilaDataPanel }) {
+  return (
+    <>
+      {fila.tag && (
+        <span className="shrink-0 rounded-md bg-uc-lila-claro px-2 py-1 text-xs font-bold text-uc-primary">
+          {fila.tag}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-tinta">{fila.titulo}</span>
+        {fila.meta && <span className="block truncate text-xs text-tinta-suave">{fila.meta}</span>}
+        {fila.progreso !== undefined && (
+          <span className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-superficie-tenue">
+            <span
+              className="block h-full rounded-full bg-uc-primary"
+              style={{ width: `${Math.max(0, Math.min(100, fila.progreso))}%` }}
+            />
+          </span>
+        )}
+      </span>
+      {fila.chip && <Badge tono={fila.chip.tono}>{fila.chip.texto}</Badge>}
+    </>
+  );
+}
+
+/* ── Lista de pendientes ──────────────────────────────────────────────── */
+
+export interface ItemPendiente {
+  readonly id: string;
+  readonly texto: string;
+  /** Color del punto — `true` para lo urgente (ej. vence en menos de 7 días). */
+  readonly urgente?: boolean;
+  readonly href?: string;
+}
+
+/**
+ * Lista de pendientes con punto de color — "Pendientes de estructura"
+ * (Admin), "Pendientes de tu decisión" (Director), "Mis plazos"
+ * (Docente), según §6 del pliego original del usuario.
+ */
+export function PendingList({
+  titulo,
+  items,
+  vacio,
+  className,
+}: {
+  titulo: string;
+  items: readonly ItemPendiente[];
+  vacio: string;
+  className?: string;
+}) {
+  return (
+    <Tarjeta className={cn('flex flex-col gap-3', className)}>
+      <h2 className="text-sm font-extrabold tracking-tight text-tinta">{titulo}</h2>
+      {items.length === 0 ? (
+        <p className="py-4 text-center text-sm text-tinta-suave">{vacio}</p>
+      ) : (
+        <ul className="flex flex-col gap-2.5">
+          {items.map((item) => (
+            <li key={item.id}>
+              {item.href ? (
+                <Link
+                  to={item.href}
+                  className="flex items-start gap-2.5 text-sm text-tinta transition hover:text-uc-primary"
+                >
+                  <PuntoPendiente urgente={item.urgente} />
+                  {item.texto}
+                </Link>
+              ) : (
+                <div className="flex items-start gap-2.5 text-sm text-tinta">
+                  <PuntoPendiente urgente={item.urgente} />
+                  {item.texto}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Tarjeta>
+  );
+}
+
+/** El punto de color de una fila de `PendingList` — mismo motivo de bifurcación que `ContenidoFilaDataPanel`. */
+function PuntoPendiente({ urgente }: { urgente: boolean | undefined }) {
+  return (
+    <span
+      className={cn(
+        'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+        urgente ? 'bg-alerta-fg' : 'bg-uc-lila',
+      )}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* ── Grid de tarjetas secundarias ─────────────────────────────────────── */
+
+export interface TarjetaSecundaria {
+  readonly id: string;
+  readonly titulo: string;
+  readonly valor: string | number;
+  readonly detalle?: string;
+  readonly href?: string;
+}
+
+/**
+ * Grid de 4 tarjetas secundarias — "Altas recientes" (Admin), "Dentro
+ * de Mejora Continua" (Director), "Competencias que evalúo" (Docente).
+ * Sin límite forzado a 4 en el componente: quien lo use decide cuántas
+ * pasar, el pliego original las describe como 4 pero eso es contenido,
+ * no una restricción del componente.
+ */
+export function SecondaryCardGrid({
+  items,
+  className,
+}: {
+  items: readonly TarjetaSecundaria[];
+  className?: string;
+}) {
+  return (
+    <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-4', className)}>
+      {items.map((item) => {
+        const tarjeta = (
+          <Tarjeta
+            className={cn('flex flex-col gap-1', item.href && 'transition hover:border-uc-lila')}
+          >
+            <span className="text-xs font-semibold text-tinta-suave">{item.titulo}</span>
+            <span className="text-xl font-extrabold text-tinta">{item.valor}</span>
+            {item.detalle && <span className="text-xs text-tinta-tenue">{item.detalle}</span>}
+          </Tarjeta>
+        );
+        return item.href ? (
+          <Link key={item.id} to={item.href}>
+            {tarjeta}
+          </Link>
+        ) : (
+          <div key={item.id}>{tarjeta}</div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Tarjeta puente a Reportes ────────────────────────────────────────── */
+
+/**
+ * Enlaza a `/reportes` con un título contextual por rol (§7 del pliego
+ * original del usuario: "Cobertura y avance institucional" para Admin,
+ * "Resultados vs. meta y cobertura" para Director, "Resultados de mis
+ * competencias" para Docente). El texto exacto lo decide quien use el
+ * componente — no está cableado aquí, porque es contenido de cada vista
+ * de rol, no del componente compartido.
+ */
+export function ReportBridgeCard({ titulo, descripcion }: { titulo: string; descripcion: string }) {
+  return (
+    <Link to="/reportes" className="block">
+      <Tarjeta className="flex items-center justify-between gap-3 transition hover:border-uc-lila">
+        <span>
+          <span className="block text-sm font-extrabold text-tinta">{titulo}</span>
+          <span className="mt-0.5 block text-xs text-tinta-suave">{descripcion}</span>
+        </span>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="shrink-0 text-uc-primary"
+        >
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </Tarjeta>
+    </Link>
   );
 }
