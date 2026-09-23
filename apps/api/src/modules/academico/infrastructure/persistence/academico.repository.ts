@@ -1,12 +1,19 @@
 /**
  * Repositorios Prisma de la estructura académica.
  *
- * Movido de `plan-estudios` (Fase 0b). La comprobación de unicidad usa
- * `$queryRaw` con **la misma expresión** que el índice de la migración —
- * ver el comentario de `normalizado()` para el motivo. Las tablas ahora
- * viven en el schema `academico`, no `plan_estudios` — las dos consultas
- * `$queryRaw` que las nombran explícitamente se actualizaron para eso;
- * es la única diferencia real de contenido contra el archivo original.
+ * Movido de `plan-estudios` (Fase 0b); las tablas ahora viven en el schema
+ * `academico`, no `plan_estudios` — las dos consultas `$queryRaw` que las
+ * nombran explícitamente se actualizaron para eso, la única diferencia real
+ * de contenido contra el archivo original.
+ *
+ * La comprobación de unicidad usa `$queryRaw` con **la misma expresión** que el
+ * índice de la migración. Comparar con una normalización propia en JavaScript
+ * daría casi siempre el mismo resultado, y ese "casi" es el problema: bastaría
+ * una diferencia de criterio para que la aplicación deje pasar un nombre que la
+ * base rechaza, y el usuario recibiría un error de PostgreSQL en vez de un
+ * mensaje comprensible.
+ *
+ * Preguntándole a la base con su propia expresión, ambas no pueden discrepar.
  */
 
 import { Injectable } from '@nestjs/common';
@@ -21,6 +28,26 @@ import type {
   RepositorioFacultadPort,
 } from '../../application/ports/academico.port.js';
 
+/**
+ * Réplica exacta del índice `facultades_nombre_normalizado`.
+ *
+ * Es una función y no dos constantes —una para la columna y otra para el
+ * argumento— porque la comparación solo tiene sentido si ambos lados se
+ * normalizan igual, y tenerlo escrito dos veces ya provocó que dejaran de
+ * estarlo: en un literal de plantilla, `'\s+'` se cuece a `'s+'`, así que un
+ * lado colapsaba los espacios y el otro sustituía las eses. La prueba de
+ * integración lo destapó. Con una sola expresión no hay dos sitios que puedan
+ * separarse.
+ *
+ * En `academico` la regla vive en dos copias —esta y el índice de la
+ * migración—, no en tres: a diferencia de `plan-estudios`, el dominio de
+ * `academico` (`GestionarFacultades`/`GestionarCarreras`, Task 2) no tiene
+ * una función equivalente a `normalizarParaUnicidad` que normalice acentos;
+ * solo usa `limpiarNombre` (espacios y bordes, sin tocar tildes). Cada una de
+ * las dos copias existe por un motivo distinto: garantía bajo concurrencia
+ * (el índice) y mensaje útil sin depender de un error de PostgreSQL (esta
+ * consulta).
+ */
 function normalizado(expresion: Prisma.Sql): Prisma.Sql {
   // La barra va duplicada a propósito: en un literal de plantilla `\s` se cuece
   // a `s`, y PostgreSQL recibiría `'s+'` —sustituir eses— en vez de `'\s+'`.
@@ -28,8 +55,10 @@ function normalizado(expresion: Prisma.Sql): Prisma.Sql {
                                     'áéíóúüÁÉÍÓÚÜ', 'aeiouuAEIOUU'))`;
 }
 
+/** El lado de la columna: `Prisma.raw` porque es un identificador, no un valor. */
 const NOMBRE_NORMALIZADO = normalizado(Prisma.raw('nombre'));
 
+/** El lado del argumento, que sí viaja parametrizado. */
 function textoNormalizado(valor: string): Prisma.Sql {
   return normalizado(Prisma.sql`${valor}`);
 }
@@ -44,6 +73,7 @@ export class FacultadRepositoryPrisma implements RepositorioFacultadPort {
         ...(filtro?.texto ? { nombre: { contains: filtro.texto, mode: 'insensitive' } } : {}),
         ...(filtro?.activa === undefined ? {} : { estado: filtro.activa ? 'ACTIVO' : 'INACTIVO' }),
       },
+      // RF003 RN1: ordenado alfabéticamente por defecto.
       orderBy: { nombre: 'asc' },
       include: { _count: { select: { carreras: true } } },
     });
@@ -125,6 +155,8 @@ export class CarreraRepositoryPrisma implements RepositorioCarreraPort {
       where: {
         ...(filtro?.facultadId ? { facultadId: filtro.facultadId } : {}),
         ...(filtro?.activa === undefined ? {} : { estado: filtro.activa ? 'ACTIVO' : 'INACTIVO' }),
+        // RF016: la búsqueda cubre nombre y código, que es como la gente busca
+        // una carrera: o la escribe entera o teclea sus tres letras.
         ...(filtro?.texto
           ? {
               OR: [
@@ -187,12 +219,20 @@ export class CarreraRepositoryPrisma implements RepositorioCarreraPort {
     return filas.length > 0;
   }
 
+  /** RF012 RN1: asignaturas que quedarían en ciclos inexistentes. */
   async asignaturasSobreCiclo(carreraId: string, cicloMaximo: number): Promise<number> {
     return this.prisma.asignatura.count({
       where: { ciclo: { carreraId, numero: { gt: cicloMaximo } } },
     });
   }
 
+  /**
+   * RF011: crea los ciclos que falten y borra los sobrantes.
+   *
+   * El borrado solo llega hasta donde los datos lo permiten: si un ciclo tiene
+   * asignaturas, la comprobación previa del caso de uso ya habrá impedido la
+   * reducción, y si aun así llegara aquí, la FK lo detendría.
+   */
   async sincronizarCiclos(carreraId: string, totalCiclos: number): Promise<void> {
     const existentes = await this.prisma.ciclo.findMany({
       where: { carreraId },

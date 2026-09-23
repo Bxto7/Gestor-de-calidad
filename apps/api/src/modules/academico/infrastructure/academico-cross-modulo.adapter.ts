@@ -1,16 +1,25 @@
 /**
- * Implementa `AcademicoCrossModuloPort` reutilizando `CarreraRepositoryPrisma`
- * — mismo patrón que `AcreditacionCrossModuloAdapter` en `plan-estudios`.
+ * Implementa `AcademicoCrossModuloPort` reutilizando `RepositorioCarreraPort`
+ * — mismo patrón que `AcreditacionAdapter` en `plan-estudios`: se inyecta por
+ * el token del puerto, no por la clase concreta `CarreraRepositoryPrisma`,
+ * para no acoplar este adaptador a Prisma y para que la Task 6 (wiring) solo
+ * tenga que registrar un provider por token, no una clase específica.
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import type { AcademicoCrossModuloPort, DatosCarreraResumen } from '../application/ports/academico-cross-modulo.port.js';
-import { CarreraRepositoryPrisma } from './persistence/academico.repository.js';
+import {
+  REPOSITORIO_CARRERA,
+  type RepositorioCarreraPort,
+} from '../application/ports/academico.port.js';
+import type {
+  AcademicoCrossModuloPort,
+  DatosCarreraResumen,
+} from '../application/ports/academico-cross-modulo.port.js';
 
 @Injectable()
 export class AcademicoCrossModuloAdapter implements AcademicoCrossModuloPort {
-  constructor(private readonly carreras: CarreraRepositoryPrisma) {}
+  constructor(@Inject(REPOSITORIO_CARRERA) private readonly carreras: RepositorioCarreraPort) {}
 
   async carreraPorId(id: string): Promise<DatosCarreraResumen | null> {
     const c = await this.carreras.porId(id);
