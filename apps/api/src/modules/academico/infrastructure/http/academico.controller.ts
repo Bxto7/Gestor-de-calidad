@@ -1,10 +1,15 @@
 /**
  * Controllers de la estructura académica.
  *
- * Las carreras cuelgan de su facultad en la ruta (`/facultades/:id/carreras`)
- * porque RF009 RN1 dice que toda carrera pertenece obligatoriamente a una: la
- * URL refleja esa dependencia en vez de aceptar un `facultadId` suelto en el
- * cuerpo, que permitiría crear una carrera sin facultad o con una inexistente.
+ * Movidos de `plan-estudios` (Fase 0b). `CarrerasController` YA NO tiene
+ * `GET :id/versiones` — esa ruta depende de `GestionarPlanes`, de
+ * `plan-estudios`, y moverla aquí habría invertido el sentido de la
+ * dependencia entre los dos módulos (`academico` nunca importa de
+ * `plan-estudios`, CLAUDE.md §3.1). Se quedó en `plan-estudios`, en
+ * `VersionesDeCarreraController` (`planes.controller.ts`), con el mismo
+ * prefijo de ruta `/carreras` — dos controllers en módulos distintos
+ * pueden compartir prefijo sin chocar, mientras no registren la misma
+ * combinación de método+ruta, y no la registran.
  */
 
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
@@ -12,17 +17,14 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../auth/infrastructure/http/jwt.guard.js';
-import {
-  GestionarCarreras,
-  GestionarFacultades,
-} from '../../application/use-cases/gestionar-estructura.use-case.js';
-import { GestionarPlanes } from '../../application/use-cases/gestionar-planes.use-case.js';
+import { GestionarFacultades } from '../../application/use-cases/gestionar-facultades.use-case.js';
+import { GestionarCarreras } from '../../application/use-cases/gestionar-carreras.use-case.js';
 import {
   CambiarEstadoDto,
   CrearFacultadDto,
   DatosCarreraDto,
   FiltroDto,
-} from './dto/estructura.dto.js';
+} from './dto/academico.dto.js';
 
 @ApiTags('Facultades')
 @ApiBearerAuth()
@@ -113,21 +115,7 @@ export class FacultadesController {
 @ApiBearerAuth()
 @Controller('carreras')
 export class CarrerasController {
-  constructor(
-    private readonly carreras: GestionarCarreras,
-    private readonly planes: GestionarPlanes,
-  ) {}
-
-  @Get(':id/versiones')
-  @ApiOperation({
-    summary: 'Histórico de versiones del plan de esta carrera',
-    description:
-      'RF076 y RF091. De la versión más alta a la más baja, que es el orden en ' +
-      'que se lee un histórico. Incluye las que ya quedaron como Histórico.',
-  })
-  async versiones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
-    return this.planes.versionesDe(actor, id);
-  }
+  constructor(private readonly carreras: GestionarCarreras) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar carreras (RF013, RF016)' })

@@ -273,3 +273,21 @@ export class PlanesController {
     };
   }
 }
+
+@ApiTags('Carreras')
+@ApiBearerAuth()
+@Controller('carreras')
+export class VersionesDeCarreraController {
+  constructor(private readonly planes: GestionarPlanes) {}
+
+  @Get(':id/versiones')
+  @ApiOperation({
+    summary: 'Histórico de versiones del plan de esta carrera',
+    description:
+      'RF076 y RF091. De la versión más alta a la más baja, que es el orden en ' +
+      'que se lee un histórico. Incluye las que ya quedaron como Histórico.',
+  })
+  async versiones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.planes.versionesDe(actor, id);
+  }
+}
