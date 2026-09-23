@@ -65,10 +65,18 @@ import {
 } from './modules/plan-estudios/application/ports/asignatura.port.js';
 import {
   REPOSITORIO_COMPETENCIA,
-  REPOSITORIO_OBJETIVO,
   type RepositorioCompetenciaPort,
-  type RepositorioObjetivoPort,
 } from './modules/plan-estudios/application/ports/catalogo.port.js';
+import {
+  REPOSITORIO_OBJETIVO,
+  type RepositorioObjetivoPort,
+} from './modules/objetivos-educacionales/application/ports/objetivos.port.js';
+import {
+  OBJETIVOS_CROSS_MODULO,
+  type ObjetivosCrossModuloPort,
+} from './modules/objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
+import { ObjetivoRepositoryPrisma } from './modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
+import { ObjetivosCrossModuloAdapter } from './modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import {
   REPOSITORIO_ATRIBUTO,
   REPOSITORIO_CRITERIO,
@@ -236,10 +244,8 @@ import { GenerarNuevaVersion } from './modules/plan-estudios/application/use-cas
 import { GestionarAsignaturas } from './modules/plan-estudios/application/use-cases/gestionar-asignaturas.use-case.js';
 import { ConsultarHistorial } from './modules/plan-estudios/application/use-cases/consultar-historial.use-case.js';
 import { GestionarPlanes } from './modules/plan-estudios/application/use-cases/gestionar-planes.use-case.js';
-import {
-  GestionarCompetencias,
-  GestionarObjetivos,
-} from './modules/plan-estudios/application/use-cases/gestionar-catalogo.use-case.js';
+import { GestionarCompetencias } from './modules/plan-estudios/application/use-cases/gestionar-catalogo.use-case.js';
+import { GestionarObjetivos } from './modules/objetivos-educacionales/application/use-cases/gestionar-objetivos.use-case.js';
 import { UbicarAsignatura } from './modules/plan-estudios/application/use-cases/ubicar-asignatura.use-case.js';
 import {
   AprobacionesRepositoryPrisma,
@@ -255,10 +261,8 @@ import {
   AsignaturasController,
   AsignaturasDelPlanController,
 } from './modules/plan-estudios/infrastructure/http/asignaturas.controller.js';
-import {
-  CompetenciasController,
-  ObjetivosController,
-} from './modules/plan-estudios/infrastructure/http/catalogo.controller.js';
+import { CompetenciasController } from './modules/plan-estudios/infrastructure/http/catalogo.controller.js';
+import { ObjetivosController } from './modules/objetivos-educacionales/infrastructure/http/objetivos.controller.js';
 import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
 import {
   REPOSITORIO_REPORTES,
@@ -268,10 +272,7 @@ import { ConsultarReportes } from './modules/plan-estudios/application/use-cases
 import { ReportesRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/reportes.repository.js';
 import { ReportesController } from './modules/plan-estudios/infrastructure/http/reportes.controller.js';
 import { AsignaturaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/asignatura.repository.js';
-import {
-  CompetenciaRepositoryPrisma,
-  ObjetivoRepositoryPrisma,
-} from './modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
+import { CompetenciaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
 import {
   ALMACEN_ARCHIVOS,
   COLA_DOCUMENTOS,
@@ -392,6 +393,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_ASIGNATURA, useClass: AsignaturaRepositoryPrisma },
     { provide: REPOSITORIO_BITACORA, useClass: BitacoraRepositoryPrisma },
     { provide: REPOSITORIO_OBJETIVO, useClass: ObjetivoRepositoryPrisma },
+    { provide: OBJETIVOS_CROSS_MODULO, useClass: ObjetivosCrossModuloAdapter },
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
     { provide: REPOSITORIO_ATRIBUTO, useClass: AtributoRepositoryPrisma },
     { provide: REPOSITORIO_CRITERIO, useClass: CriterioRepositoryPrisma },
@@ -638,6 +640,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       inject: [
         REPOSITORIO_PLAN_MEJORA,
         ACREDITACION_PORT,
+        OBJETIVOS_CROSS_MODULO,
         REPOSITORIO_PLAN_EVALUACION,
         REPOSITORIO_PLAN_MEDICION,
         REPOSITORIO_CONFIGURACION_EVALUACION,
@@ -648,6 +651,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       useFactory: (
         planes: RepositorioPlanMejoraPort,
         acreditacion: AcreditacionPort,
+        objetivos: ObjetivosCrossModuloPort,
         evaluaciones: RepositorioPlanEvaluacionPort,
         mediciones: RepositorioPlanMedicionPort,
         configuraciones: RepositorioConfiguracionEvaluacionPort,
@@ -658,6 +662,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         new GestionarPlanesMejora(
           planes,
           acreditacion,
+          objetivos,
           evaluaciones,
           mediciones,
           configuraciones,
