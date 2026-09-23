@@ -29,7 +29,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua", "academico", "objetivos_educacionales"]
+  schemas  = ["auth", "plan_estudios", "auditoria", "mejora_continua", "academico", "objetivos_educacionales", "atributos_graduado"]
 }
 
 // ============================================================================
@@ -390,7 +390,7 @@ model AtributoGraduado {
 
   @@unique([marco, codigo])
   @@map("atributos_graduado")
-  @@schema("plan_estudios")
+  @@schema("atributos_graduado")
 }
 
 model Competencia {
