@@ -32,7 +32,10 @@ const RAIZ = import.meta.dirname;
  * `medicion`/`evaluacion`) y `acreditacion-cross-modulo.port.js` (nuevo, de
  * `mejora` — RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B).
  */
-const PUERTO_PERMITIDO = ['ports/contenido-curricular.port.js', 'ports/acreditacion-cross-modulo.port.js'];
+const PUERTO_PERMITIDO = [
+  'ports/contenido-curricular.port.js',
+  'ports/acreditacion-cross-modulo.port.js',
+];
 
 /**
  * Las tres pertenencias, con las dos barras y no con el nombre suelto: `auth`
@@ -187,5 +190,37 @@ describe('aislamiento de mejora-continua', () => {
     }
 
     expect(infractores).toEqual([]);
+  });
+});
+
+describe('aislamiento de mejora-continua hacia objetivos-educacionales', () => {
+  // `DE_PLAN_ESTUDIOS` (arriba) busca `/plan-estudios/` y no casa con este
+  // import real (`gestionar-planes-mejora.use-case.ts` →
+  // `objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js`):
+  // el puerto vive en `objetivos-educacionales`, no en `plan-estudios`. Por
+  // eso necesita su propio patrón y su propio `describe`, no una entrada más
+  // en `PUERTO_PERMITIDO` —esa lista solo se filtra sobre lo que
+  // `DE_PLAN_ESTUDIOS` ya capturó, así que una entrada ahí nunca se evaluaría.
+  const DE_OBJETIVOS_EDUCACIONALES = /(^|\/)objetivos-educacionales\//;
+  const PUERTO_PERMITIDO_OBJETIVOS = 'ports/objetivos-cross-modulo.port.js';
+
+  it('solo importa de objetivos-educacionales el puerto cross-módulo', () => {
+    const vistos = importsDe().filter(({ importado }) =>
+      DE_OBJETIVOS_EDUCACIONALES.test(importado),
+    );
+    const infractores = vistos
+      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_OBJETIVOS))
+      .map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+    expect(vistos).not.toEqual([]);
+  });
+
+  it('reconoce un import prohibido de objetivos-educacionales escrito en relativo', () => {
+    expect(
+      DE_OBJETIVOS_EDUCACIONALES.test(
+        '../../objetivos-educacionales/infrastructure/persistence/objetivos.repository.js',
+      ),
+    ).toBe(true);
   });
 });

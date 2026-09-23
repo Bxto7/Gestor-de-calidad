@@ -93,3 +93,33 @@ describe('aislamiento de plan-estudios hacia academico', () => {
     ).toBe(true);
   });
 });
+
+describe('aislamiento de plan-estudios hacia objetivos-educacionales', () => {
+  const DE_OBJETIVOS = /(^|\/)objetivos-educacionales\//;
+  const PUERTO_PERMITIDO_OBJETIVOS = 'ports/objetivos-cross-modulo.port.js';
+
+  it('solo importa de objetivos-educacionales el puerto cross-módulo', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_OBJETIVOS.test(importado));
+    const infractores = vistos
+      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_OBJETIVOS))
+      .map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+    // Sin control positivo `vistos.not.toEqual([])` a propósito: hoy
+    // plan-estudios no consume nada de objetivos-educacionales —a diferencia
+    // de academico, donde sí hay un consumo real (crear un plan necesita la
+    // carrera). Verificado de primera mano (Task 6): ningún archivo de
+    // plan-estudios tiene un `import ... from` real hacia
+    // objetivos-educacionales; las únicas coincidencias de la cadena son
+    // menciones en comentarios de documentación. Si en el futuro aparece un
+    // consumo real, agregar aquí el control positivo correspondiente.
+  });
+
+  it('reconoce un import prohibido de objetivos-educacionales escrito en relativo', () => {
+    expect(
+      DE_OBJETIVOS.test(
+        '../../objetivos-educacionales/infrastructure/persistence/objetivos.repository.js',
+      ),
+    ).toBe(true);
+  });
+});
