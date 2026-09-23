@@ -205,7 +205,19 @@ import {
   REPOSITORIO_FACULTAD,
   type RepositorioCarreraPort,
   type RepositorioFacultadPort,
-} from './modules/plan-estudios/application/ports/estructura.port.js';
+} from './modules/academico/application/ports/academico.port.js';
+import { ACADEMICO_CROSS_MODULO } from './modules/academico/application/ports/academico-cross-modulo.port.js';
+import { GestionarFacultades } from './modules/academico/application/use-cases/gestionar-facultades.use-case.js';
+import { GestionarCarreras } from './modules/academico/application/use-cases/gestionar-carreras.use-case.js';
+import {
+  CarrerasController,
+  FacultadesController,
+} from './modules/academico/infrastructure/http/academico.controller.js';
+import {
+  CarreraRepositoryPrisma,
+  FacultadRepositoryPrisma,
+} from './modules/academico/infrastructure/persistence/academico.repository.js';
+import { AcademicoCrossModuloAdapter } from './modules/academico/infrastructure/academico-cross-modulo.adapter.js';
 import {
   REPOSITORIO_MALLA,
   type RepositorioMallaPort,
@@ -221,10 +233,6 @@ import {
 import { CambiarEstadoPlan } from './modules/plan-estudios/application/use-cases/cambiar-estado-plan.use-case.js';
 import { ConsultarPlan } from './modules/plan-estudios/application/use-cases/consultar-plan.use-case.js';
 import { GenerarNuevaVersion } from './modules/plan-estudios/application/use-cases/generar-nueva-version.use-case.js';
-import {
-  GestionarCarreras,
-  GestionarFacultades,
-} from './modules/plan-estudios/application/use-cases/gestionar-estructura.use-case.js';
 import { GestionarAsignaturas } from './modules/plan-estudios/application/use-cases/gestionar-asignaturas.use-case.js';
 import { ConsultarHistorial } from './modules/plan-estudios/application/use-cases/consultar-historial.use-case.js';
 import { GestionarPlanes } from './modules/plan-estudios/application/use-cases/gestionar-planes.use-case.js';
@@ -238,11 +246,10 @@ import {
   ContenidoRepositoryPrisma,
   PlanRepositoryPrisma,
 } from './modules/plan-estudios/infrastructure/persistence/plan.repository.js';
-import { PlanesController } from './modules/plan-estudios/infrastructure/http/planes.controller.js';
 import {
-  CarrerasController,
-  FacultadesController,
-} from './modules/plan-estudios/infrastructure/http/estructura.controller.js';
+  PlanesController,
+  VersionesDeCarreraController,
+} from './modules/plan-estudios/infrastructure/http/planes.controller.js';
 import { MallaController } from './modules/plan-estudios/infrastructure/http/malla.controller.js';
 import {
   AsignaturasController,
@@ -252,10 +259,6 @@ import {
   CompetenciasController,
   ObjetivosController,
 } from './modules/plan-estudios/infrastructure/http/catalogo.controller.js';
-import {
-  CarreraRepositoryPrisma,
-  FacultadRepositoryPrisma,
-} from './modules/plan-estudios/infrastructure/persistence/estructura.repository.js';
 import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
 import {
   REPOSITORIO_REPORTES,
@@ -333,6 +336,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     FacultadesController,
     CarrerasController,
     PlanesController,
+    VersionesDeCarreraController,
     MallaController,
     AsignaturasDelPlanController,
     AsignaturasController,
@@ -383,6 +387,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_APROBACIONES, useClass: AprobacionesRepositoryPrisma },
     { provide: REPOSITORIO_FACULTAD, useClass: FacultadRepositoryPrisma },
     { provide: REPOSITORIO_CARRERA, useClass: CarreraRepositoryPrisma },
+    { provide: ACADEMICO_CROSS_MODULO, useClass: AcademicoCrossModuloAdapter },
     { provide: REPOSITORIO_MALLA, useClass: MallaRepositoryPrisma },
     { provide: REPOSITORIO_ASIGNATURA, useClass: AsignaturaRepositoryPrisma },
     { provide: REPOSITORIO_BITACORA, useClass: BitacoraRepositoryPrisma },
