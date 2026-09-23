@@ -123,3 +123,23 @@ describe('aislamiento de plan-estudios hacia objetivos-educacionales', () => {
     ).toBe(true);
   });
 });
+
+describe('aislamiento de plan-estudios hacia atributos-graduado', () => {
+  const DE_ATRIBUTOS = /(^|\/)atributos-graduado\//;
+
+  it('no importa nada de atributos-graduado por TypeScript', () => {
+    const infractores = importsDe()
+      .filter(({ importado }) => DE_ATRIBUTOS.test(importado))
+      .map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+  });
+
+  it('reconoce un import prohibido de atributos-graduado escrito en relativo', () => {
+    expect(
+      DE_ATRIBUTOS.test(
+        '../../atributos-graduado/infrastructure/persistence/atributos.repository.js',
+      ),
+    ).toBe(true);
+  });
+});
