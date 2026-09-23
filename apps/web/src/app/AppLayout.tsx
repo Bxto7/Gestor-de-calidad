@@ -12,81 +12,119 @@ import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { LimiteDeError } from '@/shared/components/LimiteDeError';
+import { ScopeSelector } from '@/shared/components/ui';
 
 import isotipoUC from '@/assets/marca/isotipo-uc-negro.png';
 import { CtxEncabezado, type ContextoEncabezado, type Encabezado } from './encabezado';
 
+interface EnlaceNav {
+  readonly a: string;
+  readonly etiqueta: string;
+  readonly icono: () => ReactElement;
+  readonly exacto: boolean;
+  readonly permiso?: string;
+}
+
+interface SeccionNav {
+  /** `null` para el ítem suelto de arriba (Resumen), sin título de sección. */
+  readonly titulo: string | null;
+  readonly enlaces: readonly EnlaceNav[];
+}
+
 /**
- * Menú principal.
+ * Menú principal, agrupado por sección (Fase 0e del dashboard por rol).
  *
- * `permiso` esconde la entrada cuando el rol no la tiene. No es seguridad —esa
- * la aplica el backend en cada petición— sino no ofrecer una puerta que se
- * cierra en la cara: un docente que pulsara «Usuarios» solo vería un 403.
+ * Los mismos 10 destinos que ya existían como lista plana — este plan no
+ * agrega, mueve ni quita ninguna ruta, solo cambia cómo se agrupan
+ * visualmente. Las Fases 1-3 son las que van a agregar contenido nuevo
+ * bajo secciones nuevas (los 8 criterios de acreditación del Director,
+ * por ejemplo) — esta estructura ya lo soporta sin cambios adicionales.
+ *
+ * `permiso` esconde la entrada cuando el rol no la tiene. No es
+ * seguridad —esa la aplica el backend en cada petición— sino no ofrecer
+ * una puerta que se cierra en la cara.
  */
-const ENLACES: {
-  a: string;
-  etiqueta: string;
-  icono: () => ReactElement;
-  exacto: boolean;
-  permiso?: string;
-}[] = [
-  { a: '/', etiqueta: 'Resumen', icono: IconoResumen, exacto: true },
-  { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
+const SECCIONES: readonly SeccionNav[] = [
   {
-    a: '/acreditacion/atributos',
-    etiqueta: 'Atributos del Graduado',
-    icono: IconoPlan,
-    exacto: false,
-    permiso: 'atributo.leer',
+    titulo: null,
+    enlaces: [{ a: '/', etiqueta: 'Resumen', icono: IconoResumen, exacto: true }],
   },
   {
-    a: '/acreditacion/criterios',
-    etiqueta: 'Criterios de Acreditación',
-    icono: IconoPlan,
-    exacto: false,
-    permiso: 'criterio.leer',
+    titulo: 'Plan de estudios',
+    enlaces: [
+      { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
+    ],
   },
   {
-    a: '/mejora-continua/medicion',
-    etiqueta: 'Planes de Medición',
-    icono: IconoPlan,
-    exacto: false,
-    permiso: 'medicion.leer',
+    titulo: 'Acreditación',
+    enlaces: [
+      {
+        a: '/acreditacion/atributos',
+        etiqueta: 'Atributos del Graduado',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'atributo.leer',
+      },
+      {
+        a: '/acreditacion/criterios',
+        etiqueta: 'Criterios de Acreditación',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'criterio.leer',
+      },
+    ],
   },
   {
-    a: '/mejora-continua/evaluacion',
-    etiqueta: 'Planes de Evaluación',
-    icono: IconoPlan,
-    exacto: false,
-    permiso: 'evaluacion.leer',
+    titulo: 'Mejora continua',
+    enlaces: [
+      {
+        a: '/mejora-continua/medicion',
+        etiqueta: 'Planes de Medición',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'medicion.leer',
+      },
+      {
+        a: '/mejora-continua/evaluacion',
+        etiqueta: 'Planes de Evaluación',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'evaluacion.leer',
+      },
+      {
+        a: '/mejora-continua/mejora',
+        etiqueta: 'Planes de Mejora',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'mejora.leer',
+      },
+      {
+        a: '/mejora-continua/actas',
+        etiqueta: 'Actas de Aprobación',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'actas.leer',
+      },
+    ],
   },
   {
-    a: '/mejora-continua/mejora',
-    etiqueta: 'Planes de Mejora',
-    icono: IconoPlan,
-    exacto: false,
-    permiso: 'mejora.leer',
-  },
-  {
-    a: '/mejora-continua/actas',
-    etiqueta: 'Actas de Aprobación',
-    icono: IconoPlan,
-    exacto: false,
-    permiso: 'actas.leer',
-  },
-  {
-    a: '/reportes',
-    etiqueta: 'Reportes',
-    icono: IconoReportes,
-    exacto: false,
-    permiso: 'plan.leer',
-  },
-  {
-    a: '/usuarios',
-    etiqueta: 'Usuarios',
-    icono: IconoUsuarios,
-    exacto: false,
-    permiso: 'usuario.gestionar',
+    titulo: 'Sistema',
+    enlaces: [
+      {
+        a: '/reportes',
+        etiqueta: 'Reportes',
+        icono: IconoReportes,
+        exacto: false,
+        permiso: 'plan.leer',
+      },
+      {
+        a: '/usuarios',
+        etiqueta: 'Usuarios',
+        icono: IconoUsuarios,
+        exacto: false,
+        permiso: 'usuario.gestionar',
+      },
+    ],
   },
 ];
 
@@ -114,6 +152,20 @@ export function AppLayout() {
   const [encabezado, setEncabezado] = useState<Encabezado>({ migas: [], acciones: null });
   const { identidad, salir, puede } = useSesion();
   const ubicacion = useLocation();
+
+  // Colapsado por título de sección — vacío por defecto: todas abiertas.
+  // No persiste entre sesiones a propósito (Fase 0 no lo pide); si una
+  // fase futura quiere recordarlo, es un cambio contenido a este estado.
+  const [colapsadas, setColapsadas] = useState<ReadonlySet<string>>(new Set());
+
+  const alternarSeccion = useCallback((titulo: string) => {
+    setColapsadas((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(titulo)) siguiente.delete(titulo);
+      else siguiente.add(titulo);
+      return siguiente;
+    });
+  }, []);
 
   // Iniciales del nombre real, no unas fijas: "Ana María Quispe" → "AQ".
   const iniciales = useMemo(() => {
@@ -169,9 +221,20 @@ export function AppLayout() {
             </span>
           </div>
 
-          <nav className="mt-2 flex flex-1 flex-col gap-0.5 px-3" aria-label="Navegación principal">
-            {ENLACES.filter((e) => !e.permiso || puede(e.permiso)).map(
-              ({ a, etiqueta, icono: Icono, exacto }) => (
+          <ScopeSelector
+            etiqueta="Ámbito"
+            valor={identidad?.carreraACargo ? 'Carrera asignada' : 'Universidad Continental'}
+          />
+
+          <nav
+            className="mt-2 flex flex-1 flex-col gap-1 overflow-y-auto px-3"
+            aria-label="Navegación principal"
+          >
+            {SECCIONES.map((seccion) => {
+              const visibles = seccion.enlaces.filter((e) => !e.permiso || puede(e.permiso));
+              if (visibles.length === 0) return null;
+
+              const contenido = visibles.map(({ a, etiqueta, icono: Icono, exacto }) => (
                 <NavLink
                   key={a}
                   to={a}
@@ -188,8 +251,51 @@ export function AppLayout() {
                   <Icono />
                   {etiqueta}
                 </NavLink>
-              ),
-            )}
+              ));
+
+              // El ítem suelto de arriba (Resumen, sin título) no lleva
+              // cabecera de sección ni puede colapsarse.
+              if (seccion.titulo === null) {
+                return (
+                  <div key="raiz" className="flex flex-col gap-0.5">
+                    {contenido}
+                  </div>
+                );
+              }
+
+              const abierta = !colapsadas.has(seccion.titulo);
+              return (
+                <div key={seccion.titulo} className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => alternarSeccion(seccion.titulo!)}
+                    aria-expanded={abierta}
+                    className="flex items-center justify-between px-3 py-1.5 text-[11px] font-bold tracking-wide text-uc-lila/70 uppercase transition hover:text-uc-lila"
+                  >
+                    {seccion.titulo}
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className={
+                        abierta
+                          ? 'rotate-0 transition-transform'
+                          : '-rotate-90 transition-transform'
+                      }
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  {abierta && <div className="flex flex-col gap-0.5">{contenido}</div>}
+                </div>
+              );
+            })}
           </nav>
 
           <div className="m-3 flex items-center gap-3 rounded-xl bg-white/10 px-3 py-3">
