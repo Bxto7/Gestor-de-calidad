@@ -222,6 +222,10 @@ import { RenderizadorExcelActaJs } from './modules/mejora-continua/actas/infrast
 import { RenderizadorPdfActaKit } from './modules/mejora-continua/actas/infrastructure/documentos/pdfkit-acta.renderer.js';
 import { DocumentoActaRepositoryPrisma } from './modules/mejora-continua/actas/infrastructure/persistence/documentos-acta.repository.js';
 import {
+  DocumentosDelActaController,
+  DocumentosActaController,
+} from './modules/mejora-continua/actas/infrastructure/http/documentos-acta.controller.js';
+import {
   DocumentosDelPlanMejoraController,
   DocumentosMejoraController,
 } from './modules/mejora-continua/mejora/infrastructure/http/documentos-mejora.controller.js';
@@ -386,6 +390,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     ActasController,
     DocumentosDelPlanMejoraController,
     DocumentosMejoraController,
+    DocumentosDelActaController,
+    DocumentosActaController,
     DocumentosDelPlanMedicionController,
     DocumentosMedicionController,
     DocumentosDelPlanEvaluacionController,
