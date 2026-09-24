@@ -683,3 +683,54 @@ export function ReportBridgeCard({ titulo, descripcion }: { titulo: string; desc
     </Link>
   );
 }
+
+/* ── Tarjeta de acción destacada ──────────────────────────────────────── */
+
+/**
+ * La tarjeta morada de «lo más útil ahora mismo»: una etiqueta, un título, una
+ * frase y un solo botón. La usan la vista del Administrador («Acción
+ * recomendada»), la del Director y la del Docente («Vence pronto»).
+ *
+ * Los colores son los del degradado de `ResumenGenerico`; no hay ninguno nuevo.
+ */
+export function TarjetaDeAccion({
+  etiqueta,
+  titulo,
+  descripcion,
+  boton,
+  className,
+}: {
+  etiqueta: string;
+  titulo: string;
+  descripcion: string;
+  boton: { texto: string; href: string };
+  className?: string;
+}) {
+  return (
+    <section
+      aria-label={etiqueta}
+      className={cn(
+        'relative overflow-hidden rounded-2xl bg-gradient-to-br from-uc-primary via-uc-v1 to-uc-dark p-6',
+        className,
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-uc-v2 opacity-30"
+      />
+      <div className="relative flex flex-wrap items-center justify-between gap-4 text-white">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide">{etiqueta}</p>
+          <p className="mt-1 text-lg font-semibold">{titulo}</p>
+          <p className="text-sm">{descripcion}</p>
+        </div>
+        <Link
+          to={boton.href}
+          className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-uc-primary transition hover:brightness-95 focus-visible:outline-white"
+        >
+          {boton.texto}
+        </Link>
+      </div>
+    </section>
+  );
+}
