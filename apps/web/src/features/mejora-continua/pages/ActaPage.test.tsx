@@ -56,6 +56,9 @@ const sesionDePrueba: ValorSesion = {
   puede: () => true,
   dirigeCarrera: () => true,
   puedeEn: () => true,
+  roles: [],
+  vistaActiva: null,
+  cambiarVista: () => undefined,
   entrar: () => undefined,
   salir: () => Promise.resolve(),
 };
