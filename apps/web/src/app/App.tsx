@@ -22,7 +22,7 @@ import { AtributosPage } from '@/features/acreditacion/pages/AtributosPage';
 import { CriteriosPage } from '@/features/acreditacion/pages/CriteriosPage';
 import { ObjetivosPage } from '@/features/plan-estudios/pages/ObjetivosPage';
 import { PlanEstudiosPage } from '@/features/plan-estudios/pages/PlanEstudiosPage';
-import { ResumenPage } from '@/features/plan-estudios/pages/ResumenPage';
+import { ResumenPage } from '@/features/dashboard/pages/ResumenPage';
 import { ReportePlanPage } from '@/features/reportes/pages/ReportePlanPage';
 import { ReportesPage } from '@/features/reportes/pages/ReportesPage';
 import { UsuariosPage } from '@/features/usuarios/pages/UsuariosPage';

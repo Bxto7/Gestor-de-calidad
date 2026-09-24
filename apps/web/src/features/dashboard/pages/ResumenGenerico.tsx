@@ -1,5 +1,10 @@
 /**
- * 3.1 Inicio / Resumen — shell de navegación, sin RF asociados.
+ * Vista genérica de inicio — sin selector de vista propio.
+ *
+ * La usan hoy `COORDINADOR_ACADEMICO`, `USUARIO_CONSULTOR`, y cualquier
+ * usuario cuyos roles no resuelvan a una vista reconocida
+ * (`vistaPrincipalDe` devuelve `null`). Es el contenido original de
+ * `ResumenPage` antes de que existiera un despachador por rol.
  *
  * Además de listar los módulos, la pantalla se mide contra los ocho criterios
  * de acreditación de ICACIT. Es la pregunta que una acreditación hace de
@@ -11,10 +16,8 @@
  * sería peor que una escrita y revisable.
  */
 
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useEncabezado } from '@/app/encabezado';
 import { Badge } from '@/shared/components/ui';
 
 interface Modulo {
@@ -68,12 +71,7 @@ interface Criterio {
  * —evaluación, mejora y actas— que todavía no existe.
  */
 const CRITERIOS: readonly Criterio[] = [
-  {
-    numero: 1,
-    nombre: 'Estudiantes',
-    estado: 'pendiente',
-    nota: 'Sin levantar.',
-  },
+  { numero: 1, nombre: 'Estudiantes', estado: 'pendiente', nota: 'Sin levantar.' },
   {
     numero: 2,
     nombre: 'Objetivos Educacionales del Programa',
@@ -98,24 +96,9 @@ const CRITERIOS: readonly Criterio[] = [
     estado: 'cubierto',
     nota: 'Competencias, asignaturas, malla, aprobación y versionado.',
   },
-  {
-    numero: 6,
-    nombre: 'Cuerpo de Profesores',
-    estado: 'pendiente',
-    nota: 'Sin levantar.',
-  },
-  {
-    numero: 7,
-    nombre: 'Instalaciones',
-    estado: 'pendiente',
-    nota: 'Sin levantar.',
-  },
-  {
-    numero: 8,
-    nombre: 'Apoyo Institucional',
-    estado: 'pendiente',
-    nota: 'Sin levantar.',
-  },
+  { numero: 6, nombre: 'Cuerpo de Profesores', estado: 'pendiente', nota: 'Sin levantar.' },
+  { numero: 7, nombre: 'Instalaciones', estado: 'pendiente', nota: 'Sin levantar.' },
+  { numero: 8, nombre: 'Apoyo Institucional', estado: 'pendiente', nota: 'Sin levantar.' },
 ];
 
 const TONO: Record<EstadoCriterio, 'aprobado' | 'progreso' | 'inactivo'> = {
@@ -130,16 +113,7 @@ const ETIQUETA: Record<EstadoCriterio, string> = {
   pendiente: 'Pendiente',
 };
 
-export function ResumenPage() {
-  const { publicar } = useEncabezado();
-
-  useEffect(() => {
-    publicar({ migas: [{ etiqueta: 'Resumen' }], acciones: null });
-    // `publicar` es estable dentro del render del layout; incluirlo dispararía
-    // un bucle porque el contexto se recrea al publicar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+export function ResumenGenerico() {
   return (
     <>
       <div className="mb-8">
