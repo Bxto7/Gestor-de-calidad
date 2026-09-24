@@ -10,6 +10,7 @@ import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto
 import type { RolVista } from '@/features/auth/domain/vista-principal';
 
 import * as estructuraApi from '../api/estructura.api';
+import * as resumenApi from '../api/resumen-carrera.api';
 import { ResumenPage } from './ResumenPage';
 
 const sesionBase: ValorSesion = {
@@ -25,13 +26,21 @@ const sesionBase: ValorSesion = {
   salir: () => Promise.resolve(),
 };
 
-function montar(vistaActiva: RolVista | null) {
+function montar(vistaActiva: RolVista | null, carreraACargo: string | null = null) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
         <CtxEncabezado.Provider value={{ migas: [], acciones: null, publicar: () => undefined }}>
-          <ContextoSesion.Provider value={{ ...sesionBase, vistaActiva }}>
+          <ContextoSesion.Provider
+            value={{
+              ...sesionBase,
+              vistaActiva,
+              identidad: carreraACargo
+                ? { id: 'u1', nombre: 'Usuaria', permisos: [], roles: [], carreraACargo }
+                : null,
+            }}
+          >
             <ResumenPage />
           </ContextoSesion.Provider>
         </CtxEncabezado.Provider>
@@ -54,8 +63,13 @@ describe('ResumenPage — despachador por rol', () => {
   });
 
   it('DIRECTOR_CARRERA muestra VistaDirectorInicio', () => {
-    montar('DIRECTOR_CARRERA');
-    expect(screen.getByText(/Vista de Director de Carrera/)).toBeInTheDocument();
+    // Petición que no resuelve: basta el esqueleto propio de la vista para
+    // saber que el despachador montó `VistaDirectorInicio` y no otra.
+    vi.spyOn(resumenApi, 'obtenerResumenDeCarrera').mockReturnValue(new Promise(() => undefined));
+    montar('DIRECTOR_CARRERA', 'c1');
+    expect(
+      screen.getByRole('status', { name: 'Cargando resumen de la carrera' }),
+    ).toBeInTheDocument();
   });
 
   it('DOCENTE muestra VistaDocenteInicio', () => {
