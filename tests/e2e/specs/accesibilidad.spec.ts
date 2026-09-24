@@ -279,3 +279,19 @@ test.describe('con la cuenta que aprueba', () => {
     await analizar(page, 'la pestaña de versiones del plan de mejora');
   });
 });
+
+test.describe('con la cuenta de administrador', () => {
+  // La vista de inicio depende del rol: `editor` cae en el resumen genérico,
+  // que ya cubre la prueba «el resumen». Solo `ADMIN_SISTEMA` ve «Estructura
+  // institucional» (`usuario.gestionar`).
+  test.use({ rol: 'admin' });
+
+  test('la vista de inicio del administrador', async ({ page }) => {
+    await page.goto('/');
+    // Con contenido real: esperar al encabezado descarta analizar el esqueleto
+    // de carga, que no distingue «sin problemas» de «axe nunca vio los datos».
+    await expect(page.getByRole('heading', { name: 'Estructura institucional' })).toBeVisible();
+
+    await analizar(page, 'la vista de inicio del administrador');
+  });
+});
