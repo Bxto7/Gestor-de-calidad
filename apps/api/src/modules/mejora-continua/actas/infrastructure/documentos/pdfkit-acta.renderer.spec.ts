@@ -72,4 +72,115 @@ describe('RenderizadorPdfActaKit', () => {
     expect(texto).toContain('abc123def456');
     expect(texto).toContain('Página 1 de');
   });
+
+  it('escribe las siete secciones con numeración romana', async () => {
+    const pdf = await new RenderizadorPdfActaKit().render(
+      acta({
+        criterios: [
+          {
+            codigo: 'CA-01',
+            nombre: 'Reforzar bibliografía',
+            plazo: new Date('2026-12-01'),
+            recursos: 'Presupuesto adicional',
+            metas: 'Elevar el indicador',
+            responsable: 'Coordinación académica',
+          },
+        ],
+        competencias: [
+          {
+            codigo: 'COMP-01',
+            nombre: 'Diseñar soluciones',
+            plazo: new Date('2026-12-01'),
+            recursos: 'Taller adicional',
+            metas: 'Elevar el logro',
+            responsable: 'Docente responsable',
+            resultado: 75,
+            meta: 70,
+            logrado: true,
+          },
+        ],
+      }),
+    );
+    const texto = textoDelPdf(pdf);
+
+    expect(texto).toContain('I.');
+    expect(texto).toContain('DATOS DE LA REUNIÓN');
+    expect(texto).toContain('II.');
+    expect(texto).toContain('ASISTENTES');
+    expect(texto).toContain('III.');
+    expect(texto).toContain('ACUERDO');
+    expect(texto).toContain('IV.');
+    expect(texto).toContain('PLAN DE MEJORA APROBADO');
+    expect(texto).toContain('V.');
+    expect(texto).toContain('RESUMEN');
+    expect(texto).toContain('VI.');
+    expect(texto).toContain('CONSTANCIA Y RESOLUCIÓN');
+  });
+
+  it('las acciones y sus datos aparecen en la tabla de Criterios', async () => {
+    const pdf = await new RenderizadorPdfActaKit().render(
+      acta({
+        criterios: [
+          {
+            codigo: 'CA-01',
+            nombre: 'Reforzar bibliografía',
+            plazo: new Date('2026-12-01'),
+            recursos: 'Presupuesto adicional',
+            metas: 'Elevar el indicador',
+            responsable: 'Coordinación académica',
+          },
+        ],
+      }),
+    );
+    const texto = textoDelPdf(pdf);
+
+    expect(texto).toContain('CA-01');
+    expect(texto).toContain('Reforzar bibliografía');
+    expect(texto).toContain('Coordinación académica');
+  });
+
+  it('una sección sin acciones muestra la fila "Sin acciones registradas"', async () => {
+    const pdf = await new RenderizadorPdfActaKit().render(acta({ criterios: [], objetivos: [], competencias: [] }));
+    const texto = textoDelPdf(pdf);
+
+    expect(texto).toContain('Sin acciones registradas para este periodo');
+  });
+
+  it('LOGRADO y NO LOGRADO aparecen en la tabla de Competencias, según corresponda', async () => {
+    const pdf = await new RenderizadorPdfActaKit().render(
+      acta({
+        competencias: [
+          {
+            codigo: 'COMP-01', nombre: 'Lograda', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 80, meta: 70, logrado: true,
+          },
+          {
+            codigo: 'COMP-02', nombre: 'No lograda', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 50, meta: 70, logrado: false,
+          },
+        ],
+      }),
+    );
+    const texto = textoDelPdf(pdf);
+
+    expect(texto).toContain('LOGRADO');
+    expect(texto).toContain('NO LOGRADO');
+  });
+
+  it('sin lugar/fecha de emisión, la sección VI no lleva ciudad y fecha', async () => {
+    const pdf = await new RenderizadorPdfActaKit().render(acta({ ciudadYFecha: null }));
+    const texto = textoDelPdf(pdf);
+
+    expect(texto).not.toContain('Huancayo');
+  });
+
+  it('la lista de asistentes aparece completa', async () => {
+    const pdf = await new RenderizadorPdfActaKit().render(
+      acta({ asistentes: ['Ana Pérez', 'Luis Gómez'] }),
+    );
+    const texto = textoDelPdf(pdf);
+
+    expect(texto).toContain('Ana Pérez');
+    expect(texto).toContain('Luis Gómez');
+  });
 });
