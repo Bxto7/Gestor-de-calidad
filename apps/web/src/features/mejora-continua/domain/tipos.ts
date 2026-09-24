@@ -228,6 +228,8 @@ export function porcentajeDeMeta(fraccion: number): number {
 export type TipoDocumentoMedicion = 'PLAN_MEDICION_PDF' | 'PLAN_MEDICION_EXCEL';
 /** RF-PE-032 a RF-PE-034: el mismo par PDF/Excel, pero del plan de evaluación. */
 export type TipoDocumentoEvaluacion = 'PLAN_EVALUACION_PDF' | 'PLAN_EVALUACION_EXCEL';
+/** RF-AC-018/019: el mismo par PDF/Excel, del acta de aprobación. */
+export type TipoDocumentoActa = 'ACTA_PDF' | 'ACTA_EXCEL';
 export type EstadoTrabajo = 'En cola' | 'Generando' | 'Listo' | 'Fallido';
 
 /**

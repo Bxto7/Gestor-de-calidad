@@ -23,7 +23,7 @@ import type { FiltroEvaluaciones } from './evaluacion.api';
 import * as configuracionApi from './configuracion-evaluacion.api';
 import * as mejoraApi from './mejora.api';
 import type { AccionMejora, DatosCrearPlanMejora, DefinicionPlanMejora } from './mejora.api';
-import type { EstadoImplementacion, TipoDocumentoMejora } from '../domain/tipos';
+import type { EstadoImplementacion, TipoDocumentoActa, TipoDocumentoMejora } from '../domain/tipos';
 import * as actasApi from './actas.api';
 import type { AccionActaTransicion } from '../domain/estado-acta';
 
@@ -732,6 +732,7 @@ export const clavesActas = {
     ] as const,
   acta: (id: string) => ['actas', id] as const,
   contenido: (id: string) => ['actas', id, 'contenido'] as const,
+  documentos: (id: string) => ['actas', id, 'documentos'] as const,
 };
 
 const LISTA_ACTAS = ['actas', 'lista'] as const;
@@ -823,4 +824,32 @@ export function useTransicionarActa(id: string) {
 
 export function useEliminarActa(id: string) {
   return useMutacionDeActa(id, () => actasApi.eliminarActa(id));
+}
+
+/**
+ * RF-AC-018/019: los documentos exportados del acta.
+ *
+ * Mismo patrón de sondeo que `useDocumentosMejora`: mientras haya un trabajo
+ * «En cola» o «Generando» vuelve a preguntar sola cada 2 s.
+ */
+export function useDocumentosActa(id: string) {
+  return useQuery({
+    queryKey: clavesActas.documentos(id),
+    queryFn: () => actasApi.documentosDeActa(id),
+    enabled: !!id,
+    refetchInterval: (consulta) =>
+      (consulta.state.data ?? []).some((t) => t.estado === 'En cola' || t.estado === 'Generando')
+        ? 2_000
+        : false,
+  });
+}
+
+export function useGenerarDocumentoActa(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tipo: TipoDocumentoActa) => actasApi.generarDocumentoActa(id, tipo),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: clavesActas.documentos(id) });
+    },
+  });
 }

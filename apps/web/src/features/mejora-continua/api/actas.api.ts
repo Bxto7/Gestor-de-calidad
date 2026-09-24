@@ -5,10 +5,16 @@
  * Los componentes no importan este archivo: hablan con `queries.ts`.
  */
 
-import { cliente } from '@/shared/api/cliente';
+import { cliente, type ArchivoDescargado } from '@/shared/api/cliente';
 
 import type { AccionActaTransicion, EstadoActa } from '../domain/estado-acta';
-import type { Acta, ActaResumen, ContenidoActa } from '../domain/tipos';
+import type {
+  Acta,
+  ActaResumen,
+  ContenidoActa,
+  TipoDocumentoActa,
+  TrabajoDocumento,
+} from '../domain/tipos';
 
 export interface FiltroActas {
   periodoAcademico?: string;
@@ -63,7 +69,10 @@ export async function editarCabeceraActa(id: string, datos: DatosCabeceraActa): 
 }
 
 /** RF-AC-005: reemplaza el conjunto completo. */
-export async function reemplazarAsistentesActa(id: string, nombres: readonly string[]): Promise<Acta> {
+export async function reemplazarAsistentesActa(
+  id: string,
+  nombres: readonly string[],
+): Promise<Acta> {
   return cliente.put<Acta>(`/actas/${id}/asistentes`, { nombres });
 }
 
@@ -102,4 +111,21 @@ export async function transicionarActa(
 /** RF-AC-017 RN2: solo un acta en Borrador puede eliminarse. */
 export async function eliminarActa(id: string): Promise<void> {
   return cliente.delete(`/actas/${id}`);
+}
+
+/* ── Documentos (RF-AC-018/019) ─────────────────────────────────────────── */
+
+export async function generarDocumentoActa(
+  id: string,
+  tipo: TipoDocumentoActa,
+): Promise<TrabajoDocumento<TipoDocumentoActa>> {
+  return cliente.post<TrabajoDocumento<TipoDocumentoActa>>(`/actas/${id}/documentos`, { tipo });
+}
+
+export async function documentosDeActa(id: string): Promise<TrabajoDocumento<TipoDocumentoActa>[]> {
+  return cliente.get<TrabajoDocumento<TipoDocumentoActa>[]>(`/actas/${id}/documentos`);
+}
+
+export async function descargarDocumentoActa(id: string): Promise<ArchivoDescargado> {
+  return cliente.descargar(`/documentos-acta/${id}/archivo`);
 }
