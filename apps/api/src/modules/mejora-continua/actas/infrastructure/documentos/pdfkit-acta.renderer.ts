@@ -424,8 +424,8 @@ function altoDeFila(
  * en ninguna; esa es la única que PDFKit seguiría partiendo.
  *
  * `coloreado`, si se pasa, tiñe la celda de Estado de cada fila (LOGRADO en
- * verde, NO LOGRADO en rojo) — se asume que esa es siempre la penúltima
- * columna, que es como esta función se llama para 4.3.
+ * verde, NO LOGRADO en rojo). La columna se localiza por su título
+ * «Estado», no por posición: en 4.3 la penúltima es «Metas».
  */
 function dibujarTabla(
   doc: PDFKit.PDFDocument,
@@ -439,7 +439,8 @@ function dibujarTabla(
   const pesoTotal = columnas.reduce((s, c) => s + c.peso, 0);
   const anchos = columnas.map((c) => (c.peso / pesoTotal) * anchoUtil);
   const altoCabeceraTabla = ALTO_MIN_FILA;
-  const esColumnaEstado = (i: number): boolean => coloreado !== undefined && i === columnas.length - 2;
+  const indiceEstado = columnas.findIndex((c) => c.titulo === 'Estado');
+  const esColumnaEstado = (i: number): boolean => coloreado !== undefined && i === indiceEstado;
   const esNegrita = (i: number): boolean => i === 0 || esColumnaEstado(i);
   const altos = filas.map((f) => altoDeFila(doc, f, anchos, esNegrita));
   const altoTitulo = titulo === undefined ? 0 : ALTO_TITULO_SUBTABLA;
