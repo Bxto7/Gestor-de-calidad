@@ -67,19 +67,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     [identidad],
   );
 
-  const [vistaManual, setVistaManual] = useState<RolVista | null>(null);
+  // La elección manual queda atada a la identidad que la hizo: un login nuevo
+  // (identidad distinta) la descarta y la vista activa vuelve a ser la de mayor
+  // prioridad, sin necesidad de reiniciar el estado desde un efecto.
+  const [eleccion, setEleccion] = useState<{ identidadId: string; vista: RolVista } | null>(null);
 
-  // Un login nuevo (identidad distinta) descarta cualquier elección manual
-  // anterior — la próxima vista activa vuelve a ser la de mayor prioridad.
-  useEffect(() => {
-    setVistaManual(null);
-  }, [identidad?.id]);
-
+  const vistaManual = eleccion && eleccion.identidadId === identidad?.id ? eleccion.vista : null;
   const vistaActiva = vistaManual ?? vistaPrincipal;
 
-  const cambiarVista = useCallback((vista: RolVista) => {
-    setVistaManual(vista);
-  }, []);
+  const cambiarVista = useCallback(
+    (vista: RolVista) => {
+      if (identidad) setEleccion({ identidadId: identidad.id, vista });
+    },
+    [identidad],
+  );
 
   const puede = useCallback((permiso: string) => permisos.has(permiso), [permisos]);
 
