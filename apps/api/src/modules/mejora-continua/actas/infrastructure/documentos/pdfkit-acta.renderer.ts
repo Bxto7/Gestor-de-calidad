@@ -181,6 +181,13 @@ function dibujarPieEnTodasLasPaginas(
     const y = doc.page.height - MARGEN - ALTO_PIE + mm(2);
     const anchoUtil = doc.page.width - MARGEN * 2;
 
+    // El margen inferior hace que PDFKit añada una página nueva en cuanto se
+    // escribe por debajo de él. Se levanta mientras se escribe el pie y se
+    // restaura después, o cada pie generaría una página fantasma — mismo
+    // patrón que `pieEnTodasLasPaginas` en platform/documentos/pdfkit.renderer.ts.
+    const margenOriginal = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+
     doc
       .save()
       .lineWidth(0.8)
@@ -203,6 +210,8 @@ function dibujarPieEnTodasLasPaginas(
       width: anchoUtil * 0.3,
       align: 'right',
     });
+
+    doc.page.margins.bottom = margenOriginal;
   }
 }
 
