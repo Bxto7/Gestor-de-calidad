@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { useEncabezado } from '@/app/encabezado';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 
+import { SelectorDeVista } from '../components/SelectorDeVista';
 import { ResumenGenerico } from './ResumenGenerico';
 import { VistaAdminInicio } from './VistaAdminInicio';
 import { VistaDirectorInicio } from './VistaDirectorInicio';
@@ -22,7 +23,7 @@ export function ResumenPage() {
   const { publicar } = useEncabezado();
 
   useEffect(() => {
-    publicar({ migas: [{ etiqueta: 'Resumen' }], acciones: null });
+    publicar({ migas: [{ etiqueta: 'Resumen' }], acciones: <SelectorDeVista /> });
     // `publicar` es estable dentro del render del layout; incluirlo dispararía
     // un bucle porque el contexto se recrea al publicar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
