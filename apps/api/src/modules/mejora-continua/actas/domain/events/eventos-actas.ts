@@ -129,3 +129,23 @@ export class ActaTransicionada extends EventoActa {
     this.detalle = comentario?.trim() ? `${base}. Motivo: «${comentario.trim()}».` : `${base}.`;
   }
 }
+
+const NOMBRE_DOCUMENTO_ACTA: Readonly<Record<string, string>> = {
+  ACTA_PDF: 'PDF',
+  ACTA_EXCEL: 'Excel',
+};
+
+export class DocumentoActaSolicitado extends EventoActa {
+  readonly nombre = 'actas.documento';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    tipo: string,
+  ) {
+    super(actor);
+    this.detalle = `Exportación de ${codigo} en ${NOMBRE_DOCUMENTO_ACTA[tipo] ?? tipo}.`;
+  }
+}

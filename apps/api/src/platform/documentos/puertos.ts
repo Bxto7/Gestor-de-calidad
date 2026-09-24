@@ -46,7 +46,11 @@ export const RENDERIZADOR_HOJA = Symbol('RenderizadorHojaPort');
  * porque los trabajos ya encolados en Redis llevan ese valor escrito.
  */
 export type ModuloDeDocumentos =
-  'plan-estudios' | 'mejora-continua' | 'mejora-continua-evaluacion' | 'mejora-continua-mejora';
+  'plan-estudios'
+  | 'mejora-continua'
+  | 'mejora-continua-evaluacion'
+  | 'mejora-continua-mejora'
+  | 'mejora-continua-actas';
 
 export interface ColaDeDocumentosPort {
   encolar(trabajoId: string, modulo: ModuloDeDocumentos): Promise<void>;
