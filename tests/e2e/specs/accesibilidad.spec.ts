@@ -295,3 +295,20 @@ test.describe('con la cuenta de administrador', () => {
     await analizar(page, 'la vista de inicio del administrador');
   });
 });
+
+test.describe('con la cuenta de director', () => {
+  // La vista de inicio depende del rol: solo `DIRECTOR_CARRERA` con carrera a
+  // cargo ve el resumen de su carrera.
+  test.use({ rol: 'director' });
+
+  test('la vista de inicio del director', async ({ page }) => {
+    await page.goto('/');
+    // Con contenido real: esperar al encabezado descarta analizar el esqueleto
+    // de carga, que no distingue «sin problemas» de «axe nunca vio los datos».
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Carrera de Pruebas Automatizadas' }),
+    ).toBeVisible();
+
+    await analizar(page, 'la vista de inicio del director');
+  });
+});
