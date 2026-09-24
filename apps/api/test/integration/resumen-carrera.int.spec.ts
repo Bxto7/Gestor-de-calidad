@@ -283,6 +283,70 @@ describe('sinResponsableDe', () => {
     expect(r).toHaveLength(2);
   });
 
+  it('una asignatura sin docente en varias mediciones aparece una sola vez', async () => {
+    const { planId } = await planDeEstudios();
+    const directa = await planMedicion(planId, 'DIRECTA');
+    const ev = await planEvaluacion(directa.id);
+    const p1 = await prisma.periodoMedicion.create({
+      data: { planMedicionId: directa.id, etiqueta: '2026-05', orden: 1 },
+    });
+    const p2 = await prisma.periodoMedicion.create({
+      data: { planMedicionId: directa.id, etiqueta: '2026-10', orden: 2 },
+    });
+    const [k1, k2, asig] = [randomUUID(), randomUUID(), randomUUID()];
+    const mediciones = await Promise.all(
+      [
+        [k1, p1.id],
+        [k1, p2.id],
+        [k2, p1.id],
+      ].map(([competenciaId, periodoId]) =>
+        prisma.medicionAlcanzada.create({
+          data: { planEvaluacionId: ev.id, competenciaId: competenciaId!, periodoId: periodoId! },
+        }),
+      ),
+    );
+    await prisma.asignaturaEvaluada.createMany({
+      data: mediciones.map((m) => ({
+        medicionAlcanzadaId: m.id,
+        asignaturaId: asig!,
+        entregable: 'Informe',
+      })),
+    });
+
+    expect(await repo.sinResponsableDe(planId)).toEqual([
+      { tipo: 'ASIGNATURA', referenciaId: asig },
+    ]);
+  });
+
+  it('una asignatura con una fila con docente y otra sin docente sigue apareciendo una vez', async () => {
+    const { planId } = await planDeEstudios();
+    const directa = await planMedicion(planId, 'DIRECTA');
+    const ev = await planEvaluacion(directa.id);
+    const p1 = await prisma.periodoMedicion.create({
+      data: { planMedicionId: directa.id, etiqueta: '2026-05', orden: 1 },
+    });
+    const p2 = await prisma.periodoMedicion.create({
+      data: { planMedicionId: directa.id, etiqueta: '2026-10', orden: 2 },
+    });
+    const [k, asig, docente] = [randomUUID(), randomUUID(), randomUUID()];
+    const m1 = await prisma.medicionAlcanzada.create({
+      data: { planEvaluacionId: ev.id, competenciaId: k, periodoId: p1.id },
+    });
+    const m2 = await prisma.medicionAlcanzada.create({
+      data: { planEvaluacionId: ev.id, competenciaId: k, periodoId: p2.id },
+    });
+    await prisma.asignaturaEvaluada.createMany({
+      data: [
+        { medicionAlcanzadaId: m1.id, asignaturaId: asig, entregable: 'Informe', docenteId: docente },
+        { medicionAlcanzadaId: m2.id, asignaturaId: asig, entregable: 'Informe' },
+      ],
+    });
+
+    expect(await repo.sinResponsableDe(planId)).toEqual([
+      { tipo: 'ASIGNATURA', referenciaId: asig },
+    ]);
+  });
+
   it('ignora los planes de evaluación que no están vigentes', async () => {
     const { planId } = await planDeEstudios();
     const indirecta = await planMedicion(planId, 'INDIRECTA');

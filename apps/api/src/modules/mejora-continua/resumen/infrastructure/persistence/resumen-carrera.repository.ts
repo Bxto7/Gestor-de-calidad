@@ -110,6 +110,7 @@ export class ResumenCarreraRepositoryPrisma implements LecturaResumenCarreraPort
           plan: { estado: 'VIGENTE', plan: { planEstudiosId, tipo: 'INDIRECTA' } },
         },
         select: { competenciaId: true },
+        distinct: ['competenciaId'],
       }),
       this.prisma.asignaturaEvaluada.findMany({
         where: {
@@ -117,6 +118,9 @@ export class ResumenCarreraRepositoryPrisma implements LecturaResumenCarreraPort
           medicion: { plan: { estado: 'VIGENTE', plan: { planEstudiosId, tipo: 'DIRECTA' } } },
         },
         select: { asignaturaId: true },
+        // Una asignatura evalúa varias competencias en varios periodos: una fila por
+        // medición. Para el Director es un solo curso sin docente.
+        distinct: ['asignaturaId'],
       }),
     ]);
 
