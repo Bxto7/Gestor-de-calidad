@@ -102,6 +102,10 @@ export async function listarCarreras(facultadId?: string): Promise<Carrera[]> {
   return filas.map(aCarrera);
 }
 
+export async function obtenerCarrera(id: string): Promise<Carrera> {
+  return aCarrera(await cliente.get<CarreraApi>(`/carreras/${id}`));
+}
+
 export async function crearCarrera(facultadId: string, datos: DatosCarrera): Promise<Carrera> {
   return aCarrera(await cliente.post<CarreraApi>(`/facultades/${facultadId}/carreras`, datos));
 }

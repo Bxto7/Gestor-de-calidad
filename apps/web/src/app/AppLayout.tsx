@@ -8,9 +8,11 @@
  */
 
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+import { obtenerCarrera } from '@/features/plan-estudios/api/plan-estudios.api';
 import { LimiteDeError } from '@/shared/components/LimiteDeError';
 import { ScopeSelector } from '@/shared/components/ui';
 
@@ -153,6 +155,16 @@ export function AppLayout() {
   const { identidad, salir, puede } = useSesion();
   const ubicacion = useLocation();
 
+  const { data: carrera, isError: carreraConError } = useQuery({
+    queryKey: ['carrera', identidad?.carreraACargo],
+    queryFn: () => obtenerCarrera(identidad!.carreraACargo!),
+    enabled: !!identidad?.carreraACargo,
+  });
+
+  const valorAmbito = !identidad?.carreraACargo
+    ? 'Universidad Continental'
+    : (carrera?.nombre ?? (carreraConError ? identidad.carreraACargo : 'Cargando…'));
+
   // Colapsado por título de sección — vacío por defecto: todas abiertas.
   // No persiste entre sesiones a propósito (Fase 0 no lo pide); si una
   // fase futura quiere recordarlo, es un cambio contenido a este estado.
@@ -221,10 +233,7 @@ export function AppLayout() {
             </span>
           </div>
 
-          <ScopeSelector
-            etiqueta="Ámbito"
-            valor={identidad?.carreraACargo ? 'Carrera asignada' : 'Universidad Continental'}
-          />
+          <ScopeSelector etiqueta="Ámbito" valor={valorAmbito} />
 
           <nav
             className="mt-2 flex flex-1 flex-col gap-1 overflow-y-auto px-3"
