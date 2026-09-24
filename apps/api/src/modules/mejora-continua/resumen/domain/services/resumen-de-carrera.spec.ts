@@ -263,6 +263,34 @@ describe('competencias bajo la meta', () => {
     ]);
   });
 
+  it('una meta con decimales (70.5 %) marca un 70 y se muestra sin redondear a entero', () => {
+    const r = calcularResumenDeCarrera(
+      entrada({
+        competencias,
+        medicion: medicion({
+          meta: 0.705,
+          resultados: [{ competenciaId: 'k1', periodoId: 'p1', porcentaje: 70 }],
+        }),
+      }),
+    );
+    expect(r.competenciasBajoMeta).toEqual([
+      { id: 'k1', codigo: 'CPE-01', nombre: 'Comunicación efectiva', alcanzado: 70, meta: 70.5 },
+    ]);
+  });
+
+  it('con meta entera (0.7) un resultado de 70 no se marca', () => {
+    const r = calcularResumenDeCarrera(
+      entrada({
+        competencias,
+        medicion: medicion({
+          meta: 0.7,
+          resultados: [{ competenciaId: 'k1', periodoId: 'p1', porcentaje: 70 }],
+        }),
+      }),
+    );
+    expect(r.competenciasBajoMeta).toEqual([]);
+  });
+
   it('una competencia justo en la meta no cuenta', () => {
     const r = calcularResumenDeCarrera(
       conResultados([{ competenciaId: 'k1', periodoId: 'p1', porcentaje: 70 }]),

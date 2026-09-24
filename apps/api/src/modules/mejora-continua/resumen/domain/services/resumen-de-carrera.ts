@@ -260,7 +260,8 @@ export function calcularResumenDeCarrera(entrada: EntradaResumenDeCarrera): Resu
 
   const competenciasBajoMeta: CompetenciaBajoMeta[] = [];
   if (entrada.medicion && referencia) {
-    const meta = Math.round(entrada.medicion.meta * 100);
+    // Un decimal, como el conversor canónico de `Meta`: una meta de 70.5 % es válida.
+    const meta = Number((entrada.medicion.meta * 100).toFixed(1));
     const conPlan = new Set(
       abiertos
         .filter((p) => p.aspecto === 'COMPETENCIA' && p.competenciaId !== null)
