@@ -183,4 +183,119 @@ describe('RenderizadorPdfActaKit', () => {
     expect(texto).toContain('Ana Pérez');
     expect(texto).toContain('Luis Gómez');
   });
+
+  describe('paginación con celdas largas', () => {
+    const largo =
+      'Se contratará personal de apoyo para la revisión sistemática de sílabos, la capacitación docente en metodologías activas, la adquisición de licencias de software especializado y la organización de talleres de retroalimentación con egresados y empleadores del sector tecnológico de la región Junín. ';
+    const accion = (prefijo: string, i: number) => ({
+      codigo: `${prefijo}-${String(i).padStart(2, '0')}`,
+      nombre: `Acción número ${i}: fortalecimiento de la enseñanza y evaluación por competencias`,
+      plazo: new Date('2026-12-15'),
+      recursos: largo.repeat(1 + (i % 3)),
+      metas: `Alcanzar al menos el 85 % de cumplimiento en el año. ${largo}`,
+      responsable: 'Dra. Ñusta Quispe Huamán — Coordinadora de Calidad',
+    });
+    const densa = (relleno: number): ActaParaDocumento =>
+      acta({
+        asistentes: ['Ana Pérez', 'José Ñahui', 'Lucía Ávila', 'Óscar Núñez', 'Carmen Poma', 'Miguel Sáenz', 'Rocío Béjar'],
+        acuerdo: largo.repeat(relleno).trim(),
+        criterios: [1, 2, 3, 4].map((i) => accion('CRIT', i)),
+        objetivos: [1, 2, 3, 4].map((i) => accion('OBJ', i)),
+        competencias: [1, 2, 3, 4, 5].map((i) => ({
+          ...accion('COMP', i),
+          resultado: 60 + i * 5,
+          meta: 70,
+          logrado: i % 2 === 0,
+        })),
+        resumen: { criterios: 4, objetivos: 4, competencias: 5, total: 13 },
+      });
+
+    /** Texto de cada página, en orden, sin el pie ni la cabecera repetidos. */
+    function textoPorPagina(pdf: Buffer): string[] {
+      const s = pdf.toString('latin1');
+      const objetos = new Map<string, string>();
+      for (const m of s.matchAll(/(?:^|\n)(\d+) 0 obj([\s\S]*?)endobj/g)) objetos.set(m[1]!, m[2]!);
+      const paginas: string[] = [];
+      for (const cuerpo of objetos.values()) {
+        if (!/\/Type\s*\/Page\b(?!s)/.test(cuerpo)) continue;
+        const ref = (/\/Contents\s+(\d+) 0 R/.exec(cuerpo))?.[1];
+        const flujo = ref ? objetos.get(ref)?.match(/stream\n([\s\S]*?)\nendstream/) : null; // PDFKit separa con \n; tolerar \r? recortaría un 0x0D final del flujo comprimido.
+        let texto = '';
+        if (flujo) {
+          const datos = inflateSync(Buffer.from(flujo[1]!, 'latin1')).toString('latin1');
+          texto = [...datos.matchAll(/<([0-9A-Fa-f]+)>/g)]
+            .map((x) => Buffer.from(x[1]!, 'hex').toString('latin1'))
+            .join('');
+        }
+        paginas.push(texto);
+      }
+      return paginas;
+    }
+
+    /**
+     * Cuerpo de la página: lo que hay entre la caja de control de la cabecera
+     * (que termina en su etiqueta «Página») y el pie («N de M» + «Documento
+     * generado…»). PDFKit escribe en ese orden.
+     */
+    function cuerpoDe(pagina: string): string {
+      const desde = pagina.indexOf('Página') + 'Página'.length;
+      const hasta = pagina.search(/\d+ de \d+Documento generado/);
+      return pagina.slice(desde, hasta);
+    }
+
+    // Se varía el relleno previo para que los saltos de página caigan en
+    // puntos distintos; cada variante debe cumplir las mismas reglas.
+    const variantes = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    it('ninguna página posterior a la portada queda casi vacía (fila partida con resto mínimo)', async () => {
+      for (const relleno of variantes) {
+        const paginas = textoPorPagina(await new RenderizadorPdfActaKit().render(densa(relleno)));
+        paginas.slice(1).forEach((p, i) => {
+          expect(cuerpoDe(p).length, `relleno ${relleno}, página ${i + 2}`).toBeGreaterThan(150);
+        });
+      }
+    });
+
+    it('cada fila de acción queda entera en una sola página', async () => {
+      for (const relleno of variantes) {
+        const paginas = textoPorPagina(await new RenderizadorPdfActaKit().render(densa(relleno)));
+        // Cada responsable empieza con "Dra." y termina en "Calidad": si la
+        // fila se parte entre páginas, una página tiene más de un extremo.
+        let inicios = 0;
+        paginas.forEach((p, i) => {
+          const c = cuerpoDe(p);
+          const a = c.split('Dra.').length - 1;
+          const f = c.split('Calidad').length - 1;
+          expect(f, `relleno ${relleno}, página ${i + 1}`).toBe(a);
+          inicios += a;
+        });
+        expect(inicios, `relleno ${relleno}`).toBe(13);
+      }
+    });
+
+    it('un título de subtabla nunca queda solo al final de una página, sin su primera fila', async () => {
+      for (const relleno of variantes) {
+        const paginas = textoPorPagina(await new RenderizadorPdfActaKit().render(densa(relleno)));
+        for (const [titulo, primera] of [
+          ['4.1 Criterios', 'CRIT-01'],
+          ['4.2 Objetivos', 'OBJ-01'],
+          ['4.3 Competencias', 'COMP-01'],
+        ] as const) {
+          const pagina = paginas.find((p) => p.includes(titulo));
+          expect(pagina, `${titulo} (relleno ${relleno})`).toBeDefined();
+          expect(pagina, `${titulo} sin ${primera} (relleno ${relleno})`).toContain(primera);
+        }
+      }
+    });
+
+    it('la cabecera muestra el número de página real, "N de M"', async () => {
+      const paginas = textoPorPagina(await new RenderizadorPdfActaKit().render(densa(3)));
+      expect(paginas.length).toBeGreaterThan(2);
+      paginas.forEach((p, i) => {
+        // Una vez en la cabecera y otra en el pie ("Página N de M").
+        const veces = p.split(`${i + 1} de ${paginas.length}`).length - 1;
+        expect(veces, `página ${i + 1}`).toBe(2);
+      });
+    });
+  });
 });

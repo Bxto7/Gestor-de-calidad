@@ -25,6 +25,11 @@ const MARGEN = mm(14);
 const ALTO_CABECERA = mm(22);
 const ALTO_PIE = mm(10);
 
+/** Y máxima donde puede terminar el contenido: por encima del pie. */
+function limiteInferior(doc: PDFKit.PDFDocument): number {
+  return doc.page.height - MARGEN - ALTO_PIE;
+}
+
 /** Colores reales del proyecto — ver §"Decisiones de arquitectura" del plan. */
 const COLOR = {
   navy: '#57019f',
@@ -156,7 +161,8 @@ function dibujarCabeceraInstitucional(doc: PDFKit.PDFDocument, acta: ActaParaDoc
     .font('Helvetica-Bold')
     .fontSize(6.5)
     .text('Página', xControl + 2, yFila + 2, { width: mm(20) - 4 });
-  // El número de página real se rellena en el pase final de `dibujarPieEnTodasLasPaginas`.
+  // El valor ("N de M") se escribe en el pase final de `dibujarPieEnTodasLasPaginas`,
+  // cuando ya se sabe M.
 
   doc.restore();
   doc.font('Helvetica').fillColor(COLOR.texto);
@@ -169,6 +175,20 @@ function dibujarCabeceraInstitucional(doc: PDFKit.PDFDocument, acta: ActaParaDoc
  * hace en un segundo pase sobre `doc.bufferedPageRange()`, igual que
  * `pieEnTodasLasPaginas` del renderer genérico (`pdfkit.renderer.ts`).
  */
+/** Escribe el valor de «Página» en la caja de control; la posición debe coincidir con `dibujarCabeceraInstitucional`. */
+function dibujarNumeroDePaginaEnCabecera(doc: PDFKit.PDFDocument, numero: number, total: number): void {
+  const anchoUtil = doc.page.width - MARGEN * 2;
+  const anchoControl = mm(58);
+  const xControl = MARGEN + anchoUtil - anchoControl;
+  const altoFila = (ALTO_CABECERA - mm(2)) / 4;
+  const yFila = MARGEN + mm(1) + altoFila * 3;
+  doc
+    .fillColor(COLOR.texto)
+    .font('Helvetica')
+    .fontSize(6.5)
+    .text(`${numero} de ${total}`, xControl + mm(20), yFila + 2, { width: anchoControl - mm(20) - 2 });
+}
+
 function dibujarPieEnTodasLasPaginas(
   doc: PDFKit.PDFDocument,
   codigoVerificacion: string,
@@ -186,6 +206,8 @@ function dibujarPieEnTodasLasPaginas(
     // patrón que `pieEnTodasLasPaginas` en platform/documentos/pdfkit.renderer.ts.
     const margenOriginal = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
+
+    dibujarNumeroDePaginaEnCabecera(doc, i + 1, rango.count);
 
     doc
       .save()
@@ -242,7 +264,8 @@ function dibujarCuerpo(doc: PDFKit.PDFDocument, acta: ActaParaDocumento): void {
   doc.font('Helvetica').fontSize(9).fillColor(COLOR.texto).text(acta.acuerdo, { align: 'justify' });
   doc.moveDown();
 
-  dibujarBarraDeSeccion(doc, 'IV', `PLAN DE MEJORA APROBADO (${acta.resumen.total} acciones)`);
+  // Reserva para el bloque inicial de 4.1 (título + cabecera + una fila típica).
+  dibujarBarraDeSeccion(doc, 'IV', `PLAN DE MEJORA APROBADO (${acta.resumen.total} acciones)`, mm(45));
   dibujarSubtabla(doc, `4.1 Criterios de Acreditación (${acta.criterios.length})`, [
     { titulo: 'Código', peso: 16 },
     { titulo: 'Acción de mejora', peso: 62 },
@@ -299,9 +322,18 @@ function dibujarCuerpo(doc: PDFKit.PDFDocument, acta: ActaParaDocumento): void {
   }
 }
 
-function dibujarBarraDeSeccion(doc: PDFKit.PDFDocument, numero: string, titulo: string): void {
+/**
+ * `reservaDespues`: alto que debe caber además de la barra, para que la barra
+ * no quede sola al pie de una página con su contenido en la siguiente.
+ */
+function dibujarBarraDeSeccion(
+  doc: PDFKit.PDFDocument,
+  numero: string,
+  titulo: string,
+  reservaDespues = mm(10),
+): void {
   const anchoUtil = doc.page.width - MARGEN * 2;
-  if (doc.y + mm(9) > doc.page.height - MARGEN - ALTO_PIE) doc.addPage();
+  if (doc.y + mm(9) + reservaDespues > limiteInferior(doc)) doc.addPage();
   doc.rect(MARGEN, doc.y, anchoUtil, mm(7)).fill(COLOR.navy);
   doc
     .fillColor(COLOR.blanco)
@@ -317,7 +349,7 @@ function dibujarTablaClaveValor(doc: PDFKit.PDFDocument, filas: readonly [string
   const anchoClave = anchoUtil * 0.25;
   for (const [clave, valor] of filas) {
     const alto = Math.max(mm(6), doc.heightOfString(valor, { width: anchoUtil - anchoClave - 8 }) + 6);
-    if (doc.y + alto > doc.page.height - MARGEN - ALTO_PIE) doc.addPage();
+    if (doc.y + alto > limiteInferior(doc)) doc.addPage();
     doc.rect(MARGEN, doc.y, anchoClave, alto).fill(COLOR.light);
     doc.rect(MARGEN + anchoClave, doc.y, anchoUtil - anchoClave, alto).stroke(COLOR.grid);
     doc
@@ -345,12 +377,52 @@ interface ColumnaTabla {
   readonly peso: number;
 }
 
+const TAM_CELDA = 7.8;
+const ALTO_MIN_FILA = mm(6);
+const RELLENO_VERTICAL_FILA = 4;
+/** Alto que ocupa el título de una subtabla (9 pt + `moveDown(0.3)`), con holgura. */
+const ALTO_TITULO_SUBTABLA = 9 * 1.15 * 1.3 + 2;
+
+/**
+ * Deja la fuente lista para una celda: negrita en la primera columna y en la
+ * de estado, normal en el resto. Se usa tanto al medir como al dibujar — con
+ * otra fuente o tamaño, `heightOfString` subestima la altura real y la fila
+ * se sale de la página.
+ */
+function fuenteDeCelda(doc: PDFKit.PDFDocument, negrita: boolean): void {
+  doc.font(negrita ? 'Helvetica-Bold' : 'Helvetica').fontSize(TAM_CELDA);
+}
+
+/**
+ * Altura real de una fila: la de su celda más alta, medida con el mismo ancho,
+ * fuente y tamaño con los que luego se dibuja, más el relleno vertical.
+ */
+function altoDeFila(
+  doc: PDFKit.PDFDocument,
+  fila: readonly string[],
+  anchos: readonly number[],
+  esNegrita: (columna: number) => boolean,
+): number {
+  const alturas = fila.map((celda, i) => {
+    fuenteDeCelda(doc, esNegrita(i));
+    return doc.heightOfString(celda, { width: anchos[i]! - 4 });
+  });
+  return Math.max(ALTO_MIN_FILA, Math.max(...alturas) + RELLENO_VERTICAL_FILA);
+}
+
 /**
  * Tabla genérica con cabecera de color, zebra en filas pares, bordes finos
  * y anchos proporcionales al `peso` de cada columna (§5 de la
  * especificación). Repite la fila de cabecera si la tabla se parte entre
- * páginas — sin un `KeepTogether` real de PDFKit, se aproxima reservando
- * el alto de la cabecera antes de decidir si hace falta una página nueva.
+ * páginas.
+ *
+ * Paginación: la altura de cada fila se mide entera antes de dibujarla y, si
+ * no cabe en lo que queda de página, se salta ANTES de dibujar, de modo que
+ * una fila nunca se parte entre páginas. Lo mismo vale para el bloque inicial
+ * (título de la subtabla + cabecera de columnas + primera fila): si no caben
+ * juntos, se mueven juntos. Una fila más alta que una página entera no cabe
+ * en ninguna; esa es la única que PDFKit seguiría partiendo.
+ *
  * `coloreado`, si se pasa, tiñe la celda de Estado de cada fila (LOGRADO en
  * verde, NO LOGRADO en rojo) — se asume que esa es siempre la penúltima
  * columna, que es como esta función se llama para 4.3.
@@ -361,25 +433,38 @@ function dibujarTabla(
   filas: readonly string[][],
   siVacia: string,
   coloreado?: readonly (boolean | null)[],
+  titulo?: string,
 ): void {
   const anchoUtil = doc.page.width - MARGEN * 2;
   const pesoTotal = columnas.reduce((s, c) => s + c.peso, 0);
   const anchos = columnas.map((c) => (c.peso / pesoTotal) * anchoUtil);
-  const altoFila = mm(6);
+  const altoCabeceraTabla = ALTO_MIN_FILA;
+  const esColumnaEstado = (i: number): boolean => coloreado !== undefined && i === columnas.length - 2;
+  const esNegrita = (i: number): boolean => i === 0 || esColumnaEstado(i);
+  const altos = filas.map((f) => altoDeFila(doc, f, anchos, esNegrita));
+  const altoTitulo = titulo === undefined ? 0 : ALTO_TITULO_SUBTABLA;
+  const altoPrimera = filas.length === 0 ? mm(8) : altos[0]!;
+
+  // Bloque inicial indivisible: título + cabecera + primera fila.
+  if (doc.y + altoTitulo + altoCabeceraTabla + altoPrimera > limiteInferior(doc)) doc.addPage();
+  if (titulo !== undefined) {
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(COLOR.navy).text(titulo);
+    doc.moveDown(0.3);
+  }
 
   function dibujarCabecera(): void {
-    if (doc.y + altoFila > doc.page.height - MARGEN - ALTO_PIE) doc.addPage();
+    const y = doc.y;
     let x = MARGEN;
     for (let i = 0; i < columnas.length; i++) {
-      doc.rect(x, doc.y, anchos[i]!, altoFila).fill(COLOR.blue);
+      doc.rect(x, y, anchos[i]!, altoCabeceraTabla).fill(COLOR.blue);
       doc
         .fillColor(COLOR.blanco)
         .font('Helvetica-Bold')
-        .fontSize(7.8)
-        .text(columnas[i]!.titulo, x + 2, doc.y + 2, { width: anchos[i]! - 4 });
+        .fontSize(TAM_CELDA)
+        .text(columnas[i]!.titulo, x + 2, y + 2, { width: anchos[i]! - 4 });
       x += anchos[i]!;
     }
-    doc.y += altoFila;
+    doc.y = y + altoCabeceraTabla;
     doc.fillColor(COLOR.texto).font('Helvetica');
   }
 
@@ -394,30 +479,30 @@ function dibujarTabla(
   }
 
   filas.forEach((fila, indiceFila) => {
-    const alturas = fila.map((celda, i) => doc.heightOfString(celda, { width: anchos[i]! - 4 }));
-    const alto = Math.max(altoFila, Math.max(...alturas) + 4);
+    const alto = altos[indiceFila]!;
 
-    if (doc.y + alto > doc.page.height - MARGEN - ALTO_PIE) {
+    if (doc.y + alto > limiteInferior(doc)) {
       doc.addPage();
       dibujarCabecera();
     }
 
+    // Todas las celdas de la fila parten de la misma `y`: `text()` con
+    // coordenadas explícitas mueve `doc.y`, y volver a leerlo en la celda
+    // siguiente la dibujaría más abajo que la anterior.
+    const yFila = doc.y;
     let x = MARGEN;
     const esLogrado = coloreado?.[indiceFila] ?? null;
     fila.forEach((celda, i) => {
-      const esColumnaEstado = coloreado !== undefined && i === columnas.length - 2;
-      const fondo = esColumnaEstado && esLogrado !== null ? (esLogrado ? COLOR.okBg : COLOR.koBg) : indiceFila % 2 === 1 ? COLOR.zebra : COLOR.blanco;
-      const tinta = esColumnaEstado && esLogrado !== null ? (esLogrado ? COLOR.okFg : COLOR.koFg) : COLOR.texto;
+      const estado = esColumnaEstado(i);
+      const fondo = estado && esLogrado !== null ? (esLogrado ? COLOR.okBg : COLOR.koBg) : indiceFila % 2 === 1 ? COLOR.zebra : COLOR.blanco;
+      const tinta = estado && esLogrado !== null ? (esLogrado ? COLOR.okFg : COLOR.koFg) : COLOR.texto;
 
-      doc.rect(x, doc.y, anchos[i]!, alto).fill(fondo).stroke(COLOR.grid);
-      doc
-        .fillColor(tinta)
-        .font(esColumnaEstado || i === 0 ? 'Helvetica-Bold' : 'Helvetica')
-        .fontSize(7.8)
-        .text(celda, x + 2, doc.y + 2, { width: anchos[i]! - 4 });
+      doc.rect(x, yFila, anchos[i]!, alto).fill(fondo).stroke(COLOR.grid);
+      fuenteDeCelda(doc, esNegrita(i));
+      doc.fillColor(tinta).text(celda, x + 2, yFila + 2, { width: anchos[i]! - 4 });
       x += anchos[i]!;
     });
-    doc.y += alto;
+    doc.y = yFila + alto;
   });
 
   doc.fillColor(COLOR.texto).font('Helvetica');
@@ -431,10 +516,7 @@ function dibujarSubtabla(
   filas: readonly string[][],
   coloreado?: readonly (boolean | null)[],
 ): void {
-  if (doc.y + mm(6) > doc.page.height - MARGEN - ALTO_PIE) doc.addPage();
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLOR.navy).text(titulo);
-  doc.moveDown(0.3);
-  dibujarTabla(doc, columnas, filas, 'Sin acciones registradas para este periodo.', coloreado);
+  dibujarTabla(doc, columnas, filas, 'Sin acciones registradas para este periodo.', coloreado, titulo);
 }
 
 function dibujarResumen(
@@ -450,7 +532,7 @@ function dibujarResumen(
   ];
   const anchoCelda = anchoUtil / celdas.length;
   const alto = mm(14);
-  if (doc.y + alto > doc.page.height - MARGEN - ALTO_PIE) doc.addPage();
+  if (doc.y + alto > limiteInferior(doc)) doc.addPage();
 
   celdas.forEach(([etiqueta, valor], i) => {
     const x = MARGEN + i * anchoCelda;
