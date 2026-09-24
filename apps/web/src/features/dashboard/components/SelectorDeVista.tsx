@@ -7,7 +7,6 @@
  */
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
-import type { RolVista } from '@/features/auth/domain/vista-principal';
 import { cn } from '@/shared/lib/cn';
 
 const ROLES_CON_VISTA_PROPIA = ['ADMIN_SISTEMA', 'DIRECTOR_CARRERA', 'DOCENTE'] as const;
@@ -37,7 +36,7 @@ export function SelectorDeVista() {
           type="button"
           role="tab"
           aria-selected={vistaActiva === rol}
-          onClick={() => cambiarVista(rol as RolVista)}
+          onClick={() => cambiarVista(rol)}
           className={cn(
             'rounded-md px-3 py-1.5 text-sm font-semibold transition',
             vistaActiva === rol

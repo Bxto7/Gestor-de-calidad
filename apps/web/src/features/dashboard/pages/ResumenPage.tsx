@@ -24,6 +24,8 @@ export function ResumenPage() {
 
   useEffect(() => {
     publicar({ migas: [{ etiqueta: 'Resumen' }], acciones: <SelectorDeVista /> });
+    // Páginas que nunca llaman `publicar` heredarían estas acciones si no se limpian.
+    return () => publicar({ migas: [], acciones: null });
     // `publicar` es estable dentro del render del layout; incluirlo dispararía
     // un bucle porque el contexto se recrea al publicar.
     // eslint-disable-next-line react-hooks/exhaustive-deps

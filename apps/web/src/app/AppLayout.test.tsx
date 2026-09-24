@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -27,6 +28,7 @@ vi.mock('@/features/plan-estudios/api/plan-estudios.api', async (importOriginal)
 }));
 
 import * as planEstudiosApi from '@/features/plan-estudios/api/plan-estudios.api';
+import { ResumenPage } from '@/features/dashboard/pages/ResumenPage';
 import { AppLayout } from './AppLayout';
 
 const identidadBase: Identidad = {
@@ -54,7 +56,7 @@ const sesionBase: ValorSesion = {
 // aparece en la cabecera del sidebar ("Universidad Continental"), así que
 // las aserciones sobre su valor se acotan a su propio contenedor.
 function ambito() {
-  return within(screen.getByText('Ámbito').parentElement as HTMLElement);
+  return within(screen.getByText('Ámbito').parentElement!);
 }
 
 function montar(sesion: Partial<ValorSesion>) {
@@ -73,6 +75,39 @@ function montar(sesion: Partial<ValorSesion>) {
     </QueryClientProvider>,
   );
 }
+
+describe('AppLayout — encabezado publicado por ResumenPage', () => {
+  it('el selector de vista no queda pegado al navegar a una página que no publica', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ContextoSesion.Provider
+          value={{
+            ...sesionBase,
+            identidad: { ...identidadBase, roles: ['ADMIN_SISTEMA', 'DOCENTE'] },
+            vistaActiva: 'ADMIN_SISTEMA',
+          }}
+        >
+          <MemoryRouter initialEntries={['/']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route index element={<ResumenPage />} />
+                <Route path="/usuarios" element={<div>pagina usuarios</div>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </ContextoSesion.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('tablist', { name: 'Cambiar vista' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Usuarios' }));
+
+    expect(screen.getByText('pagina usuarios')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'Cambiar vista' })).not.toBeInTheDocument();
+  });
+});
 
 describe('AppLayout — ScopeSelector', () => {
   it('sin carreraACargo (Admin), no llama obtenerCarrera y muestra el nombre institucional', () => {
