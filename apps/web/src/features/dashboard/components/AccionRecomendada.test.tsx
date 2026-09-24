@@ -44,4 +44,11 @@ describe('AccionRecomendada', () => {
       '/usuarios',
     );
   });
+
+  it('tiene indicador de foco visible', () => {
+    montar(['Ing. Civil']);
+    expect(screen.getByRole('link', { name: 'Asignar responsables' })).toHaveClass(
+      'focus-visible:outline-white',
+    );
+  });
 });

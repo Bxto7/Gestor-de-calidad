@@ -47,7 +47,7 @@ export function AccionRecomendada({ carreras }: Props) {
         </div>
         <Link
           to="/usuarios"
-          className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-uc-primary transition hover:brightness-95"
+          className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-uc-primary transition hover:brightness-95 focus-visible:outline-white"
         >
           Asignar responsables
         </Link>
