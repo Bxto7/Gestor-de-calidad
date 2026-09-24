@@ -114,7 +114,10 @@ import {
   type DirectorioDeUsuariosPort,
 } from './modules/auth/application/ports/directorio-usuarios.port.js';
 import { DirectorioDeUsuariosAdapter } from './modules/auth/infrastructure/directorio-usuarios.adapter.js';
-import { CONTEO_USUARIOS } from './modules/auth/application/ports/conteo-usuarios.port.js';
+import {
+  CONTEO_USUARIOS,
+  type ConteoDeUsuariosPort,
+} from './modules/auth/application/ports/conteo-usuarios.port.js';
 import { ConteoDeUsuariosAdapter } from './modules/auth/infrastructure/conteo-usuarios.adapter.js';
 import {
   DATOS_DOCUMENTO_MEDICION,
@@ -223,10 +226,12 @@ import {
 import { ACADEMICO_CROSS_MODULO } from './modules/academico/application/ports/academico-cross-modulo.port.js';
 import { GestionarFacultades } from './modules/academico/application/use-cases/gestionar-facultades.use-case.js';
 import { GestionarCarreras } from './modules/academico/application/use-cases/gestionar-carreras.use-case.js';
+import { ConsultarEstructuraInstitucional } from './modules/academico/application/use-cases/consultar-estructura-institucional.use-case.js';
 import {
   CarrerasController,
   FacultadesController,
 } from './modules/academico/infrastructure/http/academico.controller.js';
+import { EstructuraInstitucionalController } from './modules/academico/infrastructure/http/estructura-institucional.controller.js';
 import {
   CarreraRepositoryPrisma,
   FacultadRepositoryPrisma,
@@ -342,6 +347,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     UsuariosController,
     FacultadesController,
     CarrerasController,
+    EstructuraInstitucionalController,
     PlanesController,
     VersionesDeCarreraController,
     MallaController,
@@ -477,6 +483,16 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos),
+    },
+    {
+      provide: ConsultarEstructuraInstitucional,
+      inject: [REPOSITORIO_FACULTAD, REPOSITORIO_CARRERA, CONTEO_USUARIOS, AUTHORIZATION_PORT],
+      useFactory: (
+        facultades: RepositorioFacultadPort,
+        carreras: RepositorioCarreraPort,
+        conteo: ConteoDeUsuariosPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarEstructuraInstitucional(facultades, carreras, conteo, autorizacion),
     },
     {
       provide: GestionarUsuarios,
