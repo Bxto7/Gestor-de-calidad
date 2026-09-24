@@ -1,13 +1,15 @@
 /** @vitest-environment jsdom */
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { CtxEncabezado } from '@/app/encabezado';
 import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto-sesion';
 import type { RolVista } from '@/features/auth/domain/vista-principal';
 
+import * as estructuraApi from '../api/estructura.api';
 import { ResumenPage } from './ResumenPage';
 
 const sesionBase: ValorSesion = {
@@ -24,21 +26,31 @@ const sesionBase: ValorSesion = {
 };
 
 function montar(vistaActiva: RolVista | null) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <MemoryRouter>
-      <CtxEncabezado.Provider value={{ migas: [], acciones: null, publicar: () => undefined }}>
-        <ContextoSesion.Provider value={{ ...sesionBase, vistaActiva }}>
-          <ResumenPage />
-        </ContextoSesion.Provider>
-      </CtxEncabezado.Provider>
-    </MemoryRouter>,
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <CtxEncabezado.Provider value={{ migas: [], acciones: null, publicar: () => undefined }}>
+          <ContextoSesion.Provider value={{ ...sesionBase, vistaActiva }}>
+            <ResumenPage />
+          </ContextoSesion.Provider>
+        </CtxEncabezado.Provider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe('ResumenPage — despachador por rol', () => {
   it('ADMIN_SISTEMA muestra VistaAdminInicio', () => {
+    // Petición que no resuelve: basta el esqueleto propio de la vista para
+    // saber que el despachador montó `VistaAdminInicio` y no otra.
+    vi.spyOn(estructuraApi, 'obtenerEstructuraInstitucional').mockReturnValue(
+      new Promise(() => undefined),
+    );
     montar('ADMIN_SISTEMA');
-    expect(screen.getByText(/Vista de Administrador/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Cargando estructura institucional' }),
+    ).toBeInTheDocument();
   });
 
   it('DIRECTOR_CARRERA muestra VistaDirectorInicio', () => {
