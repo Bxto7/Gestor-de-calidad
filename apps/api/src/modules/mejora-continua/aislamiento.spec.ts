@@ -28,13 +28,15 @@ const RAIZ = import.meta.dirname;
 /**
  * Lo único que este módulo puede importar del Plan de Estudios.
  *
- * Dos puertos desde 2c-J-B: `contenido-curricular.port.js` (existente, de
- * `medicion`/`evaluacion`) y `acreditacion-cross-modulo.port.js` (nuevo, de
- * `mejora` — RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B).
+ * Tres puertos: `contenido-curricular.port.js` (existente, de
+ * `medicion`/`evaluacion`), `acreditacion-cross-modulo.port.js` (de `mejora` —
+ * RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B) y `plan-vigente.port.js`
+ * (de `resumen`, la vista de inicio del Director).
  */
 const PUERTO_PERMITIDO = [
   'ports/contenido-curricular.port.js',
   'ports/acreditacion-cross-modulo.port.js',
+  'ports/plan-vigente.port.js',
 ];
 
 /**
