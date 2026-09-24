@@ -9,12 +9,13 @@
  * en Borrador (RF-AC-017).
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
-import { ErrorDeNegocio } from '@/shared/api/cliente';
+import { ErrorDeNegocio, guardarArchivo } from '@/shared/api/cliente';
 import {
   AreaTexto,
   Badge,
@@ -27,14 +28,19 @@ import {
   Tarjeta,
 } from '@/shared/components/ui';
 
+import { descargarDocumentoActa } from '../api/actas.api';
+import { DocumentosDelActa } from '../components/DocumentosDelActa';
 import {
+  clavesActas,
   useActa,
   useActualizarSeleccionActa,
   useCargarAccionesActa,
   useContenidoActa,
+  useDocumentosActa,
   useEditarCabeceraActa,
   useEditarTextosActa,
   useEliminarActa,
+  useGenerarDocumentoActa,
   useReemplazarAsistentesActa,
   useTransicionarActa,
 } from '../api/queries';
@@ -141,7 +147,12 @@ export function ActaPage() {
         ejecutar={ejecutar}
       />
       <EstadoActaSeccion acta={acta} ejecutar={ejecutar} puede={puede} />
-      {editable && puede('actas.eliminar') && <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />}
+      {puede('actas.leer') && ESTADOS_EXPORTABLES.includes(acta.estado) && (
+        <ExportacionActaSeccion acta={acta} ejecutar={ejecutar} />
+      )}
+      {editable && puede('actas.eliminar') && (
+        <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />
+      )}
     </div>
   );
 }
@@ -575,6 +586,51 @@ function EstadoActaSeccion({
   );
 }
 
+/**
+ * RF-AC-018/019: exportar a PDF y Excel. Solo Aprobada y Emitida: el acta ya
+ * es un documento formal, y la primera exportación exitosa de una Aprobada la
+ * pasa a Emitida en el servidor. `GenerarDocumentoActa.encolar` exige
+ * `actas.leer` (exportar es leer) y no valida el estado; el filtro por estado
+ * es de la pantalla, por eso vive aquí y no en el permiso.
+ */
+const ESTADOS_EXPORTABLES: readonly Acta['estado'][] = ['Aprobada', 'Emitida'];
+
+function ExportacionActaSeccion({
+  acta,
+  ejecutar,
+}: {
+  acta: Acta;
+  ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const qc = useQueryClient();
+  const { data: documentos } = useDocumentosActa(acta.id);
+  const generar = useGenerarDocumentoActa(acta.id);
+
+  // El worker pasa el acta de Aprobada a Emitida al terminar la primera
+  // exportación: cuando aparece un documento listo, se vuelve a pedir el acta
+  // para que el badge y las transiciones reflejen el estado real.
+  const hayListo = (documentos ?? []).some((d) => d.estado === 'Listo');
+  useEffect(() => {
+    if (hayListo && acta.estado === 'Aprobada') {
+      void qc.invalidateQueries({ queryKey: clavesActas.acta(acta.id) });
+    }
+  }, [hayListo, acta.estado, acta.id, qc]);
+
+  return (
+    <Tarjeta>
+      <h2 className="mb-4 text-sm font-semibold text-tinta">Exportar el acta</h2>
+      <DocumentosDelActa
+        documentos={documentos ?? []}
+        generando={generar.isPending}
+        onGenerar={(tipo) => void ejecutar(() => generar.mutateAsync(tipo))}
+        onDescargar={(idDocumento) =>
+          void ejecutar(async () => guardarArchivo(await descargarDocumentoActa(idDocumento)))
+        }
+      />
+    </Tarjeta>
+  );
+}
+
 /** RF-AC-015 RN1: el rechazo obliga a comentario. */
 function ModalObservacion({
   etiqueta,
@@ -647,9 +703,15 @@ function EliminarActaSeccion({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-tinta">Eliminar acta</h2>
-          <p className="text-sm text-tinta-suave">Solo posible mientras el acta está en Borrador.</p>
+          <p className="text-sm text-tinta-suave">
+            Solo posible mientras el acta está en Borrador.
+          </p>
         </div>
-        <Boton variante="peligro" disabled={eliminar.isPending} onClick={() => setConfirmando(true)}>
+        <Boton
+          variante="peligro"
+          disabled={eliminar.isPending}
+          onClick={() => setConfirmando(true)}
+        >
           {eliminar.isPending ? 'Eliminando…' : 'Eliminar acta'}
         </Boton>
       </div>

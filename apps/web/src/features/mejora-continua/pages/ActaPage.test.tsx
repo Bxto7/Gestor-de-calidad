@@ -45,8 +45,17 @@ vi.mock('../api/actas.api', async (importOriginal) => ({
   obtenerContenidoActa: vi
     .fn()
     .mockResolvedValue({ ...actaDePrueba, acciones: [] } satisfies ContenidoActa),
+  documentosDeActa: vi.fn().mockResolvedValue([]),
+  generarDocumentoActa: vi.fn(),
+  descargarDocumentoActa: vi.fn(),
 }));
 
+vi.mock('@/shared/api/cliente', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/api/cliente')>()),
+  guardarArchivo: vi.fn(),
+}));
+
+import { guardarArchivo } from '@/shared/api/cliente';
 import * as actasApi from '../api/actas.api';
 import { ActaPage } from './ActaPage';
 
@@ -119,7 +128,9 @@ describe('RF-AC-003/004/006 — cabecera del acta', () => {
 
 describe('RF-AC-005 — asistentes', () => {
   it('reemplazar asistentes llama a reemplazarAsistentesActa con la lista completa', async () => {
-    const reemplazar = vi.spyOn(actasApi, 'reemplazarAsistentesActa').mockResolvedValue(actaDePrueba);
+    const reemplazar = vi
+      .spyOn(actasApi, 'reemplazarAsistentesActa')
+      .mockResolvedValue(actaDePrueba);
     montar();
     await screen.findByDisplayValue(actaDePrueba.titulo);
 
@@ -135,7 +146,9 @@ describe('RF-AC-005 — asistentes', () => {
 
 describe('RF-AC-007/008 — acciones del periodo', () => {
   it('cargar acciones llama a cargarAccionesActa', async () => {
-    const cargar = vi.spyOn(actasApi, 'cargarAccionesActa').mockResolvedValue({ cantidadCargada: 2 });
+    const cargar = vi
+      .spyOn(actasApi, 'cargarAccionesActa')
+      .mockResolvedValue({ cantidadCargada: 2 });
     montar();
     await screen.findByDisplayValue(actaDePrueba.titulo);
 
@@ -189,7 +202,9 @@ describe('RF-AC-007/008 — acciones del periodo', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: /reforzar el syllabus/i }));
 
     await waitFor(() => {
-      expect(actualizar).toHaveBeenCalledWith('acta-1', [{ planMejoraId: 'plan-1', incluida: false }]);
+      expect(actualizar).toHaveBeenCalledWith('acta-1', [
+        { planMejoraId: 'plan-1', incluida: false },
+      ]);
     });
   });
 });
@@ -343,5 +358,63 @@ describe('RF-AC-015 — motivo del último rechazo', () => {
     await screen.findByDisplayValue(actaDePrueba.titulo);
 
     expect(screen.queryByText(/motivo del último rechazo/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('RF-AC-018/019 — exportar el acta a PDF y Excel', () => {
+  const trabajo = {
+    id: 'doc-1',
+    tipo: 'ACTA_PDF' as const,
+    estado: 'En cola' as const,
+    nombreArchivo: null,
+    bytes: null,
+    error: null,
+    solicitadoEn: '2026-09-24T10:00:00.000Z',
+  };
+
+  it.each(['Aprobada', 'Emitida'] as const)(
+    'en %s ofrece exportar y pide el tipo elegido',
+    async (estado) => {
+      vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado });
+      const generar = vi.mocked(actasApi.generarDocumentoActa).mockResolvedValue(trabajo);
+      montar();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Exportar PDF' }));
+      await waitFor(() => expect(generar).toHaveBeenCalledWith('acta-1', 'ACTA_PDF'));
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }));
+      await waitFor(() => expect(generar).toHaveBeenCalledWith('acta-1', 'ACTA_EXCEL'));
+    },
+  );
+
+  it.each(['Borrador', 'En revisión'] as const)('en %s no ofrece exportar', async (estado) => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado });
+    montar();
+    await screen.findByText(actaDePrueba.codigo);
+
+    expect(screen.queryByRole('button', { name: /exportar/i })).not.toBeInTheDocument();
+  });
+
+  it('sin actas.leer no ofrece exportar', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado: 'Aprobada' });
+    montar({ ...sesionDePrueba, puede: (permiso) => permiso !== 'actas.leer' });
+    await screen.findByText(actaDePrueba.codigo);
+
+    expect(screen.queryByRole('button', { name: /exportar/i })).not.toBeInTheDocument();
+  });
+
+  it('un documento listo se descarga y se guarda desde memoria', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado: 'Emitida' });
+    vi.mocked(actasApi.documentosDeActa).mockResolvedValue([
+      { ...trabajo, estado: 'Listo', nombreArchivo: 'ACTA_001.pdf', bytes: 2048 },
+    ]);
+    const archivo = { blob: new Blob(['x']), nombreArchivo: 'ACTA_001.pdf' };
+    vi.mocked(actasApi.descargarDocumentoActa).mockResolvedValue(archivo);
+    montar();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Descargar' }));
+
+    await waitFor(() => expect(actasApi.descargarDocumentoActa).toHaveBeenCalledWith('doc-1'));
+    await waitFor(() => expect(guardarArchivo).toHaveBeenCalledWith(archivo));
   });
 });
