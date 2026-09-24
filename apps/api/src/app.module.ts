@@ -114,6 +114,8 @@ import {
   type DirectorioDeUsuariosPort,
 } from './modules/auth/application/ports/directorio-usuarios.port.js';
 import { DirectorioDeUsuariosAdapter } from './modules/auth/infrastructure/directorio-usuarios.adapter.js';
+import { CONTEO_USUARIOS } from './modules/auth/application/ports/conteo-usuarios.port.js';
+import { ConteoDeUsuariosAdapter } from './modules/auth/infrastructure/conteo-usuarios.adapter.js';
 import {
   DATOS_DOCUMENTO_MEDICION,
   REPOSITORIO_DOCUMENTOS_MEDICION,
@@ -427,6 +429,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // La otra frontera: `auth` pone el nombre donde Mejora Continua solo tiene
     // un identificador, sin que nadie consulte su tabla de usuarios (§3.2).
     { provide: DIRECTORIO_USUARIOS, useClass: DirectorioDeUsuariosAdapter },
+    { provide: CONTEO_USUARIOS, useClass: ConteoDeUsuariosAdapter },
     { provide: REPOSITORIO_DOCUMENTOS_MEDICION, useClass: DocumentoMedicionRepositoryPrisma },
     { provide: DATOS_DOCUMENTO_MEDICION, useClass: DatosDocumentoMedicionRepositoryPrisma },
     { provide: REPOSITORIO_DOCUMENTOS_EVALUACION, useClass: DocumentoEvaluacionRepositoryPrisma },
