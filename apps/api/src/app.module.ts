@@ -110,6 +110,18 @@ import {
 } from './modules/plan-estudios/application/ports/contenido-curricular.port.js';
 import { ContenidoCurricularAdapter } from './modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
 import {
+  PLAN_VIGENTE_DE_CARRERA,
+  type PlanVigenteDeCarreraPort,
+} from './modules/plan-estudios/application/ports/plan-vigente.port.js';
+import { PlanVigenteAdapter } from './modules/plan-estudios/infrastructure/plan-vigente.adapter.js';
+import { ConsultarResumenDeCarrera } from './modules/mejora-continua/resumen/application/use-cases/consultar-resumen-de-carrera.use-case.js';
+import {
+  LECTURA_RESUMEN_CARRERA,
+  type LecturaResumenCarreraPort,
+} from './modules/mejora-continua/resumen/application/ports/lectura-resumen-carrera.port.js';
+import { ResumenCarreraRepositoryPrisma } from './modules/mejora-continua/resumen/infrastructure/persistence/resumen-carrera.repository.js';
+import { ResumenCarreraController } from './modules/mejora-continua/resumen/infrastructure/http/resumen-carrera.controller.js';
+import {
   DIRECTORIO_USUARIOS,
   type DirectorioDeUsuariosPort,
 } from './modules/auth/application/ports/directorio-usuarios.port.js';
@@ -386,6 +398,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     ResultadosController,
     DocentesController,
     PlanesMejoraController,
+    ResumenCarreraController,
     EvidenciasPlanMejoraController,
     ActasController,
     DocumentosDelPlanMejoraController,
@@ -433,6 +446,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // La frontera entre módulos: lo expone `plan-estudios` y lo consume
     // `mejora-continua`, que solo conoce la interfaz (§3.2).
     { provide: CONTENIDO_CURRICULAR, useClass: ContenidoCurricularAdapter },
+    { provide: PLAN_VIGENTE_DE_CARRERA, useClass: PlanVigenteAdapter },
+    { provide: LECTURA_RESUMEN_CARRERA, useClass: ResumenCarreraRepositoryPrisma },
     { provide: REPOSITORIO_PLAN_MEDICION, useClass: PlanMedicionRepositoryPrisma },
     { provide: REPOSITORIO_PLAN_EVALUACION, useClass: PlanEvaluacionRepositoryPrisma },
     {
@@ -514,6 +529,21 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         conteo: ConteoDeUsuariosPort,
         autorizacion: AuthorizationPort,
       ) => new ConsultarEstructuraInstitucional(facultades, carreras, conteo, autorizacion),
+    },
+    {
+      provide: ConsultarResumenDeCarrera,
+      inject: [
+        LECTURA_RESUMEN_CARRERA,
+        PLAN_VIGENTE_DE_CARRERA,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+      ],
+      useFactory: (
+        lectura: LecturaResumenCarreraPort,
+        planVigente: PlanVigenteDeCarreraPort,
+        contenido: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+      ) => new ConsultarResumenDeCarrera(lectura, planVigente, contenido, autorizacion),
     },
     {
       provide: GestionarUsuarios,
