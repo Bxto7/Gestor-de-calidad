@@ -122,6 +122,13 @@ import {
 import { ResumenCarreraRepositoryPrisma } from './modules/mejora-continua/resumen/infrastructure/persistence/resumen-carrera.repository.js';
 import { ResumenCarreraController } from './modules/mejora-continua/resumen/infrastructure/http/resumen-carrera.controller.js';
 import {
+  REPOSITORIO_MIS_EVIDENCIAS,
+  type RepositorioMisEvidenciasPort,
+} from './modules/mejora-continua/mis-evidencias/application/ports/mis-evidencias.port.js';
+import { GestionarMisEvidencias } from './modules/mejora-continua/mis-evidencias/application/use-cases/gestionar-mis-evidencias.use-case.js';
+import { MisEvidenciasController } from './modules/mejora-continua/mis-evidencias/infrastructure/http/mis-evidencias.controller.js';
+import { MisEvidenciasRepositoryPrisma } from './modules/mejora-continua/mis-evidencias/infrastructure/persistence/mis-evidencias.repository.js';
+import {
   DIRECTORIO_USUARIOS,
   type DirectorioDeUsuariosPort,
 } from './modules/auth/application/ports/directorio-usuarios.port.js';
@@ -399,6 +406,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     DocentesController,
     PlanesMejoraController,
     ResumenCarreraController,
+    MisEvidenciasController,
     EvidenciasPlanMejoraController,
     ActasController,
     DocumentosDelPlanMejoraController,
@@ -448,6 +456,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: CONTENIDO_CURRICULAR, useClass: ContenidoCurricularAdapter },
     { provide: PLAN_VIGENTE_DE_CARRERA, useClass: PlanVigenteAdapter },
     { provide: LECTURA_RESUMEN_CARRERA, useClass: ResumenCarreraRepositoryPrisma },
+    { provide: REPOSITORIO_MIS_EVIDENCIAS, useClass: MisEvidenciasRepositoryPrisma },
     { provide: REPOSITORIO_PLAN_MEDICION, useClass: PlanMedicionRepositoryPrisma },
     { provide: REPOSITORIO_PLAN_EVALUACION, useClass: PlanEvaluacionRepositoryPrisma },
     {
@@ -544,6 +553,23 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         contenido: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
       ) => new ConsultarResumenDeCarrera(lectura, planVigente, contenido, autorizacion),
+    },
+    {
+      provide: GestionarMisEvidencias,
+      inject: [
+        REPOSITORIO_MIS_EVIDENCIAS,
+        PLAN_VIGENTE_DE_CARRERA,
+        CONTENIDO_CURRICULAR,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        repositorio: RepositorioMisEvidenciasPort,
+        planVigente: PlanVigenteDeCarreraPort,
+        contenido: ContenidoCurricularPort,
+        autorizacion: AuthorizationPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarMisEvidencias(repositorio, planVigente, contenido, autorizacion, eventos),
     },
     {
       provide: GestionarUsuarios,
