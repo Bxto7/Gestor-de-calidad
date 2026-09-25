@@ -110,6 +110,18 @@ const SECCIONES: readonly SeccionNav[] = [
     ],
   },
   {
+    titulo: 'Mi trabajo',
+    enlaces: [
+      {
+        a: '/mis-evidencias',
+        etiqueta: 'Mis evidencias',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'evidencia.registrar',
+      },
+    ],
+  },
+  {
     titulo: 'Sistema',
     enlaces: [
       {

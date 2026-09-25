@@ -1,0 +1,187 @@
+/**
+ * Una evaluación asignada al docente, con sus evidencias y el formulario para
+ * agregar más.
+ *
+ * Es una región con nombre (asignatura · competencia · periodo): con varias
+ * tarjetas en la página, «Enlace de la evidencia» a secas se repite una vez por
+ * tarjeta y no distingue nada; el nombre de la región sí (WCAG 2.4.6).
+ */
+
+import { useState, type FormEvent } from 'react';
+
+import { Boton, Campo, Entrada, Tarjeta } from '@/shared/components/ui';
+
+import type { EvaluacionAsignada } from '../api/mis-evidencias.api';
+
+interface Props {
+  readonly evaluacion: EvaluacionAsignada;
+  readonly onAgregar: (
+    asignaturaEvaluadaId: string,
+    datos: { enlace: string; descripcion: string },
+  ) => Promise<void>;
+  readonly onRetirar: (evidenciaId: string) => Promise<void>;
+}
+
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/** `2026-07-15` → `15 jul`. A mano: `toLocaleDateString` depende del ICU de cada entorno. */
+function fechaCorta(iso: string): string {
+  const [, mes, dia] = iso.split('-');
+  return `${Number(dia)} ${MESES[Number(mes) - 1] ?? ''}`;
+}
+
+const mensajeDe = (fallo: unknown): string =>
+  fallo instanceof Error ? fallo.message : 'No se pudo completar la operación.';
+
+export function TarjetaEvaluacion({ evaluacion, onAgregar, onRetirar }: Props) {
+  const [enlace, setEnlace] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [errores, setErrores] = useState<{ enlace?: string; descripcion?: string }>({});
+  const [errorDeEnvio, setErrorDeEnvio] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [porConfirmar, setPorConfirmar] = useState<string | null>(null);
+  const [errorDeRetiro, setErrorDeRetiro] = useState<string | null>(null);
+
+  const nombre = `${evaluacion.asignatura.nombre} · ${evaluacion.competencia.codigo} · ${evaluacion.periodo.etiqueta}`;
+
+  async function agregar(e: FormEvent) {
+    e.preventDefault();
+    const enlaceLimpio = enlace.trim();
+    const descripcionLimpia = descripcion.trim();
+
+    const nuevos: { enlace?: string; descripcion?: string } = {};
+    if (!enlaceLimpio) nuevos.enlace = 'Escribe el enlace de la evidencia.';
+    else if (!/^https?:\/\//i.test(enlaceLimpio)) {
+      nuevos.enlace = 'El enlace debe empezar por http:// o https://.';
+    }
+    if (!descripcionLimpia) nuevos.descripcion = 'Escribe una descripción.';
+    setErrores(nuevos);
+    if (nuevos.enlace || nuevos.descripcion) return;
+
+    setEnviando(true);
+    setErrorDeEnvio(null);
+    try {
+      await onAgregar(evaluacion.id, { enlace: enlaceLimpio, descripcion: descripcionLimpia });
+      setEnlace('');
+      setDescripcion('');
+    } catch (fallo) {
+      setErrorDeEnvio(mensajeDe(fallo));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function retirar(evidenciaId: string) {
+    setErrorDeRetiro(null);
+    try {
+      await onRetirar(evidenciaId);
+      setPorConfirmar(null);
+    } catch (fallo) {
+      setErrorDeRetiro(mensajeDe(fallo));
+      setPorConfirmar(null);
+    }
+  }
+
+  return (
+    <Tarjeta role="region" aria-label={nombre} className="space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-tinta">
+          {evaluacion.competencia.codigo} · {evaluacion.competencia.nombre}
+        </p>
+        <p className="mt-0.5 text-xs text-tinta-suave">
+          {evaluacion.entregable} · Periodo {evaluacion.periodo.etiqueta} ·{' '}
+          {evaluacion.periodo.fechaCierre
+            ? `cierra el ${fechaCorta(evaluacion.periodo.fechaCierre)}`
+            : 'sin fecha de cierre'}
+        </p>
+      </div>
+
+      {evaluacion.evidencias.length === 0 ? (
+        <p className="text-sm text-tinta-suave">
+          Aún no registraste evidencias en esta evaluación.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {evaluacion.evidencias.map((ev) => (
+            <li key={ev.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <a
+                href={ev.enlace}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-uc-primary underline-offset-2 hover:underline"
+              >
+                {ev.descripcion}
+              </a>
+              {ev.propia &&
+                (porConfirmar === ev.id ? (
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-tinta-suave">¿Retirar esta evidencia?</span>
+                    <Boton tamano="sm" variante="peligro" onClick={() => void retirar(ev.id)}>
+                      Confirmar
+                    </Boton>
+                    <Boton tamano="sm" variante="fantasma" onClick={() => setPorConfirmar(null)}>
+                      Cancelar
+                    </Boton>
+                  </span>
+                ) : (
+                  <Boton
+                    tamano="sm"
+                    variante="fantasma"
+                    aria-label={`Retirar ${ev.descripcion}`}
+                    onClick={() => setPorConfirmar(ev.id)}
+                  >
+                    Retirar
+                  </Boton>
+                ))}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {errorDeRetiro && (
+        <p role="alert" className="text-xs font-medium text-alerta-fg">
+          {errorDeRetiro}
+        </p>
+      )}
+
+      {evaluacion.puedeAgregar ? (
+        <form onSubmit={(e) => void agregar(e)} noValidate className="grid gap-3 sm:grid-cols-2">
+          <Campo etiqueta="Enlace de la evidencia" error={errores.enlace}>
+            {(props) => (
+              <Entrada
+                {...props}
+                type="url"
+                inputMode="url"
+                value={enlace}
+                onChange={(e) => setEnlace(e.target.value)}
+                placeholder="https://"
+              />
+            )}
+          </Campo>
+          <Campo etiqueta="Descripción" error={errores.descripcion}>
+            {(props) => (
+              <Entrada
+                {...props}
+                maxLength={200}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+              />
+            )}
+          </Campo>
+          <div className="sm:col-span-2">
+            <Boton type="submit" variante="primario" disabled={enviando}>
+              Agregar evidencia
+            </Boton>
+          </div>
+          {errorDeEnvio && (
+            <p role="alert" className="text-xs font-medium text-alerta-fg sm:col-span-2">
+              {errorDeEnvio}
+            </p>
+          )}
+        </form>
+      ) : (
+        <p className="text-sm text-tinta-suave">Esta evaluación ya tiene 20 evidencias.</p>
+      )}
+    </Tarjeta>
+  );
+}

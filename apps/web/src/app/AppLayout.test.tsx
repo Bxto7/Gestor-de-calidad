@@ -137,3 +137,18 @@ describe('AppLayout — ScopeSelector', () => {
     expect(screen.getByText('contenido')).toBeInTheDocument();
   });
 });
+
+describe('AppLayout — entrada «Mis evidencias»', () => {
+  it('aparece cuando el usuario tiene evidencia.registrar', () => {
+    montar({ puede: (permiso: string) => permiso === 'evidencia.registrar' });
+    expect(screen.getByRole('link', { name: 'Mis evidencias' })).toHaveAttribute(
+      'href',
+      '/mis-evidencias',
+    );
+  });
+
+  it('no aparece sin el permiso', () => {
+    montar({ puede: () => false });
+    expect(screen.queryByRole('link', { name: 'Mis evidencias' })).not.toBeInTheDocument();
+  });
+});
