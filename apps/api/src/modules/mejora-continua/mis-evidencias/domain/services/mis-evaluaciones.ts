@@ -118,6 +118,8 @@ export function armarMisEvaluaciones(entrada: EntradaMisEvaluaciones): MisEvalua
   vistas.sort(
     (a, b) =>
       a.vista.asignatura.codigo.localeCompare(b.vista.asignatura.codigo) ||
+      // Las desconocidas comparten código «—»: sin esto sus grupos se intercalan por fecha.
+      a.vista.asignatura.id.localeCompare(b.vista.asignatura.id) ||
       marcaDeFecha(a.origen.periodo.fechaCierre) - marcaDeFecha(b.origen.periodo.fechaCierre) ||
       a.vista.competencia.codigo.localeCompare(b.vista.competencia.codigo) ||
       a.vista.id.localeCompare(b.vista.id),

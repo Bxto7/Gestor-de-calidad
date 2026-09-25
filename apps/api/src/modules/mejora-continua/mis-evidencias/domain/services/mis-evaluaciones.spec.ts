@@ -161,6 +161,22 @@ describe('armarMisEvaluaciones — fechas y orden', () => {
     expect(r.map((e) => e.id)).toEqual(['bd-k1', 'bd-k2', 'bd-tarde', 'sin-fecha', 'ed', 'rc']);
   });
 
+  it('agrupa contiguas las evaluaciones de una misma asignatura aunque no esté en el plan', () => {
+    // Desconocidas: comparten código «—», así que solo el id las separa.
+    const cierre = (mes: number) => ({
+      id: `p${mes}`,
+      etiqueta: `M${mes}`,
+      fechaCierre: new Date(Date.UTC(2026, mes, 15)),
+    });
+    const r = armar([
+      evaluacion({ id: 'e1', asignaturaId: 'u1', periodo: cierre(5) }),
+      evaluacion({ id: 'e2', asignaturaId: 'u2', periodo: cierre(6) }),
+      evaluacion({ id: 'e3', asignaturaId: 'u1', periodo: cierre(11) }),
+    ]);
+    expect(r.map((e) => e.asignatura.id)).toEqual(['u1', 'u1', 'u2']);
+    expect(r.map((e) => e.id)).toEqual(['e1', 'e3', 'e2']);
+  });
+
   it('desempata por id para que el orden sea determinista', () => {
     const r = armar([evaluacion({ id: 'z' }), evaluacion({ id: 'a' })]);
     expect(r.map((e) => e.id)).toEqual(['a', 'z']);
