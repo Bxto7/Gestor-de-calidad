@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CtxEncabezado } from '@/app/encabezado';
 import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto-sesion';
 import type { RolVista } from '@/features/auth/domain/vista-principal';
+import * as misEvidenciasApi from '@/features/mejora-continua/api/mis-evidencias.api';
 
 import * as estructuraApi from '../api/estructura.api';
 import * as resumenApi from '../api/resumen-carrera.api';
@@ -73,8 +74,13 @@ describe('ResumenPage — despachador por rol', () => {
   });
 
   it('DOCENTE muestra VistaDocenteInicio', () => {
-    montar('DOCENTE');
-    expect(screen.getByText(/Vista de Docente/)).toBeInTheDocument();
+    // Petición que no resuelve: basta el esqueleto propio de la vista para
+    // saber que el despachador montó `VistaDocenteInicio` y no otra.
+    vi.spyOn(misEvidenciasApi, 'listarMisEvaluaciones').mockReturnValue(
+      new Promise(() => undefined),
+    );
+    montar('DOCENTE', 'c1');
+    expect(screen.getByRole('status', { name: 'Cargando tu resumen' })).toBeInTheDocument();
   });
 
   it('COORDINADOR_ACADEMICO cae en ResumenGenerico', () => {
