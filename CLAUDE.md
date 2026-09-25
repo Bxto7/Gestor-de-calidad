@@ -90,6 +90,37 @@ Se están construyendo **en paralelo**:
 > El cruce sirve además para detectar erratas: destapó una prueba que decía
 > cubrir un `RF-PM-080` que no existe en ningún documento.
 
+### Vistas de inicio por rol
+
+No tienen ficha de requisito en ningún documento, así que **no entran en la cuenta
+de arriba**. Al 25 de septiembre de 2026 hay tres vistas propias —Administrador
+(estructura institucional), Director de carrera (resumen de su carrera) y Docente—;
+Coordinador y Consultor caen en el resumen genérico. `SelectorDeVista` deja cambiar
+de pestaña a quien tenga varios de esos roles, y desde 4b cuenta también al
+Coordinador: sin eso, un Coordinador y Docente a la vez tenía un solo rol «con
+vista propia» y no veía el selector.
+
+La del Docente se hizo en dos ciclos:
+
+- **4a — Mis evidencias.** Un Docente registra y retira **enlaces** de evidencia,
+  solo en las evaluaciones que tiene asignadas en un plan de evaluación Vigente, y
+  solo las suyas (`Evidencia.registradaPorId`, permiso `evidencia.registrar`).
+  Endpoints `/mejora-continua/mis-evaluaciones`, página `/mis-evidencias`.
+- **4b — Inicio del Docente** (25 de septiembre de 2026). Solo frontend: sale de la
+  misma consulta de 4a, con su misma clave de caché. Tres KPIs (asignaturas,
+  evidencias pendientes, competencias que evalúa), la tarjeta «Vence pronto» con el
+  botón «Subir evidencia», «Mis plazos» (máximo cinco) y el puente a Reportes. El
+  cálculo vive en `dashboard/domain/vista-docente.ts`.
+
+Dos decisiones de 4b que no se deducen del código a simple vista: una evaluación
+está **pendiente si no tiene ninguna evidencia**, sea de quien sea (importa que
+quede respaldada, no quién la respaldó); y las ya vencidas siguen contando como
+pendientes y van primero. Las evaluaciones sin fecha de cierre no generan plazo.
+
+Pendiente: la prueba de accesibilidad con `axe-core` cubre las vistas de inicio del
+Administrador y del Director y la página Mis evidencias, pero **no la de inicio del
+Docente**.
+
 ### Fuera de alcance en MVP 1 (pero la arquitectura debe dejar espacio)
 
 - Más módulos de gestión de calidad (no definidos aún en detalle)
