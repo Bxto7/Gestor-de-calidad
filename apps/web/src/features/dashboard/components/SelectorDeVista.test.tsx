@@ -62,6 +62,28 @@ describe('SelectorDeVista', () => {
     expect(screen.queryByRole('tab', { name: 'Director de carrera' })).not.toBeInTheDocument();
   });
 
+  it('un Coordinador que además es Docente puede llegar a la pestaña Docente', async () => {
+    const cambiarVista = vi.fn<(vista: RolVista) => void>();
+    montar({
+      identidad: { ...identidadBase, roles: ['COORDINADOR_ACADEMICO', 'DOCENTE'] },
+      vistaActiva: 'COORDINADOR_ACADEMICO',
+      cambiarVista,
+    });
+    expect(screen.getByRole('tab', { name: 'Coordinador' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Docente' }));
+    expect(cambiarVista).toHaveBeenCalledWith('DOCENTE');
+  });
+
+  it('un Coordinador sin otro rol con vista propia sigue sin selector', () => {
+    const { container } = montar({
+      identidad: { ...identidadBase, roles: ['COORDINADOR_ACADEMICO'] },
+    });
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('marca aria-selected en la pestaña de vistaActiva', () => {
     montar({
       identidad: { ...identidadBase, roles: ['ADMIN_SISTEMA', 'DOCENTE'] },

@@ -9,11 +9,19 @@
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { cn } from '@/shared/lib/cn';
 
-const ROLES_CON_VISTA_PROPIA = ['ADMIN_SISTEMA', 'DIRECTOR_CARRERA', 'DOCENTE'] as const;
+// El Coordinador entra por el resumen genérico, pero cuenta como pestaña: sin ella, quien es
+// Coordinador y Docente a la vez vería un solo rol y no tendría cómo llegar a la vista Docente.
+const ROLES_CON_VISTA_PROPIA = [
+  'ADMIN_SISTEMA',
+  'DIRECTOR_CARRERA',
+  'COORDINADOR_ACADEMICO',
+  'DOCENTE',
+] as const;
 
 const ETIQUETA: Record<(typeof ROLES_CON_VISTA_PROPIA)[number], string> = {
   ADMIN_SISTEMA: 'Administrador',
   DIRECTOR_CARRERA: 'Director de carrera',
+  COORDINADOR_ACADEMICO: 'Coordinador',
   DOCENTE: 'Docente',
 };
 
