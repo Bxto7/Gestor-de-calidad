@@ -117,9 +117,11 @@ está **pendiente si no tiene ninguna evidencia**, sea de quien sea (importa que
 quede respaldada, no quién la respaldó); y las ya vencidas siguen contando como
 pendientes y van primero. Las evaluaciones sin fecha de cierre no generan plazo.
 
-Pendiente: la prueba de accesibilidad con `axe-core` cubre las vistas de inicio del
-Administrador y del Director y la página Mis evidencias, pero **no la de inicio del
-Docente**.
+La prueba de accesibilidad con `axe-core` (`tests/e2e/specs/accesibilidad.spec.ts`)
+cubre las tres vistas de inicio y la página Mis evidencias. Con la cuenta
+`e2e-docente@sgc.local` —sin evaluaciones asignadas— analiza el **estado vacío** del
+Docente (KPIs en cero y «Estás al día»); el estado con datos lo cubren las pruebas de
+componente, no axe.
 
 ### Fuera de alcance en MVP 1 (pero la arquitectura debe dejar espacio)
 

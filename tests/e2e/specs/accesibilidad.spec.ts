@@ -317,8 +317,20 @@ test.describe('con la cuenta de docente', () => {
   // «Mis evidencias» depende del permiso `evidencia.registrar`, que solo tiene el
   // rol Docente. Sin evaluaciones asignadas en un plan de evaluación vigente
   // —el estado de esta cuenta en la base de pruebas— la página muestra su estado
-  // vacío; el estado con datos lo cubren las pruebas de componente.
+  // vacío; el estado con datos lo cubren las pruebas de componente. Lo mismo vale
+  // para el inicio: con cero evaluaciones enseña los KPIs en cero y «Estás al día».
   test.use({ rol: 'docente' });
+
+  test('la vista de inicio del docente', async ({ page }) => {
+    await page.goto('/');
+    // Con contenido real: esperar al saludo —«Hola, E2E», por el nombre «E2E
+    // Docente» de la cuenta— descarta analizar el esqueleto de carga, que no
+    // distingue «sin problemas» de «axe nunca vio los datos».
+    await expect(page.getByRole('heading', { level: 1, name: 'Hola, E2E' })).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Cargando tu resumen' })).toBeHidden();
+
+    await analizar(page, 'la vista de inicio del docente');
+  });
 
   test('la página Mis evidencias', async ({ page }) => {
     await page.goto('/mis-evidencias');
