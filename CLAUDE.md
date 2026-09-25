@@ -30,8 +30,8 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 25 de septiembre de 2026: **241 de 243 requisitos contables construidos**,
-> un 99 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> Al 25 de septiembre de 2026: **243 de 243 requisitos contables construidos**,
+> un 100 %. El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
 >
@@ -42,7 +42,7 @@ Se están construyendo **en paralelo**:
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
 > | Mejora Continua · Evaluación (`RF-PE`) | 49 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 47 | 47 |
-> | Mejora Continua · Actas (`RF-AC`) | 25 | 27 |
+> | Mejora Continua · Actas (`RF-AC`) | 27 | 27 |
 >
 > La cuenta sale de cruzar los `RF-` distintos del documento fuente con sus
 > citas en `apps/api/src` y `apps/web/src`, **pero el cruce no basta por sí
@@ -77,7 +77,7 @@ Se están construyendo **en paralelo**:
 >   construidos desde 2c-J-A/2c-J-B (vía `transicionar` y el patrón
 >   `exigir()`/bitácora que usa cada método), solo les faltaba el comentario
 >   que los nombrara. No queda ningún `RF-PJ` citado sin construir.
-> - **`RF-AC`: 25 de 27, en `mejora-continua/actas`.** Se hizo en cuatro
+> - **`RF-AC`: 27 de 27, en `mejora-continua/actas`.** Se hizo en cuatro
 >   tramos. 2c-AC-A (15 de septiembre de 2026): el núcleo del Acta de
 >   Aprobación, `RF-AC-000` a `006` (crear, correlativo por carrera,
 >   título/objetivo autogenerados, cabecera de reunión y asistentes). 2c-AC-B
@@ -98,13 +98,22 @@ Se están construyendo **en paralelo**:
 >   documento— (`026`). Solo `023`, `025` y `026` se citan por su número; `024`
 >   está construido sin comentario que lo nombre. Es el mismo caso que
 >   `RF-PJ-043` a `046`, y por eso cuentan.
-> - **`RF-AC` pendientes: `021` y `022`.** `022` es el claro: los eventos se
->   registran, pero no hay endpoint ni pantalla para **consultar** el histórico
->   de modificaciones de un acta, que es lo que pide el requisito. `021`
->   (consultar un acta Aprobada, Emitida o Histórica en solo lectura, con el
->   Consultor como actor) queda cubierto de hecho por el bloqueo de edición de
->   `RF-AC-017` —solo Borrador se edita—, pero ninguna comprobación lo cita ni
->   lo prueba como requisito propio; se deja sin contar hasta tenerla.
+> - **`RF-AC-021` y `022`: cerrados el 25 de septiembre de 2026, solo frontend.**
+>   `022` (histórico de modificaciones): los eventos ya se guardaban en
+>   `audit_log`, pero nadie podía **consultarlos**. Ahora el detalle del acta trae
+>   la sección «Historial de modificaciones» (`HistorialDelActa`), que lee
+>   `/auditoria` con `entidad=ActaAprobacion` y solo se pinta con `auditoria.leer`
+>   o `auditoria.leer_entidad` —Administrador, Director y Coordinador—; Consultor y
+>   Docente no lo ven. Muestra el texto que ya guardan los eventos («cabecera
+>   editada»), a nivel de acción y no de campo con valor anterior y nuevo. `021`
+>   (consultar un acta Aprobada, Emitida o Histórica sin poder editarla): el bloqueo
+>   ya existía por `RF-AC-017`; lo que se añadió es el aviso «Esta acta está
+>   {estado} y no admite cambios» y las pruebas de los tres estados con un
+>   Consultor y con un Coordinador que sí tiene `actas.editar`.
+>
+> Con esto el 100 % dice que **cada requisito con ficha tiene su código**, no que
+> esté probado uno por uno: `023` a `026` cuentan por el patrón, sin una prueba
+> propia cada uno.
 >
 > El cruce sirve además para detectar erratas: destapó una prueba que decía
 > cubrir un `RF-PM-080` que no existe en ningún documento.
