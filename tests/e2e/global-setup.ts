@@ -25,13 +25,10 @@ export const CUENTAS = {
   lector: { email: 'e2e-lector@sgc.local' },
   director: { email: 'e2e-director@sgc.local' },
   admin: { email: 'e2e-admin@sgc.local' },
+  // «Mis evidencias» solo la ve el rol Docente. Cada cuenta gasta uno de los
+  // cinco accesos por minuto del login: con esta la suite consume los cinco.
+  docente: { email: 'e2e-docente@sgc.local' },
 } as const;
-
-// `e2e-docente@sgc.local` existe —lo crea `crear-usuario.ts`, y el desplegable
-// de responsables lo necesita— pero no está aquí a propósito: ninguna prueba
-// navega como docente, y cada cuenta de esta tabla gasta uno de los cinco
-// accesos por minuto que admite el login. Añadirla costaría un quinto acceso
-// para escribir un `docente.json` que nadie lee.
 
 export type Rol = keyof typeof CUENTAS;
 
@@ -57,7 +54,7 @@ async function entrar(email: string, password: string): Promise<Sesion> {
     if (login.status === 429) {
       throw new Error(
         'Demasiados intentos de acceso: el login admite cinco por minuto y esta ' +
-          'suite gasta cuatro por ejecución. Espera un minuto y vuelve a lanzarla.',
+          'suite gasta cinco por ejecución. Espera un minuto y vuelve a lanzarla.',
       );
     }
 

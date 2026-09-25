@@ -312,3 +312,22 @@ test.describe('con la cuenta de director', () => {
     await analizar(page, 'la vista de inicio del director');
   });
 });
+
+test.describe('con la cuenta de docente', () => {
+  // «Mis evidencias» depende del permiso `evidencia.registrar`, que solo tiene el
+  // rol Docente. Sin evaluaciones asignadas en un plan de evaluación vigente
+  // —el estado de esta cuenta en la base de pruebas— la página muestra su estado
+  // vacío; el estado con datos lo cubren las pruebas de componente.
+  test.use({ rol: 'docente' });
+
+  test('la página Mis evidencias', async ({ page }) => {
+    await page.goto('/mis-evidencias');
+    // Con contenido real: esperar a que el esqueleto desaparezca y aparezca el
+    // título descarta analizar la carga, que no distingue «sin problemas» de
+    // «axe nunca vio la página».
+    await expect(page.getByRole('heading', { level: 1, name: 'Mis evidencias' })).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Cargando tus evaluaciones' })).toBeHidden();
+
+    await analizar(page, 'la página Mis evidencias del docente');
+  });
+});
