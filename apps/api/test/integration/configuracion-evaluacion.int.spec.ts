@@ -360,6 +360,97 @@ describe('el repositorio', () => {
     ]);
   });
 
+  it('reemplazar conserva la autoría de las evidencias que no cambian', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+    const { mediciones } = await repo.del(plan.id);
+    const ae = mediciones[0]!.asignaturas[0]!;
+    await prisma.evidencia.createMany({
+      data: [
+        {
+          asignaturaEvaluadaId: ae.id,
+          enlace: 'https://del-docente',
+          descripcion: 'Del docente',
+          orden: 0,
+          registradaPorId: RESPONSABLE,
+        },
+        {
+          asignaturaEvaluadaId: ae.id,
+          enlace: 'https://del-coordinador',
+          descripcion: 'Del coordinador',
+          orden: 1,
+          registradaPorId: null,
+        },
+      ],
+    });
+
+    // El coordinador reenvía la lista completa, con una evidencia nueva al final.
+    await repo.reemplazarEvidencias(ae.id, [
+      { enlace: 'https://del-docente', descripcion: 'Del docente' },
+      { enlace: 'https://del-coordinador', descripcion: 'Del coordinador' },
+      { enlace: 'https://nueva', descripcion: 'Nueva' },
+    ]);
+
+    const filas = await prisma.evidencia.findMany({
+      where: { asignaturaEvaluadaId: ae.id },
+      orderBy: { orden: 'asc' },
+    });
+    expect(filas.map((f) => [f.descripcion, f.registradaPorId])).toEqual([
+      ['Del docente', RESPONSABLE],
+      ['Del coordinador', null],
+      // La nueva no hereda ninguna autoría: no la inventa.
+      ['Nueva', null],
+    ]);
+  });
+
+  it('reemplazar pierde la autoría si el coordinador cambia el enlace o la descripción', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+    const { mediciones } = await repo.del(plan.id);
+    const ae = mediciones[0]!.asignaturas[0]!;
+    await prisma.evidencia.create({
+      data: {
+        asignaturaEvaluadaId: ae.id,
+        enlace: 'https://a',
+        descripcion: 'Original',
+        orden: 0,
+        registradaPorId: RESPONSABLE,
+      },
+    });
+
+    await repo.reemplazarEvidencias(ae.id, [{ enlace: 'https://a', descripcion: 'Corregida' }]);
+
+    const [fila] = await prisma.evidencia.findMany({ where: { asignaturaEvaluadaId: ae.id } });
+    expect(fila?.descripcion).toBe('Corregida');
+    expect(fila?.registradaPorId).toBeNull();
+  });
+
+  it('reemplazar quita las evidencias del docente que el coordinador ya no envía', async () => {
+    const plan = await crearEvaluacion();
+    await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
+      { asignaturaId: ASIG1, entregable: 'Proyecto', docenteId: null },
+    ]);
+    const { mediciones } = await repo.del(plan.id);
+    const ae = mediciones[0]!.asignaturas[0]!;
+    await prisma.evidencia.create({
+      data: {
+        asignaturaEvaluadaId: ae.id,
+        enlace: 'https://a',
+        descripcion: 'Del docente',
+        orden: 0,
+        registradaPorId: RESPONSABLE,
+      },
+    });
+
+    await repo.reemplazarEvidencias(ae.id, []);
+
+    expect(await prisma.evidencia.count({ where: { asignaturaEvaluadaId: ae.id } })).toBe(0);
+  });
+
   it('planDeAsignaturaEvaluada dice de qué plan es, y null si no existe', async () => {
     const plan = await crearEvaluacion();
     await repo.reemplazarAsignaturas(plan.id, CMP1, PER1, [
@@ -378,7 +469,11 @@ describe('el repositorio', () => {
     // «Guardar» sin haber tocado esa fila.
     const plan = await crearEvaluacion();
     await repo.reemplazarIndicaciones(plan.id, ANIO1, [
-      { grupoObjetivo: 'EGRESADOS', instruccion: 'Encuesta anual', enlaceInstrumento: 'https://e.test/f' },
+      {
+        grupoObjetivo: 'EGRESADOS',
+        instruccion: 'Encuesta anual',
+        enlaceInstrumento: 'https://e.test/f',
+      },
     ]);
     const [i] = (await repo.del(plan.id)).indicaciones;
     await repo.guardarResultados(i!.id, 'https://e.test/r');

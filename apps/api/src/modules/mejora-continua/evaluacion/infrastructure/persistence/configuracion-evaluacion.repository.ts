@@ -265,6 +265,19 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
     evidencias: readonly { enlace: string; descripcion: string }[],
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      // Quien reenvía la lista completa (el coordinador) no debe convertir en
+      // «ajenas» las evidencias que registró un docente: las filas que no
+      // cambian conservan su autoría, la clave es el par enlace + descripción.
+      const existentes = await tx.evidencia.findMany({
+        where: { asignaturaEvaluadaId },
+        select: { enlace: true, descripcion: true, registradaPorId: true },
+      });
+      const autoria = new Map<string, string | null>();
+      for (const e of existentes) {
+        const clave = `${e.enlace}\u0000${e.descripcion}`;
+        if (!autoria.has(clave)) autoria.set(clave, e.registradaPorId);
+      }
+
       await tx.evidencia.deleteMany({ where: { asignaturaEvaluadaId } });
       if (evidencias.length === 0) return;
       await tx.evidencia.createMany({
@@ -273,6 +286,7 @@ export class ConfiguracionEvaluacionRepositoryPrisma implements RepositorioConfi
           enlace: e.enlace,
           descripcion: e.descripcion,
           orden: indice,
+          registradaPorId: autoria.get(`${e.enlace}\u0000${e.descripcion}`) ?? null,
         })),
       });
     });
