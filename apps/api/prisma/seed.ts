@@ -86,6 +86,11 @@ const PERMISOS = [
     'Aprobar, observar y dar vigencia a un plan de evaluación',
     'mejora-continua',
   ],
+  [
+    'evidencia.registrar',
+    'Registrar evidencias de las evaluaciones que tiene asignadas',
+    'mejora-continua',
+  ],
 
   // Mejora continua — Planes de Mejora
   ['mejora.leer', 'Consultar planes de mejora', 'mejora-continua'],
@@ -304,6 +309,9 @@ const ROLES: {
       // Ve en qué periodos se mide la competencia de la asignatura que dicta.
       'medicion.leer',
       'evaluacion.leer',
+      // Registra las evidencias de las evaluaciones que le asignaron (spec de
+      // evidencias del docente): escritura acotada a su carrera.
+      'evidencia.registrar',
       'mejora.leer',
       'actas.leer',
       'reporte.generar',

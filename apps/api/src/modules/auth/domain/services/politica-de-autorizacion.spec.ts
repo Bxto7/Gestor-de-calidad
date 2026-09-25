@@ -161,9 +161,18 @@ describe('los permisos de mejora-continua se acotan a la carrera', () => {
   });
 
   it.each([
-    'medicion.crear', 'medicion.editar', 'medicion.eliminar', 'medicion.aprobar',
-    'evaluacion.crear', 'evaluacion.editar', 'evaluacion.eliminar', 'evaluacion.aprobar',
-    'mejora.crear', 'mejora.editar', 'mejora.eliminar', 'mejora.aprobar',
+    'medicion.crear',
+    'medicion.editar',
+    'medicion.eliminar',
+    'medicion.aprobar',
+    'evaluacion.crear',
+    'evaluacion.editar',
+    'evaluacion.eliminar',
+    'evaluacion.aprobar',
+    'mejora.crear',
+    'mejora.editar',
+    'mejora.eliminar',
+    'mejora.aprobar',
   ])('%s sobre la carrera de otro se deniega', (permiso) => {
     const d = puede(contexto([permiso], 'carrera-A'), permiso, 'carrera-B');
     expect(d.permitido).toBe(false);
@@ -177,6 +186,24 @@ describe('los permisos de mejora-continua se acotan a la carrera', () => {
       expect(puede(contexto([permiso], 'carrera-A'), permiso, 'carrera-B').permitido).toBe(true);
     },
   );
+
+  it('evidencia.registrar se acota: registrar evidencias en la carrera de otro se deniega', () => {
+    const d = puede(
+      contexto(['evidencia.registrar'], 'carrera-A'),
+      'evidencia.registrar',
+      'carrera-B',
+    );
+    expect(d.permitido).toBe(false);
+  });
+
+  it('evidencia.registrar sobre la propia carrera se permite', () => {
+    const d = puede(
+      contexto(['evidencia.registrar'], 'carrera-A'),
+      'evidencia.registrar',
+      'carrera-A',
+    );
+    expect(d.permitido).toBe(true);
+  });
 
   it('un permiso acotado sin carrera se deniega, no se asume', () => {
     // Es la propiedad que hace seguro este refactor: si una llamada olvida

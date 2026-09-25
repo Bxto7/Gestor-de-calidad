@@ -64,6 +64,9 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
   'actas.editar',
   'actas.eliminar',
   'actas.aprobar',
+  // El docente registra evidencias solo en la carrera del plan de la
+  // evaluación que le asignaron: es escritura, y esta lista existe para eso.
+  'evidencia.registrar',
 ]);
 
 export type Decision =

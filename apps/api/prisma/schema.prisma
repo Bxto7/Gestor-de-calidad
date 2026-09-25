@@ -1113,6 +1113,11 @@ model Evidencia {
   /// Sin ella, cinco enlaces en un expediente son cinco URLs indistinguibles.
   descripcion String @db.VarChar(200)
   orden       Int    @default(0) @db.SmallInt
+  /// Quién la registró, si fue un docente por su cuenta. Nulo: la registró un
+  /// coordinador o es anterior a este campo — el docente no puede retirarla.
+  /// Sin clave foránea, como `docenteId` en `AsignaturaEvaluada`: el registro
+  /// debe seguir siendo legible aunque la cuenta desaparezca.
+  registradaPorId String? @map("registrada_por_id") @db.Uuid
 
   asignatura AsignaturaEvaluada @relation(fields: [asignaturaEvaluadaId], references: [id], onDelete: Cascade)
 
