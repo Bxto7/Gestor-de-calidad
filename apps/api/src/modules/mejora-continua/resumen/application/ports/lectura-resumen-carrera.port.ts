@@ -28,7 +28,7 @@ export interface LecturaResumenCarreraPort {
    */
   medicionDirectaVigente(planEstudiosId: string): Promise<MedicionLeida | null>;
 
-  /** Los planes de mejora de la carrera, salvo las versiones históricas. */
+  /** Los planes de mejora de la carrera: la versión más reciente de cada linaje, salvo las históricas. */
   planesMejoraDeCarrera(carreraId: string): Promise<readonly PlanMejoraLeido[]>;
 
   /** Actas de la carrera que no están Emitidas ni Históricas. */

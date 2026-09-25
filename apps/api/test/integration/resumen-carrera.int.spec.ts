@@ -193,6 +193,60 @@ describe('planesMejoraDeCarrera', () => {
       plazo: new Date('2026-10-12'),
     });
   });
+
+  it('de un linaje versionado trae solo la versión más nueva', async () => {
+    const { carreraId } = await planDeEstudios();
+    const origen = await prisma.planMejora.create({
+      data: {
+        ...definicion,
+        codigo: 'PM-O',
+        aspecto: 'CRITERIO_ACREDITACION',
+        carreraId,
+        estado: 'VIGENTE',
+      },
+    });
+    await prisma.planMejora.create({
+      data: {
+        ...definicion,
+        codigo: 'PM-O-V2',
+        aspecto: 'CRITERIO_ACREDITACION',
+        carreraId,
+        estado: 'BORRADOR',
+        derivadoDeId: origen.id,
+      },
+    });
+
+    const r = await repo.planesMejoraDeCarrera(carreraId);
+
+    expect(r.map((p) => p.codigo)).toEqual(['PM-O-V2']);
+  });
+
+  it('si la versión derivada es histórica, el origen sigue contando', async () => {
+    const { carreraId } = await planDeEstudios();
+    const origen = await prisma.planMejora.create({
+      data: {
+        ...definicion,
+        codigo: 'PM-O',
+        aspecto: 'CRITERIO_ACREDITACION',
+        carreraId,
+        estado: 'VIGENTE',
+      },
+    });
+    await prisma.planMejora.create({
+      data: {
+        ...definicion,
+        codigo: 'PM-O-V2',
+        aspecto: 'CRITERIO_ACREDITACION',
+        carreraId,
+        estado: 'HISTORICO',
+        derivadoDeId: origen.id,
+      },
+    });
+
+    const r = await repo.planesMejoraDeCarrera(carreraId);
+
+    expect(r.map((p) => p.codigo)).toEqual(['PM-O']);
+  });
 });
 
 describe('actasPorCerrarDeCarrera', () => {
@@ -308,7 +362,7 @@ describe('sinResponsableDe', () => {
     await prisma.asignaturaEvaluada.createMany({
       data: mediciones.map((m) => ({
         medicionAlcanzadaId: m.id,
-        asignaturaId: asig!,
+        asignaturaId: asig,
         entregable: 'Informe',
       })),
     });
@@ -337,7 +391,12 @@ describe('sinResponsableDe', () => {
     });
     await prisma.asignaturaEvaluada.createMany({
       data: [
-        { medicionAlcanzadaId: m1.id, asignaturaId: asig, entregable: 'Informe', docenteId: docente },
+        {
+          medicionAlcanzadaId: m1.id,
+          asignaturaId: asig,
+          entregable: 'Informe',
+          docenteId: docente,
+        },
         { medicionAlcanzadaId: m2.id, asignaturaId: asig, entregable: 'Informe' },
       ],
     });

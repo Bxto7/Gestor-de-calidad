@@ -72,7 +72,14 @@ export class ResumenCarreraRepositoryPrisma implements LecturaResumenCarreraPort
 
   async planesMejoraDeCarrera(carreraId: string): Promise<readonly PlanMejoraLeido[]> {
     const filas = await this.prisma.planMejora.findMany({
-      where: { carreraId, estado: { not: 'HISTORICO' } },
+      // La versión más reciente de cada linaje, salvo las históricas: una versión
+      // nueva copia nombre, plazo y responsable, y el origen sigue Vigente hasta
+      // que alguien lo archiva; contar ambas duplicaría la misma acción.
+      where: {
+        carreraId,
+        estado: { not: 'HISTORICO' },
+        derivados: { none: { estado: { not: 'HISTORICO' } } },
+      },
       select: {
         id: true,
         codigo: true,
