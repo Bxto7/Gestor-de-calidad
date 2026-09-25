@@ -341,7 +341,7 @@ function FormularioUsuario({
         */}
         <Campo
           etiqueta="Carrera sobre la que tiene alcance"
-          ayuda="Obligatoria para los roles que conceden permisos acotados a una carrera, como Director o Coordinador."
+          ayuda="Obligatoria para los roles que conceden permisos acotados a una carrera, como Director, Coordinador o Docente."
         >
           {(props) => (
             <Selector {...props} value={carreraId} onChange={(e) => setCarreraId(e.target.value)}>

@@ -42,9 +42,9 @@ const dos: MisEvaluaciones = {
   ],
 };
 
-const sesion = (carreraACargo: string | null): ValorSesion => ({
+const sesion = (carreraACargo: string | null, usuarioId = 'u1'): ValorSesion => ({
   identidad: {
-    id: 'u1',
+    id: usuarioId,
     nombre: 'Jorge Huamán',
     permisos: ['evidencia.registrar'],
     roles: ['DOCENTE'],
@@ -64,20 +64,21 @@ const sesion = (carreraACargo: string | null): ValorSesion => ({
 function montar(
   carreraACargo: string | null = 'c1',
   qc = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  usuarioId = 'u1',
 ) {
   const publicar = vi.fn();
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
         <CtxEncabezado.Provider value={{ migas: [], acciones: null, publicar }}>
-          <ContextoSesion.Provider value={sesion(carreraACargo)}>
+          <ContextoSesion.Provider value={sesion(carreraACargo, usuarioId)}>
             <MisEvidenciasPage />
           </ContextoSesion.Provider>
         </CtxEncabezado.Provider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  return { publicar };
+  return { publicar, unmount };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -116,6 +117,9 @@ describe('MisEvidenciasPage', () => {
     montar(null);
 
     expect(screen.getByText('Esta vista necesita una carrera asignada.')).toBeInTheDocument();
+    // Un docente no puede abrir Usuarios: se le dice a quién pedirlo, sin enlace.
+    expect(screen.getByText(/Pide a un administrador/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ir a Usuarios' })).not.toBeInTheDocument();
     expect(espia).not.toHaveBeenCalled();
   });
 
@@ -266,11 +270,18 @@ describe('MisEvidenciasPage', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
-  it('la lista en caché de otro usuario no se muestra al nuevo mientras carga la suya', () => {
-    vi.spyOn(api, 'listarMisEvaluaciones').mockReturnValue(new Promise(() => undefined));
+  it('la lista en caché de otro usuario no se muestra al nuevo mientras carga la suya', async () => {
+    const listar = vi.spyOn(api, 'listarMisEvaluaciones').mockResolvedValueOnce(dos);
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(['mis-evaluaciones', 'otro-usuario', 'c1'], dos);
-    montar('c1', qc);
+
+    // Primero entra otro usuario y la lista de su carrera queda en la caché compartida.
+    const anterior = montar('c1', qc, 'otro-usuario');
+    expect(await screen.findByRole('heading', { level: 2, name: 'Base de Datos' })).toBeVisible();
+    anterior.unmount();
+
+    // Luego entra u1 en la misma carrera, y su lista tarda: no debe ver la de aquel.
+    listar.mockReturnValue(new Promise(() => undefined));
+    montar('c1', qc, 'u1');
 
     expect(screen.getByRole('status', { name: 'Cargando tus evaluaciones' })).toBeInTheDocument();
     expect(screen.queryByText('Base de Datos')).not.toBeInTheDocument();

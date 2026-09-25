@@ -32,6 +32,21 @@ function fechaCorta(iso: string): string {
 
 const ENLACE_SEGURO = /^https?:\/\//i;
 
+/**
+ * Espejo del `IsUrl({ require_protocol: true })` del servidor (que exige además un
+ * dominio con punto): así el fallo sale en español junto al campo y no como un 400.
+ */
+function validarEnlace(enlace: string): string | null {
+  if (!enlace) return 'Escribe el enlace de la evidencia.';
+  if (!ENLACE_SEGURO.test(enlace)) return 'El enlace debe empezar por http:// o https://.';
+  try {
+    if (new URL(enlace).hostname.includes('.')) return null;
+  } catch {
+    // Cae al mensaje de enlace mal formado.
+  }
+  return 'Escribe un enlace válido, por ejemplo https://ejemplo.pe/documento.';
+}
+
 const mensajeDe = (fallo: unknown): string =>
   fallo instanceof Error ? fallo.message : 'No se pudo completar la operación.';
 
@@ -54,10 +69,8 @@ export function TarjetaEvaluacion({ evaluacion, onAgregar, onRetirar }: Props) {
     const descripcionLimpia = descripcion.trim();
 
     const nuevos: { enlace?: string; descripcion?: string } = {};
-    if (!enlaceLimpio) nuevos.enlace = 'Escribe el enlace de la evidencia.';
-    else if (!ENLACE_SEGURO.test(enlaceLimpio)) {
-      nuevos.enlace = 'El enlace debe empezar por http:// o https://.';
-    }
+    const falloDeEnlace = validarEnlace(enlaceLimpio);
+    if (falloDeEnlace) nuevos.enlace = falloDeEnlace;
     if (!descripcionLimpia) nuevos.descripcion = 'Escribe una descripción.';
     setErrores(nuevos);
     if (nuevos.enlace || nuevos.descripcion) return;

@@ -25,6 +25,15 @@ export interface MisEvaluaciones {
   evaluaciones: EvaluacionAsignada[];
 }
 
+/**
+ * Clave de caché de la lista. Lleva el usuario: la caché de react-query sobrevive a un
+ * cierre de sesión y sin él el siguiente docente vería un instante la lista del anterior.
+ */
+export const claveMisEvaluaciones = (
+  identidadId: string | null | undefined,
+  carreraACargo: string | null | undefined,
+) => ['mis-evaluaciones', identidadId ?? null, carreraACargo ?? null] as const;
+
 export function listarMisEvaluaciones(): Promise<MisEvaluaciones> {
   return cliente.get<MisEvaluaciones>('/mejora-continua/mis-evaluaciones');
 }

@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { cliente } from '@/shared/api/cliente';
 
-import { agregarEvidencia, listarMisEvaluaciones, retirarEvidencia } from './mis-evidencias.api';
+import {
+  agregarEvidencia,
+  claveMisEvaluaciones,
+  listarMisEvaluaciones,
+  retirarEvidencia,
+} from './mis-evidencias.api';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -21,6 +26,11 @@ describe('cliente de mis evidencias', () => {
       enlace: 'https://a',
       descripcion: 'A',
     });
+  });
+
+  it('la clave de caché lleva el usuario y la carrera, con null si faltan', () => {
+    expect(claveMisEvaluaciones('u1', 'c1')).toEqual(['mis-evaluaciones', 'u1', 'c1']);
+    expect(claveMisEvaluaciones(undefined, null)).toEqual(['mis-evaluaciones', null, null]);
   });
 
   it('retirar hace DELETE de esa evidencia', async () => {

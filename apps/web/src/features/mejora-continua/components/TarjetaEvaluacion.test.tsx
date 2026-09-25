@@ -249,6 +249,21 @@ describe('TarjetaEvaluacion — agregar', () => {
     expect(screen.getByText('El enlace debe empezar por http:// o https://.')).toBeInTheDocument();
   });
 
+  it.each(['https://', 'http://intranet', 'https://intranet/doc'])(
+    'el enlace «%s» no pasa el cliente y se explica en español, como lo haría el servidor',
+    async (enlace) => {
+      const { onAgregar } = montar();
+      await userEvent.type(screen.getByLabelText('Enlace de la evidencia'), enlace);
+      await userEvent.type(screen.getByLabelText('Descripción'), 'Doc');
+      await userEvent.click(screen.getByRole('button', { name: 'Agregar evidencia' }));
+
+      expect(onAgregar).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('Escribe un enlace válido, por ejemplo https://ejemplo.pe/documento.'),
+      ).toBeInTheDocument();
+    },
+  );
+
   it('si el servidor rechaza el alta muestra su mensaje y conserva lo escrito', async () => {
     montar(base, {
       onAgregar: vi.fn().mockRejectedValue(new Error('Esta evaluación ya tiene 20 evidencias.')),

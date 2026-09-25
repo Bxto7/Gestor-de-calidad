@@ -11,7 +11,6 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
@@ -20,6 +19,7 @@ import { Boton, EstadoVacio } from '@/shared/components/ui';
 
 import {
   agregarEvidencia,
+  claveMisEvaluaciones,
   listarMisEvaluaciones,
   retirarEvidencia,
   type EvaluacionAsignada,
@@ -42,11 +42,12 @@ function Esqueleto() {
 
 function SinCarrera() {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-superficie-tenue p-6">
+    // Sin enlace a Usuarios: un docente no puede abrir esa pantalla; quien asigna es un administrador.
+    <div className="space-y-1 rounded-2xl bg-superficie-tenue p-6">
       <p className="text-sm text-tinta">Esta vista necesita una carrera asignada.</p>
-      <Link to="/usuarios" className="text-sm font-semibold text-uc-primary">
-        Ir a Usuarios
-      </Link>
+      <p className="text-sm text-tinta-suave">
+        Pide a un administrador que te asigne una carrera para ver tus evaluaciones.
+      </p>
     </div>
   );
 }
@@ -74,9 +75,7 @@ export function MisEvidenciasPage() {
   const { identidad } = useSesion();
   const carreraACargo = identidad?.carreraACargo ?? null;
   const qc = useQueryClient();
-  // El id de usuario va en la clave: la caché de react-query sobrevive a un cierre de
-  // sesión, y sin él el siguiente docente vería un instante la lista del anterior.
-  const clave = ['mis-evaluaciones', identidad?.id ?? null, carreraACargo] as const;
+  const clave = claveMisEvaluaciones(identidad?.id, carreraACargo);
   // Aviso de la página: el mensaje del servidor debe sobrevivir a la tarjeta, que puede
   // desaparecer cuando la lista recargada ya no trae esa evaluación.
   const [aviso, setAviso] = useState<string | null>(null);
