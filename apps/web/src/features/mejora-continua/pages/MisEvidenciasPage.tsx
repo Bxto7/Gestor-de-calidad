@@ -10,7 +10,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
@@ -25,6 +25,9 @@ import {
   type EvaluacionAsignada,
 } from '../api/mis-evidencias.api';
 import { TarjetaEvaluacion } from '../components/TarjetaEvaluacion';
+
+const mensajeDe = (fallo: unknown): string =>
+  fallo instanceof Error ? fallo.message : 'No se pudo completar la operación.';
 
 function Esqueleto() {
   const bloque = 'animate-pulse rounded-2xl bg-superficie-tenue';
@@ -71,7 +74,12 @@ export function MisEvidenciasPage() {
   const { identidad } = useSesion();
   const carreraACargo = identidad?.carreraACargo ?? null;
   const qc = useQueryClient();
-  const clave = ['mis-evaluaciones', carreraACargo] as const;
+  // El id de usuario va en la clave: la caché de react-query sobrevive a un cierre de
+  // sesión, y sin él el siguiente docente vería un instante la lista del anterior.
+  const clave = ['mis-evaluaciones', identidad?.id ?? null, carreraACargo] as const;
+  // Aviso de la página: el mensaje del servidor debe sobrevivir a la tarjeta, que puede
+  // desaparecer cuando la lista recargada ya no trae esa evaluación.
+  const [aviso, setAviso] = useState<string | null>(null);
 
   useEffect(() => {
     publicar({ migas: [{ etiqueta: 'Mis evidencias' }], acciones: null });
@@ -92,10 +100,14 @@ export function MisEvidenciasPage() {
   const agregar = useMutation({
     mutationFn: ({ id, datos }: { id: string; datos: { enlace: string; descripcion: string } }) =>
       agregarEvidencia(id, datos),
+    onSuccess: () => setAviso(null),
+    onError: (fallo) => setAviso(mensajeDe(fallo)),
     onSettled: alTerminar,
   });
   const retirar = useMutation({
     mutationFn: (evidenciaId: string) => retirarEvidencia(evidenciaId),
+    onSuccess: () => setAviso(null),
+    onError: (fallo) => setAviso(mensajeDe(fallo)),
     onSettled: alTerminar,
   });
 
@@ -127,6 +139,18 @@ export function MisEvidenciasPage() {
           Registra los enlaces de evidencia de las evaluaciones que tienes asignadas.
         </p>
       </div>
+
+      {aviso && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-4 rounded-2xl border border-alerta-borde bg-alerta-bg p-4"
+        >
+          <p className="text-sm font-medium text-alerta-fg">{aviso}</p>
+          <Boton tamano="sm" variante="fantasma" onClick={() => setAviso(null)}>
+            Cerrar
+          </Boton>
+        </div>
+      )}
 
       {grupos.length === 0 ? (
         <EstadoVacio

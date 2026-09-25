@@ -61,9 +61,11 @@ const sesion = (carreraACargo: string | null): ValorSesion => ({
   salir: () => Promise.resolve(),
 });
 
-function montar(carreraACargo: string | null = 'c1') {
+function montar(
+  carreraACargo: string | null = 'c1',
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const publicar = vi.fn();
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
@@ -210,7 +212,67 @@ describe('MisEvidenciasPage', () => {
     await userEvent.type(screen.getByLabelText('Descripción'), 'X');
     await userEvent.click(screen.getByRole('button', { name: 'Agregar evidencia' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('no está vigente');
+    // El aviso de la página y el de la tarjeta conviven: hay más de una alerta.
+    const alertas = await screen.findAllByRole('alert');
+    expect(alertas[0]).toHaveTextContent('no está vigente');
     await waitFor(() => expect(listar).toHaveBeenCalledTimes(2));
+  });
+
+  it('el mensaje del servidor sigue visible aunque la lista recargada ya no traiga la evaluación', async () => {
+    const mensaje = 'El plan de evaluación EV-1 no está vigente; ya no admite evidencias.';
+    const listar = vi
+      .spyOn(api, 'listarMisEvaluaciones')
+      .mockResolvedValueOnce({ evaluaciones: [evaluacion('e1', 'Base de Datos')] })
+      .mockResolvedValue({ evaluaciones: [] });
+    vi.spyOn(api, 'agregarEvidencia').mockRejectedValue(new ErrorDeNegocio(mensaje, 409));
+    montar();
+
+    await userEvent.type(
+      await screen.findByLabelText('Enlace de la evidencia'),
+      'https://ejemplo.pe/x',
+    );
+    await userEvent.type(screen.getByLabelText('Descripción'), 'X');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar evidencia' }));
+
+    // La tarjeta desaparece con la recarga; solo el aviso de la página conserva el motivo.
+    await waitFor(() => expect(listar).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findByText('No tienes evaluaciones asignadas en el plan vigente.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Enlace de la evidencia')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(mensaje);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('el aviso se limpia con el siguiente intento que sale bien', async () => {
+    vi.spyOn(api, 'listarMisEvaluaciones').mockResolvedValue({
+      evaluaciones: [evaluacion('e1', 'Base de Datos', 1)],
+    });
+    vi.spyOn(api, 'retirarEvidencia')
+      .mockRejectedValueOnce(new ErrorDeNegocio('No puedes retirar esta evidencia.', 403))
+      .mockResolvedValueOnce(undefined);
+    montar();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Retirar Evidencia e10' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent(
+      'No puedes retirar esta evidencia.',
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Retirar Evidencia e10' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('la lista en caché de otro usuario no se muestra al nuevo mientras carga la suya', () => {
+    vi.spyOn(api, 'listarMisEvaluaciones').mockReturnValue(new Promise(() => undefined));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(['mis-evaluaciones', 'otro-usuario', 'c1'], dos);
+    montar('c1', qc);
+
+    expect(screen.getByRole('status', { name: 'Cargando tus evaluaciones' })).toBeInTheDocument();
+    expect(screen.queryByText('Base de Datos')).not.toBeInTheDocument();
   });
 });

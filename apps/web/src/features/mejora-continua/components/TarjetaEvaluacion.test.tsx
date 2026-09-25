@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -114,6 +114,94 @@ describe('TarjetaEvaluacion — retirar', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'El plan de evaluación EV-1 no está vigente; ya no admite evidencias.',
     );
+  });
+});
+
+describe('TarjetaEvaluacion — foco y confirmación', () => {
+  it('la confirmación es un grupo con nombre y el foco pasa a «Confirmar» al abrirla', async () => {
+    montar();
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+
+    expect(screen.getByRole('group', { name: 'Confirmar retiro de Acta mía' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toHaveFocus();
+  });
+
+  it('cancelar devuelve el foco al botón «Retirar» de esa evidencia', async () => {
+    montar();
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.getByRole('button', { name: 'Retirar Acta mía' })).toHaveFocus();
+  });
+
+  it('un retiro fallido devuelve el foco al botón «Retirar»', async () => {
+    montar(base, { onRetirar: vi.fn<Retirar>().mockRejectedValue(new Error('No se pudo.')) });
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Retirar Acta mía' })).toHaveFocus();
+  });
+
+  it('un retiro logrado lleva el foco a la propia tarjeta, porque la fila ya no existe', async () => {
+    montar();
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: /Base de Datos/ })).toHaveFocus(),
+    );
+  });
+
+  it('un doble clic en «Confirmar» retira una sola vez', async () => {
+    const onRetirar = vi.fn<Retirar>().mockReturnValue(new Promise(() => undefined));
+    montar(base, { onRetirar });
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    const confirmar = screen.getByRole('button', { name: 'Confirmar' });
+    await userEvent.dblClick(confirmar);
+
+    expect(onRetirar).toHaveBeenCalledTimes(1);
+    expect(confirmar).toBeDisabled();
+  });
+
+  it('el error de un retiro anterior se quita al abrir otra confirmación', async () => {
+    montar(base, { onRetirar: vi.fn<Retirar>().mockRejectedValue(new Error('No se pudo.')) });
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('cancelar también quita el error de un retiro anterior', async () => {
+    montar(base, { onRetirar: vi.fn<Retirar>().mockRejectedValue(new Error('No se pudo.')) });
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    await screen.findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar Acta mía' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('TarjetaEvaluacion — enlaces y límites', () => {
+  it('un enlace guardado con otro esquema se muestra como texto, no como enlace', () => {
+    montar({
+      ...base,
+      evidencias: [
+        { id: 'x9', enlace: 'javascript:alert(1)', descripcion: 'Trampa guardada', propia: false },
+      ],
+    });
+    expect(screen.getByText('Trampa guardada')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Trampa guardada' })).not.toBeInTheDocument();
+  });
+
+  it('los campos llevan los límites del servidor', () => {
+    montar();
+    expect(screen.getByLabelText('Enlace de la evidencia')).toHaveAttribute('maxlength', '2000');
+    expect(screen.getByLabelText('Descripción')).toHaveAttribute('maxlength', '200');
   });
 });
 
