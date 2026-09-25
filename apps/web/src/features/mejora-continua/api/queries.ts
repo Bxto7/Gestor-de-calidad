@@ -733,6 +733,7 @@ export const clavesActas = {
   acta: (id: string) => ['actas', id] as const,
   contenido: (id: string) => ['actas', id, 'contenido'] as const,
   documentos: (id: string) => ['actas', id, 'documentos'] as const,
+  historial: (id: string) => ['actas', id, 'historial'] as const,
 };
 
 const LISTA_ACTAS = ['actas', 'lista'] as const;
@@ -781,8 +782,22 @@ function useMutacionDeActa<TVars, TDatos>(id: string, fn: (v: TVars) => Promise<
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey: clavesActas.acta(id) });
       await qc.invalidateQueries({ queryKey: clavesActas.contenido(id) });
+      await qc.invalidateQueries({ queryKey: clavesActas.historial(id) });
       await qc.invalidateQueries({ queryKey: LISTA_ACTAS });
     },
+  });
+}
+
+/**
+ * RF-AC-022. `habilitado` lo decide quien llama según el permiso del usuario
+ * (`auditoria.leer` o `auditoria.leer_entidad`): sin él la consulta no sale, en vez
+ * de pedirla para recibir un 403 que nadie va a ver.
+ */
+export function useHistorialActa(id: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: clavesActas.historial(id),
+    queryFn: () => actasApi.historialDeActa(id),
+    enabled: !!id && habilitado,
   });
 }
 
@@ -850,6 +865,8 @@ export function useGenerarDocumentoActa(id: string) {
     mutationFn: (tipo: TipoDocumentoActa) => actasApi.generarDocumentoActa(id, tipo),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: clavesActas.documentos(id) });
+      // Pedir un documento queda en el historial (`DocumentoActaSolicitado`).
+      await qc.invalidateQueries({ queryKey: clavesActas.historial(id) });
     },
   });
 }

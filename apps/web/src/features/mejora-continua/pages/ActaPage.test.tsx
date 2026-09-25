@@ -46,6 +46,7 @@ vi.mock('../api/actas.api', async (importOriginal) => ({
     .fn()
     .mockResolvedValue({ ...actaDePrueba, acciones: [] } satisfies ContenidoActa),
   documentosDeActa: vi.fn().mockResolvedValue([]),
+  historialDeActa: vi.fn().mockResolvedValue([]),
   generarDocumentoActa: vi.fn(),
   descargarDocumentoActa: vi.fn(),
 }));
@@ -416,5 +417,157 @@ describe('RF-AC-018/019 — exportar el acta a PDF y Excel', () => {
 
     await waitFor(() => expect(actasApi.descargarDocumentoActa).toHaveBeenCalledWith('doc-1'));
     await waitFor(() => expect(guardarArchivo).toHaveBeenCalledWith(archivo));
+  });
+});
+
+const accionDePrueba: ContenidoActa['acciones'][number] = {
+  id: 'accion-1',
+  incluida: true,
+  orden: 0,
+  porcentajeMedicionCompetencia: null,
+  plan: {
+    id: 'plan-1',
+    codigo: 'PJ-001',
+    aspecto: 'CRITERIO_ACREDITACION',
+    carreraId: 'carrera-1',
+    criterioAcreditacionId: 'criterio-1',
+    objetivoEducacionalId: null,
+    competenciaId: null,
+    periodoId: null,
+    planEvaluacionId: null,
+    planMedicionAfectadoId: null,
+    estado: 'Aprobado',
+    estadoImplementacion: 'Pendiente',
+    nombre: 'Reforzar el syllabus',
+    causaRaiz: 'Causa de prueba',
+    justificacion: 'Justificación de prueba',
+    input: null,
+    plazo: '2026-12-31T00:00:00.000Z',
+    recursos: 'Recursos de prueba',
+    metas: 'Metas de prueba',
+    responsable: 'Responsable de prueba',
+    logroMeta: null,
+    impacto: null,
+    creadoEn: '2026-01-01T00:00:00.000Z',
+    evidencias: [],
+  },
+};
+
+const sesionConPermisos = (permisos: readonly string[]): ValorSesion => ({
+  ...sesionDePrueba,
+  puede: (permiso) => permisos.includes(permiso),
+});
+
+// El Consultor solo lee. El Coordinador sí tiene `actas.editar`: si ni con él aparece
+// una opción de edición, es el estado del acta el que la quita, no la falta de permiso.
+const CONSULTOR = ['actas.leer'];
+const COORDINADOR = ['actas.leer', 'actas.crear', 'actas.editar', 'actas.eliminar'];
+
+const ACCIONES_DE_EDICION =
+  /guardar|agregar asistente|quitar|cargar acciones|enviar a revisión|aprobar|rechazar|eliminar/i;
+
+describe.each(['Aprobada', 'Emitida', 'Histórica'] as const)(
+  'RF-AC-021 — acta %s en solo lectura',
+  (estado) => {
+    const aviso = `Esta acta está ${estado} y no admite cambios.`;
+
+    it.each([
+      ['un Consultor', CONSULTOR],
+      ['un Coordinador con permiso de edición', COORDINADOR],
+    ])(
+      'la muestra completa a %s, avisa que es de solo lectura y no ofrece editarla',
+      async (_quien, permisos) => {
+        vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado });
+        vi.spyOn(actasApi, 'obtenerContenidoActa').mockResolvedValue({
+          ...actaDePrueba,
+          estado,
+          acciones: [accionDePrueba],
+        });
+        montar(sesionConPermisos(permisos));
+
+        expect(await screen.findByText(aviso)).toBeInTheDocument();
+        // Con el contenido ya cargado: sin esto se comprobaría la carga, no el acta.
+        const seleccion = await screen.findByRole('checkbox', { name: /reforzar el syllabus/i });
+        expect(screen.getByDisplayValue(actaDePrueba.titulo)).toBeInTheDocument();
+
+        // RN1: ninguna opción de edición. Todo campo del acta está deshabilitado…
+        const campos = document.querySelectorAll('input, textarea, select');
+        expect(campos.length).toBeGreaterThan(0);
+        campos.forEach((campo) => expect(campo).toBeDisabled());
+        expect(seleccion).toBeDisabled();
+        // …y ningún botón de guardar, agregar, quitar, enviar, aprobar o eliminar.
+        expect(screen.queryByRole('button', { name: ACCIONES_DE_EDICION })).not.toBeInTheDocument();
+      },
+    );
+  },
+);
+
+describe('RF-AC-021 — el aviso de solo lectura solo sale donde corresponde', () => {
+  it.each(['Borrador', 'En revisión'] as const)('un acta en %s no lo lleva', async (estado) => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado });
+    montar();
+    await screen.findByText(actaDePrueba.codigo);
+
+    expect(screen.queryByText(/no admite cambios/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('RF-AC-022 — historial de modificaciones', () => {
+  const movimientos = [
+    {
+      id: 'ev-2',
+      accion: 'actas.transicion',
+      detalle: 'Acta ACTA N° 001: Borrador → En revisión.',
+      usuarioNombre: 'María Rojas',
+      fecha: '2026-09-19T15:30:00.000Z',
+    },
+    {
+      id: 'ev-1',
+      accion: 'actas.creada',
+      detalle: 'Acta de aprobación ACTA N° 001 creada.',
+      usuarioNombre: 'Jorge Pérez',
+      fecha: '2026-09-19T14:00:00.000Z',
+    },
+  ];
+
+  it.each([['auditoria.leer_entidad'], ['auditoria.leer']])(
+    'con %s muestra quién hizo cada cambio, y pide solo el de esta acta',
+    async (permiso) => {
+      vi.mocked(actasApi.historialDeActa).mockResolvedValue(movimientos);
+      montar(sesionConPermisos(['actas.leer', permiso]));
+
+      const lista = await screen.findByRole('list', { name: 'Movimientos del acta' });
+      expect(screen.getByRole('heading', { name: 'Historial de modificaciones' })).toBeVisible();
+      expect(lista).toHaveTextContent('Acta ACTA N° 001: Borrador → En revisión.');
+      expect(lista).toHaveTextContent('María Rojas');
+      expect(lista).toHaveTextContent('Jorge Pérez');
+      expect(actasApi.historialDeActa).toHaveBeenCalledWith('acta-1');
+    },
+  );
+
+  it('también se ve en un acta ya aprobada: es cuando más importa saber qué pasó', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado: 'Aprobada' });
+    vi.mocked(actasApi.historialDeActa).mockResolvedValue(movimientos);
+    montar(sesionConPermisos(['actas.leer', 'auditoria.leer_entidad']));
+
+    expect(await screen.findByRole('list', { name: 'Movimientos del acta' })).toBeVisible();
+  });
+
+  it('un acta sin movimientos lo dice', async () => {
+    vi.mocked(actasApi.historialDeActa).mockResolvedValue([]);
+    montar(sesionConPermisos(['actas.leer', 'auditoria.leer_entidad']));
+
+    expect(await screen.findByText('Sin movimientos registrados')).toBeInTheDocument();
+  });
+
+  it('sin permiso de auditoría no muestra la sección ni llama al servidor', async () => {
+    vi.mocked(actasApi.historialDeActa).mockClear();
+    montar(sesionConPermisos(['actas.leer']));
+    await screen.findByText(actaDePrueba.codigo);
+
+    expect(
+      screen.queryByRole('heading', { name: 'Historial de modificaciones' }),
+    ).not.toBeInTheDocument();
+    expect(actasApi.historialDeActa).not.toHaveBeenCalled();
   });
 });

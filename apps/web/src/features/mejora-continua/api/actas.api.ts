@@ -12,6 +12,7 @@ import type {
   Acta,
   ActaResumen,
   ContenidoActa,
+  EventoBitacora,
   TipoDocumentoActa,
   TrabajoDocumento,
 } from '../domain/tipos';
@@ -111,6 +112,21 @@ export async function transicionarActa(
 /** RF-AC-017 RN2: solo un acta en Borrador puede eliminarse. */
 export async function eliminarActa(id: string): Promise<void> {
   return cliente.delete(`/actas/${id}`);
+}
+
+/**
+ * RF-AC-022: qué se hizo sobre el acta, con quién y cuándo.
+ *
+ * Sale de `/auditoria` y no de un endpoint de actas: el registro ya lo escribe el
+ * listener de la bitácora a partir de los eventos del acta, y §3.2 prohíbe que un
+ * módulo consulte las tablas de otro. Devuelve lo más reciente primero.
+ */
+export async function historialDeActa(id: string): Promise<EventoBitacora[]> {
+  return cliente.get<EventoBitacora[]>('/auditoria', {
+    entidad: 'ActaAprobacion',
+    entidadId: id,
+    limite: 50,
+  });
 }
 
 /* ── Documentos (RF-AC-018/019) ─────────────────────────────────────────── */

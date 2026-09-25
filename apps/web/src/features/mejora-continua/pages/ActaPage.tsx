@@ -1,12 +1,13 @@
 // apps/web/src/features/mejora-continua/pages/ActaPage.tsx
 
 /**
- * Detalle del acta de aprobación — RF-AC-003 a 017.
+ * Detalle del acta de aprobación — RF-AC-003 a 022.
  *
  * Secciones apiladas verticalmente, no en pestañas (mismo criterio que
  * `PlanMedicionPage`): cabecera, asistentes, acciones del periodo, textos
- * institucionales, y el estado del acta con sus transiciones. Editable solo
- * en Borrador (RF-AC-017).
+ * institucionales, el estado del acta con sus transiciones y su historial de
+ * modificaciones (RF-AC-022). Editable solo en Borrador (RF-AC-017); una acta
+ * Aprobada, Emitida o Histórica se consulta en solo lectura (RF-AC-021).
  */
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,6 +31,7 @@ import {
 
 import { descargarDocumentoActa } from '../api/actas.api';
 import { DocumentosDelActa } from '../components/DocumentosDelActa';
+import { HistorialDelActa } from '../components/HistorialDelActa';
 import {
   clavesActas,
   useActa,
@@ -41,6 +43,7 @@ import {
   useEditarTextosActa,
   useEliminarActa,
   useGenerarDocumentoActa,
+  useHistorialActa,
   useReemplazarAsistentesActa,
   useTransicionarActa,
 } from '../api/queries';
@@ -52,6 +55,13 @@ import {
   type AccionActaTransicion,
 } from '../domain/estado-acta';
 import type { Acta, AccionDelActa } from '../domain/tipos';
+
+/**
+ * RF-AC-021: estados en los que el acta ya es un documento cerrado y solo se
+ * consulta. En Borrador se edita; En revisión tampoco se edita, pero está en manos
+ * de quien aprueba o rechaza, así que no lleva este aviso.
+ */
+const ESTADOS_DE_SOLO_LECTURA: readonly Acta['estado'][] = ['Aprobada', 'Emitida', 'Histórica'];
 
 export function ActaPage() {
   const { id = '' } = useParams();
@@ -93,6 +103,15 @@ export function ActaPage() {
         descripcion={`Periodo académico ${acta.periodoAcademico}`}
         acciones={<Badge tono={TONO_ESTADO_ACTA[acta.estado]}>{acta.estado}</Badge>}
       />
+
+      {ESTADOS_DE_SOLO_LECTURA.includes(acta.estado) && (
+        <p
+          role="note"
+          className="rounded-lg bg-superficie-tenue px-3 py-2 text-sm text-tinta-suave"
+        >
+          Esta acta está {acta.estado} y no admite cambios.
+        </p>
+      )}
 
       {error && (
         <p
@@ -153,7 +172,27 @@ export function ActaPage() {
       {editable && puede('actas.eliminar') && (
         <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />
       )}
+      {(puede('auditoria.leer') || puede('auditoria.leer_entidad')) && (
+        <HistorialActaSeccion acta={acta} />
+      )}
     </div>
+  );
+}
+
+/**
+ * RF-AC-022: el historial de modificaciones del acta. Se pinta solo con
+ * `auditoria.leer` o `auditoria.leer_entidad`, los mismos permisos que exige
+ * `/auditoria`: sin ellos el servidor respondería 403, y una sección vacía por un
+ * permiso que falta se leería como «no se ha tocado nunca».
+ */
+function HistorialActaSeccion({ acta }: { acta: Acta }) {
+  const { data: historial } = useHistorialActa(acta.id, true);
+
+  return (
+    <Tarjeta>
+      <h2 className="mb-4 text-sm font-semibold text-tinta">Historial de modificaciones</h2>
+      <HistorialDelActa eventos={historial ?? []} />
+    </Tarjeta>
   );
 }
 
