@@ -21,6 +21,10 @@ import type {
   RepositorioMisEvidenciasPort,
 } from '../ports/mis-evidencias.port.js';
 
+// Texto único por operación: el filtro HTTP lo devuelve tal cual y no debe distinguir «no existe» de «no es tuya».
+const DENEGADO_AGREGAR = 'No puedes registrar evidencias en esta evaluación.';
+const DENEGADO_RETIRAR = 'No puedes retirar esta evidencia.';
+
 /**
  * Las evidencias que un docente registra en sus propias evaluaciones.
  *
@@ -72,9 +76,9 @@ export class GestionarMisEvidencias {
     datos: { enlace: string; descripcion: string },
   ): Promise<{ id: string }> {
     const contexto = await this.repositorio.contextoDeEvaluacion(asignaturaEvaluadaId);
-    if (!contexto) throw new AccesoDenegado('No puedes registrar evidencias en esta evaluación.');
+    if (!contexto) throw new AccesoDenegado(DENEGADO_AGREGAR);
 
-    await this.exigirPropia(actor, contexto);
+    await this.exigirPropia(actor, contexto, DENEGADO_AGREGAR);
     this.exigirVigente(contexto);
     if (contexto.totalEvidencias >= MAXIMO_EVIDENCIAS) {
       throw new ReglaDeNegocioViolada(`Esta evaluación ya tiene ${MAXIMO_EVIDENCIAS} evidencias.`);
@@ -91,30 +95,30 @@ export class GestionarMisEvidencias {
 
   async retirar(actor: Actor, evidenciaId: string): Promise<void> {
     const contexto = await this.repositorio.contextoDeEvidencia(evidenciaId);
-    if (!contexto) throw new AccesoDenegado('No puedes retirar esta evidencia.');
+    if (!contexto) throw new AccesoDenegado(DENEGADO_RETIRAR);
 
-    await this.exigirPropia(actor, contexto);
+    await this.exigirPropia(actor, contexto, DENEGADO_RETIRAR);
     // La evidencia sin autoría la registró un coordinador: el docente no la retira.
-    if (contexto.registradaPorId !== actor.id) {
-      throw new AccesoDenegado('No puedes retirar esta evidencia.');
-    }
+    if (contexto.registradaPorId !== actor.id) throw new AccesoDenegado(DENEGADO_RETIRAR);
     this.exigirVigente(contexto);
 
     await this.repositorio.retirarEvidencia(evidenciaId);
     await this.dejarConstancia(actor, contexto, 'evidencia retirada por el docente');
   }
 
-  /** Permiso sobre la carrera del plan y evaluación asignada al actor. */
-  private async exigirPropia(actor: Actor, contexto: ContextoDeEvaluacion): Promise<void> {
+  /** Permiso sobre la carrera del plan y evaluación asignada al actor; todo rechazo lleva el mismo `mensaje`. */
+  private async exigirPropia(
+    actor: Actor,
+    contexto: ContextoDeEvaluacion,
+    mensaje: string,
+  ): Promise<void> {
     const plan = await this.contenido.planPorId(contexto.planEstudiosId);
-    if (!plan) throw new AccesoDenegado('No puedes registrar evidencias en esta evaluación.');
+    if (!plan) throw new AccesoDenegado(mensaje);
 
     const decision = await this.autorizacion.puede(actor.id, 'evidencia.registrar', plan.carreraId);
-    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+    if (!decision.permitido) throw new AccesoDenegado(mensaje);
 
-    if (contexto.docenteId !== actor.id) {
-      throw new AccesoDenegado('Esta evaluación no está asignada a ti.');
-    }
+    if (contexto.docenteId !== actor.id) throw new AccesoDenegado(mensaje);
   }
 
   /** Solo donde el plan ya rige: un plan aún sin vigencia o ya histórico no admite evidencias del docente. */

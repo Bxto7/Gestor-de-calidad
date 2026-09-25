@@ -65,7 +65,10 @@ function montar(o: Opciones = {}) {
     puede: vi.fn(async () =>
       opciones.permitido
         ? { permitido: true as const }
-        : { permitido: false as const, motivo: 'no' },
+        : {
+            permitido: false as const,
+            motivo: 'El usuario no dirige la carrera a la que pertenece este plan.',
+          },
     ),
     permisosDe: vi.fn(async () => new Set<string>()),
     carreraACargoDe: vi.fn(async () => opciones.carreraACargo),
@@ -111,6 +114,9 @@ function montar(o: Opciones = {}) {
   );
   return { caso, autorizacion, repositorio, planVigente, contenido, eventos };
 }
+
+const DENEGADO_AGREGAR = 'No puedes registrar evidencias en esta evaluación.';
+const DENEGADO_RETIRAR = 'No puedes retirar esta evidencia.';
 
 const DATOS = { enlace: 'https://ejemplo.pe/acta', descripcion: 'Acta firmada' };
 
@@ -227,26 +233,70 @@ describe('agregar', () => {
 
   it('una evaluación inexistente es AccesoDenegado, no «no encontrado»', async () => {
     const { caso, repositorio } = montar({ contextoEvaluacion: null });
-    await expect(caso.agregar(ACTOR, 'ae-x', DATOS)).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.agregar(ACTOR, 'ae-x', DATOS).catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_AGREGAR);
     expect(repositorio.agregarEvidencia).not.toHaveBeenCalled();
   });
 
   it('sin el permiso evidencia.registrar sobre la carrera del plan es AccesoDenegado', async () => {
     const { caso, autorizacion, repositorio } = montar({ permitido: false });
-    await expect(caso.agregar(ACTOR, 'ae-1', DATOS)).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.agregar(ACTOR, 'ae-1', DATOS).catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_AGREGAR);
     expect(autorizacion.puede).toHaveBeenCalledWith(ACTOR.id, 'evidencia.registrar', CARRERA);
     expect(repositorio.agregarEvidencia).not.toHaveBeenCalled();
   });
 
+  it('el permiso se comprueba sobre la carrera del plan, no sobre la del actor', async () => {
+    const { caso, autorizacion } = montar({
+      carreraACargo: 'carrera-del-actor',
+      carreraDelPlan: 'carrera-del-plan',
+    });
+    await caso.agregar(ACTOR, 'ae-1', DATOS);
+    expect(autorizacion.puede).toHaveBeenCalledWith(
+      ACTOR.id,
+      'evidencia.registrar',
+      'carrera-del-plan',
+    );
+    expect(autorizacion.puede).not.toHaveBeenCalledWith(
+      ACTOR.id,
+      'evidencia.registrar',
+      'carrera-del-actor',
+    );
+  });
+
   it('una evaluación de otro docente es AccesoDenegado', async () => {
     const { caso, repositorio } = montar({ contextoEvaluacion: contexto({ docenteId: 'otro' }) });
-    await expect(caso.agregar(ACTOR, 'ae-1', DATOS)).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.agregar(ACTOR, 'ae-1', DATOS).catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_AGREGAR);
     expect(repositorio.agregarEvidencia).not.toHaveBeenCalled();
   });
 
   it('una evaluación sin docente asignado es AccesoDenegado', async () => {
     const { caso } = montar({ contextoEvaluacion: contexto({ docenteId: null }) });
-    await expect(caso.agregar(ACTOR, 'ae-1', DATOS)).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.agregar(ACTOR, 'ae-1', DATOS).catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_AGREGAR);
+  });
+
+  it('todos los rechazos de acceso dicen lo mismo: no revelan si la evaluación existe', async () => {
+    const casos = [
+      montar({ contextoEvaluacion: null }),
+      montar({ permitido: false }),
+      montar({ contextoEvaluacion: contexto({ docenteId: 'otro' }) }),
+      montar({ contextoEvaluacion: contexto({ docenteId: null }) }),
+      montar({ carreraDelPlan: null }),
+    ];
+    const mensajes = await Promise.all(
+      casos.map(async ({ caso }) => {
+        const fallo = await caso.agregar(ACTOR, 'ae-1', DATOS).catch((e: unknown) => e);
+        expect(fallo).toBeInstanceOf(AccesoDenegado);
+        return (fallo as Error).message;
+      }),
+    );
+    expect(new Set(mensajes).size).toBe(1);
   });
 
   it.each(['BORRADOR', 'EN_REVISION', 'APROBADO', 'HISTORICO'] as const)(
@@ -282,7 +332,9 @@ describe('agregar', () => {
 
   it('si el plan de estudios ya no existe es AccesoDenegado', async () => {
     const { caso } = montar({ carreraDelPlan: null });
-    await expect(caso.agregar(ACTOR, 'ae-1', DATOS)).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.agregar(ACTOR, 'ae-1', DATOS).catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_AGREGAR);
   });
 });
 
@@ -301,7 +353,9 @@ describe('retirar', () => {
 
   it('una evidencia inexistente es AccesoDenegado', async () => {
     const { caso, repositorio } = montar({ contextoDeLaEvidencia: null });
-    await expect(caso.retirar(ACTOR, 'ev-x')).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.retirar(ACTOR, 'ev-x').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_RETIRAR);
     expect(repositorio.retirarEvidencia).not.toHaveBeenCalled();
   });
 
@@ -309,7 +363,9 @@ describe('retirar', () => {
     const { caso, repositorio } = montar({
       contextoDeLaEvidencia: contextoEvidencia({ registradaPorId: 'otra-persona' }),
     });
-    await expect(caso.retirar(ACTOR, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_RETIRAR);
     expect(repositorio.retirarEvidencia).not.toHaveBeenCalled();
   });
 
@@ -317,7 +373,9 @@ describe('retirar', () => {
     const { caso, repositorio } = montar({
       contextoDeLaEvidencia: contextoEvidencia({ registradaPorId: null }),
     });
-    await expect(caso.retirar(ACTOR, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_RETIRAR);
     expect(repositorio.retirarEvidencia).not.toHaveBeenCalled();
   });
 
@@ -325,13 +383,43 @@ describe('retirar', () => {
     const { caso } = montar({
       contextoDeLaEvidencia: contextoEvidencia({ docenteId: 'otro' }),
     });
-    await expect(caso.retirar(ACTOR, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_RETIRAR);
   });
 
   it('sin el permiso evidencia.registrar es AccesoDenegado', async () => {
     const { caso, repositorio } = montar({ permitido: false });
-    await expect(caso.retirar(ACTOR, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_RETIRAR);
     expect(repositorio.retirarEvidencia).not.toHaveBeenCalled();
+  });
+
+  it('si el plan de estudios ya no existe es AccesoDenegado', async () => {
+    const { caso } = montar({ carreraDelPlan: null });
+    const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
+    expect(fallo).toBeInstanceOf(AccesoDenegado);
+    expect((fallo as Error).message).toBe(DENEGADO_RETIRAR);
+  });
+
+  it('todos los rechazos de acceso dicen lo mismo: no revelan si la evidencia existe', async () => {
+    const casos = [
+      montar({ contextoDeLaEvidencia: null }),
+      montar({ permitido: false }),
+      montar({ contextoDeLaEvidencia: contextoEvidencia({ docenteId: 'otro' }) }),
+      montar({ contextoDeLaEvidencia: contextoEvidencia({ registradaPorId: 'otra-persona' }) }),
+      montar({ contextoDeLaEvidencia: contextoEvidencia({ registradaPorId: null }) }),
+      montar({ carreraDelPlan: null }),
+    ];
+    const mensajes = await Promise.all(
+      casos.map(async ({ caso }) => {
+        const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
+        expect(fallo).toBeInstanceOf(AccesoDenegado);
+        return (fallo as Error).message;
+      }),
+    );
+    expect(new Set(mensajes).size).toBe(1);
   });
 
   it('con el plan que dejó de estar vigente responde 409', async () => {
@@ -340,6 +428,9 @@ describe('retirar', () => {
     });
     const fallo = await caso.retirar(ACTOR, 'ev-1').catch((e: unknown) => e);
     expect(fallo).toBeInstanceOf(ReglaDeNegocioViolada);
+    expect((fallo as Error).message).toBe(
+      'El plan de evaluación EV-1 no está vigente; ya no admite evidencias.',
+    );
     expect(repositorio.retirarEvidencia).not.toHaveBeenCalled();
   });
 
