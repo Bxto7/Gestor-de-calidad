@@ -201,9 +201,13 @@ export class PlanesMedicionController {
   @Put(':id/competencias')
   @ApiOperation({
     summary: 'Declarar las competencias que el plan mide',
-    description: 'RF-PM-013 y RF-PM-015. Reemplaza el conjunto completo.',
+    description: 'RF-PM-013, RF-PM-015 y RF127. Reemplaza el conjunto completo.',
   })
-  @ApiResponse({ status: 409, description: 'Alguna competencia no pertenece al plan base.' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Alguna competencia no pertenece al plan base, o no tiene ningún atributo del graduado asociado (RF127).',
+  })
   async declararCompetencias(
     @Param('id', ParseUUIDPipe) id: string,
     @ActorActual() actor: Actor,
