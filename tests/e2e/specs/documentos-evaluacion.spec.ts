@@ -82,9 +82,7 @@ test.describe('con la cuenta que aprueba', () => {
       await page.getByRole('button', { name: accion }).click();
       await expect(page.getByRole('button', { name: accion })).toHaveCount(0);
     }
-    await expect(
-      page.locator('main').getByText('Vigente', { exact: true }).first(),
-    ).toBeVisible();
+    await expect(page.locator('main').getByText('Vigente', { exact: true }).first()).toBeVisible();
     // RF-PE-042: la fecha de aprobación queda junto al plan, no solo en la
     // bitácora — sigue visible aunque el plan ya haya avanzado a Vigente.
     await expect(page.getByText('Aprobado el')).toBeVisible();

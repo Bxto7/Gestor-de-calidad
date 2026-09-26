@@ -71,9 +71,9 @@ test('configurar un año deja los demás intactos', async ({ page }) => {
     'Encuesta',
   );
   // El porcentaje es por año (RF-PE-027): 2027 sigue vacío.
-  await expect(page.getByRole('spinbutton', { name: 'Porcentaje alcanzado de CPE-01' })).toHaveValue(
-    '',
-  );
+  await expect(
+    page.getByRole('spinbutton', { name: 'Porcentaje alcanzado de CPE-01' }),
+  ).toHaveValue('');
 });
 
 test.describe('con la cuenta que aprueba', () => {
