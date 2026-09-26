@@ -30,15 +30,17 @@ Se están construyendo **en paralelo**:
 > (Atributos del Graduado y Criterios de Acreditación). No hay solapamiento: el
 > documento de Plan de Estudios no menciona ningún RF120 o superior.
 >
-> Al 25 de septiembre de 2026: **243 de 243 requisitos contables construidos**,
-> un 100 %. El denominador son los 60 de Plan de Estudios documentados con ficha
+> Al 25 de septiembre de 2026: **243 de 243 requisitos contables con código**,
+> un 100 %. **Eso no es «cumplidos»**: mide que cada requisito con ficha tiene
+> implementación, no que haga lo que el requisito dice (ver «Qué no dice este
+> 100 %», más abajo). El denominador son los 60 de Plan de Estudios documentados con ficha
 > más los 183 de Mejora Continua (47 `RF-PM` + 49 `RF-PE` + 47 `RF-PJ` +
 > 27 `RF-AC` + los 13 de `RF120`–`RF132`).
 >
-> | Bloque | Construido | Total |
+> | Bloque | Con código | Total |
 > |---|---|---|
 > | Plan de Estudios (fichas) | 60 | 60 |
-> | Atributos del Graduado y Criterios (`RF120`–`RF132`) | 13 | 13 |
+> | Atributos del Graduado y Criterios (`RF120`–`RF132`; `RF127` diverge, D-11) | 13 | 13 |
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
 > | Mejora Continua · Evaluación (`RF-PE`) | 49 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 47 | 47 |
@@ -111,9 +113,31 @@ Se están construyendo **en paralelo**:
 >   {estado} y no admite cambios» y las pruebas de los tres estados con un
 >   Consultor y con un Coordinador que sí tiene `actas.editar`.
 >
-> Con esto el 100 % dice que **cada requisito con ficha tiene su código**, no que
-> esté probado uno por uno: `023` a `026` cuentan por el patrón, sin una prueba
-> propia cada uno.
+> **Qué no dice este 100 %.**
+>
+> - **Divergencias abiertas: 11.** El registro vive en
+>   `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md` §8 y es la fuente; aquí
+>   solo se resumen. Están **pendientes** —nadie de la universidad las ha aprobado—
+>   D-1 (`RF092`, evidencia de aprobación también desde Vigente e Histórico), D-2
+>   (`RF056`/`067`, sin grupos de electivos), D-3 (`RF084`, solo PDF), D-4
+>   (`RF101`–`110`, numeración inferida), D-5 (`RF041`/`053`, código generado por el
+>   sistema), D-6 (sin RF que defina los prerrequisitos), D-9 (`RF055`/`047`, plan
+>   ISI 2018 con horas teóricas en 0 y sumillas «pendiente»), D-11 (`RF127`), D-12
+>   (`RF-PE-020`, evidencia solo como enlace), D-13 (`RF-PE-006` RN2, remite a
+>   números equivocados) y D-14 (`RF-PE-032`/`033`, sin la plantilla institucional).
+>   D-7 y D-8 están ratificadas y D-10 aprobada.
+> - **`RF127` cuenta como construido pero no cumple lo que pide.** El requisito
+>   exige excluir de la selección las competencias sin atributo del graduado; el
+>   sistema las muestra y deja incluirlas en un plan de medición, y la API tampoco
+>   lo impide. Cerrarlo pide una decisión primero —aplicar el requisito tal cual, la
+>   salida intermedia con la casilla deshabilitada, o corregir el requisito— y luego
+>   unas pocas líneas en `GrupoDeCompetencias.tsx` más la validación en el caso de
+>   uso.
+> - **`RF-AC-023` a `026` cuentan por el patrón**, sin una prueba propia cada uno.
+> - **Los RNF no tienen seguimiento.** Ninguna cuenta de este documento los incluye:
+>   el código cita por número apenas seis (`RNF03`, `04`, `08`, `09`, `12` y `24`) y
+>   el documento de Mejora Continua tiene 26 filas de RNF. Los «24 RNF» de Plan de
+>   Estudios vienen del PDF original, que no está en el repositorio.
 >
 > El cruce sirve además para detectar erratas: destapó una prueba que decía
 > cubrir un `RF-PM-080` que no existe en ningún documento.
