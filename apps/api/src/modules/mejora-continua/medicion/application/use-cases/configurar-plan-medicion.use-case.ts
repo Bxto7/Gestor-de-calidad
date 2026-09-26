@@ -29,6 +29,7 @@ import {
 } from '../../domain/value-objects/periodos.js';
 import {
   agruparPorAtributo,
+  competenciasSinAtributo,
   type GrupoDeCompetencias,
 } from '../../../domain/services/agrupar-por-atributo.js';
 import type {
@@ -68,7 +69,16 @@ export class ConfigurarPlanMedicion {
     return agruparPorAtributo(competencias);
   }
 
-  /** RF-PM-013 RN1 y RF-PM-015. */
+  /**
+   * RF-PM-013 RN1, RF-PM-015 y RF127.
+   *
+   * RF127 exige que todo plan de medición se construya solo con competencias
+   * trazables a un atributo del graduado. La pantalla las muestra deshabilitadas
+   * para que se vea qué falta mapear, pero la regla vive aquí: sin ella, una
+   * petición directa a la API las seguiría incluyendo. Es estricta: rige sobre todo
+   * el conjunto enviado, así que un plan que ya traía una competencia sin atributo
+   * tiene que dejarla fuera para poder guardar. Dejarla fuera nunca se rechaza.
+   */
   async declararCompetencias(
     actor: Actor,
     id: string,
@@ -82,13 +92,22 @@ export class ConfigurarPlanMedicion {
     // rechazar, porque mandarla dos veces expresa la misma intención.
     const unicos = [...new Set(competenciaIds)];
 
-    const delPlan = new Set(
-      (await this.curricular.competenciasDelPlan(plan.planEstudiosId)).map((c) => c.id),
-    );
+    const competenciasDelPlan = await this.curricular.competenciasDelPlan(plan.planEstudiosId);
+    const delPlan = new Set(competenciasDelPlan.map((c) => c.id));
     const ajenas = unicos.filter((c) => !delPlan.has(c));
     if (ajenas.length > 0) {
       throw new ReglaDeNegocioViolada(
         `Estas competencias no pertenecen al plan de estudios base: ${ajenas.join(', ')}.`,
+      );
+    }
+
+    // RF127. Después de la comprobación de arriba: una ajena se rechaza por ajena.
+    const sinAtributo = competenciasSinAtributo(competenciasDelPlan, unicos);
+    if (sinAtributo.length > 0) {
+      throw new ReglaDeNegocioViolada(
+        `RF127: no se pueden incluir competencias sin un atributo del graduado asociado: ${sinAtributo
+          .map((c) => c.codigo)
+          .join(', ')}. Asócialas a un atributo en el plan de estudios y vuelve a intentarlo.`,
       );
     }
 

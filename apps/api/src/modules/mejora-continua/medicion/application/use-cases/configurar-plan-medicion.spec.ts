@@ -87,8 +87,16 @@ function contenido(sobre: Partial<ContenidoCurricularPort> = {}): ContenidoCurri
   return {
     planesElegibles: async () => [planBase()],
     planPorId: async () => planBase(),
+    // Con atributo: desde RF127 una competencia sin él no puede incluirse en el plan, y
+    // casi todas las pruebas de este archivo declaran justo `cmp-1`.
     competenciasDelPlan: async () => [
-      { id: 'cmp-1', codigo: 'CPE-01', nombre: 'Una', activa: true, atributos: [] },
+      {
+        id: 'cmp-1',
+        codigo: 'CPE-01',
+        nombre: 'Una',
+        activa: true,
+        atributos: [{ id: 'a1', codigo: 'AG-I01', nombre: 'Uno' }],
+      },
     ],
     asignaturasDelPlan: async () => [],
     carreraPorId: async () => null,
@@ -183,7 +191,13 @@ describe('RF-PM-013 y RF-PM-014 — competencias agrupadas por atributo', () => 
   });
 
   it('las competencias sin atributo salen en un grupo propio, no se pierden', async () => {
-    const { caso } = montar();
+    const { caso } = montar({
+      contenido: {
+        competenciasDelPlan: async () => [
+          { id: 'cmp-1', codigo: 'CPE-01', nombre: 'Una', activa: true, atributos: [] },
+        ],
+      },
+    });
 
     const grupos = await caso.competenciasDisponibles(ACTOR, 'pm-1');
 
@@ -316,6 +330,116 @@ describe('RF-PM-013 RN1 y RF-PM-015 — declarar competencias', () => {
 
     await expect(caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1'])).rejects.toThrow(
       AccesoDenegado,
+    );
+  });
+});
+
+describe('RF127 — una competencia sin atributo del graduado no puede incluirse', () => {
+  const CON_ATRIBUTO = {
+    id: 'cmp-1',
+    codigo: 'CPE-01',
+    nombre: 'Mapeada',
+    activa: true,
+    atributos: [{ id: 'a1', codigo: 'AG-I01', nombre: 'Uno' }],
+  };
+  const SIN_ATRIBUTO = {
+    id: 'cmp-2',
+    codigo: 'CPE-02',
+    nombre: 'Suelta',
+    activa: true,
+    atributos: [],
+  };
+  const OTRA_SIN_ATRIBUTO = {
+    id: 'cmp-3',
+    codigo: 'CPE-03',
+    nombre: 'Otra suelta',
+    activa: true,
+    atributos: [],
+  };
+  const del_plan = async () => [CON_ATRIBUTO, SIN_ATRIBUTO, OTRA_SIN_ATRIBUTO];
+
+  it('la rechaza y nombra su código, para que se sepa cuál mapear', async () => {
+    const { caso } = montar({ contenido: { competenciasDelPlan: del_plan } });
+
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-2'])).rejects.toThrow(/CPE-02/);
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-2'])).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
+
+  it('nombra todas las que faltan, no solo la primera, y no las que sí tienen atributo', async () => {
+    const { caso } = montar({ contenido: { competenciasDelPlan: del_plan } });
+
+    const intento = caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1', 'cmp-2', 'cmp-3']);
+
+    await expect(intento).rejects.toThrow(/CPE-02, CPE-03/);
+    await expect(intento).rejects.not.toThrow(/CPE-01/);
+  });
+
+  it('no guarda nada ni audita: un rechazo no deja rastro a medias', async () => {
+    const declarar = vi.fn(async () => plan());
+    const { caso, vistos } = montar({
+      repo: { declararCompetencias: declarar },
+      contenido: { competenciasDelPlan: del_plan },
+    });
+
+    await caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1', 'cmp-2']).catch(() => undefined);
+
+    expect(declarar).not.toHaveBeenCalled();
+    expect(vistos).toHaveLength(0);
+  });
+
+  it('las que sí tienen atributo se declaran con normalidad', async () => {
+    let recibidos: readonly string[] = [];
+    const { caso } = montar({
+      repo: {
+        declararCompetencias: async (_id, ids) => {
+          recibidos = ids;
+          return plan();
+        },
+      },
+      contenido: { competenciasDelPlan: del_plan },
+    });
+
+    await caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1']);
+
+    expect(recibidos).toEqual(['cmp-1']);
+  });
+
+  it('un plan que ya la traía puede quitarla: dejarla fuera nunca se rechaza', async () => {
+    let recibidos: readonly string[] | null = null;
+    const { caso } = montar({
+      repo: {
+        porId: async () => plan({ competenciaIds: ['cmp-1', 'cmp-2'] }),
+        declararCompetencias: async (_id, ids) => {
+          recibidos = ids;
+          return plan();
+        },
+      },
+      contenido: { competenciasDelPlan: del_plan },
+    });
+
+    await caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1']);
+
+    expect(recibidos).toEqual(['cmp-1']);
+  });
+
+  it('el rechazo es estricto: una heredada sin atributo tampoco pasa si se vuelve a enviar', async () => {
+    const { caso } = montar({
+      repo: { porId: async () => plan({ competenciaIds: ['cmp-1', 'cmp-2'] }) },
+      contenido: { competenciasDelPlan: del_plan },
+    });
+
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-1', 'cmp-2'])).rejects.toThrow(
+      /CPE-02/,
+    );
+  });
+
+  it('una competencia ajena al plan se sigue rechazando por ajena, antes de mirar sus atributos', async () => {
+    const { caso } = montar({ contenido: { competenciasDelPlan: del_plan } });
+
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', ['cmp-ajena'])).rejects.toThrow(
+      /no pertenecen al plan de estudios base/,
     );
   });
 });

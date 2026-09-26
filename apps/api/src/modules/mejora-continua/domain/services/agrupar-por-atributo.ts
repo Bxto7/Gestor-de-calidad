@@ -60,6 +60,24 @@ export function agruparPorAtributo(
     : ordenados;
 }
 
+/**
+ * RF127: de las competencias que se quieren incluir, las que no responden a ningún
+ * atributo del graduado.
+ *
+ * Un plan de medición solo puede construirse con competencias trazables a un
+ * atributo: es lo que la evaluación ICACIT necesita poder seguir. Se devuelven
+ * enteras y en el orden del plan de estudios, no en el de la petición, para que el
+ * mensaje que las nombra salga siempre igual. Un identificador que no está en
+ * `competencias` se ignora: que sea ajena al plan lo comprueba otra regla.
+ */
+export function competenciasSinAtributo(
+  competencias: readonly CompetenciaAgrupable[],
+  competenciaIds: readonly string[],
+): CompetenciaAgrupable[] {
+  const pedidas = new Set(competenciaIds);
+  return competencias.filter((c) => pedidas.has(c.id) && c.atributos.length === 0);
+}
+
 /** Cómo se titula un grupo cuando el documento lo lee una persona. */
 export function tituloDeGrupo(grupo: GrupoDeCompetencias): string {
   return grupo.atributo === null
