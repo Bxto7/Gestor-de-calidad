@@ -5,7 +5,11 @@ completa antes de cada release. Staging no existe todavía (§5 pendiente), así
 todo corre en CI.
 
 Cubren el flujo de Mejora Continua contra la API real y la accesibilidad de sus pantallas
-contra WCAG 2.1 AA, que §6.6 exige en cada PR que toque interfaz.
+contra WCAG 2.1 AA, que §6.6 exige en cada PR que toque interfaz. Un spec —
+`competencias-sin-atributo.spec.ts` — llama a la API directamente, sin pantalla, para las
+reglas que la interfaz solo refleja (hoy, RF127): usa el token que `global-setup` ya guardó
+(`fixtures/api.ts`), porque el login admite cinco intentos por minuto y la suite gasta los
+cinco.
 
 ## Qué NO cubren
 
@@ -53,7 +57,18 @@ SGC_PASSWORD="$SGC_E2E_PASSWORD" npx tsx scripts/crear-usuario.ts \
 
 # 4. La API, con el limitador alto
 npm run build && THROTTLE_LIMIT=10000 npm start
+
+# 5. El worker de documentos, en otra terminal
+npm run start:worker
 ```
+
+El worker no es opcional: los PDF y Excel se generan en una cola de BullMQ y solo él la
+consume. Sin él, la API responde bien pero los documentos se quedan en «Pendiente» y fallan
+las pruebas que esperan verlos «Listo» (`exportacion`, `documentos-evaluacion`,
+`plan-mejora-2c-j-c` y dos de `accesibilidad`). CI ya lo arranca aparte (`ci.yml`).
+
+`npm run build` compila con el cliente Prisma que haya generado: si el esquema cambió desde
+la última vez, `npx prisma generate` antes, o `tsc` fallará con propiedades que «no existen».
 
 La contraseña va por variable de entorno y no como argumento: los argumentos quedan en el
 historial del shell y en la lista de procesos.
@@ -84,8 +99,17 @@ en vez de dejar que fallen quince pruebas por razones distintas.
 estudios y tipo: dos pruebas en paralelo competirían por el mismo número y una fallaría por
 una razón que no es la que prueba.
 
-Los planes se acumulan entre ejecuciones. No estorba —cada prueba toma el más reciente con
-`.first()`— pero `npm run e2e:preparar` los limpia si quieres partir de cero.
+Los planes se acumulan entre ejecuciones, y cada prueba toma el más reciente con `.first()`.
+Eso **no siempre es inocuo**: el 25 de septiembre de 2026, repetir la suite sin reiniciar hizo
+fallar tres pruebas que habían pasado en la primera vuelta (`configuracion-evaluacion`,
+`configuracion-indirecta` y `documentos-evaluacion`, con «asignaturas asociadas sin docente
+responsable») y que volvieron a pasar tras `npm run e2e:preparar`. Ante un fallo que no
+reconoces, reinicia los datos antes de investigar. `e2e:preparar` solo toca la carrera `E2E`.
+
+`e2e:preparar` siembra también `CPE-E2E05`, una competencia **sin atributo del graduado**, a
+propósito: sin ella ninguna prueba llegaría a la rama de RF127 (casilla deshabilitada en la
+pantalla, rechazo en la API). Va fuera de la lista de competencias del plan de medición de
+partida, porque una competencia sin atributo no puede formar parte de un plan de medición.
 
 ## Por qué el bundle y no el servidor de desarrollo
 
@@ -110,6 +134,16 @@ que iban de 2.56:1 a 3.80:1 donde AA exige 4.5:1. Esa desviación respecto del d
 está registrada como **D-10** en la sección 8 de
 `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, **aprobada el 4 de septiembre de
 2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
+
+**Cobertura actual (25 de septiembre de 2026).** Además de las cuatro pantallas de
+aquella primera medición, el spec tiene hoy 21 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
+sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, el
+resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias
+y, desde RF127, el selector de competencias con una competencia sin atributo — la casilla
+deshabilitada y su motivo enlazado por `aria-describedby`. Todas pasan sin violaciones y sin
+reglas desactivadas. **No** hay `axe` sobre las pantallas de Actas de Aprobación, ni sobre el
+estado «ya marcada» de esa casilla (un plan no puede llegar a él por la interfaz: la API lo
+impide, así que solo lo cubren las pruebas de componente).
 
 **Automatizado no es completo.** `axe-core` detecta alrededor de un tercio de los problemas
 reales de accesibilidad. Si el orden de tabulación tiene sentido, si un texto alternativo
