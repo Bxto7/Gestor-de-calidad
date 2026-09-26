@@ -10,6 +10,7 @@
 import type { Page } from '@playwright/test';
 
 import { analizar } from '../fixtures/axe';
+import { completarDefinicion } from '../fixtures/plan-mejora';
 import { expect, test } from '../fixtures/sesion';
 
 /**
@@ -250,7 +251,9 @@ test.describe('con la cuenta que aprueba', () => {
 
     // RF-PJ-035 RN (misma regla que RF-PE-034 en Evaluación): «Generar nueva
     // versión» solo cabe desde Aprobado, Vigente o Histórico — hace falta
-    // salir de Borrador primero.
+    // salir de Borrador primero, y RF-PJ-042 no deja salir con la definición
+    // incompleta.
+    await completarDefinicion(page);
     await page.getByRole('button', { name: 'Enviar a revisión' }).click();
     await page.getByRole('button', { name: 'Aprobar' }).click();
     await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();

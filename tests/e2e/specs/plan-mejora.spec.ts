@@ -22,6 +22,7 @@
  * los dos primeros recorridos.
  */
 
+import { completarDefinicion } from '../fixtures/plan-mejora';
 import { expect, test } from '../fixtures/sesion';
 
 test('crear un plan de mejora de Criterio de Acreditación y enviarlo a revisión', async ({
@@ -56,6 +57,10 @@ test('crear un plan de mejora de Criterio de Acreditación y enviarlo a revisió
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.reload();
   await expect(page.getByLabel('Nombre de la acción')).toHaveValue('Reforzar el syllabus del curso');
+
+  // RF-PJ-042: guardar con la definición a medias es válido (RF-PJ-006), pero
+  // enviar a revisión no: hay que completarla antes.
+  await completarDefinicion(page);
 
   // RF-PJ-004/005: Borrador → En revisión.
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
