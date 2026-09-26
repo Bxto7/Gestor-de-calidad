@@ -56,7 +56,9 @@ test('crear un plan de mejora de Criterio de Acreditación y enviarlo a revisió
   await guardado;
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.reload();
-  await expect(page.getByLabel('Nombre de la acción')).toHaveValue('Reforzar el syllabus del curso');
+  await expect(page.getByLabel('Nombre de la acción')).toHaveValue(
+    'Reforzar el syllabus del curso',
+  );
 
   // RF-PJ-042: guardar con la definición a medias es válido (RF-PJ-006), pero
   // enviar a revisión no: hay que completarla antes.
@@ -64,7 +66,9 @@ test('crear un plan de mejora de Criterio de Acreditación y enviarlo a revisió
 
   // RF-PJ-004/005: Borrador → En revisión.
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
-  await expect(page.locator('main').getByText('En revisión', { exact: true }).first()).toBeVisible();
+  await expect(
+    page.locator('main').getByText('En revisión', { exact: true }).first(),
+  ).toBeVisible();
 });
 
 test('crear un plan de mejora de Objetivo Educacional', async ({ page }) => {
