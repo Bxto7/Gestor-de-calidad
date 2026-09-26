@@ -15,7 +15,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const API = process.env['E2E_API_URL'] ?? 'http://localhost:3000/api/v1';
+export const API = process.env['E2E_API_URL'] ?? 'http://localhost:3000/api/v1';
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
 export const DIRECTORIO_AUTH = join(AQUI, '.auth');
