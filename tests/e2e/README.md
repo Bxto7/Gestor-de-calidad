@@ -136,18 +136,20 @@ está registrada como **D-10** en la sección 8 de
 2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
 
 **Cobertura actual (26 de septiembre de 2026).** Además de las cuatro pantallas de
-aquella primera medición, el spec tiene hoy 22 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
+aquella primera medición, el spec tiene hoy 24 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
 sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, el
 resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias,
 desde RF127 el selector de competencias con una competencia sin atributo —la casilla
 deshabilitada y su motivo enlazado por `aria-describedby`— y las Actas de Aprobación: el
-listado con una acta ya creada y el detalle en tres estados —Borrador con una fila de
-asistente en blanco, Aprobada en solo lectura con su sección de exportación, y Emitida con el
-PDF ya exportado—. Todas pasan sin violaciones y sin reglas desactivadas. Las dos últimas
-recorren la interfaz hasta aprobar el acta (cada una aprueba antes su propio plan de mejora,
-porque un plan que ya está en un acta emitida no vuelve a ser candidato), y la de Emitida
-necesita el worker: sin él se queda esperando el «Listo» del PDF. Del acta queda sin `axe`
-el modal de rechazo y el estado En revisión. Tampoco hay `axe`
+listado con una acta ya creada, el detalle en sus cuatro estados —Borrador con una fila de
+asistente en blanco, En revisión con Aprobar y Rechazar, Aprobada en solo lectura con su
+sección de exportación, y Emitida con el PDF ya exportado— y el modal de rechazo con el
+motivo escrito. Todas pasan sin violaciones y sin reglas desactivadas. Las cuatro que parten
+de un acta nueva recorren la interfaz hasta enviarla a revisión (cada una aprueba antes su
+propio plan de mejora, porque un plan que ya está en un acta emitida no vuelve a ser
+candidato), y la de Emitida necesita el worker: sin él se queda esperando el «Listo» del PDF.
+Del acta solo queda sin `axe` el estado Histórica, que ninguna acción del sistema alcanza
+todavía. Tampoco hay `axe`
 sobre el estado «ya marcada» de la casilla de RF127 (un plan no puede llegar a él por la
 interfaz: la API lo impide, así que solo lo cubren las pruebas de componente).
 

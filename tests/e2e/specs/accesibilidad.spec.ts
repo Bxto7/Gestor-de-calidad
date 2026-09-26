@@ -297,16 +297,16 @@ async function pulsarYEsperarGuardado(page: Page, nombre: string): Promise<void>
 }
 
 /**
- * Deja un acta en Aprobada, recorriendo la interfaz como lo haría quien la arma.
+ * Deja un acta En revisión, recorriendo la interfaz como lo haría quien la arma.
  *
- * Aprobar exige la validación integral de RF-AC-016: cabecera, un asistente, al
- * menos una acción incluida y los datos de emisión. Las acciones salen de los planes
+ * Enviar a revisión exige la validación integral de RF-AC-016: cabecera, un asistente,
+ * al menos una acción incluida y los datos de emisión. Las acciones salen de los planes
  * de mejora Aprobados o Vigentes de la carrera que no estén ya en un acta emitida,
  * así que cada llamada aprueba antes su propio plan de mejora: no depende de lo que
  * hayan dejado otros ficheros ni de que una corrida anterior no lo haya gastado.
  * Requiere la cuenta `director`, la única con `mejora.aprobar` y `actas.aprobar`.
  */
-async function crearActaAprobada(page: Page): Promise<void> {
+async function crearActaEnRevision(page: Page): Promise<void> {
   await crearPlanMejora(page);
   await completarDefinicion(page);
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
@@ -332,6 +332,14 @@ async function crearActaAprobada(page: Page): Promise<void> {
   await expect(acciones.getByRole('checkbox').first()).toBeChecked();
 
   await pulsarYEsperarGuardado(page, 'Enviar a revisión');
+  // Aprobar solo aparece con el acta ya En revisión: esperarlo confirma que el
+  // servidor y la pantalla coinciden antes de que la prueba haga nada más.
+  await expect(page.getByRole('button', { name: 'Aprobar', exact: true })).toBeVisible();
+}
+
+/** Lo mismo que `crearActaEnRevision`, y además la aprueba (RF-AC-014). */
+async function crearActaAprobada(page: Page): Promise<void> {
+  await crearActaEnRevision(page);
   await pulsarYEsperarGuardado(page, 'Aprobar');
   await expect(page.getByRole('note')).toContainText(
     'Esta acta está Aprobada y no admite cambios.',
@@ -435,6 +443,32 @@ test.describe('con la cuenta que aprueba', () => {
     );
 
     await analizar(page, 'el detalle del acta de aprobación Emitida');
+  });
+
+  test('el detalle de un acta En revisión, con Aprobar y Rechazar', async ({ page }) => {
+    // En revisión ya no se edita, pero tampoco lleva el aviso de solo lectura de
+    // RF-AC-021: está en manos de quien aprueba o rechaza. Es el único estado en que
+    // «Aprobar» y «Rechazar» conviven en la fila de transición.
+    await crearActaEnRevision(page);
+    await expect(page.getByRole('button', { name: 'Rechazar', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Convocada por')).toBeDisabled();
+
+    await analizar(page, 'el detalle del acta de aprobación En revisión');
+  });
+
+  test('el modal de rechazo de un acta, con el motivo escrito', async ({ page }) => {
+    // El modal exige motivo (RF-AC-015 RN1). Se abre y se rellena antes de analizar:
+    // con el campo vacío y el botón «Confirmar» deshabilitado axe vería solo la mitad
+    // de lo que un usuario ve.
+    await crearActaEnRevision(page);
+    await page.getByRole('button', { name: 'Rechazar', exact: true }).click();
+
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible();
+    await modal.getByLabel('Motivo del rechazo').fill('Falta detallar los recursos de la acción.');
+    await expect(modal.getByRole('button', { name: 'Confirmar' })).toBeEnabled();
+
+    await analizar(page, 'el modal de rechazo del acta de aprobación');
   });
 });
 
