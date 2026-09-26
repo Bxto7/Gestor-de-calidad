@@ -57,6 +57,34 @@ test('el detalle, con su matriz', async ({ page }) => {
   await analizar(page, 'el detalle del plan de medición');
 });
 
+test('el selector de competencias, con una sin atributo del graduado (RF127)', async ({ page }) => {
+  // Un plan propio y en Borrador: es el único estado en que el selector se puede
+  // editar, y por tanto el único en que la casilla deshabilitada por RF127 lleva su
+  // motivo. Crearlo aquí y no tomar «el primero» del listado, que puede ser
+  // cualquiera de los que dejan otros ficheros.
+  await page.goto('/mejora-continua/medicion');
+  await page.getByRole('button', { name: 'Nuevo plan de medición' }).click();
+  const modal = page.getByRole('dialog');
+  await modal.getByLabel('Plan de estudios*').selectOption({ label: 'PE-E2E-v1 — Vigente' });
+  await modal.getByRole('spinbutton', { name: 'Meta (%)*' }).fill('70');
+  await modal.getByRole('spinbutton', { name: 'Año de inicio' }).fill('2026');
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(modal).toBeHidden();
+
+  const enlace = page.getByRole('link', { name: /^PM-PE-E2E-v1-D-v/ }).first();
+  await expect(enlace).toBeVisible();
+  await enlace.click();
+  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
+
+  // Con el estado real delante: analizar sin haber visto la casilla no distingue
+  // «sin problemas» de «axe nunca vio el motivo».
+  const sinAtributo = page.getByRole('checkbox', { name: /CPE-E2E05/ });
+  await expect(sinAtributo).toBeDisabled();
+  await expect(sinAtributo).toHaveAccessibleDescription(/para poder incluirla/);
+
+  await analizar(page, 'el selector de competencias con una sin atributo del graduado');
+});
+
 test('el listado de planes de evaluación', async ({ page }) => {
   await page.goto('/mejora-continua/evaluacion');
   await expect(page.getByRole('heading', { name: 'Planes de evaluación' })).toBeVisible();

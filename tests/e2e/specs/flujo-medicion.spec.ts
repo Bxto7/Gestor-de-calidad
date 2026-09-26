@@ -54,6 +54,20 @@ test('crear, configurar, programar y enviar a revisión un plan de medición', a
   // clic— fallaría siempre. Encadenar los dos clics sin esperar tampoco vale:
   // el segundo calcularía el conjunto a enviar sobre un estado que aún no
   // incluye el primero, y lo perdería.
+  //
+  // RF127: la competencia que no responde a ningún atributo del graduado
+  // (`CPE-E2E05`, sembrada aparte en `preparar-e2e.ts`) se ve en su grupo propio
+  // pero no se puede marcar, y dice por qué.
+  const sinAtributo = page.getByRole('checkbox', { name: /CPE-E2E05/ });
+  await expect(
+    page.getByRole('group', { name: 'Sin atributo del graduado asignado' }),
+  ).toBeVisible();
+  await expect(sinAtributo).toBeDisabled();
+  await expect(sinAtributo).not.toBeChecked();
+  await expect(sinAtributo).toHaveAccessibleDescription(
+    'Asocia esta competencia a un atributo del graduado en el plan de estudios para poder incluirla.',
+  );
+
   const primera = page.getByRole('checkbox', { name: /CPE-E2E01/ });
   await primera.click();
   await expect(primera).toBeChecked();

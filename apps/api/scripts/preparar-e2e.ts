@@ -56,6 +56,21 @@ const COMPETENCIAS = [
 ];
 
 /**
+ * La competencia del plan que **no responde a ningún atributo del graduado**.
+ *
+ * Existe para que la suite vea el estado de RF127: la casilla deshabilitada con su
+ * motivo, y `axe` sobre ella. Sin una así, ninguna prueba E2E llega a esa rama.
+ *
+ * Va aparte de `COMPETENCIAS` a propósito: esa lista alimenta el plan de medición
+ * de partida y fija cuál es «la primera» (`CPE-E2E01`), y una competencia sin
+ * atributo no puede formar parte de un plan de medición.
+ */
+const COMPETENCIA_SIN_ATRIBUTO = {
+  codigo: 'CPE-E2E05',
+  nombre: 'Competencia sin atributo de prueba',
+} as const;
+
+/**
  * RF-PE-016: la configuración de un cruce asocia asignaturas del plan base, y
  * el desplegable las necesita reales para no salir vacío. Dos y no una: para
  * enseñar el `<optgroup>` con más de una fila hace falta más de una asignatura.
@@ -182,6 +197,20 @@ async function main(): Promise<void> {
     });
   }
 
+  const sinAtributo = await prisma.competencia.upsert({
+    where: { codigo: COMPETENCIA_SIN_ATRIBUTO.codigo },
+    update: { nombre: COMPETENCIA_SIN_ATRIBUTO.nombre, estado: 'ACTIVO' },
+    create: { codigo: COMPETENCIA_SIN_ATRIBUTO.codigo, nombre: COMPETENCIA_SIN_ATRIBUTO.nombre },
+  });
+  // Idempotente en los dos sentidos: si alguien le asoció un atributo a mano entre
+  // dos corridas, aquí vuelve a quedar sin ninguno.
+  await prisma.competenciaAtributo.deleteMany({ where: { competenciaId: sinAtributo.id } });
+  await prisma.planCompetencia.upsert({
+    where: { planId_competenciaId: { planId: plan.id, competenciaId: sinAtributo.id } },
+    update: {},
+    create: { planId: plan.id, competenciaId: sinAtributo.id },
+  });
+
   for (const a of ASIGNATURAS) {
     await prisma.asignatura.upsert({
       where: { planId_codigo: { planId: plan.id, codigo: a.codigo } },
@@ -204,7 +233,8 @@ async function main(): Promise<void> {
   await criterioYObjetivoDePrueba(carrera.id);
 
   console.log(
-    `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias y ` +
+    `Carrera E2E lista: plan ${plan.codigo} VIGENTE con ${COMPETENCIAS.length} competencias (más ` +
+      `${COMPETENCIA_SIN_ATRIBUTO.codigo}, sin atributo del graduado, para RF127) y ` +
       `${ASIGNATURAS.length} asignaturas, un plan de medición vigente de partida con una ` +
       'competencia programada en ambos periodos, y un plan de medición Indirecta Aprobado ' +
       'con dos años, más un Criterio de Acreditación y un Objetivo Educacional activos para ' +
