@@ -238,6 +238,47 @@ test('la pestaña de documentos del plan de mejora, con un PDF ya generado', asy
   await analizar(page, 'la pestaña de documentos del plan de mejora');
 });
 
+/**
+ * Crea un acta de aprobación fresca en Borrador y abre su detalle. El periodo
+ * lleva la hora para que dos corridas seguidas sin reiniciar la base no choquen
+ * ni se confundan entre sí.
+ */
+async function crearActa(page: Page): Promise<void> {
+  await page.goto('/mejora-continua/actas');
+  await page.getByRole('button', { name: 'Nueva acta' }).click();
+  const modal = page.getByRole('dialog');
+  await modal.getByLabel('Periodo académico*').fill(`E2E-AXE-${Date.now()}`);
+  await modal.getByRole('button', { name: 'Crear' }).click();
+  await expect(page.getByRole('heading', { name: 'Cabecera del acta' })).toBeVisible();
+}
+
+test('el listado de actas de aprobación, con una acta ya creada', async ({ page }) => {
+  // Con contenido real: analizar el estado vacío no distingue «sin problemas» de
+  // «axe nunca vio la tabla», que es lo que el resto de este fichero ya evita.
+  await crearActa(page);
+  await page.goto('/mejora-continua/actas');
+  await expect(page.getByRole('heading', { name: 'Actas de aprobación' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Actas de aprobación registradas' })).toBeVisible();
+
+  await analizar(page, 'el listado de actas de aprobación');
+});
+
+test('el detalle de un acta en Borrador, con sus campos editables', async ({ page }) => {
+  // Borrador es el único estado en que todos los campos están habilitados y en
+  // que aparecen los botones de guardar, quitar y eliminar. Se añade una fila de
+  // asistente en blanco antes de analizar: es el campo dinámico de la pantalla y
+  // el que más fácilmente pierde su etiqueta.
+  await crearActa(page);
+  await page.getByRole('button', { name: 'Agregar asistente' }).click();
+  await expect(page.getByLabel('Asistente 1')).toBeVisible();
+
+  // El historial ya trae el evento de creación: sin esperarlo, axe vería el
+  // estado vacío o la carga en su lugar.
+  await expect(page.getByRole('list', { name: 'Movimientos del acta' })).toBeVisible();
+
+  await analizar(page, 'el detalle del acta de aprobación en Borrador');
+});
+
 test.describe('con la cuenta que aprueba', () => {
   // Generar una versión exige `evaluacion.crear`/`mejora.crear` y aprobar
   // exige `evaluacion.aprobar`/`mejora.aprobar`; la cuenta por defecto

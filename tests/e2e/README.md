@@ -135,15 +135,20 @@ está registrada como **D-10** en la sección 8 de
 `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, **aprobada el 4 de septiembre de
 2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
 
-**Cobertura actual (25 de septiembre de 2026).** Además de las cuatro pantallas de
-aquella primera medición, el spec tiene hoy 21 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
+**Cobertura actual (26 de septiembre de 2026).** Además de las cuatro pantallas de
+aquella primera medición, el spec tiene hoy 20 pruebas de `axe` (el «21» que figuraba aquí
+antes no coincidía con el fichero): listados y detalles de medición, evaluación y mejora (con
 sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, el
-resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias
-y, desde RF127, el selector de competencias con una competencia sin atributo — la casilla
-deshabilitada y su motivo enlazado por `aria-describedby`. Todas pasan sin violaciones y sin
-reglas desactivadas. **No** hay `axe` sobre las pantallas de Actas de Aprobación, ni sobre el
-estado «ya marcada» de esa casilla (un plan no puede llegar a él por la interfaz: la API lo
-impide, así que solo lo cubren las pruebas de componente).
+resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias,
+desde RF127 el selector de competencias con una competencia sin atributo —la casilla
+deshabilitada y su motivo enlazado por `aria-describedby`— y las Actas de Aprobación: el
+listado con una acta ya creada y el detalle de un acta en Borrador con una fila de asistente
+en blanco y su historial. Todas pasan sin violaciones y sin reglas desactivadas. Actas queda
+cubierta solo en **Borrador**: el detalle de un acta Aprobada o Emitida (campos
+deshabilitados, aviso de solo lectura, sección de exportación) y el modal de rechazo no se
+analizan, porque llegar a ellos exige aprobar un acta con acciones cargadas. Tampoco hay `axe`
+sobre el estado «ya marcada» de la casilla de RF127 (un plan no puede llegar a él por la
+interfaz: la API lo impide, así que solo lo cubren las pruebas de componente).
 
 **Automatizado no es completo.** `axe-core` detecta alrededor de un tercio de los problemas
 reales de accesibilidad. Si el orden de tabulación tiene sentido, si un texto alternativo
