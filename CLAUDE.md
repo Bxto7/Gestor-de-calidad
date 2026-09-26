@@ -40,7 +40,7 @@ Se están construyendo **en paralelo**:
 > | Bloque | Con código | Total |
 > |---|---|---|
 > | Plan de Estudios (fichas) | 60 | 60 |
-> | Atributos del Graduado y Criterios (`RF120`–`RF132`; `RF127` diverge, D-11) | 13 | 13 |
+> | Atributos del Graduado y Criterios (`RF120`–`RF132`; `RF127` cumple el resultado y diverge en la forma, D-11) | 13 | 13 |
 > | Mejora Continua · Planes de Medición (`RF-PM`) | 47 | 47 |
 > | Mejora Continua · Evaluación (`RF-PE`) | 49 | 49 |
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 47 | 47 |
@@ -122,17 +122,18 @@ Se están construyendo **en paralelo**:
 >   (`RF056`/`067`, sin grupos de electivos), D-3 (`RF084`, solo PDF), D-4
 >   (`RF101`–`110`, numeración inferida), D-5 (`RF041`/`053`, código generado por el
 >   sistema), D-6 (sin RF que defina los prerrequisitos), D-9 (`RF055`/`047`, plan
->   ISI 2018 con horas teóricas en 0 y sumillas «pendiente»), D-11 (`RF127`), D-12
+>   ISI 2018 con horas teóricas en 0 y sumillas «pendiente»), D-11 (`RF127`, se muestran deshabilitadas en vez de excluirse), D-12
 >   (`RF-PE-020`, evidencia solo como enlace), D-13 (`RF-PE-006` RN2, remite a
 >   números equivocados) y D-14 (`RF-PE-032`/`033`, sin la plantilla institucional).
 >   D-7 y D-8 están ratificadas y D-10 aprobada.
-> - **`RF127` cuenta como construido pero no cumple lo que pide.** El requisito
->   exige excluir de la selección las competencias sin atributo del graduado; el
->   sistema las muestra y deja incluirlas en un plan de medición, y la API tampoco
->   lo impide. Cerrarlo pide una decisión primero —aplicar el requisito tal cual, la
->   salida intermedia con la casilla deshabilitada, o corregir el requisito— y luego
->   unas pocas líneas en `GrupoDeCompetencias.tsx` más la validación en el caso de
->   uso.
+> - **`RF127` cumple el resultado pero no la forma que pide.** Desde el 25 de
+>   septiembre de 2026 ningún plan de medición puede incluir una competencia sin
+>   atributo del graduado: `declararCompetencias` la rechaza (regla estricta sobre todo
+>   el conjunto enviado) y `GrupoDeCompetencias.tsx` deja su casilla deshabilitada con
+>   el motivo al lado. Pero el requisito dice **excluirla** de la lista, y el sistema
+>   la sigue mostrando, para que se vea qué falta mapear. Esa forma es la «salida
+>   intermedia» de D-11 y nadie de la universidad la ha aprobado, así que la
+>   divergencia sigue abierta.
 > - **`RF-AC-023` a `026` cuentan por el patrón**, sin una prueba propia cada uno.
 > - **Los RNF no tienen seguimiento.** Ninguna cuenta de este documento los incluye:
 >   el código cita por número apenas seis (`RNF03`, `04`, `08`, `09`, `12` y `24`) y

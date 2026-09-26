@@ -1276,7 +1276,7 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-8 | RF073 | `.xlsx` real con tipos, no CSV | Ratificada |
 | D-9 | RF055 · RF047 | Datos del plan ISI 2018 cargados incompletos: horas teóricas en 0 y sumillas en «pendiente» | **PENDIENTE** |
 | D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | Aprobada (2026-09-04) |
-| D-11 | RF127 (Mejora Continua) | Una competencia sin atributo del graduado se muestra y se puede incluir en un plan de medición; el requisito dice excluirla | **PENDIENTE** |
+| D-11 | RF127 (Mejora Continua) | Una competencia sin atributo del graduado se muestra deshabilitada y la API no deja incluirla; el requisito dice excluirla de la lista | **PENDIENTE** (resultado cumplido desde 2026-09-25; falta aprobar la forma) |
 | D-12 | RF-PE-020 (Mejora Continua) | La evidencia del entregable se registra como enlace; el requisito admite «archivos o enlaces» y no hay subida de archivos | **PENDIENTE** |
 | D-13 | RF-PE-006 RN2 (Mejora Continua) | La excepción del registro progresivo remite a RF-PE-022 y RF-PE-028 (medición Indirecta, ninguno registra un porcentaje); los que sí lo describen son RF-PE-019 y RF-PE-026 | **PENDIENTE** |
 | D-14 | RF-PE-032 RN2 · RF-PE-033 RN2 (Mejora Continua) | El Excel y el PDF calcan la plantilla del plan de medición, no «el formato institucional»: esa plantilla no está en el repositorio | **PENDIENTE** |
@@ -1402,7 +1402,7 @@ Pendiente menor: si esta decisión tiene que constar con nombre en el expediente
 ---
 
 
-### D-11 · RF127 — la competencia sin atributo del graduado no se excluye
+### D-11 · RF127 — la competencia sin atributo del graduado no se excluye, se deshabilita
 
 Primera divergencia de esta lista que no es del documento de Plan de Estudios sino del de
 Mejora Continua. Se anota aquí porque el registro de divergencias es uno solo, y tener dos
@@ -1413,29 +1413,32 @@ la lista de selección** y sugiere completar la asociación primero.» Resultado
 «Todo plan de medición queda construido únicamente con competencias trazables a un
 atributo del graduado.»
 
-**Hace:** las muestra, agrupadas al final bajo «Sin atributo del graduado asignado», y
-**permite seleccionarlas**. Tampoco la API lo impide: `declararCompetencias` comprueba que
-la competencia pertenezca al plan de estudios base, y nada más.
+**Hace (desde el 25 de septiembre de 2026):** las muestra, agrupadas al final bajo «Sin
+atributo del graduado asignado», con la casilla **deshabilitada** y el motivo escrito al
+lado. La API lo impone: `declararCompetencias` rechaza con `RF127: …` cualquier conjunto
+que incluya una competencia sin atributo, y lo hace sobre **todo** el conjunto enviado. Un
+plan que ya traía una de ellas (de antes de la regla) la sigue viendo marcada y habilitada
+para poder quitarla; hasta que la quite no puede guardar. Dejarla fuera nunca se rechaza.
+
+**Hacía antes:** las mostraba y dejaba seleccionarlas; la API solo comprobaba que la
+competencia perteneciera al plan de estudios base.
 
 **Por qué se hizo así.** Esconder una competencia sin mapear la hace invisible justo para
 quien podría arreglarla. Quien configura el plan vería una lista más corta sin saber que
 lo es, y el mapeo que falta —que es un hallazgo de acreditación en sí mismo— no aparecería
 en ninguna pantalla.
 
-**Qué se pierde.** Lo que RF127 protege: hoy un plan de medición **puede** contener
-competencias que no se trazan a ningún atributo del graduado, que es exactamente lo que la
-evaluación ICACIT necesita poder seguir. El requisito tiene razón en el resultado; la
-discrepancia está en el medio para conseguirlo.
+**Qué se pierde.** Ya nada de fondo: el resultado que RF127 protege —ningún plan de
+medición contiene competencias no trazables a un atributo del graduado— se cumple, y en la
+API, no solo en la pantalla. Lo que queda es la **forma**: el requisito dice excluirlas de
+la lista y aquí se ven deshabilitadas.
 
-**Salida intermedia, si se aprueba.** Mostrarlas, pero con la casilla deshabilitada y el
-motivo escrito al lado. Cumple el resultado esperado de RF127 —ningún plan las incluye— y
-conserva la razón por la que hoy se ven. Son unas pocas líneas en
-`GrupoDeCompetencias.tsx` más la validación equivalente en el caso de uso, que es donde
-tiene que estar para que no dependa de la pantalla.
-
-**Qué hay que decidir.** Si se aplica RF127 tal como está escrito, si se adopta la salida
-intermedia, o si el requisito se corrige para admitir que se vean. Mientras no se decida,
-el sistema y el requisito discrepan en algo que afecta a la trazabilidad del expediente.
+**Qué hay que decidir.** Si la universidad aprueba lo que hay (la salida intermedia), si
+prefiere ocultarlas tal como está escrito, o si el requisito se corrige para admitir que se
+vean deshabilitadas. Mientras no se decida, la divergencia sigue abierta, aunque ya no
+afecta a la trazabilidad del expediente. Cubierto por
+`configurar-plan-medicion.spec.ts`, `agrupar-por-atributo.spec.ts` y
+`GrupoDeCompetencias.test.tsx`.
 
 ---
 

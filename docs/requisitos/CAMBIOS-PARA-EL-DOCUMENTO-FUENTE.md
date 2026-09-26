@@ -6,7 +6,7 @@ Al construir los módulos aparecieron trece puntos en los que el sistema y el do
 
 Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-14** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
 
-Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto).
+Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto); D-11 se actualizó el 25 de septiembre de 2026.
 
 ---
 
@@ -93,25 +93,25 @@ El plan ISI 2018 está cargado con **todas las horas teóricas en cero** y **tod
 
 ---
 
-### D-11 · RF127 · Una competencia sin atributo del graduado se puede incluir en un plan de medición
+### D-11 · RF127 · Una competencia sin atributo del graduado se muestra deshabilitada en vez de excluirse
 
 *Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
 
 RF127 dice que una competencia sin ningún Atributo del Graduado asociado **se excluya de la lista de selección** al configurar un plan de medición, para que «todo plan de medición quede construido únicamente con competencias trazables a un atributo del graduado».
 
-**El sistema hace lo contrario:** las muestra —agrupadas al final, bajo «Sin atributo del graduado asignado»— y deja incluirlas. La API tampoco lo impide.
+**Estado al 25 de septiembre de 2026.** El resultado que busca RF127 ya se cumple: ningún plan de medición puede incluir una competencia sin atributo, y la regla la impone la API, no solo la pantalla. Lo que queda distinto es la forma: en lugar de **ocultarlas**, el sistema las muestra —agrupadas al final, bajo «Sin atributo del graduado asignado»— con la casilla deshabilitada y el motivo escrito al lado. Un plan que ya traía una de ellas debe quitarla para poder guardarse.
 
-**Por qué.** Esconder una competencia sin mapear la vuelve invisible justo para quien podría arreglarla: quien configura el plan vería una lista más corta sin saber que lo es, y el mapeo que falta —que es un hallazgo de acreditación en sí mismo— no aparecería en ninguna pantalla.
+*(Hasta esa fecha el sistema hacía lo contrario: las mostraba y dejaba incluirlas.)*
 
-**Qué se pierde mientras tanto.** Justo lo que RF127 protege: hoy un plan de medición puede contener competencias que no se trazan a ningún atributo, que es precisamente lo que la evaluación ICACIT necesita poder seguir.
+**Por qué se muestran.** Esconder una competencia sin mapear la vuelve invisible justo para quien podría arreglarla: quien configura el plan vería una lista más corta sin saber que lo es, y el mapeo que falta —que es un hallazgo de acreditación en sí mismo— no aparecería en ninguna pantalla.
 
 **Qué hay que decidir.** Tres salidas:
 
 1. Aplicar RF127 tal como está escrito: se ocultan.
-2. Una intermedia: se muestran, pero no se pueden marcar, con el motivo escrito al lado. Cumple el resultado que RF127 busca y conserva la razón por la que hoy se ven.
-3. Corregir el requisito para admitir que se vean y se incluyan.
+2. La actual: se muestran, pero no se pueden marcar, con el motivo escrito al lado.
+3. Corregir el requisito para que diga que se muestran deshabilitadas.
 
-La segunda es la que recomendamos, y es poco trabajo. Pero es una decisión de la universidad, no de quien programa.
+Recomendamos la segunda, o la tercera para dejar el documento igual que el sistema. Pero es una decisión de la universidad, no de quien programa.
 
 ---
 
@@ -231,7 +231,6 @@ De más urgente a menos:
 | Punto | Impacto si no se resuelve |
 |---|---|
 | **D-2** · Grupos de electivos | El sistema publica una cifra de créditos que no coincide con el documento oficial de la carrera |
-| **D-11** · RF127 · Competencias sin atributo | Un plan de medición puede quedar con competencias no trazables a ningún atributo del graduado — lo que la evaluación ICACIT sigue |
 | **D-12** · RF-PE-020 · Evidencias como enlace | Un enlace roto deja sin respaldo una evidencia de acreditación, y no se nota hasta que alguien la busca |
 | **D-4** · Numeración RF101–110 | No se puede construir una tabla de trazabilidad fiable para ese bloque |
 | **D-6** · Prerrequisitos | Faltan 16 requisitos reales del plan vigente; hay un RF sin redactar |
@@ -239,6 +238,7 @@ De más urgente a menos:
 | **D-1** · RF092 | Discrepancia entre código y requisito, sin efecto práctico negativo hoy |
 | **D-5** · Carga de planes históricos | Discrepancia sobre el papel; la práctica es la correcta |
 | **D-13** · RF-PE-006 RN2 · Cita cruzada equivocada | Discrepancia sobre el papel; el sistema ya sigue la lectura correcta |
+| **D-11** · RF127 · Competencias sin atributo | Discrepancia de forma: se muestran deshabilitadas en vez de ocultarse; el resultado ya se cumple |
 | **D-3** · RF084 en Excel | Ninguno, salvo que alguien lo pida |
 
 Los dos puntos de constancia (**D-7** y **D-8**) no aparecen aquí porque no hay nada que resolver.
