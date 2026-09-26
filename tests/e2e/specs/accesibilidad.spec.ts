@@ -279,6 +279,65 @@ test('el detalle de un acta en Borrador, con sus campos editables', async ({ pag
   await analizar(page, 'el detalle del acta de aprobación en Borrador');
 });
 
+/**
+ * Pulsa un botón del acta y espera a que el servidor confirme el cambio (una
+ * escritura a `/actas/...` con respuesta correcta). El acta se arma paso a paso y
+ * cada paso valida contra lo ya guardado: pulsar «Enviar a revisión» antes de que
+ * el servidor tenga la cabecera fallaría con «Hay inconsistencias bloqueantes» sin
+ * decir cuál.
+ */
+async function pulsarYEsperarGuardado(page: Page, nombre: string): Promise<void> {
+  const [respuesta] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() !== 'GET' && new URL(r.url()).pathname.includes('/actas/'),
+    ),
+    page.getByRole('button', { name: nombre, exact: true }).click(),
+  ]);
+  expect(respuesta.ok(), `«${nombre}» no se guardó (${respuesta.status()}).`).toBe(true);
+}
+
+/**
+ * Deja un acta en Aprobada, recorriendo la interfaz como lo haría quien la arma.
+ *
+ * Aprobar exige la validación integral de RF-AC-016: cabecera, un asistente, al
+ * menos una acción incluida y los datos de emisión. Las acciones salen de los planes
+ * de mejora Aprobados o Vigentes de la carrera que no estén ya en un acta emitida,
+ * así que cada llamada aprueba antes su propio plan de mejora: no depende de lo que
+ * hayan dejado otros ficheros ni de que una corrida anterior no lo haya gastado.
+ * Requiere la cuenta `director`, la única con `mejora.aprobar` y `actas.aprobar`.
+ */
+async function crearActaAprobada(page: Page): Promise<void> {
+  await crearPlanMejora(page);
+  await completarDefinicion(page);
+  await page.getByRole('button', { name: 'Enviar a revisión' }).click();
+  await page.getByRole('button', { name: 'Aprobar', exact: true }).click();
+  // Sin esperar: el `goto` siguiente abandonaría la página antes de que el servidor
+  // termine de aprobar el plan, y el acta no encontraría ninguna acción que cargar.
+  await expect(page.getByRole('button', { name: 'Aprobar', exact: true })).toBeHidden();
+
+  await crearActa(page);
+  await page.getByLabel('Convocada por').fill('Dirección de la carrera');
+  await page.getByLabel('Fecha de reunión').fill('2026-09-01');
+  await page.getByLabel('Lugar de reunión').fill('Sala de reuniones');
+  await page.getByLabel('Lugar de emisión').fill('Huancayo');
+  await page.getByLabel('Fecha de emisión').fill('2026-09-02');
+  await pulsarYEsperarGuardado(page, 'Guardar cabecera');
+
+  await page.getByRole('button', { name: 'Agregar asistente' }).click();
+  await page.getByLabel('Asistente 1').fill('E2E Director');
+  await pulsarYEsperarGuardado(page, 'Guardar asistentes');
+
+  await pulsarYEsperarGuardado(page, 'Cargar acciones del periodo');
+  const acciones = page.getByRole('table', { name: 'Acciones de mejora incluidas en el acta' });
+  await expect(acciones.getByRole('checkbox').first()).toBeChecked();
+
+  await pulsarYEsperarGuardado(page, 'Enviar a revisión');
+  await pulsarYEsperarGuardado(page, 'Aprobar');
+  await expect(page.getByRole('note')).toContainText(
+    'Esta acta está Aprobada y no admite cambios.',
+  );
+}
+
 test.describe('con la cuenta que aprueba', () => {
   // Generar una versión exige `evaluacion.crear`/`mejora.crear` y aprobar
   // exige `evaluacion.aprobar`/`mejora.aprobar`; la cuenta por defecto
@@ -349,6 +408,33 @@ test.describe('con la cuenta que aprueba', () => {
     await expect(page.getByRole('link', { name: /^PJ-/ })).toBeVisible();
 
     await analizar(page, 'la pestaña de versiones del plan de mejora');
+  });
+
+  test('el detalle de un acta Aprobada, en solo lectura y con su exportación', async ({ page }) => {
+    // Es el estado que el aviso de RF-AC-021 y la sección de exportación (RF-AC-018/019)
+    // pintan: campos deshabilitados, sin botones de guardar y con «Exportar PDF».
+    await crearActaAprobada(page);
+    await expect(page.getByRole('heading', { name: 'Exportar el acta' })).toBeVisible();
+    await expect(page.getByLabel('Convocada por')).toBeDisabled();
+    await expect(page.getByRole('list', { name: 'Movimientos del acta' })).toBeVisible();
+
+    await analizar(page, 'el detalle del acta de aprobación Aprobada');
+  });
+
+  test('el detalle de un acta Emitida, con su PDF ya exportado', async ({ page }) => {
+    // Emitida no tiene botón: la primera exportación que termina bien pasa el acta de
+    // Aprobada a Emitida (RF-AC-018/019), y eso lo hace el worker. Sin él, esta prueba
+    // se queda esperando «Listo».
+    await crearActaAprobada(page);
+    await page.getByRole('button', { name: 'Exportar PDF' }).click();
+
+    const documentos = page.getByRole('list', { name: 'Documentos exportados' });
+    await expect(documentos.getByText('Listo')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('note')).toContainText(
+      'Esta acta está Emitida y no admite cambios.',
+    );
+
+    await analizar(page, 'el detalle del acta de aprobación Emitida');
   });
 });
 
