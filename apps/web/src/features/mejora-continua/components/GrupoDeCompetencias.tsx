@@ -9,11 +9,20 @@
  * Las competencias sin atributo salen en un grupo propio y al final. Que se vean
  * es lo que delata que falta mapearlas, y es justo el hallazgo que una
  * acreditación busca.
+ *
+ * RF127: esas competencias se ven pero no se pueden incluir. La casilla queda
+ * deshabilitada con el motivo escrito al lado. La regla real vive en la API; esto
+ * solo evita que la persona choque con ella.
  */
 
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 
 import type { GrupoCompetencias } from '../domain/tipos';
+
+const MOTIVO_ASOCIAR =
+  'Asocia esta competencia a un atributo del graduado en el plan de estudios para poder incluirla.';
+const MOTIVO_QUITAR =
+  'Está incluida sin atributo del graduado: quítala para poder guardar el plan.';
 
 export interface GrupoDeCompetenciasProps {
   readonly grupos: readonly GrupoCompetencias[];
@@ -28,6 +37,7 @@ export function GrupoDeCompetencias({
   editable = false,
   onCambiar,
 }: GrupoDeCompetenciasProps) {
+  const idBase = useId();
   const marcadas = useMemo(() => new Set(elegidas), [elegidas]);
 
   /**
@@ -60,23 +70,38 @@ export function GrupoDeCompetencias({
               : 'Sin atributo del graduado asignado'}
           </legend>
 
-          {grupo.competencias.map((c) => (
-            <label
-              key={`${grupo.atributo?.id ?? 'sin'}-${c.id}`}
-              className="flex items-center gap-2 text-sm"
-            >
-              <input
-                type="checkbox"
-                checked={marcadas.has(c.id)}
-                disabled={!editable}
-                onChange={() => alternar(c.id)}
-                className="h-4 w-4 rounded border-slate-300"
-              />
-              <span>
-                <span className="font-medium">{c.codigo}</span> — {c.nombre}
-              </span>
-            </label>
-          ))}
+          {grupo.competencias.map((c) => {
+            const marcada = marcadas.has(c.id);
+            const sinAtributo = grupo.atributo === null;
+            // RF127: sin atributo no se puede incluir. Si el plan ya la traía marcada
+            // se deja desmarcar, o el plan quedaría atrapado sin poder guardarse.
+            const bloqueada = sinAtributo && !marcada;
+            const motivo = editable && sinAtributo ? (marcada ? MOTIVO_QUITAR : MOTIVO_ASOCIAR) : null;
+            const idMotivo = `${idBase}-${c.id}-motivo`;
+
+            return (
+              <div key={`${grupo.atributo?.id ?? 'sin'}-${c.id}`} className="space-y-0.5">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={marcada}
+                    disabled={!editable || bloqueada}
+                    aria-describedby={motivo ? idMotivo : undefined}
+                    onChange={() => alternar(c.id)}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  <span>
+                    <span className="font-medium">{c.codigo}</span> — {c.nombre}
+                  </span>
+                </label>
+                {motivo && (
+                  <p id={idMotivo} className="ml-6 text-xs text-tinta-suave">
+                    {motivo}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </fieldset>
       ))}
     </div>
