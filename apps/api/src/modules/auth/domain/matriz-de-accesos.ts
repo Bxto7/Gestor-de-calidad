@@ -139,15 +139,7 @@ export const ROLES: {
       'plan.leer_historico',
       'objetivo.leer',
       'competencia.leer',
-      'atributo.leer',
-      'criterio.leer',
       'asignatura.leer',
-      // Solo lectura, como con el resto del contenido académico: decidir qué se
-      // mide y aprobarlo es una responsabilidad académica, no de administración.
-      'medicion.leer',
-      'evaluacion.leer',
-      'mejora.leer',
-      'actas.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
@@ -177,36 +169,9 @@ export const ROLES: {
       'objetivo.gestionar',
       'competencia.leer',
       'competencia.gestionar',
-      // RF120 y RF129 nombran al Director como quien registra atributos del
-      // graduado y criterios de acreditación de su carrera.
-      'atributo.leer',
-      'atributo.gestionar',
-      'criterio.leer',
-      'criterio.gestionar',
       'asignatura.leer',
       'asignatura.gestionar',
       'malla.editar',
-      // RF-PM-006 le reserva la aprobación: «el Coordinador académico envía a
-      // revisión, y el Director de carrera aprueba, rechaza u observa».
-      'medicion.leer',
-      'medicion.crear',
-      'medicion.editar',
-      'medicion.eliminar',
-      'medicion.aprobar',
-      // RF-PE-046: la misma separación que en medición. Quien construye no da
-      // el visto bueno, pero el Director sí hace ambas cosas.
-      'evaluacion.leer',
-      'evaluacion.crear',
-      'evaluacion.editar',
-      'evaluacion.eliminar',
-      'evaluacion.aprobar',
-      // RF-PJ-044: misma separación que medición y evaluación. Quien
-      // construye no da el visto bueno, pero el Director sí hace ambas cosas.
-      'mejora.leer',
-      'mejora.crear',
-      'mejora.editar',
-      'mejora.eliminar',
-      'mejora.aprobar',
       'actas.leer',
       'actas.crear',
       'actas.editar',
@@ -226,25 +191,12 @@ export const ROLES: {
     permisos: [
       'facultad.leer',
       'carrera.leer',
-      'plan.leer',
-      'plan.leer_historico',
-      'plan.crear',
-      'plan.editar',
-      'plan.enviar_revision',
-      'plan.justificar',
-      'objetivo.leer',
-      'objetivo.gestionar',
-      'competencia.leer',
-      'competencia.gestionar',
       // RF120 y RF129 listan al Coordinador junto al Director como actor de
       // registro y edición; lo que no tiene, aquí como en el plan, es aprobar.
       'atributo.leer',
       'atributo.gestionar',
       'criterio.leer',
       'criterio.gestionar',
-      'asignatura.leer',
-      'asignatura.gestionar',
-      'malla.editar',
       // Configura y envía a revisión, pero no aprueba: la misma separación que
       // ya lo deja fuera de `plan.aprobar`. Quien construye no da el visto bueno.
       'medicion.leer',
