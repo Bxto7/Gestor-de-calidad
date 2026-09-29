@@ -54,7 +54,13 @@ const SECCIONES: readonly SeccionNav[] = [
   {
     titulo: 'Plan de estudios',
     enlaces: [
-      { a: '/plan-estudios', etiqueta: 'Plan de Estudios', icono: IconoPlan, exacto: false },
+      {
+        a: '/plan-estudios',
+        etiqueta: 'Plan de Estudios',
+        icono: IconoPlan,
+        exacto: false,
+        permiso: 'plan.leer',
+      },
     ],
   },
   {

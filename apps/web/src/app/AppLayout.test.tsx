@@ -153,6 +153,21 @@ describe('AppLayout — entrada «Mis evidencias»', () => {
   });
 });
 
+describe('AppLayout — entrada «Plan de Estudios»', () => {
+  it('aparece cuando el usuario tiene plan.leer', () => {
+    montar({ puede: (permiso: string) => permiso === 'plan.leer' });
+    expect(screen.getByRole('link', { name: 'Plan de Estudios' })).toHaveAttribute(
+      'href',
+      '/plan-estudios',
+    );
+  });
+
+  it('no aparece sin el permiso (antes de este cambio, aparecía siempre)', () => {
+    montar({ puede: () => false });
+    expect(screen.queryByRole('link', { name: 'Plan de Estudios' })).not.toBeInTheDocument();
+  });
+});
+
 function CapturaUbicacion() {
   const ubicacion = useLocation();
   return (
