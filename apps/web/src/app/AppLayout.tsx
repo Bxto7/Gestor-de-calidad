@@ -9,7 +9,7 @@
 
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { obtenerCarrera } from '@/features/plan-estudios/api/plan-estudios.api';
@@ -166,6 +166,16 @@ export function AppLayout() {
   const [encabezado, setEncabezado] = useState<Encabezado>({ migas: [], acciones: null });
   const { identidad, salir, puede } = useSesion();
   const ubicacion = useLocation();
+  const navegar = useNavigate();
+
+  const manejarSalida = useCallback(async () => {
+    await salir();
+    // Sin `state`: un logout explícito no debe hacer que el siguiente inicio
+    // de sesión aterrice en la pantalla que dejó esta persona (RF-CH-001). La
+    // pérdida de sesión por expiración (RutaProtegida) sí conserva `desde`,
+    // porque ahí es la misma persona quien vuelve.
+    navegar('/acceso', { replace: true, state: null });
+  }, [salir, navegar]);
 
   const { data: carrera, isError: carreraConError } = useQuery({
     queryKey: ['carrera', identidad?.carreraACargo],
@@ -333,7 +343,7 @@ export function AppLayout() {
             </span>
             <button
               type="button"
-              onClick={() => void salir()}
+              onClick={() => void manejarSalida()}
               title="Cerrar sesión"
               aria-label="Cerrar sesión"
               className="shrink-0 rounded-lg p-1.5 text-uc-lila transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"

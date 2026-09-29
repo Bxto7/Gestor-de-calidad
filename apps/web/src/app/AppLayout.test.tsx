@@ -3,7 +3,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto-sesion';
@@ -150,5 +150,43 @@ describe('AppLayout — entrada «Mis evidencias»', () => {
   it('no aparece sin el permiso', () => {
     montar({ puede: () => false });
     expect(screen.queryByRole('link', { name: 'Mis evidencias' })).not.toBeInTheDocument();
+  });
+});
+
+function CapturaUbicacion() {
+  const ubicacion = useLocation();
+  return (
+    <div>
+      <span data-testid="ruta">{ubicacion.pathname}</span>
+      <span data-testid="estado">{JSON.stringify(ubicacion.state)}</span>
+    </div>
+  );
+}
+
+describe('AppLayout — cerrar sesión (RF-CH-001)', () => {
+  it('navega a /acceso sin arrastrar la ruta actual en el estado', async () => {
+    const salir = vi.fn().mockResolvedValue(undefined);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ContextoSesion.Provider value={{ ...sesionBase, salir }}>
+          <MemoryRouter initialEntries={['/mejora-continua/mejora/plan-1']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/mejora-continua/mejora/:id" element={<div>plan</div>} />
+              </Route>
+              <Route path="/acceso" element={<CapturaUbicacion />} />
+            </Routes>
+          </MemoryRouter>
+        </ContextoSesion.Provider>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+
+    expect(salir).toHaveBeenCalled();
+    expect(await screen.findByTestId('ruta')).toHaveTextContent('/acceso');
+    expect(screen.getByTestId('estado')).toHaveTextContent('null');
   });
 });
