@@ -24,6 +24,7 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'facultad.inactivar',
         'facultad.leer',
         'objetivo.leer',
+        'plan.acceder',
         'plan.leer',
         'plan.leer_historico',
         'rol.gestionar',
@@ -50,6 +51,7 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'malla.editar',
         'objetivo.gestionar',
         'objetivo.leer',
+        'plan.acceder',
         'plan.aprobar',
         'plan.crear',
         'plan.editar',
@@ -65,7 +67,7 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
     );
   });
 
-  it('COORDINADOR_ACADEMICO: pierde Plan de Estudios y Sistema; conserva Acreditación y Mejora Continua', () => {
+  it('COORDINADOR_ACADEMICO: sin módulo Plan de Estudios ni Sistema; aprueba los planes de Mejora Continua', () => {
     expect(permisosOrdenados('COORDINADOR_ACADEMICO')).toEqual(
       [
         'actas.crear',
@@ -76,23 +78,38 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'atributo.leer',
         'auditoria.leer_entidad',
         'carrera.leer',
+        'competencia.leer',
         'criterio.gestionar',
         'criterio.leer',
+        'evaluacion.aprobar',
         'evaluacion.crear',
         'evaluacion.editar',
         'evaluacion.eliminar',
         'evaluacion.leer',
         'facultad.leer',
+        'medicion.aprobar',
         'medicion.crear',
         'medicion.editar',
         'medicion.eliminar',
         'medicion.leer',
+        'mejora.aprobar',
         'mejora.crear',
         'mejora.editar',
         'mejora.eliminar',
         'mejora.leer',
+        'objetivo.leer',
+        'plan.leer',
         'reporte.generar',
       ].sort(),
     );
+  });
+
+  it('COORDINADOR_ACADEMICO no recibe plan.acceder: lee planes, objetivos y competencias sin entrar al módulo', () => {
+    expect(permisosOrdenados('COORDINADOR_ACADEMICO')).not.toContain('plan.acceder');
+  });
+
+  it('DOCENTE y USUARIO_CONSULTOR conservan la entrada al módulo Plan de Estudios', () => {
+    expect(permisosOrdenados('DOCENTE')).toContain('plan.acceder');
+    expect(permisosOrdenados('USUARIO_CONSULTOR')).toContain('plan.acceder');
   });
 });

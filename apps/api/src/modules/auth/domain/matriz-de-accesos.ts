@@ -29,6 +29,11 @@ export const PERMISOS = [
   ['carrera.inactivar', 'Inactivar una carrera', 'plan-estudios'],
 
   // Plan de estudios
+  // `plan.acceder` decide solo si el usuario entra a las pantallas del módulo
+  // Plan de Estudios; `plan.leer` decide si puede leer los datos. Van separados
+  // porque el Coordinador lee planes, objetivos y competencias desde Mejora
+  // Continua sin tener el módulo Plan de Estudios.
+  ['plan.acceder', 'Entrar al módulo Plan de Estudios', 'plan-estudios'],
   ['plan.leer', 'Consultar planes de estudio', 'plan-estudios'],
   ['plan.leer_historico', 'Consultar versiones históricas', 'plan-estudios'],
   ['plan.crear', 'Crear un plan de estudios', 'plan-estudios'],
@@ -135,6 +140,7 @@ export const ROLES: {
       'carrera.crear',
       'carrera.editar',
       'carrera.inactivar',
+      'plan.acceder',
       'plan.leer',
       'plan.leer_historico',
       'objetivo.leer',
@@ -155,6 +161,7 @@ export const ROLES: {
     permisos: [
       'facultad.leer',
       'carrera.leer',
+      'plan.acceder',
       'plan.leer',
       'plan.leer_historico',
       'plan.crear',
@@ -185,35 +192,39 @@ export const ROLES: {
     codigo: 'COORDINADOR_ACADEMICO',
     nombre: 'Coordinador académico',
     descripcion: 'Apoyo en la gestión operativa del plan de estudios.',
-    // Arma el plan y lo envía a revisión, pero NO lo aprueba ni lo observa:
-    // quien construye no puede ser quien da el visto bueno. Esa separación es
-    // lo que hace que la aprobación signifique algo en una auditoría.
+    // Arma los planes de Mejora Continua y los aprueba: decisión de la
+    // universidad tomada al revisar el Bloque 1 (2026-09-29). No aprueba el
+    // plan de estudios, que sigue siendo del Director.
     permisos: [
       'facultad.leer',
       'carrera.leer',
+      // Lecturas que las pantallas de Mejora Continua hacen sobre Plan de
+      // Estudios (elegir plan, objetivos y competencias). Sin `plan.acceder`:
+      // leen los datos, no entran al módulo.
+      'plan.leer',
+      'objetivo.leer',
+      'competencia.leer',
       // RF120 y RF129 listan al Coordinador junto al Director como actor de
       // registro y edición; lo que no tiene, aquí como en el plan, es aprobar.
       'atributo.leer',
       'atributo.gestionar',
       'criterio.leer',
       'criterio.gestionar',
-      // Configura y envía a revisión, pero no aprueba: la misma separación que
-      // ya lo deja fuera de `plan.aprobar`. Quien construye no da el visto bueno.
       'medicion.leer',
       'medicion.crear',
       'medicion.editar',
       'medicion.eliminar',
-      // Igual que en medición y por la misma razón (RF-PE-046): sin
-      // `evaluacion.aprobar`.
+      'medicion.aprobar',
       'evaluacion.leer',
       'evaluacion.crear',
       'evaluacion.editar',
       'evaluacion.eliminar',
-      // Misma separación otra vez (RF-PJ-044): arma y edita, no aprueba.
+      'evaluacion.aprobar',
       'mejora.leer',
       'mejora.crear',
       'mejora.editar',
       'mejora.eliminar',
+      'mejora.aprobar',
       'actas.leer',
       'actas.crear',
       'actas.editar',
@@ -234,6 +245,7 @@ export const ROLES: {
     permisos: [
       'facultad.leer',
       'carrera.leer',
+      'plan.acceder',
       'plan.leer',
       'objetivo.leer',
       'competencia.leer',
@@ -264,6 +276,7 @@ export const ROLES: {
     permisos: [
       'facultad.leer',
       'carrera.leer',
+      'plan.acceder',
       'plan.leer',
       'atributo.leer',
       'criterio.leer',
