@@ -62,6 +62,8 @@ export interface FiltroUsuarios {
   readonly texto?: string;
   readonly activo?: boolean;
   readonly rol?: string;
+  /** Solo las cuentas asignadas a esa carrera. */
+  readonly carreraId?: string;
 }
 
 export interface DatosUsuarioEntrada {
@@ -88,6 +90,14 @@ export interface RepositorioGestionUsuariosPort {
    * es justo lo que se quería cortar.
    */
   cambiarPassword(id: string, passwordHash: string): Promise<void>;
+
+  /**
+   * Borra la cuenta. Sus filas de `usuario_rol`, `usuario_carrera` y
+   * `refresh_tokens` se van por `ON DELETE CASCADE`. Los demás módulos guardan
+   * el id sin clave foránea: quien llame decide antes si pueden quedar huérfanos
+   * (ver `DocenteEnUsoPort`).
+   */
+  eliminar(id: string): Promise<void>;
 
   /** Cuántas cuentas activas tienen un rol dado. Sostiene la regla del último administrador. */
   cuantosActivosConRol(rolCodigo: string): Promise<number>;

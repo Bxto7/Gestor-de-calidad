@@ -47,6 +47,7 @@ export class GestionUsuariosRepositoryPrisma implements RepositorioGestionUsuari
           ? {}
           : { estado: filtro.activo ? ('ACTIVO' as const) : ('INACTIVO' as const) }),
         ...(filtro.rol ? { roles: { some: { rol: { codigo: filtro.rol } } } } : {}),
+        ...(filtro.carreraId ? { carreras: { some: { carreraId: filtro.carreraId } } } : {}),
       },
       include: INCLUIR,
       orderBy: { nombreCompleto: 'asc' },
@@ -143,6 +144,10 @@ export class GestionUsuariosRepositoryPrisma implements RepositorioGestionUsuari
         data: { revocadoEn: new Date() },
       }),
     ]);
+  }
+
+  async eliminar(id: string): Promise<void> {
+    await this.prisma.usuario.delete({ where: { id } });
   }
 
   async cuantosActivosConRol(rolCodigo: string): Promise<number> {

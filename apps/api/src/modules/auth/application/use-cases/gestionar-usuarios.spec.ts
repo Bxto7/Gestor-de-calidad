@@ -64,6 +64,7 @@ function montar(
       return guardado;
     },
     cambiarEstado: async (_id, activo) => usuario({ activo }),
+    eliminar: async () => undefined,
     cambiarPassword: async (_id, hash) => void passwordsCambiadas.push(hash),
     cuantosActivosConRol: async () => opciones.administradoresActivos ?? 2,
     roles: async () => [],
