@@ -92,6 +92,13 @@ export interface RepositorioAsignaturaPort {
    */
   competenciasValidas(competenciaIds: readonly string[]): Promise<string[]>;
 
+  /**
+   * RF-CH-021: identificadores de las competencias asociadas al plan (RF029).
+   * Una asignatura solo puede vincular competencias de aquí: el catálogo es
+   * global, y el plan es lo que lo acota a la carrera.
+   */
+  competenciasDelPlan(planId: string): Promise<string[]>;
+
   impactoDeInactivar(id: string): Promise<ImpactoInactivacion>;
 }
 

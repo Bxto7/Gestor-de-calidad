@@ -14,7 +14,11 @@ import type {
   DomainEvent,
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
-import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
+import {
+  AccesoDenegado,
+  NoEncontrado,
+  ReglaDeNegocioViolada,
+} from '../../../../shared-kernel/errors/errores.js';
 import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
@@ -94,6 +98,8 @@ function montar(
     plan?: PlanDeEstudios | null;
     nombreDuplicado?: boolean;
     competenciasValidas?: string[];
+    /** RF-CH-021: las competencias asociadas al plan. */
+    competenciasDelPlan?: string[];
     codigos?: string[];
     dependientes?: string[];
     permitido?: boolean;
@@ -105,6 +111,7 @@ function montar(
   const actualizadas: DatosAsignaturaEntrada[] = [];
   const estados: boolean[] = [];
   const filtros: (FiltroAsignaturas | undefined)[] = [];
+  const planesDeCompetencias: string[] = [];
 
   const repo: RepositorioAsignaturaPort = {
     listar: async (_planId, filtro) => {
@@ -127,6 +134,10 @@ function montar(
     },
     existeNombreEnPlan: async () => opciones.nombreDuplicado ?? false,
     competenciasValidas: async (ids) => opciones.competenciasValidas ?? [...ids],
+    competenciasDelPlan: async (planId) => {
+      planesDeCompetencias.push(planId);
+      return opciones.competenciasDelPlan ?? ['c-1', 'c-2', 'c-3'];
+    },
     impactoDeInactivar: async () => ({
       dependientes: opciones.dependientes ?? [],
       cicloNumero: 1,
@@ -161,7 +172,7 @@ function montar(
     opciones.alcance ?? sinRestriccion(),
   );
 
-  return { caso, publicados, creadas, actualizadas, estados, filtros };
+  return { caso, publicados, creadas, actualizadas, estados, filtros, planesDeCompetencias };
 }
 
 describe('RF047 — registrar asignatura', () => {
@@ -314,6 +325,76 @@ describe('RF049 — competencias vinculadas', () => {
     const { caso, creadas } = montar();
     await caso.crear(ACTOR, 'plan-1', { ...ENTRADA, competenciaIds: ['c-1', 'c-1', 'c-2'] });
     expect(creadas[0]?.datos.competenciaIds).toEqual(['c-1', 'c-2']);
+  });
+});
+
+describe('RF-CH-021 — solo competencias del plan', () => {
+  it('acepta las competencias asociadas al plan', async () => {
+    const { caso, creadas } = montar({ competenciasDelPlan: ['c-1', 'c-2'] });
+    await caso.crear(ACTOR, 'plan-1', { ...ENTRADA, competenciaIds: ['c-1', 'c-2'] });
+    expect(creadas[0]?.datos.competenciaIds).toEqual(['c-1', 'c-2']);
+  });
+
+  it('rechaza una competencia que no está asociada al plan, sin guardar nada', async () => {
+    const { caso, creadas } = montar({ competenciasDelPlan: ['c-1'] });
+    const intento = caso.crear(ACTOR, 'plan-1', { ...ENTRADA, competenciaIds: ['c-1', 'c-9'] });
+
+    await expect(intento).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
+    await expect(intento).rejects.toThrow(
+      /1 de las competencias indicadas no están asociadas al plan/,
+    );
+    expect(creadas).toHaveLength(0);
+  });
+
+  it('una inactiva se rechaza aunque esté en el plan', async () => {
+    const { caso } = montar({ competenciasValidas: ['c-1'], competenciasDelPlan: ['c-1', 'c-2'] });
+    await expect(
+      caso.crear(ACTOR, 'plan-1', { ...ENTRADA, competenciaIds: ['c-1', 'c-2'] }),
+    ).rejects.toThrow(/No existen o están inactivas 1/);
+  });
+
+  it('al editar, reenviar una competencia ya vinculada que no es del plan se rechaza', async () => {
+    const { caso, actualizadas } = montar({
+      existente: asignatura({ competencias: [{ id: 'c-9', codigo: 'CPE-09', nombre: 'Ajena' }] }),
+      competenciasDelPlan: ['c-1'],
+    });
+    await expect(
+      caso.editar(ACTOR, 'asig-1', { ...ENTRADA, competenciaIds: ['c-1', 'c-9'] }),
+    ).rejects.toThrow(/no están asociadas al plan/);
+    expect(actualizadas).toHaveLength(0);
+  });
+
+  it('al editar, quitar la ajena y dejar solo las del plan se permite', async () => {
+    const { caso, actualizadas } = montar({
+      existente: asignatura({ competencias: [{ id: 'c-9', codigo: 'CPE-09', nombre: 'Ajena' }] }),
+      competenciasDelPlan: ['c-1'],
+    });
+    await caso.editar(ACTOR, 'asig-1', { ...ENTRADA, competenciaIds: ['c-1'] });
+    expect(actualizadas[0]?.competenciaIds).toEqual(['c-1']);
+  });
+
+  it('leer una asignatura con una competencia de fuera del plan no falla: nada se toca hasta editarla', async () => {
+    const { caso } = montar({
+      existente: asignatura({ competencias: [{ id: 'c-9', codigo: 'CPE-09', nombre: 'Ajena' }] }),
+      competenciasDelPlan: [],
+    });
+    await expect(caso.porId(ACTOR, 'asig-1')).resolves.toMatchObject({
+      competencias: [{ id: 'c-9' }],
+    });
+  });
+
+  it('consulta el plan de la asignatura que se edita', async () => {
+    const { caso, planesDeCompetencias } = montar({
+      existente: asignatura({ planId: 'plan-7' }),
+    });
+    await caso.editar(ACTOR, 'asig-1', { ...ENTRADA, competenciaIds: ['c-1'] });
+    expect(planesDeCompetencias).toEqual(['plan-7']);
+  });
+
+  it('sin competencias no consulta el plan: no hay nada que comprobar', async () => {
+    const { caso, planesDeCompetencias } = montar();
+    await caso.crear(ACTOR, 'plan-1', { ...ENTRADA, competenciaIds: [] });
+    expect(planesDeCompetencias).toEqual([]);
   });
 });
 

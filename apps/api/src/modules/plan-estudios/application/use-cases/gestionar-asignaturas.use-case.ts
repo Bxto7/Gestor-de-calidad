@@ -229,7 +229,7 @@ export class GestionarAsignaturas {
       throw new ReglaDeNegocioViolada('Ya existe otra asignatura con ese nombre en el plan.');
     }
 
-    const competenciaIds = await this.validarCompetencias(datos.competenciaIds);
+    const competenciaIds = await this.validarCompetencias(planId, datos.competenciaIds);
 
     return {
       nombre,
@@ -242,17 +242,25 @@ export class GestionarAsignaturas {
   }
 
   /**
-   * RF049 — el vínculo con competencias.
+   * RF049 y RF-CH-021 — el vínculo con competencias.
    *
    * No se exige que haya al menos una: RN1 la pide "antes de aprobarse el plan",
    * y esa comprobación es del `MotorDeValidaciones` (RF094), no del alta. Exigirla
    * aquí impediría registrar el catálogo de cursos antes de tener definidas las
    * competencias, que es el orden en el que se trabaja de verdad.
    *
-   * Lo que sí se valida es que las que se envían existan: una clave inexistente
-   * produciría una violación de clave foránea con un mensaje de PostgreSQL.
+   * Se valida, en este orden, que las enviadas existan y estén activas —una
+   * clave inexistente produciría una violación de clave foránea con un mensaje
+   * de PostgreSQL— y que estén asociadas al plan (RF-CH-021: «de la carrera»
+   * se lee como «del plan», porque el catálogo es global y el plan es lo que lo
+   * acota). La regla se aplica al crear y a cada edición del conjunto: una
+   * asignatura que ya tuviera una ajena no se toca hasta que se edita, y si la
+   * edición la reenvía, se rechaza con el mismo motivo.
    */
-  private async validarCompetencias(ids: readonly string[]): Promise<readonly string[]> {
+  private async validarCompetencias(
+    planId: string,
+    ids: readonly string[],
+  ): Promise<readonly string[]> {
     const unicos = [...new Set(ids)];
     if (unicos.length === 0) return [];
 
@@ -261,6 +269,15 @@ export class GestionarAsignaturas {
     if (invalidos.length > 0) {
       throw new ReglaDeNegocioViolada(
         `No existen o están inactivas ${invalidos.length} de las competencias indicadas.`,
+      );
+    }
+
+    const delPlan = new Set(await this.asignaturas.competenciasDelPlan(planId));
+    const ajenas = unicos.filter((id) => !delPlan.has(id));
+    if (ajenas.length > 0) {
+      throw new ReglaDeNegocioViolada(
+        `${ajenas.length} de las competencias indicadas no están asociadas al plan. ` +
+          'Asócialas primero en la sección Competencias.',
       );
     }
     return unicos;

@@ -199,6 +199,14 @@ export class AsignaturaRepositoryPrisma implements RepositorioAsignaturaPort {
     return filas.map((f) => f.id);
   }
 
+  async competenciasDelPlan(planId: string): Promise<string[]> {
+    const filas = await this.prisma.planCompetencia.findMany({
+      where: { planId },
+      select: { competenciaId: true },
+    });
+    return filas.map((f) => f.competenciaId);
+  }
+
   async impactoDeInactivar(id: string): Promise<ImpactoInactivacion> {
     const [dependientes, asignatura] = await Promise.all([
       // Quién la requiere: la asignatura está del lado `requiere_id`.

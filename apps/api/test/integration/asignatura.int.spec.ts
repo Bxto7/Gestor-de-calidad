@@ -416,5 +416,29 @@ describe('RF-CH-020 — sin horas teóricas', () => {
   });
 });
 
+describe('RF-CH-021 — competencias del plan', () => {
+  it('devuelve solo las asociadas a ese plan', async () => {
+    await prisma.planCompetencia.create({ data: { planId, competenciaId: idDe('CPE-01') } });
+    const otro = await prisma.planEstudios.create({
+      data: {
+        carreraId,
+        codigo: 'PE-ISI-2027-v2',
+        version: 2,
+        estado: 'BORRADOR',
+        duracionAnios: 2,
+      },
+    });
+    await prisma.planCompetencia.create({
+      data: { planId: otro.id, competenciaId: idDe('CPE-02') },
+    });
+
+    expect(await repo.competenciasDelPlan(planId)).toEqual([idDe('CPE-01')]);
+  });
+
+  it('un plan sin competencias asociadas devuelve lista vacía', async () => {
+    expect(await repo.competenciasDelPlan(planId)).toEqual([]);
+  });
+});
+
 /** Sufijo por tipo, solo para no repetir códigos en el bucle de la prueba. */
 const TIPOS_INDICE: Record<string, number> = { General: 1, Transversal: 2, Especialidad: 3 };
