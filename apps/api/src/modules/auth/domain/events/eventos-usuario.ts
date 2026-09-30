@@ -81,3 +81,84 @@ export class PasswordRestablecida extends DomainEvent {
       'Se revocaron sus sesiones abiertas.';
   }
 }
+
+/* ── Docentes gestionados por el Director de carrera (RF-CH-010 a 014) ──────
+ * Ninguno lleva la contraseña ni su hash, por la misma razón que los de arriba.
+ */
+
+export class DocenteCreado extends DomainEvent {
+  readonly nombre = 'docente.creado';
+  readonly entidad = 'Usuario' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    email: string,
+  ) {
+    super(actor);
+    this.detalle = `Docente ${email} registrado por el Director de carrera.`;
+  }
+}
+
+export class PasswordDeDocenteCambiada extends DomainEvent {
+  readonly nombre = 'docente.password_cambiada';
+  readonly entidad = 'Usuario' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    email: string,
+  ) {
+    super(actor);
+    this.detalle =
+      `Contraseña del docente ${email} cambiada por el Director de carrera. ` +
+      'Se revocaron sus sesiones abiertas.';
+  }
+}
+
+export class DocenteInactivado extends DomainEvent {
+  readonly nombre = 'docente.inactivado';
+  readonly entidad = 'Usuario' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    email: string,
+  ) {
+    super(actor);
+    this.detalle = `Docente ${email} inactivado: ya no puede iniciar sesión ni ser elegido como responsable.`;
+  }
+}
+
+export class DocenteReactivado extends DomainEvent {
+  readonly nombre = 'docente.reactivado';
+  readonly entidad = 'Usuario' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    email: string,
+  ) {
+    super(actor);
+    this.detalle = `Docente ${email} reactivado.`;
+  }
+}
+
+export class DocenteEliminado extends DomainEvent {
+  readonly nombre = 'docente.eliminado';
+  readonly entidad = 'Usuario' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    email: string,
+  ) {
+    super(actor);
+    this.detalle = `Docente ${email} eliminado. Ningún registro de otro módulo lo referenciaba.`;
+  }
+}
