@@ -132,3 +132,34 @@ export function tienePermiso(contexto: ContextoDeAutorizacion, permiso: string):
 export function esPermisoAcotadoACarrera(permiso: string): boolean {
   return PERMISOS_ACOTADOS_A_CARRERA.has(permiso);
 }
+
+/**
+ * Permiso-marca del alcance de lectura (RF-CH-009).
+ *
+ * No concede lectura de nada: solo acota las lecturas que el rol ya tiene a la
+ * carrera que el usuario tiene a cargo. Es un permiso y no un `if` sobre el
+ * nombre del rol porque §3.5 pide que lo que un rol puede se configure como
+ * dato: darle o quitarle este alcance a otro rol no exige tocar código.
+ */
+export const PERMISO_LECTURA_SOLO_SU_CARRERA = 'lectura.solo_su_carrera';
+
+export type AlcanceDeLectura =
+  { readonly tipo: 'TODAS' } | { readonly tipo: 'CARRERA'; readonly carreraId: string | null };
+
+/**
+ * Qué carreras puede leer el usuario.
+ *
+ * Con la marca y sin carrera asignada el alcance es `CARRERA` con `null`, no
+ * `TODAS`: quien está restringido y no tiene carrera no debe leer nada, y
+ * confundirlo con «sin restricción» sería abrirle todo justo por no haberle
+ * asignado la carrera.
+ */
+export function alcanceDeLectura(contexto: ContextoDeAutorizacion): AlcanceDeLectura {
+  if (!contexto.permisos.has(PERMISO_LECTURA_SOLO_SU_CARRERA)) return { tipo: 'TODAS' };
+  return { tipo: 'CARRERA', carreraId: contexto.carreraACargo };
+}
+
+export function puedeLeerCarrera(alcance: AlcanceDeLectura, carreraId: string): boolean {
+  if (alcance.tipo === 'TODAS') return true;
+  return alcance.carreraId !== null && alcance.carreraId === carreraId;
+}

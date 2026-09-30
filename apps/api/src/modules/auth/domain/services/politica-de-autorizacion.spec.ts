@@ -13,7 +13,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  alcanceDeLectura,
   esPermisoAcotadoACarrera,
+  puedeLeerCarrera,
   puede,
   tienePermiso,
   type ContextoDeAutorizacion,
@@ -241,5 +243,48 @@ describe('docente.gestionar', () => {
   it('el director lo ejerce sobre su carrera y no sobre otra', () => {
     expect(puede(conPermiso, 'docente.gestionar', ISI).permitido).toBe(true);
     expect(puede(conPermiso, 'docente.gestionar', IIN).permitido).toBe(false);
+  });
+});
+
+describe('alcance de lectura (RF-CH-009)', () => {
+  const marca = 'lectura.solo_su_carrera';
+
+  it('sin la marca el alcance es TODAS aunque tenga carrera a cargo', () => {
+    const contexto: ContextoDeAutorizacion = {
+      permisos: new Set(['plan.leer']),
+      carreraACargo: ISI,
+    };
+    expect(alcanceDeLectura(contexto)).toEqual({ tipo: 'TODAS' });
+  });
+
+  it('con la marca el alcance es la carrera a cargo', () => {
+    const contexto: ContextoDeAutorizacion = {
+      permisos: new Set(['plan.leer', marca]),
+      carreraACargo: ISI,
+    };
+    expect(alcanceDeLectura(contexto)).toEqual({ tipo: 'CARRERA', carreraId: ISI });
+  });
+
+  it('con la marca y sin carrera asignada el alcance es CARRERA sin carrera: no lee ninguna', () => {
+    const contexto: ContextoDeAutorizacion = {
+      permisos: new Set([marca]),
+      carreraACargo: null,
+    };
+    expect(alcanceDeLectura(contexto)).toEqual({ tipo: 'CARRERA', carreraId: null });
+  });
+
+  it('puedeLeerCarrera: TODAS lee cualquiera', () => {
+    expect(puedeLeerCarrera({ tipo: 'TODAS' }, ISI)).toBe(true);
+    expect(puedeLeerCarrera({ tipo: 'TODAS' }, IIN)).toBe(true);
+  });
+
+  it('puedeLeerCarrera: CARRERA lee solo la suya', () => {
+    const alcance = { tipo: 'CARRERA', carreraId: ISI } as const;
+    expect(puedeLeerCarrera(alcance, ISI)).toBe(true);
+    expect(puedeLeerCarrera(alcance, IIN)).toBe(false);
+  });
+
+  it('puedeLeerCarrera: CARRERA sin carrera no lee ninguna', () => {
+    expect(puedeLeerCarrera({ tipo: 'CARRERA', carreraId: null }, ISI)).toBe(false);
   });
 });

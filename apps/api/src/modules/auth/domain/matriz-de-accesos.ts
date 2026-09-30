@@ -109,6 +109,7 @@ export const PERMISOS = [
   ['usuario.gestionar', 'Administrar usuarios y sus roles', 'auth'],
   ['rol.gestionar', 'Administrar roles y permisos', 'auth'],
   ['docente.gestionar', 'Gestionar los docentes de su carrera', 'auth'],
+  ['lectura.solo_su_carrera', 'Leer solo los datos de la carrera que tiene a cargo', 'auth'],
 ] as const satisfies readonly (readonly [string, string, string])[];
 
 /* ── Roles ────────────────────────────────────────────────────────────────
@@ -125,20 +126,15 @@ export const ROLES: {
     codigo: 'ADMIN_SISTEMA',
     nombre: 'Administrador del sistema',
     descripcion: 'Gestión de la estructura base (facultades, carreras).',
-    // Dueño de la estructura y de las cuentas. **Lee todo, no decide nada
-    // académico**: esa separación es la que define el rol.
+    // Dueño de la estructura y de las cuentas. Desde el Bloque 3 (RF-CH-008) ve
+    // el módulo Plan de Estudios como «Facultades» y solo hasta las carreras:
+    // no lee planes ni su contenido (objetivos, competencias, asignaturas). Antes
+    // sí los leía, para no abrir un plan a medias; el documento de cambios
+    // decide que no le corresponden.
     //
-    // Los tres `.leer` de contenido curricular estaban fuera y se añadieron
-    // después de comprobar el resultado: con `plan.leer` pero sin
-    // `asignatura.leer`, el administrador abría un plan y encontraba la mitad
-    // vacía —sin créditos, sin malla, sin validaciones— sobre un plan que sí
-    // existe. Puede administrar cuentas y estructura de una universidad cuyo
-    // contenido no podía consultar.
-    //
-    // Lo que sigue fuera, y a propósito: no crea ni edita contenido, no aprueba
-    // planes y **no tiene `reporte.generar`**. Ese permiso no es de lectura:
-    // produce evidencia documental que sale de la universidad hacia un
-    // expediente de acreditación, y eso es una responsabilidad académica.
+    // Conserva `plan.acceder` para entrar al módulo. Lo que sigue fuera, a
+    // propósito: no crea ni edita contenido, no aprueba planes y no tiene
+    // `reporte.generar`.
     permisos: [
       'facultad.leer',
       'facultad.crear',
@@ -149,11 +145,6 @@ export const ROLES: {
       'carrera.editar',
       'carrera.inactivar',
       'plan.acceder',
-      'plan.leer',
-      'plan.leer_historico',
-      'objetivo.leer',
-      'competencia.leer',
-      'asignatura.leer',
       'auditoria.leer',
       'usuario.gestionar',
       'rol.gestionar',
@@ -195,6 +186,7 @@ export const ROLES: {
       'reporte.generar',
       'auditoria.leer',
       'docente.gestionar',
+      'lectura.solo_su_carrera',
     ],
   },
   {

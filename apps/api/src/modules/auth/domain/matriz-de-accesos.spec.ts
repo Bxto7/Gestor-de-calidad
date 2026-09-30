@@ -9,24 +9,19 @@ function permisosOrdenados(codigo: string): string[] {
 }
 
 describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
-  it('ADMIN_SISTEMA: Facultades y Sistema, sin Acreditación ni Mejora Continua', () => {
+  it('ADMIN_SISTEMA: solo Facultades y Sistema; no lee contenido de planes (RF-CH-008)', () => {
     expect(permisosOrdenados('ADMIN_SISTEMA')).toEqual(
       [
         'auditoria.leer',
-        'asignatura.leer',
         'carrera.crear',
         'carrera.editar',
         'carrera.inactivar',
         'carrera.leer',
-        'competencia.leer',
         'facultad.crear',
         'facultad.editar',
         'facultad.inactivar',
         'facultad.leer',
-        'objetivo.leer',
         'plan.acceder',
-        'plan.leer',
-        'plan.leer_historico',
         'rol.gestionar',
         'usuario.gestionar',
       ].sort(),
@@ -49,6 +44,7 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'competencia.leer',
         'docente.gestionar',
         'facultad.leer',
+        'lectura.solo_su_carrera',
         'malla.editar',
         'objetivo.gestionar',
         'objetivo.leer',
@@ -153,6 +149,26 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
       (r) => r.codigo,
     );
     expect(quienes).toEqual(['DIRECTOR_CARRERA']);
+  });
+
+  it('solo el Director tiene lectura.solo_su_carrera', () => {
+    const quienes = ROLES.filter((r) => r.permisos.includes('lectura.solo_su_carrera')).map(
+      (r) => r.codigo,
+    );
+    expect(quienes).toEqual(['DIRECTOR_CARRERA']);
+  });
+
+  it('el Administrador no tiene ningún permiso de lectura de planes ni de su contenido', () => {
+    const permisos = permisosOrdenados('ADMIN_SISTEMA');
+    for (const ajeno of [
+      'plan.leer',
+      'plan.leer_historico',
+      'objetivo.leer',
+      'competencia.leer',
+      'asignatura.leer',
+    ]) {
+      expect(permisos).not.toContain(ajeno);
+    }
   });
 
   it('todo permiso asignado a un rol existe en el catálogo', () => {
