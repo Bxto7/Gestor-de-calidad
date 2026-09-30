@@ -9,6 +9,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
+import { SiPuede } from '@/features/auth/components/SiPuede';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import {
   claveMisEvaluaciones,
@@ -121,10 +122,12 @@ export function VistaDocenteInicio() {
           items={plazosDe(evaluaciones, hoy)}
           vacio="No tienes plazos pendientes."
         />
-        <ReportBridgeCard
-          titulo="Resultados de mis competencias"
-          descripcion="El detalle por competencia y periodo vive en Reportes."
-        />
+        <SiPuede permiso="plan.leer">
+          <ReportBridgeCard
+            titulo="Resultados de mis competencias"
+            descripcion="El detalle por competencia y periodo vive en Reportes."
+          />
+        </SiPuede>
       </div>
     </div>
   );

@@ -51,4 +51,19 @@ describe('ResumenGenerico — módulos activos según permisos', () => {
     );
     expect(screen.queryByRole('link', { name: /Mejora Continua/ })).not.toBeInTheDocument();
   });
+
+  it('Criterios de Acreditación se ofrece con criterio.acceder, no con criterio.leer', () => {
+    montar(['criterio.leer']);
+    expect(
+      screen.queryByRole('link', { name: /Criterios de Acreditación/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('con criterio.acceder enlaza a Criterios de Acreditación', () => {
+    montar(['criterio.acceder']);
+    expect(screen.getByRole('link', { name: /Criterios de Acreditación/ })).toHaveAttribute(
+      'href',
+      '/acreditacion/criterios',
+    );
+  });
 });

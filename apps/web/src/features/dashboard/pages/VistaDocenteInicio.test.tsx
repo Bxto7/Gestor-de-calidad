@@ -58,7 +58,10 @@ const conTrabajo: MisEvaluaciones = {
 
 const alDia: MisEvaluaciones = { evaluaciones: [evaluacion('e1', 'a1', 'k1', '2026-10-05', 2)] };
 
-const sesion = (carreraACargo: string | null): ValorSesion => ({
+const sesion = (
+  carreraACargo: string | null,
+  puedeEn: (permiso: string) => boolean = () => true,
+): ValorSesion => ({
   identidad: {
     id: 'u1',
     nombre: 'Jorge Pérez Rojas',
@@ -69,7 +72,7 @@ const sesion = (carreraACargo: string | null): ValorSesion => ({
   cargando: false,
   puede: () => true,
   dirigeCarrera: () => true,
-  puedeEn: () => true,
+  puedeEn,
   roles: ['DOCENTE'],
   vistaActiva: 'DOCENTE',
   cambiarVista: () => undefined,
@@ -77,12 +80,15 @@ const sesion = (carreraACargo: string | null): ValorSesion => ({
   salir: () => Promise.resolve(),
 });
 
-function montar(carreraACargo: string | null = 'c1') {
+function montar(
+  carreraACargo: string | null = 'c1',
+  puedeEn: (permiso: string) => boolean = () => true,
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <ContextoSesion.Provider value={sesion(carreraACargo)}>
+        <ContextoSesion.Provider value={sesion(carreraACargo, puedeEn)}>
           <VistaDocenteInicio />
         </ContextoSesion.Provider>
       </MemoryRouter>
@@ -155,6 +161,16 @@ describe('VistaDocenteInicio', () => {
     expect(
       await screen.findByRole('link', { name: /Resultados de mis competencias/ }),
     ).toHaveAttribute('href', '/reportes');
+  });
+
+  it('sin plan.leer no ofrece el puente a Reportes: el Docente no tiene esa sección', async () => {
+    vi.spyOn(api, 'listarMisEvaluaciones').mockResolvedValue(conTrabajo);
+    montar('c1', (permiso) => permiso !== 'plan.leer');
+
+    await screen.findByRole('region', { name: 'Vence pronto' });
+    expect(
+      screen.queryByRole('link', { name: /Resultados de mis competencias/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('sin pendientes dice que está al día y deja el botón para seguir agregando', async () => {

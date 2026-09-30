@@ -83,7 +83,7 @@ export function App() {
                 <Route element={<RutaConPermiso permiso="atributo.leer" />}>
                   <Route path="acreditacion/atributos" element={<AtributosPage />} />
                 </Route>
-                <Route element={<RutaConPermiso permiso="criterio.leer" />}>
+                <Route element={<RutaConPermiso permiso="criterio.acceder" />}>
                   <Route path="acreditacion/criterios" element={<CriteriosPage />} />
                 </Route>
 
@@ -91,7 +91,7 @@ export function App() {
                   <Route path="mejora-continua/medicion" element={<PlanesMedicionPage />} />
                   <Route path="mejora-continua/medicion/:id" element={<PlanMedicionPage />} />
                 </Route>
-                <Route element={<RutaConPermiso permiso="evaluacion.leer" />}>
+                <Route element={<RutaConPermiso permiso="evaluacion.acceder" />}>
                   <Route path="mejora-continua/evaluacion" element={<PlanesEvaluacionPage />} />
                   <Route path="mejora-continua/evaluacion/:id" element={<PlanEvaluacionPage />} />
                 </Route>

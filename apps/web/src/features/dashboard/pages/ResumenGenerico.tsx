@@ -58,7 +58,7 @@ const ACTIVOS: readonly Modulo[] = [
     detalle:
       'Los criterios del programa, por carrera profesional. Son uno de los tres aspectos sobre los que se generarán los planes de mejora.',
     a: '/acreditacion/criterios',
-    permiso: 'criterio.leer',
+    permiso: 'criterio.acceder',
   },
 ];
 

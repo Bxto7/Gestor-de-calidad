@@ -78,7 +78,7 @@ const SECCIONES: readonly SeccionNav[] = [
         etiqueta: 'Criterios de Acreditación',
         icono: IconoPlan,
         exacto: false,
-        permiso: 'criterio.leer',
+        permiso: 'criterio.acceder',
       },
     ],
   },
@@ -97,7 +97,7 @@ const SECCIONES: readonly SeccionNav[] = [
         etiqueta: 'Planes de Evaluación',
         icono: IconoPlan,
         exacto: false,
-        permiso: 'evaluacion.leer',
+        permiso: 'evaluacion.acceder',
       },
       {
         a: '/mejora-continua/mejora',

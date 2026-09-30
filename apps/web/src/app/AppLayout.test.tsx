@@ -173,6 +173,42 @@ describe('AppLayout — entrada «Plan de Estudios»', () => {
   });
 });
 
+describe('AppLayout — el Docente lee Evaluación y Criterios pero no entra a esos módulos', () => {
+  const comoDocente = (permiso: string) =>
+    [
+      'mejora.leer',
+      'evidencia.registrar',
+      'evaluacion.leer',
+      'criterio.leer',
+      'carrera.leer',
+      'objetivo.leer',
+      'competencia.leer',
+    ].includes(permiso);
+
+  it('ve Planes de Mejora y Mis evidencias', () => {
+    montar({ puede: comoDocente });
+    expect(screen.getByRole('link', { name: 'Planes de Mejora' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mis evidencias' })).toBeInTheDocument();
+  });
+
+  it('no ve Planes de Evaluación ni Criterios de Acreditación aunque los pueda leer', () => {
+    montar({ puede: comoDocente });
+    expect(screen.queryByRole('link', { name: 'Planes de Evaluación' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Criterios de Acreditación' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('con evaluacion.acceder y criterio.acceder sí los ve (Coordinador, Consultor)', () => {
+    montar({
+      puede: (permiso: string) =>
+        permiso === 'evaluacion.acceder' || permiso === 'criterio.acceder',
+    });
+    expect(screen.getByRole('link', { name: 'Planes de Evaluación' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Criterios de Acreditación' })).toBeInTheDocument();
+  });
+});
+
 function CapturaUbicacion() {
   const ubicacion = useLocation();
   return (
