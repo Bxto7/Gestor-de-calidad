@@ -14,6 +14,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanJustificado } from '../../domain/events/eventos-plan.js';
 import type { PublicadorDeEventos } from '../../../../shared-kernel/domain-events/domain-event.js';
@@ -42,6 +43,7 @@ export class ConsultarHistorial {
     private readonly aprobaciones: RepositorioAprobacionesPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF089: los pasos del flujo de aprobación de un plan. */
@@ -114,6 +116,11 @@ export class ConsultarHistorial {
     const decision = await this.autorizacion.puede(actor.id, 'plan.leer_historico', null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
 
+    // Las dos versiones son de la misma carrera (comprobado arriba): basta mirar una.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, a.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', idA);
+    }
+
     const [enA, enB] = await Promise.all([
       this.asignaturas.listar(idA),
       this.asignaturas.listar(idB),
@@ -168,6 +175,11 @@ export class ConsultarHistorial {
 
     const decision = await this.autorizacion.puede(actor.id, 'plan.leer', plan.carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+
+    // RF-CH-009: fuera de alcance responde NoEncontrado, como si no existiera.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
   }
 }
 

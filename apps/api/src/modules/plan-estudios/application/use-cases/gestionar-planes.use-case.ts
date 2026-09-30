@@ -23,6 +23,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import { PlanEditado, PlanEliminado } from '../../domain/events/eventos-plan.js';
@@ -64,19 +65,34 @@ export class GestionarPlanes {
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
     private readonly generarId: { nuevo(): string },
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
-  /** RF024 / RF030 / RF031: listado con filtros combinables. */
+  /**
+   * RF024 / RF030 / RF031: listado con filtros combinables.
+   *
+   * RF-CH-009: quien solo lee su carrera recibe únicamente sus planes; el
+   * `carreraId` que pida el filtro se sobrescribe. Antes la lectura no se
+   * acotaba (un director podía consultar planes ajenos); el documento de
+   * cambios lo revierte para el Director.
+   */
   async listar(actor: Actor, filtro?: FiltroPlanes): Promise<ResumenPlan[]> {
-    // La lectura de planes no está acotada a una carrera: un director puede
-    // consultar planes ajenos, lo que no puede es modificarlos.
     await this.exigir(actor, 'plan.leer', null);
+
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    if (alcance.tipo === 'CARRERA') {
+      if (alcance.carreraId === null) return [];
+      return (await this.planes.listar({ ...filtro, carreraId: alcance.carreraId })).map(resumen);
+    }
     return (await this.planes.listar(filtro)).map(resumen);
   }
 
   /** RF076 / RF091: el histórico de versiones de una carrera. */
   async versionesDe(actor: Actor, carreraId: string): Promise<ResumenPlan[]> {
     await this.exigir(actor, 'plan.leer_historico', null);
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, carreraId))) {
+      throw new NoEncontrado('la carrera', carreraId);
+    }
     return (await this.planes.versionesDeCarrera(carreraId)).map(resumen);
   }
 

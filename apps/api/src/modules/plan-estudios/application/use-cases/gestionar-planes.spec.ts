@@ -18,6 +18,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type { EstadoPlan } from '../../domain/value-objects/estado-plan.js';
@@ -30,6 +31,22 @@ import { GestionarPlanes } from './gestionar-planes.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Directora de Sistemas' };
 const ISI = 'car-isi';
+const IIN = 'car-iin';
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
 
 function plan(estado: EstadoPlan, sobre: Partial<{ id: string; version: number }> = {}) {
   return PlanDeEstudios.desde({
@@ -51,6 +68,7 @@ function montar(
     ultimaVersion?: number;
     carrera?: { id: string; codigo: string; duracionAnios: number } | null;
     permitido?: boolean;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -98,9 +116,14 @@ function montar(
 
   const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
   let n = 0;
-  const caso = new GestionarPlanes(repo, contenido, autorizacion, eventos, {
-    nuevo: () => `nuevo-${++n}`,
-  });
+  const caso = new GestionarPlanes(
+    repo,
+    contenido,
+    autorizacion,
+    eventos,
+    { nuevo: () => `nuevo-${++n}` },
+    opciones.alcance ?? sinRestriccion(),
+  );
 
   return {
     caso,
@@ -311,5 +334,46 @@ describe('RF024 / RF030 / RF076 — consulta', () => {
   it('leer exige permiso', async () => {
     const { caso } = montar({ permitido: false });
     await expect(caso.listar(ACTOR)).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+});
+
+describe('RF-CH-009 — alcance de lectura de planes', () => {
+  it('sin restricción, listar no toca el filtro', async () => {
+    const { caso, filtros } = montar();
+    await caso.listar(ACTOR, { estado: 'Vigente' });
+    expect(filtros).toEqual([{ estado: 'Vigente' }]);
+  });
+
+  it('con alcance de carrera, listar fuerza la carrera propia aunque se pida otra', async () => {
+    const { caso, filtros } = montar({ alcance: soloCarrera(ISI) });
+    await caso.listar(ACTOR, { carreraId: IIN, estado: 'Vigente' });
+    expect(filtros).toEqual([{ carreraId: ISI, estado: 'Vigente' }]);
+  });
+
+  it('con alcance de carrera y sin filtro, listar pide igualmente solo la propia', async () => {
+    const { caso, filtros } = montar({ alcance: soloCarrera(ISI) });
+    await caso.listar(ACTOR);
+    expect(filtros).toEqual([{ carreraId: ISI }]);
+  });
+
+  it('con alcance de carrera y sin carrera asignada, listar devuelve la lista vacía sin consultar', async () => {
+    const { caso, filtros } = montar({ alcance: soloCarrera(null) });
+    expect(await caso.listar(ACTOR)).toEqual([]);
+    expect(filtros).toEqual([]);
+  });
+
+  it('versionesDe de la carrera propia devuelve el histórico', async () => {
+    const { caso } = montar({ alcance: soloCarrera(ISI) });
+    expect(await caso.versionesDe(ACTOR, ISI)).toHaveLength(2);
+  });
+
+  it('versionesDe de una carrera ajena responde NoEncontrado, no AccesoDenegado', async () => {
+    const { caso } = montar({ alcance: soloCarrera(ISI) });
+    await expect(caso.versionesDe(ACTOR, IIN)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('versionesDe sin restricción lee cualquier carrera', async () => {
+    const { caso } = montar();
+    expect(await caso.versionesDe(ACTOR, IIN)).toHaveLength(2);
   });
 });

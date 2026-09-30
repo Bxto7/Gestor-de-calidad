@@ -19,6 +19,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type { DatosAsignatura, RepositorioAsignaturaPort } from '../ports/asignatura.port.js';
@@ -31,6 +32,21 @@ import { ConsultarHistorial } from './consultar-historial.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Directora de Sistemas' };
 const ISI = 'car-isi';
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
 
 function plan(id: string, codigo: string, carreraId = ISI): PlanDeEstudios {
   return PlanDeEstudios.desde({
@@ -73,6 +89,7 @@ function montar(
     enB?: DatosAsignatura[];
     permitido?: boolean;
     reglasJustificadas?: string[];
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -130,6 +147,7 @@ function montar(
     aprobaciones,
     autorizacion,
     eventos,
+    opciones.alcance ?? sinRestriccion(),
   );
 
   return { caso, publicados, justificadas };
@@ -318,5 +336,39 @@ describe('RF092 — comparar versiones', () => {
     await expect(caso.compararVersiones(ACTOR, 'plan-a', 'plan-b')).rejects.toBeInstanceOf(
       AccesoDenegado,
     );
+  });
+});
+
+describe('RF-CH-009 — alcance de lectura del historial', () => {
+  it('aprobacionesDe del plan propio devuelve los pasos', async () => {
+    const { caso } = montar({ alcance: soloCarrera(ISI) });
+    expect(await caso.aprobacionesDe(ACTOR, 'plan-a')).toHaveLength(1);
+  });
+
+  it('aprobacionesDe de un plan de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.aprobacionesDe(ACTOR, 'plan-a')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('justificacionesDe de un plan de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.justificacionesDe(ACTOR, 'plan-a')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('compararVersiones de planes de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.compararVersiones(ACTOR, 'plan-a', 'plan-b')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('compararVersiones de la carrera propia funciona', async () => {
+    const { caso } = montar({ alcance: soloCarrera(ISI) });
+    expect(await caso.compararVersiones(ACTOR, 'plan-a', 'plan-b')).toEqual([]);
+  });
+
+  it('sin restricción se sigue leyendo cualquier plan', async () => {
+    const { caso } = montar();
+    expect(await caso.aprobacionesDe(ACTOR, 'plan-a')).toHaveLength(1);
   });
 });

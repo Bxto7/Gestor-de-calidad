@@ -1042,6 +1042,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         REPOSITORIO_APROBACIONES,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanPort,
@@ -1050,21 +1051,42 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         aprobaciones: RepositorioAprobacionesPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
-        new ConsultarHistorial(planes, asignaturas, contenido, aprobaciones, autorizacion, eventos),
+        new ConsultarHistorial(
+          planes,
+          asignaturas,
+          contenido,
+          aprobaciones,
+          autorizacion,
+          eventos,
+          alcance,
+        ),
     },
     {
       provide: GestionarPlanes,
-      inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_PLAN,
+        REPOSITORIO_CONTENIDO,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         planes: RepositorioPlanPort,
         contenido: RepositorioContenidoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
-        new GestionarPlanes(planes, contenido, autorizacion, eventos, {
-          nuevo: () => randomUUID(),
-        }),
+        new GestionarPlanes(
+          planes,
+          contenido,
+          autorizacion,
+          eventos,
+          { nuevo: () => randomUUID() },
+          alcance,
+        ),
     },
     {
       provide: SolicitarDocumento,
@@ -1245,12 +1267,13 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: ConsultarPlan,
-      inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT],
+      inject: [REPOSITORIO_PLAN, REPOSITORIO_CONTENIDO, AUTHORIZATION_PORT, ALCANCE_DE_LECTURA],
       useFactory: (
         planes: RepositorioPlanPort,
         contenido: RepositorioContenidoPort,
         autorizacion: AuthorizationPort,
-      ) => new ConsultarPlan(planes, contenido, autorizacion),
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarPlan(planes, contenido, autorizacion, alcance),
     },
     {
       provide: CambiarEstadoPlan,

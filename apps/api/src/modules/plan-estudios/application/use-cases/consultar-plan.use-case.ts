@@ -12,6 +12,7 @@
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import {
@@ -53,17 +54,23 @@ export class ConsultarPlan {
     private readonly planes: RepositorioPlanPort,
     private readonly contenido: RepositorioContenidoPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async ejecutar(planId: string, actor: Actor): Promise<DetallePlan> {
     const plan = await this.planes.porId(planId);
     if (!plan) throw new NoEncontrado('el plan de estudios', planId);
 
-    // La lectura no está acotada a la carrera: un director puede consultar
-    // planes ajenos, lo que no puede es modificarlos. Por eso `plan.leer` no
-    // figura entre los permisos acotados de la política.
+    // El permiso va primero: sin `plan.leer` es AccesoDenegado. Después el
+    // alcance (RF-CH-009): un plan de otra carrera responde NoEncontrado, no
+    // AccesoDenegado, para no revelar que existe. `plan.leer` sigue sin figurar
+    // entre los permisos acotados de la política: el alcance de lectura lo
+    // decide la marca `lectura.solo_su_carrera`, no la carrera del permiso.
     const lectura = await this.autorizacion.puede(actor.id, 'plan.leer', plan.carreraId);
     if (!lectura.permitido) throw new AccesoDenegado(lectura.motivo);
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
 
     const carrera = await this.contenido.carreraDe(plan.id);
     if (!carrera) throw new NoEncontrado('la carrera del plan', plan.carreraId);

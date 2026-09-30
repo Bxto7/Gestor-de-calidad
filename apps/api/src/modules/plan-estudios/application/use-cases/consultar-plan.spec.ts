@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type { EstadoPlan } from '../../domain/value-objects/estado-plan.js';
@@ -24,6 +25,21 @@ import { ConsultarPlan } from './consultar-plan.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Director de carrera' };
 const ISI = 'car-isi';
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
 
 function plan(estado: EstadoPlan): PlanDeEstudios {
   return PlanDeEstudios.desde({
@@ -57,6 +73,7 @@ function montar(opciones: {
   objetivos?: string[];
   /** Permisos que la política concede. Ausente = concede todo. */
   permisos?: string[];
+  alcance?: AlcanceDeLecturaPort;
 }) {
   const planes: RepositorioPlanPort = {
     porId: async () => opciones.plan,
@@ -91,7 +108,7 @@ function montar(opciones: {
     rolesDe: async () => [],
   };
 
-  return new ConsultarPlan(planes, contenido, autorizacion);
+  return new ConsultarPlan(planes, contenido, autorizacion, opciones.alcance ?? sinRestriccion());
 }
 
 describe('Precondiciones', () => {
@@ -102,6 +119,23 @@ describe('Precondiciones', () => {
   it('403 sin permiso de lectura', async () => {
     const caso = montar({ plan: plan('Borrador'), permisos: [] });
     await expect(caso.ejecutar('plan-1', ACTOR)).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('el plan de la carrera propia se lee con alcance de carrera', async () => {
+    const caso = montar({ plan: plan('Borrador'), alcance: soloCarrera(ISI) });
+    await expect(caso.ejecutar('plan-1', ACTOR)).resolves.toMatchObject({
+      plan: { id: 'plan-1' },
+    });
+  });
+
+  it('el plan de otra carrera responde NoEncontrado con alcance de carrera', async () => {
+    const caso = montar({ plan: plan('Borrador'), alcance: soloCarrera('car-iin') });
+    await expect(caso.ejecutar('plan-1', ACTOR)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('con alcance de carrera y sin carrera asignada no se lee ningún plan', async () => {
+    const caso = montar({ plan: plan('Borrador'), alcance: soloCarrera(null) });
+    await expect(caso.ejecutar('plan-1', ACTOR)).rejects.toBeInstanceOf(NoEncontrado);
   });
 });
 
