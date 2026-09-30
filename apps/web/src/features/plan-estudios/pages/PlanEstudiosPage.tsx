@@ -240,6 +240,13 @@ export function PlanEstudiosPage() {
       dato: `${ciclos.length} ciclos`,
       permiso: 'asignatura.leer',
     },
+    {
+      a: `/plan-estudios/planes/${planId}/docentes`,
+      titulo: 'Docentes',
+      detalle: 'Los docentes de tu carrera: alta, contraseña, inactivación y baja.',
+      dato: 'Tu carrera',
+      permiso: 'docente.gestionar',
+    },
   ].filter((s) => puede(s.permiso));
 
   return (

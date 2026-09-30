@@ -6,6 +6,7 @@ import { RutaConPermiso } from '@/features/auth/components/RutaConPermiso';
 import { RutaProtegida } from '@/features/auth/components/RutaProtegida';
 import { ProveedorSesion } from '@/features/auth/hooks/ProveedorSesion';
 import { AccesoPage } from '@/features/auth/pages/AccesoPage';
+import { DocentesPage } from '@/features/docentes/pages/DocentesPage';
 import { AsignaturasPage } from '@/features/plan-estudios/pages/AsignaturasPage';
 import { CarrerasPage } from '@/features/plan-estudios/pages/CarrerasPage';
 import { CompetenciasPage } from '@/features/plan-estudios/pages/CompetenciasPage';
@@ -78,6 +79,12 @@ export function App() {
                     path="plan-estudios/planes/:planId/malla"
                     element={<MallaCurricularPage />}
                   />
+                  <Route element={<RutaConPermiso permiso="docente.gestionar" />}>
+                    <Route
+                      path="plan-estudios/planes/:planId/docentes"
+                      element={<DocentesPage />}
+                    />
+                  </Route>
                 </Route>
 
                 <Route element={<RutaConPermiso permiso="atributo.leer" />}>
