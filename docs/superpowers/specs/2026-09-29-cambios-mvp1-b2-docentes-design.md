@@ -40,7 +40,9 @@ Se añade a la lista de permisos de escritura acotados por carrera de `politica-
 
 El caso de uso opera siempre sobre `carreraACargoDe(actor)`. Un docente que no pertenece a esa carrera responde `NoEncontrado`, no `AccesoDenegado`: no se revela que existe.
 
-**Rol Docente (RF-CH-006, RN4).** Se le retiran los permisos que abren módulos que el documento no le da: `plan.acceder`, `medicion.leer`, `evaluacion.leer`, `atributo.leer`, `criterio.leer`, `actas.leer`. Conserva Planes de Mejora (`mejora.leer`), «Mis evidencias» (`evidencia.registrar`) y su inicio. También conserva los permisos de **lectura de datos** que las pantallas de Planes de Mejora, el inicio y la cabecera consumen (por ejemplo `objetivo.leer`, `competencia.leer`, `carrera.leer`). La lista exacta se fija en el plan de implementación, verificando qué endpoint llama cada pantalla; un permiso que una pantalla del Docente necesite no se retira aunque el módulo correspondiente se le oculte.
+**Rol Docente (RF-CH-006, RN4).** Se verificó qué endpoint llama cada pantalla del Docente (Planes de Mejora, «Mis evidencias», su inicio y la cabecera). El Docente queda con exactamente: `mejora.leer`, `evidencia.registrar`, `evaluacion.leer`, `criterio.leer`, `objetivo.leer`, `competencia.leer` y `carrera.leer`. Se le retiran `plan.acceder`, `plan.leer`, `medicion.leer`, `atributo.leer`, `actas.leer`, `asignatura.leer`, `facultad.leer` y `reporte.generar`. Como no tiene `plan.leer`, el puente a «Reportes» de su inicio deja de mostrarse.
+
+**Acceder no es leer.** `evaluacion.leer` y `criterio.leer` los necesitan los endpoints que consumen «Mis evidencias» y Planes de Mejora, pero hoy también deciden si el menú y la ruta de Planes de Evaluación y Criterios de Acreditación se abren. Igual que el Bloque 1 hizo con `plan.acceder`, se separan: permisos nuevos `evaluacion.acceder` y `criterio.acceder` gobiernan solo el menú, la ruta y la tarjeta del resumen; los `.leer` siguen gobernando los datos. Coordinador y Consultor reciben ambos `.acceder`; el Docente no.
 
 ### 3.2 Backend (`auth`)
 
@@ -70,7 +72,7 @@ Endpoints, en un controlador nuevo de `auth` con el prefijo `/carrera/docentes` 
 
 Se conecta en `app.module.ts`, igual que `ConteoDeUsuariosPort`. Ni `auth` conoce las tablas de `mejora-continua` ni al revés.
 
-`eliminar`: si `enUso`, lanza `ReglaDeNegocioViolada` con los motivos y la sugerencia de inactivar (RF-CH-014, flujo alternativo). Si no, borra el usuario; las filas de `usuario_rol`, `usuario_carrera` y `refresh_tokens` se van por `ON DELETE CASCADE`. Solo se eliminan cuentas con rol DOCENTE de la carrera del Director: nunca un Director, Coordinador ni Administrador.
+`eliminar`: si `enUso`, lanza `ReglaDeNegocioViolada` con los motivos y la sugerencia de inactivar (RF-CH-014, flujo alternativo). Si no, borra el usuario; las filas de `usuario_rol`, `usuario_carrera` y `refresh_tokens` se van por `ON DELETE CASCADE`. Solo se gestionan (listar, cambiar contraseña, inactivar, eliminar) las cuentas de la carrera del Director **cuyo único rol es DOCENTE**: una cuenta con DOCENTE y otro rol (por ejemplo Coordinador y Docente a la vez) no aparece ni se puede tocar desde aquí, y nunca se borra un Director, Coordinador ni Administrador.
 
 ### 3.4 Interfaz
 
