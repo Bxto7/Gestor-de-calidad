@@ -86,7 +86,7 @@ export class GestionarAsignaturas {
     return asignatura;
   }
 
-  /** RF047, RF048, RF053, RF054, RF055, RF056 y RF049 en una sola alta. */
+  /** RF047, RF048, RF053, RF054, RF056 y RF049 en una sola alta. */
   async crear(
     actor: Actor,
     planId: string,

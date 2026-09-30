@@ -1274,7 +1274,7 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-6 | — | El documento no tiene ningún RF que defina cómo se registran los prerrequisitos | **PENDIENTE** |
 | D-7 | RF072 | Generación en servidor y en cola, no impresión del navegador | Ratificada |
 | D-8 | RF073 | `.xlsx` real con tipos, no CSV | Ratificada |
-| D-9 | RF055 · RF047 | Datos del plan ISI 2018 cargados incompletos: horas teóricas en 0 y sumillas en «pendiente» | **PENDIENTE** |
+| D-9 | RF047 (RF055 retirado por RF-CH-020) | Datos del plan ISI 2018 cargados incompletos: sumillas en «pendiente» (la parte de horas teóricas en 0 quedó retirada con el campo) | **PENDIENTE** |
 | D-10 | §2 «Paleta» | Cinco colores de texto oscurecidos: los del documento no llegan al 4.5:1 de WCAG 2.1 AA | Aprobada (2026-09-04) |
 | D-11 | RF127 (Mejora Continua) | Una competencia sin atributo del graduado se muestra deshabilitada y la API no deja incluirla; el requisito dice excluirla de la lista | **PENDIENTE** (resultado cumplido desde 2026-09-25; falta aprobar la forma) |
 | D-12 | RF-PE-020 (Mejora Continua) | La evidencia del entregable se registra como enlace; el requisito admite «archivos o enlaces» y no hay subida de archivos | **PENDIENTE** |
@@ -1359,15 +1359,17 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 
 **Por qué:** la versión anterior era un CSV renombrado. Abría en Excel y era inútil para lo único que RF073 justifica —«análisis externos»—: una columna de créditos en texto no se puede sumar ni llevar a una tabla dinámica.
 
-### D-9 · RF055 y RF047 — datos incompletos del plan cargado
+### D-9 · RF047 — datos incompletos del plan cargado (RF055 retirado)
 
-**Pide:** RF055 define las horas teóricas de cada asignatura; RF047 crea la asignatura con nombre **y descripción**.
+**Pide:** RF047 crea la asignatura con nombre **y descripción**. (RF055 definía las horas teóricas; lo retiró RF-CH-020 el 30 de septiembre de 2026.)
 
-**Hace:** el plan ISI 2018 está cargado con **horas teóricas en 0** y **todas las sumillas con un texto de relleno** («Sumilla pendiente de cargar desde el sílabo oficial de la asignatura»).
+**Hace:** el plan ISI 2018 está cargado con **todas las sumillas con un texto de relleno** («Sumilla pendiente de cargar desde el sílabo oficial de la asignatura»).
 
 **Por qué:** el documento del que se cargó el plan no los trae. Se prefirió un valor visiblemente vacío antes que inventarlo.
 
-**Qué hay que decidir:** de dónde salen esos datos. Mientras tanto, cualquier reporte que use horas teóricas dará cero, y el PDF del plan sale con las sumillas en blanco.
+**Retirado por RF-CH-020:** la parte de «horas teóricas en 0» ya no aplica; el campo «Horas Teóricas por semana» no existe y la columna queda nullable y sin uso, pendiente de una migración de limpieza. Solo la parte de las sumillas sigue abierta.
+
+**Qué hay que decidir:** de dónde salen las sumillas. Mientras tanto, el PDF del plan sale con las sumillas en blanco.
 
 ---
 

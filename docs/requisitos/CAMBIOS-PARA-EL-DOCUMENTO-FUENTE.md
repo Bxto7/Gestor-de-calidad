@@ -83,13 +83,15 @@ Hay además un problema concreto: el plan ISI 2018 tiene **16 requisitos que el 
 
 ---
 
-### D-9 · RF055 y RF047 · Faltan horas teóricas y sumillas
+### D-9 · RF047 · Faltan sumillas (las horas teóricas quedaron retiradas)
 
-El plan ISI 2018 está cargado con **todas las horas teóricas en cero** y **todas las sumillas con un texto de relleno** («Sumilla pendiente de cargar desde el sílabo oficial de la asignatura»).
+El plan ISI 2018 está cargado con **todas las sumillas con un texto de relleno** («Sumilla pendiente de cargar desde el sílabo oficial de la asignatura»).
+
+La parte de las **horas teóricas en cero** quedó retirada por RF-CH-020 (30 de septiembre de 2026): el campo «Horas Teóricas por semana» ya no existe, y con él RF055 deja de contarse como implementado. La columna sigue en la base de datos, nullable y sin uso, a la espera de una migración de limpieza. Solo queda abierta la parte de las sumillas.
 
 **Por qué.** El documento del que se cargó el plan no los trae. Se optó por un valor visiblemente vacío antes que inventar cifras.
 
-**Qué hay que decidir.** De dónde salen esos datos y quién los aporta. Mientras tanto, cualquier reporte que use horas teóricas dará cero, y el PDF del plan sale con las sumillas en blanco — cosa que se nota a simple vista en un expediente.
+**Qué hay que decidir.** De dónde salen las sumillas y quién los aporta. Mientras tanto, el PDF del plan sale con las sumillas en blanco — cosa que se nota a simple vista en un expediente.
 
 ---
 

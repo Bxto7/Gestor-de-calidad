@@ -46,6 +46,11 @@ Se están construyendo **en paralelo**:
 > | Mejora Continua · Planes de Mejora (`RF-PJ`) | 47 | 47 |
 > | Mejora Continua · Actas (`RF-AC`) | 27 | 27 |
 >
+> **RF055 (horas teóricas) quedó retirado** por la solicitud de cambio RF-CH-020 el
+> 30 de septiembre de 2026: el campo «Horas Teóricas por semana» ya no existe. Sigue
+> en el total del documento —el PDF lo trae—, pero ya no cuenta como implementado; las
+> cifras de esta sección no se han recalculado y aún lo incluyen.
+>
 > La cuenta sale de cruzar los `RF-` distintos del documento fuente con sus
 > citas en `apps/api/src` y `apps/web/src`, **pero el cruce no basta por sí
 > solo**: falla en las dos direcciones y hay que mirar ambas.
@@ -121,8 +126,8 @@ Se están construyendo **en paralelo**:
 >   D-1 (`RF092`, evidencia de aprobación también desde Vigente e Histórico), D-2
 >   (`RF056`/`067`, sin grupos de electivos), D-3 (`RF084`, solo PDF), D-4
 >   (`RF101`–`110`, numeración inferida), D-5 (`RF041`/`053`, código generado por el
->   sistema), D-6 (sin RF que defina los prerrequisitos), D-9 (`RF055`/`047`, plan
->   ISI 2018 con horas teóricas en 0 y sumillas «pendiente»), D-11 (`RF127`, se muestran deshabilitadas en vez de excluirse), D-12
+>   sistema), D-6 (sin RF que defina los prerrequisitos), D-9 (`RF047`, plan
+>   ISI 2018 con sumillas «pendiente»; la parte de horas teóricas en 0 la retiró RF-CH-020), D-11 (`RF127`, se muestran deshabilitadas en vez de excluirse), D-12
 >   (`RF-PE-020`, evidencia solo como enlace), D-13 (`RF-PE-006` RN2, remite a
 >   números equivocados) y D-14 (`RF-PE-032`/`033`, sin la plantilla institucional).
 >   D-7 y D-8 están ratificadas y D-10 aprobada.
