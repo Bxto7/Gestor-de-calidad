@@ -23,7 +23,11 @@ const A_DOMINIO: Readonly<Record<string, EstadoDocActa>> = {
 export class DocumentoActaRepositoryPrisma implements RepositorioDocumentosActaPort {
   constructor(private readonly prisma: PrismaService) {}
 
-  async crear(datos: { actaId: string; tipo: TipoDocActa; solicitadoPor: string }): Promise<TrabajoDocumentoActa> {
+  async crear(datos: {
+    actaId: string;
+    tipo: TipoDocActa;
+    solicitadoPor: string;
+  }): Promise<TrabajoDocumentoActa> {
     const fila = await this.prisma.documentoActa.create({
       data: { actaId: datos.actaId, tipo: datos.tipo, solicitadoPor: datos.solicitadoPor },
     });
@@ -45,7 +49,10 @@ export class DocumentoActaRepositoryPrisma implements RepositorioDocumentosActaP
   }
 
   async marcarGenerando(id: string): Promise<void> {
-    await this.prisma.documentoActa.update({ where: { id }, data: { estado: 'GENERANDO', error: null } });
+    await this.prisma.documentoActa.update({
+      where: { id },
+      data: { estado: 'GENERANDO', error: null },
+    });
   }
 
   async marcarListo(
@@ -74,7 +81,10 @@ export class DocumentoActaRepositoryPrisma implements RepositorioDocumentosActaP
   }
 
   async ubicacionDe(id: string): Promise<string | null> {
-    const fila = await this.prisma.documentoActa.findUnique({ where: { id }, select: { ubicacion: true } });
+    const fila = await this.prisma.documentoActa.findUnique({
+      where: { id },
+      select: { ubicacion: true },
+    });
     return fila?.ubicacion ?? null;
   }
 }

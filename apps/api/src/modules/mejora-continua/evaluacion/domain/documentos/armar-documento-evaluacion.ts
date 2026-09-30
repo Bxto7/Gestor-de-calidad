@@ -222,9 +222,7 @@ function seccionMedicionAlcanzadaExcel(datos: DatosParaDocumentoEvaluacion): Sec
       filas: datos.competencias.map((c) => [
         `${c.codigo} — ${c.nombre}`,
         ...datos.periodos.map((p) => {
-          const m = datos.mediciones.find(
-            (x) => x.competenciaId === c.id && x.periodoId === p.id,
-          );
+          const m = datos.mediciones.find((x) => x.competenciaId === c.id && x.periodoId === p.id);
           if (m === undefined) return '';
           return m.porcentajeAlcanzado === null ? 'Sin registrar' : `${m.porcentajeAlcanzado}%`;
         }),

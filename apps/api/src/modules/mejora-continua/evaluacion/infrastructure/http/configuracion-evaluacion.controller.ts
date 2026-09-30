@@ -56,7 +56,8 @@ export class ConfiguracionEvaluacionController {
 
   @Put('competencias/:competenciaId')
   @ApiOperation({
-    summary: 'Instrumento, frecuencia y responsable de una competencia (RF-PE-013, RF-PE-014, RF-PE-024)',
+    summary:
+      'Instrumento, frecuencia y responsable de una competencia (RF-PE-013, RF-PE-014, RF-PE-024)',
     description:
       'Valen para todos los periodos: RF-PE-013 RN1. Solo en Borrador. Reemplazo ' +
       'total: cada campo omitido se borra, igual que `instrumento` y `frecuencia`.',
@@ -134,7 +135,10 @@ export class ConfiguracionEvaluacionController {
 
   @Put('periodos/:periodoId/indicaciones')
   @ApiOperation({ summary: 'Las indicaciones de un año (RF-PE-028 a RF-PE-030)' })
-  @ApiResponse({ status: 409, description: 'El plan no es Indirecta, o el año no está en la matriz' })
+  @ApiResponse({
+    status: 409,
+    description: 'El plan no es Indirecta, o el año no está en la matriz',
+  })
   async indicaciones(
     @Param('planId', ParseUUIDPipe) planId: string,
     @Param('periodoId', ParseUUIDPipe) periodoId: string,

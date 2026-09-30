@@ -204,7 +204,8 @@ function repoEvaluacion(
     crear: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo }),
     cambiarEstado: async (_id, estado) => evaluacion({ estado }),
     eliminar: async () => undefined,
-    copiar: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
+    copiar: async (d) =>
+      evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
     linajeDe: async () => [evaluacion()],
     ...sobre,
   };
@@ -259,7 +260,11 @@ function montar(
     evidencias?: readonly { enlace: string; descripcion: string }[];
     indicaciones?: {
       periodoId: string;
-      lista: readonly { grupoObjetivo: GrupoObjetivo; instruccion: string; enlaceInstrumento: string }[];
+      lista: readonly {
+        grupoObjetivo: GrupoObjetivo;
+        instruccion: string;
+        enlaceInstrumento: string;
+      }[];
     };
     resultados?: { indicacionId: string; enlaceResultados: string | null };
   } = {};
@@ -510,17 +515,17 @@ describe('RF-PE-002 RN2 — el tipo del plan de medición limita qué se configu
     // con no pedir una base INDIRECTA.
     const { caso } = montar();
 
-    await expect(
-      caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION]),
-    ).rejects.toThrow(/DIRECTA/);
+    await expect(caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION])).rejects.toThrow(
+      /DIRECTA/,
+    );
   });
 
   it('un plan indirecto no acepta asignaturas', async () => {
     const { caso } = montar({ base: baseIndirecta() });
 
-    await expect(
-      caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'anio-1', []),
-    ).rejects.toThrow(/INDIRECTA/);
+    await expect(caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'anio-1', [])).rejects.toThrow(
+      /INDIRECTA/,
+    );
   });
 });
 
@@ -532,9 +537,9 @@ describe('RF-PE-028 a RF-PE-030 — indicaciones de medición y su enlace a resu
       // Si esto cayera ya en la primera vuelta ('En revisión') aunque el
       // bucle no recorriera el resto, el `for` no estaría probando nada más
       // que ese primer estado — por eso cada iteración monta su propio caso.
-      await expect(
-        caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION]),
-      ).rejects.toThrow(ReglaDeNegocioViolada);
+      await expect(caso.guardarIndicaciones(ACTOR, 'ev-1', 'anio-1', [INDICACION])).rejects.toThrow(
+        ReglaDeNegocioViolada,
+      );
     }
   });
 
@@ -628,10 +633,10 @@ describe('permisos y bitácora', () => {
 
     await expect(
       caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
-          instrumento: 'R',
-          frecuencia: 'S',
-          responsableId: null,
-        }),
+        instrumento: 'R',
+        frecuencia: 'S',
+        responsableId: null,
+      }),
     ).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toEqual(['evaluacion.editar']);
   });

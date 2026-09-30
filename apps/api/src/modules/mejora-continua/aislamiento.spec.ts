@@ -94,6 +94,9 @@ describe('aislamiento de mejora-continua', () => {
     const permitidos = [
       'ports/authorization.port.js',
       'ports/directorio-usuarios.port.js',
+      // Puerto que `auth` define para preguntar si un docente está en uso
+      // (RF-CH-014). Mejora Continua lo implementa con sus propias tablas.
+      'ports/docente-en-uso.port.js',
       // Lo que se permite es la **ruta del fichero**, no un símbolo: por aquí
       // pasan también `JwtGuard`, `PUBLICO` y `Publico`, que es lo demás que
       // ese módulo exporta. Se deja así a propósito —los cuatro son plomería

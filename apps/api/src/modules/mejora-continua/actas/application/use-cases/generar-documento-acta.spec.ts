@@ -17,51 +17,76 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
-import type { DatosPlanMejora, RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
 import type {
-  DatosActa,
-  RepositorioActaAprobacionPort,
-} from '../ports/acta-aprobacion.port.js';
+  DatosPlanMejora,
+  RepositorioPlanMejoraPort,
+} from '../../../mejora/application/ports/plan-mejora.port.js';
+import type { DatosActa, RepositorioActaAprobacionPort } from '../ports/acta-aprobacion.port.js';
 import type {
   RenderizadorExcelActaPort,
   RenderizadorPdfActaPort,
   RepositorioDocumentosActaPort,
   TrabajoDocumentoActa,
 } from '../ports/documentos-acta.port.js';
-import {
-  ConsultarDocumentoActa,
-  GenerarDocumentoActa,
-} from './generar-documento-acta.use-case.js';
+import { ConsultarDocumentoActa, GenerarDocumentoActa } from './generar-documento-acta.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 
 function permitirTodo(): AuthorizationPort {
-  return { puede: async () => ({ permitido: true }), permisosDe: async () => new Set(), carreraACargoDe: async () => null, rolesDe: async () => [] };
+  return {
+    puede: async () => ({ permitido: true }),
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
 }
 function denegar(): AuthorizationPort {
-  return { puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }), permisosDe: async () => new Set(), carreraACargoDe: async () => null, rolesDe: async () => [] };
+  return {
+    puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
 }
 
 function trabajo(sobre: Partial<TrabajoDocumentoActa> = {}): TrabajoDocumentoActa {
   return {
-    id: 't-1', actaId: 'acta-1', tipo: 'ACTA_PDF', estado: 'En cola',
-    nombreArchivo: null, tipoMime: null, bytes: null, error: null,
-    solicitadoEn: new Date('2026-09-20'), terminadoEn: null,
+    id: 't-1',
+    actaId: 'acta-1',
+    tipo: 'ACTA_PDF',
+    estado: 'En cola',
+    nombreArchivo: null,
+    tipoMime: null,
+    bytes: null,
+    error: null,
+    solicitadoEn: new Date('2026-09-20'),
+    terminadoEn: null,
     ...sobre,
   };
 }
 
 function acta(sobre: Partial<DatosActa> = {}): DatosActa {
   return {
-    id: 'acta-1', carreraId: 'carrera-1', correlativo: 2, codigo: 'ACTA N° 002 – EAP-ISI',
-    periodoAcademico: '2025-10', periodoMedicionId: null,
+    id: 'acta-1',
+    carreraId: 'carrera-1',
+    correlativo: 2,
+    codigo: 'ACTA N° 002 – EAP-ISI',
+    periodoAcademico: '2025-10',
+    periodoMedicionId: null,
     titulo: 'Acta de aprobación — Ingeniería de Software — 2025-10',
     objetivo: 'Elaborar y aprobar el Plan de Mejora 2025-10',
-    textoIntroduccion: 'x', textoAcuerdoCierre: 'y',
-    convocadaPor: 'Directora de Escuela', fechaReunion: new Date('2026-03-09'), lugarReunion: 'Sala',
-    comentario: null, lugarEmision: 'Huancayo', fechaEmision: new Date('2026-03-20'),
-    aprobadoPorId: 'u-2', aprobadoEn: new Date('2026-03-15'),
-    estado: 'Aprobada', creadoEn: new Date('2026-03-01'),
+    textoIntroduccion: 'x',
+    textoAcuerdoCierre: 'y',
+    convocadaPor: 'Directora de Escuela',
+    fechaReunion: new Date('2026-03-09'),
+    lugarReunion: 'Sala',
+    comentario: null,
+    lugarEmision: 'Huancayo',
+    fechaEmision: new Date('2026-03-20'),
+    aprobadoPorId: 'u-2',
+    aprobadoEn: new Date('2026-03-15'),
+    estado: 'Aprobada',
+    creadoEn: new Date('2026-03-01'),
     asistentes: [{ id: 'as-1', nombre: 'Ana Pérez' }],
     ...sobre,
   };
@@ -69,12 +94,32 @@ function acta(sobre: Partial<DatosActa> = {}): DatosActa {
 
 function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
   return {
-    id: 'plan-1', codigo: 'CA-01', aspecto: 'CRITERIO_ACREDITACION', carreraId: 'carrera-1',
-    criterioAcreditacionId: 'cri-1', objetivoEducacionalId: null, competenciaId: null, periodoId: null,
-    planEvaluacionId: null, planMedicionAfectadoId: null, estado: 'Aprobado', estadoImplementacion: 'Pendiente',
-    nombre: 'Reforzar bibliografía', causaRaiz: 'x', justificacion: 'x', input: null,
-    plazo: new Date('2026-12-01'), recursos: 'r', metas: 'm', responsable: 'resp',
-    logroMeta: null, impacto: null, creadoEn: new Date('2026-01-01'), evidencias: [], version: 1, derivadoDeId: null,
+    id: 'plan-1',
+    codigo: 'CA-01',
+    aspecto: 'CRITERIO_ACREDITACION',
+    carreraId: 'carrera-1',
+    criterioAcreditacionId: 'cri-1',
+    objetivoEducacionalId: null,
+    competenciaId: null,
+    periodoId: null,
+    planEvaluacionId: null,
+    planMedicionAfectadoId: null,
+    estado: 'Aprobado',
+    estadoImplementacion: 'Pendiente',
+    nombre: 'Reforzar bibliografía',
+    causaRaiz: 'x',
+    justificacion: 'x',
+    input: null,
+    plazo: new Date('2026-12-01'),
+    recursos: 'r',
+    metas: 'm',
+    responsable: 'resp',
+    logroMeta: null,
+    impacto: null,
+    creadoEn: new Date('2026-01-01'),
+    evidencias: [],
+    version: 1,
+    derivadoDeId: null,
     ...sobre,
   };
 }
@@ -102,7 +147,21 @@ function montar(dobles: Dobles = {}) {
     editarCabecera: async () => acta(),
     reemplazarAsistentes: async () => acta(),
     accionesDe: async () => [
-      { id: 'aa-1', planMejoraId: 'plan-1', aspecto: 'CRITERIO_ACREDITACION', incluida: true, porcentajeMedicionCompetencia: null, orden: 0, codigoSnapshot: 'CA-01', nombreSnapshot: 'Reforzar bibliografía', plazoSnapshot: new Date('2026-12-01'), recursosSnapshot: 'r', metasSnapshot: 'm', responsableSnapshot: 'resp', metaCompetenciaSnapshot: null },
+      {
+        id: 'aa-1',
+        planMejoraId: 'plan-1',
+        aspecto: 'CRITERIO_ACREDITACION',
+        incluida: true,
+        porcentajeMedicionCompetencia: null,
+        orden: 0,
+        codigoSnapshot: 'CA-01',
+        nombreSnapshot: 'Reforzar bibliografía',
+        plazoSnapshot: new Date('2026-12-01'),
+        recursosSnapshot: 'r',
+        metasSnapshot: 'm',
+        responsableSnapshot: 'resp',
+        metaCompetenciaSnapshot: null,
+      },
     ],
     agregarAcciones: async () => {},
     actualizarSeleccion: async () => {},
@@ -129,13 +188,23 @@ function montar(dobles: Dobles = {}) {
   };
 
   const planes: RepositorioPlanMejoraPort = {
-    crear: async () => plan(), porId: async () => plan(), editarDefinicion: async () => plan(),
-    eliminar: async () => {}, cambiarEstado: async () => plan(), actualizarImplementacion: async () => plan(),
-    actualizarRetroalimentacion: async () => plan(), agregarEvidencia: async () => plan().evidencias[0]!,
-    planDeEvidencia: async () => null, eliminarEvidencia: async () => {}, codigosDe: async () => [],
+    crear: async () => plan(),
+    porId: async () => plan(),
+    editarDefinicion: async () => plan(),
+    eliminar: async () => {},
+    cambiarEstado: async () => plan(),
+    actualizarImplementacion: async () => plan(),
+    actualizarRetroalimentacion: async () => plan(),
+    agregarEvidencia: async () => plan().evidencias[0]!,
+    planDeEvidencia: async () => null,
+    eliminarEvidencia: async () => {},
+    codigosDe: async () => [],
     parametros: async () => ({ minimoAccionesCriterio: 1, minimoAccionesObjetivo: 1 }),
-    registrarImpactoEnMedicion: async () => plan(), copiar: async () => plan(), linajeDe: async () => [],
-    listarDeCarrera: async () => [], planesPorIds: async () => [plan()],
+    registrarImpactoEnMedicion: async () => plan(),
+    copiar: async () => plan(),
+    linajeDe: async () => [],
+    listarDeCarrera: async () => [],
+    planesPorIds: async () => [plan()],
     ...dobles.planes,
   };
 
@@ -144,7 +213,11 @@ function montar(dobles: Dobles = {}) {
     repoActas,
     planes,
     { encolar: async () => {}, ...dobles.cola },
-    { guardar: async () => '/documentos/t-1.pdf', leer: async () => Buffer.alloc(0), ...dobles.almacen },
+    {
+      guardar: async () => '/documentos/t-1.pdf',
+      leer: async () => Buffer.alloc(0),
+      ...dobles.almacen,
+    },
     { render: dobles.pdf ?? (async () => Buffer.from('pdf')) },
     { render: dobles.excel ?? (async () => Buffer.from('excel')) },
     dobles.autorizacion ?? permitirTodo(),
@@ -170,7 +243,9 @@ describe('RF-AC-018/019 — encolar', () => {
 
   it('encola diciendo de qué módulo es', async () => {
     const encolados: { id: string; modulo: string }[] = [];
-    const { caso } = montar({ cola: { encolar: async (id, modulo) => void encolados.push({ id, modulo }) } });
+    const { caso } = montar({
+      cola: { encolar: async (id, modulo) => void encolados.push({ id, modulo }) },
+    });
 
     await caso.encolar(ACTOR, 'acta-1', 'ACTA_PDF');
 
@@ -201,7 +276,11 @@ describe('RF-AC-018/019 — generar', () => {
     const pdf = async () => (usados.push('pdf'), Buffer.from('x'));
     const excel = async () => (usados.push('excel'), Buffer.from('x'));
 
-    const casoExcel = montar({ repo: { porId: async () => trabajo({ tipo: 'ACTA_EXCEL' }) }, pdf, excel });
+    const casoExcel = montar({
+      repo: { porId: async () => trabajo({ tipo: 'ACTA_EXCEL' }) },
+      pdf,
+      excel,
+    });
     await casoExcel.caso.ejecutar('t-1');
     expect(usados).toEqual(['excel']);
 
@@ -222,7 +301,9 @@ describe('RF-AC-018/019 — generar', () => {
   });
 
   it('un acta Aprobada pasa a Emitida tras la primera exportación exitosa', async () => {
-    const { caso, estadoCambiadoA } = montar({ actas: { porId: async () => acta({ estado: 'Aprobada' }) } });
+    const { caso, estadoCambiadoA } = montar({
+      actas: { porId: async () => acta({ estado: 'Aprobada' }) },
+    });
 
     await caso.ejecutar('t-1');
 
@@ -230,7 +311,9 @@ describe('RF-AC-018/019 — generar', () => {
   });
 
   it('un acta ya Emitida no vuelve a transicionar', async () => {
-    const { caso, estadoCambiadoA } = montar({ actas: { porId: async () => acta({ estado: 'Emitida' }) } });
+    const { caso, estadoCambiadoA } = montar({
+      actas: { porId: async () => acta({ estado: 'Emitida' }) },
+    });
 
     await caso.ejecutar('t-1');
 
@@ -272,10 +355,20 @@ describe('RF-AC-018/019 — generar', () => {
 });
 
 describe('RF-AC-018/019 — consultar y descargar', () => {
-  function montarConsulta(dobles: { repo?: Partial<RepositorioDocumentosActaPort>; almacen?: Partial<AlmacenDeArchivosPort>; autorizacion?: AuthorizationPort } = {}) {
+  function montarConsulta(
+    dobles: {
+      repo?: Partial<RepositorioDocumentosActaPort>;
+      almacen?: Partial<AlmacenDeArchivosPort>;
+      autorizacion?: AuthorizationPort;
+    } = {},
+  ) {
     const repo: RepositorioDocumentosActaPort = {
-      crear: async () => trabajo(), porId: async () => trabajo(), listarDeActa: async () => [],
-      marcarGenerando: async () => {}, marcarListo: async () => {}, marcarFallido: async () => {},
+      crear: async () => trabajo(),
+      porId: async () => trabajo(),
+      listarDeActa: async () => [],
+      marcarGenerando: async () => {},
+      marcarListo: async () => {},
+      marcarFallido: async () => {},
       ubicacionDe: async () => '/documentos/t-1.pdf',
       ...dobles.repo,
     };
@@ -287,7 +380,12 @@ describe('RF-AC-018/019 — consultar y descargar', () => {
   }
 
   it('descarga un trabajo Listo con su nombre y su tipo', async () => {
-    const caso = montarConsulta({ repo: { porId: async () => trabajo({ estado: 'Listo', nombreArchivo: 'a.pdf', tipoMime: 'application/pdf' }) } });
+    const caso = montarConsulta({
+      repo: {
+        porId: async () =>
+          trabajo({ estado: 'Listo', nombreArchivo: 'a.pdf', tipoMime: 'application/pdf' }),
+      },
+    });
 
     const archivo = await caso.descargar(ACTOR, 't-1');
 
@@ -296,7 +394,9 @@ describe('RF-AC-018/019 — consultar y descargar', () => {
   });
 
   it('descargar uno que falló devuelve su motivo', async () => {
-    const caso = montarConsulta({ repo: { porId: async () => trabajo({ estado: 'Fallido', error: 'El acta ya no existe.' }) } });
+    const caso = montarConsulta({
+      repo: { porId: async () => trabajo({ estado: 'Fallido', error: 'El acta ya no existe.' }) },
+    });
 
     await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow('El acta ya no existe.');
   });

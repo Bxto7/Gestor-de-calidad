@@ -212,7 +212,8 @@ function repoEvaluacion(
         ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
       }),
     eliminar: async () => undefined,
-    copiar: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
+    copiar: async (d) =>
+      evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
     linajeDe: async () => [evaluacion()],
     ...sobre,
   };

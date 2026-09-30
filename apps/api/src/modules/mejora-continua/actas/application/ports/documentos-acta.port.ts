@@ -36,7 +36,11 @@ export interface TrabajoDocumentoActa {
 }
 
 export interface RepositorioDocumentosActaPort {
-  crear(datos: { actaId: string; tipo: TipoDocActa; solicitadoPor: string }): Promise<TrabajoDocumentoActa>;
+  crear(datos: {
+    actaId: string;
+    tipo: TipoDocActa;
+    solicitadoPor: string;
+  }): Promise<TrabajoDocumentoActa>;
   porId(id: string): Promise<TrabajoDocumentoActa | null>;
   listarDeActa(actaId: string, limite: number): Promise<TrabajoDocumentoActa[]>;
   marcarGenerando(id: string): Promise<void>;

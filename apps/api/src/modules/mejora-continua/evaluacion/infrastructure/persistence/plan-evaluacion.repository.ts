@@ -162,7 +162,9 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
         where: { id },
         data: {
           estado: A_BD[estado],
-          ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+          ...(aprobacion
+            ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha }
+            : {}),
         },
         select: SELECCION,
       });
