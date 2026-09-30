@@ -34,7 +34,10 @@ import {
 } from './modules/auth/application/ports/sesion.port.js';
 import { ConsultarSesion } from './modules/auth/application/use-cases/consultar-sesion.use-case.js';
 import { IniciarSesion } from './modules/auth/application/use-cases/iniciar-sesion.use-case.js';
-import { ALCANCE_DE_LECTURA } from './modules/auth/application/ports/alcance-de-lectura.port.js';
+import {
+  ALCANCE_DE_LECTURA,
+  type AlcanceDeLecturaPort,
+} from './modules/auth/application/ports/alcance-de-lectura.port.js';
 import { AuthorizationAdapter } from './modules/auth/infrastructure/authorization.adapter.js';
 import { UsuarioRepositoryPrisma } from './modules/auth/infrastructure/usuario.repository.js';
 import { Seguridad } from './modules/auth/infrastructure/seguridad.js';
@@ -535,13 +538,20 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarCarreras,
-      inject: [REPOSITORIO_CARRERA, REPOSITORIO_FACULTAD, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_CARRERA,
+        REPOSITORIO_FACULTAD,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         carreras: RepositorioCarreraPort,
         facultades: RepositorioFacultadPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarCarreras(carreras, facultades, autorizacion, eventos, alcance),
     },
     {
       provide: ConsultarEstructuraInstitucional,

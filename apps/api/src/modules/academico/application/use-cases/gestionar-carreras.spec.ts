@@ -18,6 +18,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type {
   DatosCarreraCompleta,
@@ -71,11 +72,28 @@ function denegar(): AuthorizationPort {
   };
 }
 
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
 /* ── Carreras ─────────────────────────────────────────────────────────── */
 
 function montarCarreras(opciones: {
   facultad?: DatosFacultad | null;
   carrera?: DatosCarreraCompleta | null;
+  carreras?: DatosCarreraCompleta[];
+  alcance?: AlcanceDeLecturaPort;
   nombreDuplicado?: boolean;
   codigoDuplicado?: boolean;
   asignaturasHuerfanas?: number;
@@ -89,7 +107,7 @@ function montarCarreras(opciones: {
   const repoCarrera: RepositorioCarreraPort = {
     listar: async (filtro) => {
       filtrosCarrera.push(filtro);
-      return [carrera()];
+      return opciones.carreras ?? [carrera()];
     },
     porId: async () => opciones.carrera ?? null,
     crear: async (d) => {
@@ -114,6 +132,7 @@ function montarCarreras(opciones: {
     repoFacultad,
     opciones.autorizacion ?? permitirTodo(),
     eventos,
+    opciones.alcance ?? sinRestriccion(),
   );
   return { caso, publicados, ciclosSincronizados, creadas, filtrosCarrera };
 }
@@ -241,5 +260,44 @@ describe('RF013 / RF016 — consulta de carreras', () => {
     // listado y devolvía el primero que hubiera si no encontraba el id.
     const { caso } = montarCarreras({ carrera: null });
     await expect(caso.porId(ACTOR, 'car-x')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+});
+
+describe('RF-CH-009 — alcance de lectura de carreras', () => {
+  const isi = carrera({ id: 'car-isi', nombre: 'Sistemas' });
+  const iin = carrera({ id: 'car-iin', nombre: 'Industrial' });
+
+  it('sin restricción, listar devuelve todas', async () => {
+    const { caso } = montarCarreras({ carreras: [isi, iin] });
+    expect((await caso.listar(ACTOR)).map((c) => c.id)).toEqual(['car-isi', 'car-iin']);
+  });
+
+  it('con alcance de carrera, listar devuelve solo la suya', async () => {
+    const { caso } = montarCarreras({ carreras: [isi, iin], alcance: soloCarrera('car-isi') });
+    expect((await caso.listar(ACTOR)).map((c) => c.id)).toEqual(['car-isi']);
+  });
+
+  it('con alcance de carrera y sin carrera asignada, listar devuelve la lista vacía', async () => {
+    const { caso } = montarCarreras({ carreras: [isi, iin], alcance: soloCarrera(null) });
+    expect(await caso.listar(ACTOR)).toEqual([]);
+  });
+
+  it('porId de la carrera propia la devuelve', async () => {
+    const { caso } = montarCarreras({ carrera: isi, alcance: soloCarrera('car-isi') });
+    await expect(caso.porId(ACTOR, 'car-isi')).resolves.toMatchObject({ id: 'car-isi' });
+  });
+
+  it('porId de una carrera ajena responde NoEncontrado, no AccesoDenegado', async () => {
+    const { caso } = montarCarreras({ carrera: iin, alcance: soloCarrera('car-isi') });
+    await expect(caso.porId(ACTOR, 'car-iin')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('el permiso carrera.leer sigue yendo primero: sin él, AccesoDenegado aunque la carrera sea propia', async () => {
+    const { caso } = montarCarreras({
+      carrera: isi,
+      alcance: soloCarrera('car-isi'),
+      autorizacion: denegar(),
+    });
+    await expect(caso.porId(ACTOR, 'car-isi')).rejects.toBeInstanceOf(AccesoDenegado);
   });
 });

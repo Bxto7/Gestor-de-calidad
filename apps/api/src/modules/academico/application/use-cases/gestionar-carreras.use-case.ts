@@ -18,6 +18,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import {
   CarreraCreada,
@@ -43,21 +44,35 @@ export class GestionarCarreras {
     private readonly facultades: RepositorioFacultadPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
-  /** RF013 / RF016: filtros combinables. */
+  /**
+   * RF013 / RF016: filtros combinables.
+   *
+   * RF-CH-009: quien solo lee su carrera recibe únicamente esa. El filtro se
+   * aplica sobre el resultado y no dentro del repositorio: son pocas carreras y
+   * así la regla vive en un solo sitio.
+   */
   async listar(
     actor: Actor,
     filtro?: { facultadId?: string; texto?: string; activa?: boolean },
   ): Promise<DatosCarreraCompleta[]> {
     await this.exigir(actor, 'carrera.leer');
-    return this.carreras.listar(filtro);
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    const todas = await this.carreras.listar(filtro);
+    if (alcance.tipo === 'TODAS') return todas;
+    return todas.filter((c) => c.id === alcance.carreraId);
   }
 
   async porId(actor: Actor, id: string): Promise<DatosCarreraCompleta> {
     await this.exigir(actor, 'carrera.leer');
     const carrera = await this.carreras.porId(id);
     if (!carrera) throw new NoEncontrado('la carrera', id);
+    // NoEncontrado y no AccesoDenegado: no se revela que la carrera existe.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, carrera.id))) {
+      throw new NoEncontrado('la carrera', id);
+    }
     return carrera;
   }
 
