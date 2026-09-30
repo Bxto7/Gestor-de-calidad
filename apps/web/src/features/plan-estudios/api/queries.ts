@@ -231,9 +231,18 @@ export function useJustificarRegla(planId: string) {
   return useMutacionConInvalidacion(
     (v: { codigoRegla: string; motivo: string }) =>
       api.justificarRegla(planId, v.codigoRegla, v.motivo),
-    [claves.justificaciones(planId), claves.auditoria('Plan', planId)],
+    [claves.justificaciones(planId), claves.auditoria('Plan', planId), claves.plan(planId)],
   );
 }
+
+/*
+ * RF-CH-024: todo lo que cambia lo que el motor de validaciones mira invalida
+ * también el detalle del plan (`claves.plan(planId)` es prefijo de
+ * `planDetalle`), porque de ahí sale `accionesDisponibles` y con ello si
+ * «Enviar a Revisión» está habilitado. Objetivos y competencias son un
+ * catálogo global y sus mutaciones no conocen un plan: invalidan el prefijo
+ * `['plan']` entero, que solo refresca las consultas montadas.
+ */
 
 /* ── Objetivos y competencias ─────────────────────────────────────────── */
 
@@ -244,7 +253,7 @@ export function useObjetivos() {
 export function useCrearObjetivo() {
   return useMutacionConInvalidacion(
     (v: { nombre: string; descripcion: string }) => api.crearObjetivo(v.nombre, v.descripcion),
-    [claves.objetivos],
+    [claves.objetivos, ['plan']],
   );
 }
 
@@ -252,14 +261,14 @@ export function useEditarObjetivo() {
   return useMutacionConInvalidacion(
     (v: { id: string; nombre: string; descripcion: string }) =>
       api.editarObjetivo(v.id, v.nombre, v.descripcion),
-    [claves.objetivos],
+    [claves.objetivos, ['plan']],
   );
 }
 
 export function useInactivarObjetivo() {
   return useMutacionConInvalidacion(
     (v: { id: string; activo: boolean }) => api.inactivarObjetivo(v.id, v.activo),
-    [claves.objetivos],
+    [claves.objetivos, ['plan']],
   );
 }
 
@@ -292,7 +301,7 @@ export function useCrearCompetencia() {
       api.crearCompetencia(v.nombre, v.atributoIds),
     // `claves.competencias` es prefijo de `atributos` y `cobertura`, así que
     // invalidar aquí refresca también el panel de cobertura.
-    [claves.competencias],
+    [claves.competencias, ['plan']],
   );
 }
 
@@ -300,14 +309,14 @@ export function useEditarCompetencia() {
   return useMutacionConInvalidacion(
     (v: { id: string; nombre: string; atributoIds: readonly string[] }) =>
       api.editarCompetencia(v.id, v.nombre, v.atributoIds),
-    [claves.competencias],
+    [claves.competencias, ['plan']],
   );
 }
 
 export function useInactivarCompetencia() {
   return useMutacionConInvalidacion(
     (v: { id: string; activo: boolean }) => api.inactivarCompetencia(v.id, v.activo),
-    [claves.competencias],
+    [claves.competencias, ['plan']],
   );
 }
 
@@ -331,21 +340,21 @@ export function useAsignaturas(planId: string) {
 export function useCrearAsignatura(planId: string) {
   return useMutacionConInvalidacion(
     (datos: api.DatosAsignatura) => api.crearAsignatura(planId, datos),
-    [claves.asignaturas(planId), claves.auditoria('Plan', planId)],
+    [claves.asignaturas(planId), claves.auditoria('Plan', planId), claves.plan(planId)],
   );
 }
 
 export function useEditarAsignatura(planId: string) {
   return useMutacionConInvalidacion(
     (v: { id: string; datos: api.DatosAsignatura }) => api.editarAsignatura(v.id, v.datos),
-    [claves.asignaturas(planId)],
+    [claves.asignaturas(planId), claves.plan(planId)],
   );
 }
 
 export function useInactivarAsignatura(planId: string) {
   return useMutacionConInvalidacion(
     (v: { id: string; activa: boolean }) => api.inactivarAsignatura(v.id, v.activa),
-    [claves.asignaturas(planId)],
+    [claves.asignaturas(planId), claves.plan(planId)],
   );
 }
 
@@ -354,7 +363,7 @@ export function useUbicarAsignatura(planId: string) {
   return useMutacionConInvalidacion(
     (v: { id: string; ciclo: number | null; ordenDestino?: number }) =>
       api.ubicarAsignatura(v.id, v.ciclo, v.ordenDestino),
-    [claves.asignaturas(planId)],
+    [claves.asignaturas(planId), claves.plan(planId)],
   );
 }
 
