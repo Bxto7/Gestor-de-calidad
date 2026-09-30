@@ -147,7 +147,8 @@ sección de exportación, y Emitida con el PDF ya exportado— y el modal de rec
 motivo escrito. Todas pasan sin violaciones y sin reglas desactivadas. Las cuatro que parten
 de un acta nueva recorren la interfaz hasta enviarla a revisión (cada una aprueba antes su
 propio plan de mejora, porque un plan que ya está en un acta emitida no vuelve a ser
-candidato), y la de Emitida necesita el worker: sin él se queda esperando el «Listo» del PDF.
+candidato; ese plan lo aprueba `e2e-editor`, el Coordinador, en una pestaña aparte con
+`paginaComo`, y el acta la lleva `e2e-director`), y la de Emitida necesita el worker: sin él se queda esperando el «Listo» del PDF.
 Del acta solo queda sin `axe` el estado Histórica, que ninguna acción del sistema alcanza
 todavía. Tampoco hay `axe`
 sobre el estado «ya marcada» de la casilla de RF127 (un plan no puede llegar a él por la

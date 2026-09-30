@@ -49,8 +49,7 @@ test('generar un PDF y descargarlo', async ({ page }) => {
 test.describe('con la cuenta que aprueba', () => {
   // Versionar exige `evaluacion.crear` (RF-PE-042: el mismo permiso que
   // crear) y llevar el plan a Vigente exige `evaluacion.aprobar`. La cuenta
-  // por defecto (`e2e-editor`) no tiene el segundo.
-  test.use({ rol: 'director' });
+  // por defecto (`e2e-editor`, COORDINADOR_ACADEMICO) tiene los dos.
 
   /**
    * Crea un plan sobre la base Indirecta de la semilla y lo lleva a Vigente.

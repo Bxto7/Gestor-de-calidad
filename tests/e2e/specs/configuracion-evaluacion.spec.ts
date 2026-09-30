@@ -70,8 +70,8 @@ test('configurar un periodo deja los demás intactos', async ({ page }) => {
 });
 
 test.describe('con la cuenta que aprueba', () => {
-  test.use({ rol: 'director' });
-
+  // La cuenta por defecto (`editor` → COORDINADOR_ACADEMICO) aprueba los planes
+  // de Mejora Continua: no hace falta cambiar de rol.
   test('un plan Vigente deja registrar lo alcanzado, no cambiar la definición', async ({
     page,
   }) => {

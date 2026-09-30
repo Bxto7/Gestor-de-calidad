@@ -77,11 +77,9 @@ test('configurar un año deja los demás intactos', async ({ page }) => {
 });
 
 test.describe('con la cuenta que aprueba', () => {
-  // `e2e-editor` (COORDINADOR_ACADEMICO) no tiene `evaluacion.aprobar` — solo
-  // `e2e-director` (DIRECTOR_CARRERA) puede llevar el plan a Vigente, y ambas
-  // cuentas están en la misma carrera E2E que este plan, como exigen los
+  // `e2e-editor` (COORDINADOR_ACADEMICO) tiene `evaluacion.aprobar` desde el
+  // Bloque 1 y está en la misma carrera E2E que este plan, como exigen los
   // permisos acotados por carrera de este ciclo.
-  test.use({ rol: 'director' });
 
   test('un plan Vigente deja registrar resultados pero no cambiar la instrucción', async ({
     page,

@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
 
 import { analizar } from '../fixtures/axe';
 import { completarDefinicion } from '../fixtures/plan-mejora';
-import { expect, test } from '../fixtures/sesion';
+import { expect, paginaComo, test } from '../fixtures/sesion';
 
 /**
  * Crea un plan de evaluación fresco sobre la base Indirecta de la semilla y
@@ -304,16 +304,22 @@ async function pulsarYEsperarGuardado(page: Page, nombre: string): Promise<void>
  * de mejora Aprobados o Vigentes de la carrera que no estén ya en un acta emitida,
  * así que cada llamada aprueba antes su propio plan de mejora: no depende de lo que
  * hayan dejado otros ficheros ni de que una corrida anterior no lo haya gastado.
- * Requiere la cuenta `director`, la única con `mejora.aprobar` y `actas.aprobar`.
+ * Los permisos se reparten: `page` va con la cuenta `director` (`actas.*`) y el plan
+ * de mejora lo aprueba el Coordinador (`mejora.aprobar`) en una pestaña aparte.
  */
 async function crearActaEnRevision(page: Page): Promise<void> {
-  await crearPlanMejora(page);
-  await completarDefinicion(page);
-  await page.getByRole('button', { name: 'Enviar a revisión' }).click();
-  await page.getByRole('button', { name: 'Aprobar', exact: true }).click();
-  // Sin esperar: el `goto` siguiente abandonaría la página antes de que el servidor
-  // termine de aprobar el plan, y el acta no encontraría ninguna acción que cargar.
-  await expect(page.getByRole('button', { name: 'Aprobar', exact: true })).toBeHidden();
+  const coordinador = await paginaComo(page, 'editor');
+  try {
+    await crearPlanMejora(coordinador);
+    await completarDefinicion(coordinador);
+    await coordinador.getByRole('button', { name: 'Enviar a revisión' }).click();
+    await coordinador.getByRole('button', { name: 'Aprobar', exact: true }).click();
+    // Sin cerrar antes: la pestaña abandonaría la página antes de que el servidor
+    // termine de aprobar el plan, y el acta no encontraría ninguna acción que cargar.
+    await expect(coordinador.getByRole('button', { name: 'Aprobar', exact: true })).toBeHidden();
+  } finally {
+    await coordinador.close();
+  }
 
   await crearActa(page);
   await page.getByLabel('Convocada por').fill('Dirección de la carrera');
@@ -348,13 +354,9 @@ async function crearActaAprobada(page: Page): Promise<void> {
 
 test.describe('con la cuenta que aprueba', () => {
   // Generar una versión exige `evaluacion.crear`/`mejora.crear` y aprobar
-  // exige `evaluacion.aprobar`/`mejora.aprobar`; la cuenta por defecto
-  // (`editor` → COORDINADOR_ACADEMICO) tiene el primer permiso de cada par
-  // pero no el segundo (`prisma/seed.ts`, RF-PJ-044: "quien construye no da
-  // el visto bueno"). Verificado contra el seed y no asumido: `director`
-  // (DIRECTOR_CARRERA) es el único rol de la suite con los cinco permisos
-  // `mejora.*`, incluido `mejora.aprobar`.
-  test.use({ rol: 'director' });
+  // exige `evaluacion.aprobar`/`mejora.aprobar`. Desde el Bloque 1 la cuenta
+  // por defecto (`editor` → COORDINADOR_ACADEMICO) tiene los cuatro
+  // (`matriz-de-accesos.ts`): no hace falta cambiar de rol.
 
   test('la pestaña de versiones del plan de evaluación, con un linaje real', async ({ page }) => {
     await crearPlanEvaluacion(page);
@@ -417,6 +419,13 @@ test.describe('con la cuenta que aprueba', () => {
 
     await analizar(page, 'la pestaña de versiones del plan de mejora');
   });
+});
+
+test.describe('con las cuentas que aprueban planes y actas', () => {
+  // Las actas las arma y aprueba el Director (`actas.*`); los planes de mejora
+  // de los que salen sus acciones los aprueba el Coordinador. Por eso `page` va
+  // como `director` y `crearActaEnRevision` abre al Coordinador en otra pestaña.
+  test.use({ rol: 'director' });
 
   test('el detalle de un acta Aprobada, en solo lectura y con su exportación', async ({ page }) => {
     // Es el estado que el aviso de RF-AC-021 y la sección de exportación (RF-AC-018/019)

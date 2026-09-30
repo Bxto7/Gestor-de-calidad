@@ -24,9 +24,8 @@
  *   primero en una lista que otros ficheros de la suite también alimentan.
  * - Generar una nueva versión exige que el plan ya no esté en Borrador
  *   (`permiteVersionado`) y el permiso `mejora.crear`, y aprobarlo hasta ahí
- *   exige `mejora.aprobar` — solo el rol `director` tiene los dos a la vez
- *   (`prisma/seed.ts`), igual que en `accesibilidad.spec.ts` y
- *   `documentos-evaluacion.spec.ts`.
+ *   exige `mejora.aprobar` — la cuenta por defecto (`editor`,
+ *   COORDINADOR_ACADEMICO) tiene los dos (`matriz-de-accesos.ts`).
  */
 
 import type { Page } from '@playwright/test';
@@ -61,9 +60,8 @@ test('exportar un PDF del plan de mejora y verlo listo', async ({ page }) => {
 
 test.describe('con la cuenta que aprueba', () => {
   // Versionar exige `mejora.crear` y llevar el plan hasta Aprobado exige
-  // `mejora.aprobar` (RF-PJ-044: quien construye no da el visto bueno). La
-  // cuenta por defecto (`editor`) tiene el primero pero no el segundo.
-  test.use({ rol: 'director' });
+  // `mejora.aprobar`. Desde el Bloque 1 el Coordinador aprueba: la cuenta por
+  // defecto (`editor`) tiene los dos.
 
   test('generar una nueva versión y verla en el linaje', async ({ page }) => {
     await crearPlanMejora(page);
