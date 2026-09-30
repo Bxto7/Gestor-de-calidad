@@ -1,12 +1,14 @@
 /** @vitest-environment jsdom */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CtxEncabezado, type ContextoEncabezado } from '@/app/encabezado';
 import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto-sesion';
+import { ErrorDeNegocio } from '@/shared/api/cliente';
 
 import * as api from '../api/plan-estudios.api';
 import { CarrerasPage } from './CarrerasPage';
@@ -119,5 +121,46 @@ describe('CarrerasPage — el Administrador (RF-CH-008)', () => {
     expect(planes).not.toHaveBeenCalled();
     expect(migas.at(-1)?.[0]).toBe('Facultades');
     expect(screen.queryByRole('button', { name: /plan/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('CarrerasPage — Inactivar y Reactivar (RF-CH-023)', () => {
+  it('«Inactivar» pide el estado inactivo', async () => {
+    vi.spyOn(api, 'listarFacultades').mockResolvedValue([]);
+    vi.spyOn(api, 'listarCarreras').mockResolvedValue([carreraIsi]);
+    const cambiar = vi
+      .spyOn(api, 'inactivarCarrera')
+      .mockResolvedValue({ ...carreraIsi, estado: 'Inactivo' });
+    montar({ permisos: ['carrera.leer', 'carrera.inactivar'] });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Inactivar' }));
+
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('c1', false));
+  });
+
+  it('«Reactivar» pide el estado activo', async () => {
+    vi.spyOn(api, 'listarFacultades').mockResolvedValue([]);
+    vi.spyOn(api, 'listarCarreras').mockResolvedValue([{ ...carreraIsi, estado: 'Inactivo' }]);
+    const cambiar = vi.spyOn(api, 'inactivarCarrera').mockResolvedValue(carreraIsi);
+    montar({ permisos: ['carrera.leer', 'carrera.inactivar'] });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Reactivar' }));
+
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('c1', true));
+  });
+
+  it('si el servidor rechaza la reactivación, muestra su motivo', async () => {
+    vi.spyOn(api, 'listarFacultades').mockResolvedValue([]);
+    vi.spyOn(api, 'listarCarreras').mockResolvedValue([{ ...carreraIsi, estado: 'Inactivo' }]);
+    vi.spyOn(api, 'inactivarCarrera').mockRejectedValue(
+      new ErrorDeNegocio('La facultad está inactiva y no admite carreras activas.', 409),
+    );
+    montar({ permisos: ['carrera.leer', 'carrera.inactivar'] });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Reactivar' }));
+
+    expect(
+      await screen.findByText('La facultad está inactiva y no admite carreras activas.'),
+    ).toBeInTheDocument();
   });
 });

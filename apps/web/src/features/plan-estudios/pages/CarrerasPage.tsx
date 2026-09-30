@@ -276,7 +276,16 @@ export function CarrerasPage({ modo = 'facultad' }: { modo?: 'facultad' | 'mi-ca
                     variante="fantasma"
                     tamano="sm"
                     className="ml-auto"
-                    onClick={() => inactivar.mutate(c.id)}
+                    onClick={() => {
+                      setError(null);
+                      inactivar
+                        .mutateAsync({ id: c.id, activa: c.estado !== 'Activo' })
+                        .catch((e: unknown) => {
+                          setError(
+                            e instanceof Error ? e.message : 'No se pudo cambiar el estado.',
+                          );
+                        });
+                    }}
                   >
                     {c.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
                   </Boton>

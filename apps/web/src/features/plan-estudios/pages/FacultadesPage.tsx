@@ -47,6 +47,7 @@ export function FacultadesPage() {
   const [filtro, setFiltro] = useState<FiltroEstado>('todos');
   const [editando, setEditando] = useState<Facultad | null>(null);
   const [creando, setCreando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [historialDe, setHistorialDe] = useState<Facultad | null>(null);
   const [confirmar, setConfirmar] = useState<{
     facultad: Facultad;
@@ -83,10 +84,21 @@ export function FacultadesPage() {
     });
   }, [facultades, busqueda, filtro]);
 
+  /**
+   * RF-CH-023: el estado deseado se pasa siempre. Si el servidor lo rechaza, su
+   * motivo se muestra: antes el fallo se perdía y el botón no hacía nada.
+   */
+  function cambiarEstado(facultad: Facultad, activa: boolean) {
+    setError(null);
+    inactivar.mutateAsync({ id: facultad.id, activa }).catch((e: unknown) => {
+      setError(e instanceof Error ? e.message : 'No se pudo cambiar el estado de la facultad.');
+    });
+  }
+
   async function pedirInactivacion(facultad: Facultad) {
     if (facultad.estado === 'Inactivo') {
       // Reactivar no necesita advertencia: no destruye nada.
-      inactivar.mutate(facultad.id);
+      cambiarEstado(facultad, true);
       return;
     }
     // RF005: advertir si hay carreras con planes vigentes.
@@ -107,6 +119,12 @@ export function FacultadesPage() {
           </SiPuede>
         }
       />
+
+      {error && (
+        <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg">
+          {error}
+        </p>
+      )}
 
       <div className="mb-5 flex flex-wrap gap-3">
         <div className="min-w-56 flex-1">
@@ -243,7 +261,7 @@ export function FacultadesPage() {
             <Boton
               variante="peligro"
               onClick={() => {
-                if (confirmar) inactivar.mutate(confirmar.facultad.id);
+                if (confirmar) cambiarEstado(confirmar.facultad, false);
                 setConfirmar(null);
               }}
             >

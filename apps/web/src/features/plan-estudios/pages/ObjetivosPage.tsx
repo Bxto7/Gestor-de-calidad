@@ -199,7 +199,16 @@ export function ObjetivosPage() {
                         <Boton
                           variante="fantasma"
                           tamano="sm"
-                          onClick={() => inactivar.mutate(o.id)}
+                          onClick={() => {
+                            setError(null);
+                            inactivar
+                              .mutateAsync({ id: o.id, activo: o.estado !== 'Activo' })
+                              .catch((e: unknown) => {
+                                setError(
+                                  e instanceof Error ? e.message : 'No se pudo cambiar el estado.',
+                                );
+                              });
+                          }}
                         >
                           {o.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
                         </Boton>

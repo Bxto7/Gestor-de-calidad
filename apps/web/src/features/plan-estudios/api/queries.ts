@@ -62,7 +62,10 @@ export function useEditarFacultad() {
 }
 
 export function useInactivarFacultad() {
-  return useMutacionConInvalidacion((id: string) => api.inactivarFacultad(id), [claves.facultades]);
+  return useMutacionConInvalidacion(
+    (v: { id: string; activa: boolean }) => api.inactivarFacultad(v.id, v.activa),
+    [claves.facultades],
+  );
 }
 
 /* ── Carreras ─────────────────────────────────────────────────────────── */
@@ -90,7 +93,7 @@ export function useEditarCarrera(facultadId: string) {
 
 export function useInactivarCarrera(facultadId: string) {
   return useMutacionConInvalidacion(
-    (id: string) => api.inactivarCarrera(id),
+    (v: { id: string; activa: boolean }) => api.inactivarCarrera(v.id, v.activa),
     [claves.carreras(facultadId), claves.carreras()],
   );
 }
@@ -254,7 +257,10 @@ export function useEditarObjetivo() {
 }
 
 export function useInactivarObjetivo() {
-  return useMutacionConInvalidacion((id: string) => api.inactivarObjetivo(id), [claves.objetivos]);
+  return useMutacionConInvalidacion(
+    (v: { id: string; activo: boolean }) => api.inactivarObjetivo(v.id, v.activo),
+    [claves.objetivos],
+  );
 }
 
 export function useEliminarObjetivo() {
@@ -300,7 +306,7 @@ export function useEditarCompetencia() {
 
 export function useInactivarCompetencia() {
   return useMutacionConInvalidacion(
-    (id: string) => api.inactivarCompetencia(id),
+    (v: { id: string; activo: boolean }) => api.inactivarCompetencia(v.id, v.activo),
     [claves.competencias],
   );
 }
@@ -338,7 +344,7 @@ export function useEditarAsignatura(planId: string) {
 
 export function useInactivarAsignatura(planId: string) {
   return useMutacionConInvalidacion(
-    (id: string) => api.inactivarAsignatura(id),
+    (v: { id: string; activa: boolean }) => api.inactivarAsignatura(v.id, v.activa),
     [claves.asignaturas(planId)],
   );
 }

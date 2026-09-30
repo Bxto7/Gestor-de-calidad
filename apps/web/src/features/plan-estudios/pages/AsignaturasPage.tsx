@@ -312,9 +312,11 @@ export function AsignaturasPage() {
                   disabled={!editable}
                   onClick={() => {
                     setError(null);
-                    inactivar.mutateAsync(a.id).catch((e: unknown) => {
-                      setError(e instanceof Error ? e.message : 'No se pudo cambiar el estado.');
-                    });
+                    inactivar
+                      .mutateAsync({ id: a.id, activa: a.estado !== 'Activo' })
+                      .catch((e: unknown) => {
+                        setError(e instanceof Error ? e.message : 'No se pudo cambiar el estado.');
+                      });
                   }}
                 >
                   {a.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}

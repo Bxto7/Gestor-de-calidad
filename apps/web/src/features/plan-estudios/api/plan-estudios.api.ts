@@ -71,12 +71,14 @@ export async function editarFacultad(id: string, nombre: string): Promise<Facult
 }
 
 /**
- * RF005 — alterna el estado.
+ * RF005 — fija el estado de la facultad.
  *
- * Se llama `inactivar` por continuidad con la UI, pero reactiva igual: el
- * endpoint recibe el estado deseado. Quien llama ya sabe en cuál está.
+ * Se llama `inactivar` por continuidad con la UI, pero también reactiva: el
+ * endpoint recibe el estado deseado. Es obligatorio y sin valor por defecto a
+ * propósito (RF-CH-023): con `activa = false` por defecto, «Reactivar» mandaba
+ * `false` y no reactivaba nada. Omitirlo ahora es un error de compilación.
  */
-export async function inactivarFacultad(id: string, activa = false): Promise<Facultad> {
+export async function inactivarFacultad(id: string, activa: boolean): Promise<Facultad> {
   return aFacultad(await cliente.patch<FacultadApi>(`/facultades/${id}/estado`, { activa }));
 }
 
@@ -114,7 +116,7 @@ export async function editarCarrera(id: string, datos: DatosCarrera): Promise<Ca
   return aCarrera(await cliente.patch<CarreraApi>(`/carreras/${id}`, datos));
 }
 
-export async function inactivarCarrera(id: string, activa = false): Promise<Carrera> {
+export async function inactivarCarrera(id: string, activa: boolean): Promise<Carrera> {
   return aCarrera(await cliente.patch<CarreraApi>(`/carreras/${id}/estado`, { activa }));
 }
 
@@ -269,7 +271,7 @@ export async function editarObjetivo(
   return aObjetivo(await cliente.patch<ObjetivoApi>(`/objetivos/${id}`, { nombre, descripcion }));
 }
 
-export async function inactivarObjetivo(id: string, activo = false): Promise<ObjetivoEducacional> {
+export async function inactivarObjetivo(id: string, activo: boolean): Promise<ObjetivoEducacional> {
   return aObjetivo(await cliente.patch<ObjetivoApi>(`/objetivos/${id}/estado`, { activo }));
 }
 
@@ -319,7 +321,7 @@ export async function obtenerCobertura(): Promise<CoberturaAtributo[]> {
   return cliente.get<CoberturaAtributo[]>('/competencias/cobertura');
 }
 
-export async function inactivarCompetencia(id: string, activo = false): Promise<Competencia> {
+export async function inactivarCompetencia(id: string, activo: boolean): Promise<Competencia> {
   return aCompetencia(
     await cliente.patch<CompetenciaApi>(`/competencias/${id}/estado`, { activo }),
   );
@@ -355,7 +357,7 @@ export async function editarAsignatura(id: string, datos: DatosAsignatura): Prom
   return aAsignatura(await cliente.patch<AsignaturaApi>(`/asignaturas/${id}`, datos));
 }
 
-export async function inactivarAsignatura(id: string, activa = false): Promise<Asignatura> {
+export async function inactivarAsignatura(id: string, activa: boolean): Promise<Asignatura> {
   return aAsignatura(await cliente.patch<AsignaturaApi>(`/asignaturas/${id}/estado`, { activa }));
 }
 

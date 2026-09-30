@@ -1,0 +1,107 @@
+/** @vitest-environment jsdom */
+
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { ErrorDeNegocio } from '@/shared/api/cliente';
+
+import * as api from '../api/plan-estudios.api';
+import type { Asignatura, Competencia, PlanEstudios } from '../domain/tipos';
+import { montarPagina } from '../pruebas/montar-pagina';
+import { AsignaturasPage } from './AsignaturasPage';
+
+const PLAN: PlanEstudios = {
+  id: 'p1',
+  carreraId: 'c1',
+  codigo: 'PE-ISI-2026-v1',
+  version: 1,
+  estado: 'Borrador',
+  duracionAnios: 2,
+  fechaVigencia: null,
+  objetivoIds: ['oe-1'],
+  competenciaIds: ['cp-1'],
+  derivadoDe: null,
+  creadoEn: '2026-01-01T00:00:00.000Z',
+};
+
+const COMPETENCIAS: Competencia[] = [
+  { id: 'cp-1', codigo: 'CPE-01', nombre: 'Resolver problemas', estado: 'Activo', atributos: [] },
+];
+
+function asignatura(sobre: Partial<Asignatura> = {}): Asignatura {
+  return {
+    id: 'a1',
+    planId: 'p1',
+    codigo: 'ISI-101',
+    nombre: 'Álgebra Lineal',
+    descripcion: 'Sumilla sintética del curso.',
+    tipo: 'General',
+    condicion: 'Obligatoria',
+    creditos: 4,
+    horasTeoricas: 3,
+    competenciaIds: [],
+    cicloNumero: 1,
+    orden: 0,
+    grupoElectivo: null,
+    estado: 'Activo',
+    ...sobre,
+  };
+}
+
+function montar(
+  opciones: { plan?: PlanEstudios; asignaturas?: Asignatura[]; competencias?: Competencia[] } = {},
+) {
+  vi.spyOn(api, 'obtenerPlan').mockResolvedValue(opciones.plan ?? PLAN);
+  vi.spyOn(api, 'listarAsignaturas').mockResolvedValue(opciones.asignaturas ?? [asignatura()]);
+  vi.spyOn(api, 'listarCompetencias').mockResolvedValue(opciones.competencias ?? COMPETENCIAS);
+  return montarPagina(<AsignaturasPage />, {
+    permisos: ['asignatura.leer', 'asignatura.gestionar', 'auditoria.leer'],
+    ruta: '/plan-estudios/planes/p1/asignaturas',
+    patron: '/plan-estudios/planes/:planId/asignaturas',
+  });
+}
+
+/** Los botones de escritura nacen deshabilitados hasta que llega el plan. */
+async function botonHabilitado(nombre: string): Promise<HTMLElement> {
+  const boton = await screen.findByRole('button', { name: nombre });
+  await waitFor(() => expect(boton).toBeEnabled());
+  return boton;
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('AsignaturasPage — Inactivar y Reactivar (RF-CH-023)', () => {
+  it('«Inactivar» pide el estado inactivo', async () => {
+    const cambiar = vi
+      .spyOn(api, 'inactivarAsignatura')
+      .mockResolvedValue(asignatura({ estado: 'Inactivo' }));
+    montar();
+
+    await userEvent.click(await botonHabilitado('Inactivar'));
+
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('a1', false));
+  });
+
+  it('«Reactivar» pide el estado activo', async () => {
+    const cambiar = vi.spyOn(api, 'inactivarAsignatura').mockResolvedValue(asignatura());
+    montar({ asignaturas: [asignatura({ estado: 'Inactivo', cicloNumero: null })] });
+
+    await userEvent.click(await botonHabilitado('Reactivar'));
+
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('a1', true));
+  });
+
+  it('si el servidor rechaza la reactivación, muestra su motivo', async () => {
+    vi.spyOn(api, 'inactivarAsignatura').mockRejectedValue(
+      new ErrorDeNegocio('Ya existe otra asignatura con ese nombre en el plan.', 409),
+    );
+    montar({ asignaturas: [asignatura({ estado: 'Inactivo', cicloNumero: null })] });
+
+    await userEvent.click(await botonHabilitado('Reactivar'));
+
+    expect(
+      await screen.findByText('Ya existe otra asignatura con ese nombre en el plan.'),
+    ).toBeInTheDocument();
+  });
+});
