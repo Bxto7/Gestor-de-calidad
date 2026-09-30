@@ -119,6 +119,14 @@ async function main(): Promise<void> {
     },
   });
 
+  // Los ciclos de la carrera (dos años, dos ciclos por año). Sin ellos, ubicar
+  // una asignatura en un ciclo no persiste nada: la malla resuelve el ciclo por
+  // (carrera, número). Los necesita `plan-estudios-correcciones.spec.ts`.
+  await prisma.ciclo.createMany({
+    data: [1, 2, 3, 4].map((numero) => ({ carreraId: carrera.id, numero })),
+    skipDuplicates: true,
+  });
+
   // Los planes de medición de esta carrera se borran en cada preparación: la
   // suite crea uno por ejecución y el correlativo de versión no debe arrastrar
   // el histórico de corridas anteriores.
