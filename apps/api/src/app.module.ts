@@ -1001,6 +1001,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         REPOSITORIO_CONTENIDO,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         asignaturas: RepositorioAsignaturaPort,
@@ -1008,7 +1009,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         contenido: RepositorioContenidoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarAsignaturas(asignaturas, planes, contenido, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarAsignaturas(asignaturas, planes, contenido, autorizacion, eventos, alcance),
     },
     {
       provide: UbicarAsignatura,
@@ -1261,9 +1263,12 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: ConsultarReportes,
-      inject: [REPOSITORIO_REPORTES, AUTHORIZATION_PORT],
-      useFactory: (reportes: RepositorioReportesPort, autorizacion: AuthorizationPort) =>
-        new ConsultarReportes(reportes, autorizacion),
+      inject: [REPOSITORIO_REPORTES, AUTHORIZATION_PORT, ALCANCE_DE_LECTURA],
+      useFactory: (
+        reportes: RepositorioReportesPort,
+        autorizacion: AuthorizationPort,
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarReportes(reportes, autorizacion, alcance),
     },
     {
       provide: ConsultarPlan,

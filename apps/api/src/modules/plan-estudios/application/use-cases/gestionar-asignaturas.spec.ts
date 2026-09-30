@@ -15,6 +15,7 @@ import type {
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type { EstadoPlan } from '../../domain/value-objects/estado-plan.js';
@@ -29,6 +30,21 @@ import { GestionarAsignaturas } from './gestionar-asignaturas.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 const ISI = 'car-isi';
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
 
 const ENTRADA: DatosAsignaturaEntrada = {
   nombre: 'Álgebra Lineal',
@@ -83,6 +99,7 @@ function montar(
     codigos?: string[];
     dependientes?: string[];
     permitido?: boolean;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -137,7 +154,14 @@ function montar(
   };
 
   const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
-  const caso = new GestionarAsignaturas(repo, planes, contenido, autorizacion, eventos);
+  const caso = new GestionarAsignaturas(
+    repo,
+    planes,
+    contenido,
+    autorizacion,
+    eventos,
+    opciones.alcance ?? sinRestriccion(),
+  );
 
   return { caso, publicados, creadas, actualizadas, estados, filtros };
 }
@@ -435,5 +459,42 @@ describe('RF051 / RF057 / RF058 — consulta', () => {
     // que parece legítimo: "este plan no tiene asignaturas".
     const { caso } = montar({ plan: null });
     await expect(caso.listar(ACTOR, 'plan-x')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+});
+
+describe('RF-CH-009 — alcance de lectura de asignaturas', () => {
+  it('listar las asignaturas de un plan de la carrera propia', async () => {
+    const { caso } = montar({ alcance: soloCarrera(ISI) });
+    await expect(caso.listar(ACTOR, 'plan-1')).resolves.toBeDefined();
+  });
+
+  it('listar las de un plan de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.listar(ACTOR, 'plan-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('sinCiclo hereda el mismo alcance', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.sinCiclo(ACTOR, 'plan-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('porId de una asignatura de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.porId(ACTOR, 'asig-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('impactoDeInactivar de una asignatura de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.impactoDeInactivar(ACTOR, 'asig-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('con alcance de carrera y sin carrera asignada no se lee ninguna', async () => {
+    const { caso } = montar({ alcance: soloCarrera(null) });
+    await expect(caso.listar(ACTOR, 'plan-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('sin restricción se lee cualquier plan', async () => {
+    const { caso } = montar();
+    await expect(caso.listar(ACTOR, 'plan-1')).resolves.toBeDefined();
   });
 });

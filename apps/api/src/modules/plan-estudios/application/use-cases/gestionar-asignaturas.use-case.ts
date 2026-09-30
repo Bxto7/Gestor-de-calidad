@@ -20,6 +20,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import {
@@ -49,6 +50,7 @@ export class GestionarAsignaturas {
     private readonly contenido: RepositorioContenidoPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF051 y RF057: listado del plan con filtros combinables. */
@@ -59,6 +61,7 @@ export class GestionarAsignaturas {
   ): Promise<DatosAsignatura[]> {
     const plan = await this.exigirPlan(planId);
     await this.exigir(actor, 'asignatura.leer', plan.carreraId);
+    await this.exigirAlcance(actor, plan.carreraId, 'el plan de estudios', planId);
     return this.asignaturas.listar(planId, filtro);
   }
 
@@ -79,6 +82,7 @@ export class GestionarAsignaturas {
 
     const plan = await this.exigirPlan(asignatura.planId);
     await this.exigir(actor, 'asignatura.leer', plan.carreraId);
+    await this.exigirAlcance(actor, plan.carreraId, 'la asignatura', id);
     return asignatura;
   }
 
@@ -143,6 +147,7 @@ export class GestionarAsignaturas {
 
     const plan = await this.exigirPlan(asignatura.planId);
     await this.exigir(actor, 'asignatura.leer', plan.carreraId);
+    await this.exigirAlcance(actor, plan.carreraId, 'la asignatura', id);
     return this.asignaturas.impactoDeInactivar(id);
   }
 
@@ -169,6 +174,22 @@ export class GestionarAsignaturas {
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */
+
+  /**
+   * RF-CH-009: fuera de alcance responde NoEncontrado, como si el recurso no
+   * existiera. Va después del permiso: sin `asignatura.leer` sigue siendo
+   * AccesoDenegado.
+   */
+  private async exigirAlcance(
+    actor: Actor,
+    carreraId: string,
+    recurso: string,
+    id: string,
+  ): Promise<void> {
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, carreraId))) {
+      throw new NoEncontrado(recurso, id);
+    }
+  }
 
   /**
    * Normaliza y valida la entrada. Devuelve los datos ya limpios para que quien

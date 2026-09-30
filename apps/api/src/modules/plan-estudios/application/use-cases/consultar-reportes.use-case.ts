@@ -12,6 +12,7 @@
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import {
   reporteAreasDeFormacion,
@@ -50,14 +51,24 @@ export class ConsultarReportes {
   constructor(
     private readonly reportes: RepositorioReportesPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** Búsqueda global: por código de plan, carrera o facultad, a la vez. */
   async buscarPlanes(actor: Actor, filtro: FiltroBusqueda): Promise<PlanEncontrado[]> {
     await this.exigirLectura(actor);
 
+    // RF-CH-009: quien solo lee su carrera busca únicamente entre sus planes; el
+    // `carreraId` que pida el filtro se sobrescribe.
+    let acotado = filtro;
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    if (alcance.tipo === 'CARRERA') {
+      if (alcance.carreraId === null) return [];
+      acotado = { ...filtro, carreraId: alcance.carreraId };
+    }
+
     return this.reportes.buscarPlanes({
-      ...filtro,
+      ...acotado,
       limite: Math.min(filtro.limite ?? LIMITE_MAXIMO, LIMITE_MAXIMO),
     });
   }
@@ -75,6 +86,11 @@ export class ConsultarReportes {
     const datos = await this.reportes.datosDePlan(planId);
     if (!datos) throw new NoEncontrado('el plan de estudios', planId);
 
+    // RF-CH-009: fuera de alcance responde NoEncontrado, como si no existiera.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, datos.plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
+
     return {
       plan: { id: datos.plan.id, codigo: datos.plan.codigo, version: datos.plan.version },
       carrera: datos.carrera,
@@ -84,19 +100,28 @@ export class ConsultarReportes {
     };
   }
 
-  /** Panel estadístico general. */
+  /**
+   * Panel estadístico general.
+   *
+   * Es institucional: agrega todas las carreras y no se acota. Quien solo lee su
+   * carrera (RF-CH-009) no puede verlo sin ver datos de las demás; un panel «solo
+   * de mi carrera» sería otro producto y se pediría como requisito aparte.
+   */
   async panel(actor: Actor): Promise<DatosPanel> {
     await this.exigirLectura(actor);
+
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    if (alcance.tipo === 'CARRERA') {
+      throw new AccesoDenegado(
+        'El panel general es institucional: tu acceso se limita a los datos de tu carrera.',
+      );
+    }
     return this.reportes.panel(MARCO_VIGENTE);
   }
 
   /**
-   * La lectura no se acota por carrera.
-   *
-   * `plan.leer` no está entre los permisos acotados de la política, y es
-   * deliberado: consultar el plan de otra carrera está permitido, modificarlo
-   * no. Un reporte que solo enseñara la carrera propia no serviría para lo que
-   * un panel institucional existe.
+   * El permiso. El alcance por carrera (RF-CH-009) se aplica aparte, en cada
+   * lectura: la marca `lectura.solo_su_carrera` acota lo que el rol ya puede leer.
    */
   private async exigirLectura(actor: Actor): Promise<void> {
     const decision = await this.autorizacion.puede(actor.id, 'plan.leer', null);
