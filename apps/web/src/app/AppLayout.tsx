@@ -59,7 +59,7 @@ const SECCIONES: readonly SeccionNav[] = [
         etiqueta: 'Plan de Estudios',
         icono: IconoPlan,
         exacto: false,
-        permiso: 'plan.leer',
+        permiso: 'plan.acceder',
       },
     ],
   },
@@ -175,12 +175,18 @@ export function AppLayout() {
   const navegar = useNavigate();
 
   const manejarSalida = useCallback(async () => {
-    await salir();
+    try {
+      await salir();
+    } catch {
+      // `cerrarSesion` limpia la sesión local y relanza el error del servidor:
+      // la persona ya quedó fuera, así que el logout sigue adelante. Sin esto,
+      // `RutaProtegida` redirige primero y graba la pantalla actual en `desde`.
+    }
     // Sin `state`: un logout explícito no debe hacer que el siguiente inicio
     // de sesión aterrice en la pantalla que dejó esta persona (RF-CH-001). La
     // pérdida de sesión por expiración (RutaProtegida) sí conserva `desde`,
     // porque ahí es la misma persona quien vuelve.
-    navegar('/acceso', { replace: true, state: null });
+    void navegar('/acceso', { replace: true, state: null });
   }, [salir, navegar]);
 
   const { data: carrera, isError: carreraConError } = useQuery({

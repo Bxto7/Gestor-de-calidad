@@ -154,12 +154,17 @@ describe('AppLayout — entrada «Mis evidencias»', () => {
 });
 
 describe('AppLayout — entrada «Plan de Estudios»', () => {
-  it('aparece cuando el usuario tiene plan.leer', () => {
-    montar({ puede: (permiso: string) => permiso === 'plan.leer' });
+  it('aparece cuando el usuario tiene plan.acceder', () => {
+    montar({ puede: (permiso: string) => permiso === 'plan.acceder' });
     expect(screen.getByRole('link', { name: 'Plan de Estudios' })).toHaveAttribute(
       'href',
       '/plan-estudios',
     );
+  });
+
+  it('no aparece con solo plan.leer: leer los datos no es entrar al módulo (Coordinador)', () => {
+    montar({ puede: (permiso: string) => permiso === 'plan.leer' });
+    expect(screen.queryByRole('link', { name: 'Plan de Estudios' })).not.toBeInTheDocument();
   });
 
   it('no aparece sin el permiso (antes de este cambio, aparecía siempre)', () => {
@@ -201,6 +206,33 @@ describe('AppLayout — cerrar sesión (RF-CH-001)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
 
     expect(salir).toHaveBeenCalled();
+    expect(await screen.findByTestId('ruta')).toHaveTextContent('/acceso');
+    expect(screen.getByTestId('estado')).toHaveTextContent('null');
+  });
+
+  it('navega a /acceso sin estado aunque el servidor falle al cerrar sesión', async () => {
+    // `cerrarSesion` limpia la sesión local y vuelve a lanzar el error del
+    // servidor: el logout tiene que completarse igual (RF-CH-001).
+    const salir = vi.fn().mockRejectedValue(new Error('el servidor no responde'));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ContextoSesion.Provider value={{ ...sesionBase, salir }}>
+          <MemoryRouter initialEntries={['/mejora-continua/mejora/plan-1']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/mejora-continua/mejora/:id" element={<div>plan</div>} />
+              </Route>
+              <Route path="/acceso" element={<CapturaUbicacion />} />
+            </Routes>
+          </MemoryRouter>
+        </ContextoSesion.Provider>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+
     expect(await screen.findByTestId('ruta')).toHaveTextContent('/acceso');
     expect(screen.getByTestId('estado')).toHaveTextContent('null');
   });

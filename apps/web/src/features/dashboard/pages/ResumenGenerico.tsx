@@ -18,12 +18,16 @@
 
 import { Link } from 'react-router-dom';
 
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+
 import { Badge } from '@/shared/components/ui';
 
 interface Modulo {
   readonly titulo: string;
   readonly detalle: string;
   readonly a: string;
+  /** Permiso que da entrada al módulo: el mismo que exige su ruta. */
+  readonly permiso: string;
 }
 
 /** Lo que hoy se puede abrir y usar. */
@@ -33,24 +37,28 @@ const ACTIVOS: readonly Modulo[] = [
     detalle:
       'Facultades, carreras, objetivos educacionales, competencias, atributos del graduado, asignaturas y malla curricular. Incluye el flujo de aprobación y el versionado del plan.',
     a: '/plan-estudios',
+    permiso: 'plan.acceder',
   },
   {
     titulo: 'Mejora Continua',
     detalle:
       'Planes de medición de competencias: meta, competencias por atributo del graduado, periodos y la matriz de programación con su seguimiento.',
     a: '/mejora-continua/medicion',
+    permiso: 'medicion.leer',
   },
   {
     titulo: 'Atributos del Graduado',
     detalle:
       'El perfil contra el que se acredita el programa. Catálogo del marco de acreditación, con el recuento de qué competencias desarrollan cada atributo.',
     a: '/acreditacion/atributos',
+    permiso: 'atributo.leer',
   },
   {
     titulo: 'Criterios de Acreditación',
     detalle:
       'Los criterios del programa, por carrera profesional. Son uno de los tres aspectos sobre los que se generarán los planes de mejora.',
     a: '/acreditacion/criterios',
+    permiso: 'criterio.leer',
   },
 ];
 
@@ -114,6 +122,8 @@ const ETIQUETA: Record<EstadoCriterio, string> = {
 };
 
 export function ResumenGenerico() {
+  const { puede } = useSesion();
+  const activos = ACTIVOS.filter((m) => puede(m.permiso));
   return (
     <>
       <div className="mb-8">
@@ -133,7 +143,7 @@ export function ResumenGenerico() {
       </h2>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {ACTIVOS.map((m) => (
+        {activos.map((m) => (
           <Link
             key={m.a}
             to={m.a}

@@ -58,7 +58,7 @@ export function App() {
               <Route element={<AppLayout />}>
                 <Route index element={<ResumenPage />} />
 
-                <Route element={<RutaConPermiso permiso="plan.leer" />}>
+                <Route element={<RutaConPermiso permiso="plan.acceder" />}>
                   <Route path="plan-estudios" element={<FacultadesPage />} />
                   <Route path="plan-estudios/facultades/:facultadId" element={<CarrerasPage />} />
                   <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />
