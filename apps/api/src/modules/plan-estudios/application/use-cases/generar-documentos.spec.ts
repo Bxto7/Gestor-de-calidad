@@ -15,6 +15,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type { EstadoPlan } from '../../domain/value-objects/estado-plan.js';
@@ -33,6 +34,21 @@ import { ConsultarDocumento, SolicitarDocumento } from './generar-documentos.use
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Ana Quispe' };
 const PLAN_ID = 'plan-1';
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
 
 function permitirTodo(): AuthorizationPort {
   return {
@@ -86,6 +102,7 @@ function montar(
     planExiste?: boolean;
     aprobaciones?: EventoDeAprobacion[];
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const encolados: string[] = [];
@@ -121,6 +138,7 @@ function montar(
     },
     opciones.autorizacion ?? permitirTodo(),
     { publicar: async (e) => void publicados.push(...e) },
+    opciones.alcance ?? sinRestriccion(),
   );
 
   return { caso, encolados, publicados, creados };
@@ -229,7 +247,11 @@ describe('RF084 — precondición del histórico de cambios', () => {
 describe('consultar y descargar', () => {
   function montarConsulta(
     t: TrabajoDocumento | null,
-    opciones: { ubicacion?: string | null; autorizacion?: AuthorizationPort } = {},
+    opciones: {
+      ubicacion?: string | null;
+      autorizacion?: AuthorizationPort;
+      alcance?: AlcanceDeLecturaPort;
+    } = {},
   ) {
     const documentos = {
       porId: async () => t,
@@ -249,6 +271,7 @@ describe('consultar y descargar', () => {
       { porId: async () => plan() } as unknown as RepositorioPlanPort,
       almacen,
       opciones.autorizacion ?? permitirTodo(),
+      opciones.alcance ?? sinRestriccion(),
     );
   }
 
@@ -293,5 +316,111 @@ describe('consultar y descargar', () => {
     // llevaría la evidencia que otro generó, saltándose el control de origen.
     const caso = montarConsulta(trabajo({ estado: 'Listo' }), { autorizacion: denegar() });
     await expect(caso.descargar(ACTOR, 'trab-1')).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+});
+
+describe('RF-CH-009 — alcance de lectura de los documentos', () => {
+  const LISTO = {
+    estado: 'Listo',
+    nombreArchivo: 'plan.pdf',
+    tipoMime: 'application/pdf',
+  } as const;
+
+  describe('solicitar', () => {
+    it('un plan de la carrera propia se solicita', async () => {
+      const { caso } = montar({ alcance: soloCarrera('car-1') });
+      await expect(caso.ejecutar(ACTOR, PLAN_ID, 'RESUMEN_PLAN')).resolves.toBeTruthy();
+    });
+
+    it('un plan de otra carrera responde NoEncontrado y no encola', async () => {
+      const { caso, encolados, creados } = montar({ alcance: soloCarrera('car-otra') });
+      await expect(caso.ejecutar(ACTOR, PLAN_ID, 'RESUMEN_PLAN')).rejects.toBeInstanceOf(
+        NoEncontrado,
+      );
+      expect(encolados).toHaveLength(0);
+      expect(creados).toHaveLength(0);
+    });
+
+    it('con la marca y sin carrera a cargo responde NoEncontrado', async () => {
+      const { caso } = montar({ alcance: soloCarrera(null) });
+      await expect(caso.ejecutar(ACTOR, PLAN_ID, 'RESUMEN_PLAN')).rejects.toBeInstanceOf(
+        NoEncontrado,
+      );
+    });
+
+    it('sin la marca cualquier plan se solicita', async () => {
+      const { caso } = montar({ alcance: sinRestriccion() });
+      await expect(caso.ejecutar(ACTOR, PLAN_ID, 'RESUMEN_PLAN')).resolves.toBeTruthy();
+    });
+
+    it('el permiso se comprueba antes que el alcance: AccesoDenegado', async () => {
+      const { caso } = montar({ autorizacion: denegar(), alcance: soloCarrera('car-otra') });
+      await expect(caso.ejecutar(ACTOR, PLAN_ID, 'RESUMEN_PLAN')).rejects.toBeInstanceOf(
+        AccesoDenegado,
+      );
+    });
+  });
+
+  describe('consultar', () => {
+    function consulta(alcance: AlcanceDeLecturaPort, autorizacion?: AuthorizationPort) {
+      return montarConsulta(trabajo(LISTO), { alcance, autorizacion });
+    }
+
+    function montarConsulta(
+      t: TrabajoDocumento,
+      opciones: { alcance: AlcanceDeLecturaPort; autorizacion?: AuthorizationPort },
+    ) {
+      return new ConsultarDocumento(
+        {
+          porId: async () => t,
+          ubicacionDe: async () => 'trab-1.pdf',
+          listarDePlan: async () => [t],
+        } as unknown as RepositorioDocumentosPort,
+        { porId: async () => plan() } as unknown as RepositorioPlanPort,
+        { guardar: async () => 'x', leer: async () => Buffer.from('%PDF-1.3') },
+        opciones.autorizacion ?? permitirTodo(),
+        opciones.alcance,
+      );
+    }
+
+    it('estado, listarDePlan y descargar funcionan con la carrera propia', async () => {
+      const caso = consulta(soloCarrera('car-1'));
+      expect((await caso.estado(ACTOR, 'trab-1')).id).toBe('trab-1');
+      expect(await caso.listarDePlan(ACTOR, PLAN_ID)).toHaveLength(1);
+      expect((await caso.descargar(ACTOR, 'trab-1')).nombreArchivo).toBe('plan.pdf');
+    });
+
+    it('estado de un documento de otra carrera responde NoEncontrado', async () => {
+      const caso = consulta(soloCarrera('car-otra'));
+      await expect(caso.estado(ACTOR, 'trab-1')).rejects.toBeInstanceOf(NoEncontrado);
+    });
+
+    it('listarDePlan de otra carrera responde NoEncontrado', async () => {
+      const caso = consulta(soloCarrera('car-otra'));
+      await expect(caso.listarDePlan(ACTOR, PLAN_ID)).rejects.toBeInstanceOf(NoEncontrado);
+    });
+
+    it('descargar de otra carrera responde NoEncontrado', async () => {
+      const caso = consulta(soloCarrera('car-otra'));
+      await expect(caso.descargar(ACTOR, 'trab-1')).rejects.toBeInstanceOf(NoEncontrado);
+    });
+
+    it('con la marca y sin carrera a cargo responde NoEncontrado en todo', async () => {
+      const caso = consulta(soloCarrera(null));
+      await expect(caso.estado(ACTOR, 'trab-1')).rejects.toBeInstanceOf(NoEncontrado);
+      await expect(caso.listarDePlan(ACTOR, PLAN_ID)).rejects.toBeInstanceOf(NoEncontrado);
+      await expect(caso.descargar(ACTOR, 'trab-1')).rejects.toBeInstanceOf(NoEncontrado);
+    });
+
+    it('sin la marca se lee cualquier documento', async () => {
+      const caso = consulta(sinRestriccion());
+      expect((await caso.estado(ACTOR, 'trab-1')).id).toBe('trab-1');
+    });
+
+    it('el permiso se comprueba antes que el alcance: AccesoDenegado', async () => {
+      const caso = consulta(soloCarrera('car-otra'), denegar());
+      await expect(caso.estado(ACTOR, 'trab-1')).rejects.toBeInstanceOf(AccesoDenegado);
+      await expect(caso.listarDePlan(ACTOR, PLAN_ID)).rejects.toBeInstanceOf(AccesoDenegado);
+    });
   });
 });

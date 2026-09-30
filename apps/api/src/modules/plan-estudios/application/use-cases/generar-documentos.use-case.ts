@@ -23,6 +23,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import {
   armarEvidenciaDeAprobacion,
@@ -78,6 +79,7 @@ export class SolicitarDocumento {
     private readonly cola: ColaDeDocumentosPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async ejecutar(actor: Actor, planId: string, tipo: TipoDocumento): Promise<TrabajoDocumento> {
@@ -86,6 +88,11 @@ export class SolicitarDocumento {
 
     const decision = await this.autorizacion.puede(actor.id, 'reporte.generar', plan.carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+
+    // RF-CH-009: fuera de alcance responde NoEncontrado, como si no existiera.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
 
     await this.comprobarPrecondiciones(plan.estado, planId, tipo);
 
@@ -203,6 +210,7 @@ export class ConsultarDocumento {
     private readonly planes: RepositorioPlanPort,
     private readonly almacen: AlmacenDeArchivosPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async estado(actor: Actor, trabajoId: string): Promise<TrabajoDocumento> {
@@ -255,6 +263,11 @@ export class ConsultarDocumento {
 
     const decision = await this.autorizacion.puede(actor.id, 'reporte.generar', plan.carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+
+    // RF-CH-009: fuera de alcance responde NoEncontrado, como si no existiera.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
   }
 }
 

@@ -1099,6 +1099,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         COLA_DOCUMENTOS,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanPort,
@@ -1107,17 +1108,34 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         cola: ColaDeDocumentosPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new SolicitarDocumento(planes, aprobaciones, documentos, cola, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) =>
+        new SolicitarDocumento(
+          planes,
+          aprobaciones,
+          documentos,
+          cola,
+          autorizacion,
+          eventos,
+          alcance,
+        ),
     },
     {
       provide: ConsultarDocumento,
-      inject: [REPOSITORIO_DOCUMENTOS, REPOSITORIO_PLAN, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      inject: [
+        REPOSITORIO_DOCUMENTOS,
+        REPOSITORIO_PLAN,
+        ALMACEN_ARCHIVOS,
+        AUTHORIZATION_PORT,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         documentos: RepositorioDocumentosPort,
         planes: RepositorioPlanPort,
         almacen: AlmacenDeArchivosPort,
         autorizacion: AuthorizationPort,
-      ) => new ConsultarDocumento(documentos, planes, almacen, autorizacion),
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarDocumento(documentos, planes, almacen, autorizacion, alcance),
     },
     {
       // Se registra también en la API aunque solo lo ejecute el worker: el
