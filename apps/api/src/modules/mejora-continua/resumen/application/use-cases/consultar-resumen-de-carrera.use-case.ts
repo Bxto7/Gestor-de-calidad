@@ -23,7 +23,9 @@ import type {
  *
  * La carrera sale siempre de la sesión (`carreraACargoDe`): no hay parámetro que
  * permita mirar la de otro. El permiso se comprueba primero y por completo; sin
- * él no se lee nada, ni siquiera la carrera a cargo.
+ * él no se lee nada, ni siquiera la carrera a cargo. La compuerta es `actas.leer`
+ * y no `mejora.leer`: el Director conserva las actas y ya no tiene el módulo
+ * Mejora Continua, pero su inicio sigue resumiendo la carrera.
  */
 export class ConsultarResumenDeCarrera {
   constructor(
@@ -35,7 +37,7 @@ export class ConsultarResumenDeCarrera {
   ) {}
 
   async ejecutar(actor: Actor): Promise<ResumenDeCarrera> {
-    const decision = await this.autorizacion.puede(actor.id, 'mejora.leer', null);
+    const decision = await this.autorizacion.puede(actor.id, 'actas.leer', null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
 
     const carreraId = await this.autorizacion.carreraACargoDe(actor.id);

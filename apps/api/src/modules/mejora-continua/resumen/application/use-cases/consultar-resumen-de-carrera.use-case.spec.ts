@@ -70,12 +70,12 @@ function montar(
 }
 
 describe('ConsultarResumenDeCarrera', () => {
-  it('sin el permiso mejora.leer lanza AccesoDenegado y no consulta nada más', async () => {
+  it('sin el permiso actas.leer lanza AccesoDenegado y no consulta nada más', async () => {
     const { caso, autorizacion, lectura, planVigente } = montar({ permitido: false });
 
     await expect(caso.ejecutar(ACTOR)).rejects.toBeInstanceOf(AccesoDenegado);
 
-    expect(autorizacion.puede).toHaveBeenCalledWith('u-director', 'mejora.leer', null);
+    expect(autorizacion.puede).toHaveBeenCalledWith('u-director', 'actas.leer', null);
     expect(autorizacion.carreraACargoDe).not.toHaveBeenCalled();
     expect(planVigente.planVigenteDeCarrera).not.toHaveBeenCalled();
     expect(lectura.planesMejoraDeCarrera).not.toHaveBeenCalled();
