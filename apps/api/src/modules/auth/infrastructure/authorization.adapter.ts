@@ -15,14 +15,18 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../../../platform/database/prisma.service.js';
 import type { AuthorizationPort } from '../application/ports/authorization.port.js';
+import type { AlcanceDeLecturaPort } from '../application/ports/alcance-de-lectura.port.js';
 import {
+  alcanceDeLectura as decidirAlcance,
   puede as decidir,
+  puedeLeerCarrera as decidirLectura,
+  type AlcanceDeLectura,
   type ContextoDeAutorizacion,
   type Decision,
 } from '../domain/services/politica-de-autorizacion.js';
 
 @Injectable()
-export class AuthorizationAdapter implements AuthorizationPort {
+export class AuthorizationAdapter implements AuthorizationPort, AlcanceDeLecturaPort {
   private readonly log = new Logger(AuthorizationAdapter.name);
 
   constructor(private readonly prisma: PrismaService) {}
@@ -65,6 +69,14 @@ export class AuthorizationAdapter implements AuthorizationPort {
       select: { roles: { select: { rol: { select: { codigo: true } } } } },
     });
     return usuario?.roles.map((ur) => ur.rol.codigo) ?? [];
+  }
+
+  async alcanceDeLectura(usuarioId: string): Promise<AlcanceDeLectura> {
+    return decidirAlcance(await this.contextoDe(usuarioId));
+  }
+
+  async puedeLeerCarrera(usuarioId: string, carreraId: string): Promise<boolean> {
+    return decidirLectura(await this.alcanceDeLectura(usuarioId), carreraId);
   }
 
   /**

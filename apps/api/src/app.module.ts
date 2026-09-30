@@ -34,6 +34,7 @@ import {
 } from './modules/auth/application/ports/sesion.port.js';
 import { ConsultarSesion } from './modules/auth/application/use-cases/consultar-sesion.use-case.js';
 import { IniciarSesion } from './modules/auth/application/use-cases/iniciar-sesion.use-case.js';
+import { ALCANCE_DE_LECTURA } from './modules/auth/application/ports/alcance-de-lectura.port.js';
 import { AuthorizationAdapter } from './modules/auth/infrastructure/authorization.adapter.js';
 import { UsuarioRepositoryPrisma } from './modules/auth/infrastructure/usuario.repository.js';
 import { Seguridad } from './modules/auth/infrastructure/seguridad.js';
@@ -442,6 +443,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
 
     /* ── Puertos → adaptadores ─────────────────────────────────────────── */
     { provide: AUTHORIZATION_PORT, useClass: AuthorizationAdapter },
+    // El mismo adaptador cumple los dos puertos: una sola instancia, una sola lectura de permisos.
+    { provide: ALCANCE_DE_LECTURA, useExisting: AUTHORIZATION_PORT },
     { provide: REPOSITORIO_USUARIO, useClass: UsuarioRepositoryPrisma },
     { provide: REPOSITORIO_GESTION_USUARIOS, useClass: GestionUsuariosRepositoryPrisma },
     { provide: SEGURIDAD_PORT, useExisting: Seguridad },
