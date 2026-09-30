@@ -362,6 +362,44 @@ describe('RF-CH-009 — alcance de lectura del historial', () => {
     );
   });
 
+  it.each([
+    ['la ajena como idB', 'plan-a', 'plan-b'],
+    ['la ajena como idA', 'plan-b', 'plan-a'],
+  ])(
+    'compararVersiones con una propia y otra ajena (%s) responde NoEncontrado, no 422',
+    async (_caso, idA, idB) => {
+      // Si la regla de «misma carrera» corriera antes que el alcance, un 422
+      // delataría que el plan ajeno existe, frente al 404 de un id inventado.
+      const { caso } = montar({
+        alcance: soloCarrera(ISI),
+        planes: {
+          'plan-a': plan('plan-a', 'PE-ISI-2026-v1'),
+          'plan-b': plan('plan-b', 'PE-CIV-2026-v1', 'car-civ'),
+        },
+      });
+      await expect(caso.compararVersiones(ACTOR, idA, idB)).rejects.toBeInstanceOf(NoEncontrado);
+    },
+  );
+
+  it('compararVersiones con la marca y sin carrera a cargo responde NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera(null) });
+    await expect(caso.compararVersiones(ACTOR, 'plan-a', 'plan-b')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('sin restricción, dos carreras distintas siguen dando ReglaDeNegocioViolada', async () => {
+    const { caso } = montar({
+      planes: {
+        'plan-a': plan('plan-a', 'PE-ISI-2026-v1'),
+        'plan-b': plan('plan-b', 'PE-CIV-2026-v1', 'car-civ'),
+      },
+    });
+    await expect(caso.compararVersiones(ACTOR, 'plan-a', 'plan-b')).rejects.toBeInstanceOf(
+      ReglaDeNegocioViolada,
+    );
+  });
+
   it('compararVersiones de la carrera propia funciona', async () => {
     const { caso } = montar({ alcance: soloCarrera(ISI) });
     expect(await caso.compararVersiones(ACTOR, 'plan-a', 'plan-b')).toEqual([]);

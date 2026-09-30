@@ -109,16 +109,21 @@ export class ConsultarHistorial {
     if (!a) throw new NoEncontrado('el plan de estudios', idA);
     if (!b) throw new NoEncontrado('el plan de estudios', idB);
 
-    if (a.carreraId !== b.carreraId) {
-      throw new ReglaDeNegocioViolada('Solo se pueden comparar versiones de una misma carrera.');
-    }
-
     const decision = await this.autorizacion.puede(actor.id, 'plan.leer_historico', null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
 
-    // Las dos versiones son de la misma carrera (comprobado arriba): basta mirar una.
+    // RF-CH-009: el alcance se comprueba en las dos versiones y antes que la regla
+    // de «misma carrera». Si fuera después, un 422 delataría que el plan ajeno
+    // existe, frente al 404 de un id inventado.
     if (!(await this.alcance.puedeLeerCarrera(actor.id, a.carreraId))) {
       throw new NoEncontrado('el plan de estudios', idA);
+    }
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, b.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', idB);
+    }
+
+    if (a.carreraId !== b.carreraId) {
+      throw new ReglaDeNegocioViolada('Solo se pueden comparar versiones de una misma carrera.');
     }
 
     const [enA, enB] = await Promise.all([
