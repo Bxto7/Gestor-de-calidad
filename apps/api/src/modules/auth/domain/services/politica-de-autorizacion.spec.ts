@@ -227,3 +227,19 @@ describe('tienePermiso — comprobación sin alcance', () => {
     expect(puede(director(ISI), 'plan.aprobar', IIN).permitido).toBe(false);
   });
 });
+
+describe('docente.gestionar', () => {
+  const conPermiso: ContextoDeAutorizacion = {
+    permisos: new Set(['docente.gestionar']),
+    carreraACargo: ISI,
+  };
+
+  it('está acotado a una carrera', () => {
+    expect(esPermisoAcotadoACarrera('docente.gestionar')).toBe(true);
+  });
+
+  it('el director lo ejerce sobre su carrera y no sobre otra', () => {
+    expect(puede(conPermiso, 'docente.gestionar', ISI).permitido).toBe(true);
+    expect(puede(conPermiso, 'docente.gestionar', IIN).permitido).toBe(false);
+  });
+});

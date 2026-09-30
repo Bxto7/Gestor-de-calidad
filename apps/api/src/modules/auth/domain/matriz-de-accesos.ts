@@ -52,6 +52,10 @@ export const PERMISOS = [
   ['competencia.gestionar', 'Crear, editar e inactivar competencias', 'plan-estudios'],
   ['atributo.leer', 'Consultar atributos del graduado', 'plan-estudios'],
   ['atributo.gestionar', 'Crear, editar e inactivar atributos del graduado', 'plan-estudios'],
+  // Como `plan.acceder`: decide solo si se entra a la sección; `criterio.leer`
+  // decide si se pueden leer los datos (el Docente los lee desde Planes de
+  // Mejora sin tener la sección).
+  ['criterio.acceder', 'Entrar a la sección Criterios de Acreditación', 'plan-estudios'],
   ['criterio.leer', 'Consultar criterios de acreditación', 'plan-estudios'],
   ['criterio.gestionar', 'Crear, editar e inactivar criterios de acreditación', 'plan-estudios'],
   ['asignatura.leer', 'Consultar asignaturas', 'plan-estudios'],
@@ -66,6 +70,9 @@ export const PERMISOS = [
   ['medicion.aprobar', 'Aprobar, observar y dar vigencia a un plan de medición', 'mejora-continua'],
 
   // Mejora continua — Planes de Evaluación
+  // Mismo criterio: el Docente lee planes de evaluación desde «Mis evidencias»
+  // sin tener el submódulo Planes de Evaluación.
+  ['evaluacion.acceder', 'Entrar al submódulo Planes de Evaluación', 'mejora-continua'],
   ['evaluacion.leer', 'Consultar planes de evaluación', 'mejora-continua'],
   ['evaluacion.crear', 'Crear un plan de evaluación', 'mejora-continua'],
   ['evaluacion.editar', 'Editar un plan de evaluación en Borrador', 'mejora-continua'],
@@ -101,6 +108,7 @@ export const PERMISOS = [
   ['auditoria.leer_entidad', 'Consultar el historial de una entidad concreta', 'auditoria'],
   ['usuario.gestionar', 'Administrar usuarios y sus roles', 'auth'],
   ['rol.gestionar', 'Administrar roles y permisos', 'auth'],
+  ['docente.gestionar', 'Gestionar los docentes de su carrera', 'auth'],
 ] as const satisfies readonly (readonly [string, string, string])[];
 
 /* ── Roles ────────────────────────────────────────────────────────────────
@@ -186,6 +194,7 @@ export const ROLES: {
       'actas.aprobar',
       'reporte.generar',
       'auditoria.leer',
+      'docente.gestionar',
     ],
   },
   {
@@ -209,6 +218,7 @@ export const ROLES: {
       'atributo.leer',
       'atributo.gestionar',
       'criterio.leer',
+      'criterio.acceder',
       'criterio.gestionar',
       'medicion.leer',
       'medicion.crear',
@@ -216,6 +226,7 @@ export const ROLES: {
       'medicion.eliminar',
       'medicion.aprobar',
       'evaluacion.leer',
+      'evaluacion.acceder',
       'evaluacion.crear',
       'evaluacion.editar',
       'evaluacion.eliminar',
@@ -239,30 +250,20 @@ export const ROLES: {
   {
     codigo: 'DOCENTE',
     nombre: 'Docente',
-    descripcion: 'Consulta de la información curricular relacionada a su labor.',
-    // Solo lectura, pero con acceso al detalle curricular: necesita ver las
-    // competencias de las asignaturas que dicta.
+    descripcion: 'Trabaja sobre los planes de mejora de su carrera y registra sus evidencias.',
+    // RF-CH-006 RN4: Planes de Mejora, «Mis evidencias» y su inicio. Nada más
+    // abre un módulo. Lo que sí conserva son las lecturas de datos que esas
+    // pantallas consumen (verificado endpoint por endpoint en el Bloque 2):
+    // `evaluacion.leer` y `criterio.leer` no abren Planes de Evaluación ni
+    // Criterios, porque eso lo deciden `evaluacion.acceder` y `criterio.acceder`.
     permisos: [
-      'facultad.leer',
       'carrera.leer',
-      'plan.acceder',
-      'plan.leer',
       'objetivo.leer',
       'competencia.leer',
-      // RF122 y RF131 incluyen al consultor entre quienes visualizan; el docente
-      // ya ve el detalle curricular, y el atributo es parte de él.
-      'atributo.leer',
       'criterio.leer',
-      'asignatura.leer',
-      // Ve en qué periodos se mide la competencia de la asignatura que dicta.
-      'medicion.leer',
       'evaluacion.leer',
-      // Registra las evidencias de las evaluaciones que le asignaron (spec de
-      // evidencias del docente): escritura acotada a su carrera.
       'evidencia.registrar',
       'mejora.leer',
-      'actas.leer',
-      'reporte.generar',
     ],
   },
   {
@@ -280,8 +281,10 @@ export const ROLES: {
       'plan.leer',
       'atributo.leer',
       'criterio.leer',
+      'criterio.acceder',
       'medicion.leer',
       'evaluacion.leer',
+      'evaluacion.acceder',
       'mejora.leer',
       'actas.leer',
     ],

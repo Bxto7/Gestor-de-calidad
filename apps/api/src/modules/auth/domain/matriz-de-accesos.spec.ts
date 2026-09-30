@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ROLES } from './matriz-de-accesos.js';
+import { PERMISOS, ROLES } from './matriz-de-accesos.js';
 
 function permisosOrdenados(codigo: string): string[] {
   const rol = ROLES.find((r) => r.codigo === codigo);
@@ -47,6 +47,7 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'carrera.leer',
         'competencia.gestionar',
         'competencia.leer',
+        'docente.gestionar',
         'facultad.leer',
         'malla.editar',
         'objetivo.gestionar',
@@ -79,8 +80,10 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'auditoria.leer_entidad',
         'carrera.leer',
         'competencia.leer',
+        'criterio.acceder',
         'criterio.gestionar',
         'criterio.leer',
+        'evaluacion.acceder',
         'evaluacion.aprobar',
         'evaluacion.crear',
         'evaluacion.editar',
@@ -108,8 +111,55 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
     expect(permisosOrdenados('COORDINADOR_ACADEMICO')).not.toContain('plan.acceder');
   });
 
-  it('DOCENTE y USUARIO_CONSULTOR conservan la entrada al módulo Plan de Estudios', () => {
-    expect(permisosOrdenados('DOCENTE')).toContain('plan.acceder');
-    expect(permisosOrdenados('USUARIO_CONSULTOR')).toContain('plan.acceder');
+  it('USUARIO_CONSULTOR conserva la entrada a Plan de Estudios, Evaluación y Criterios', () => {
+    const permisos = permisosOrdenados('USUARIO_CONSULTOR');
+    expect(permisos).toContain('plan.acceder');
+    expect(permisos).toContain('evaluacion.acceder');
+    expect(permisos).toContain('criterio.acceder');
+  });
+
+  it('DOCENTE: Planes de Mejora, Mis evidencias y las lecturas que esas pantallas consumen (RF-CH-006)', () => {
+    expect(permisosOrdenados('DOCENTE')).toEqual(
+      [
+        'carrera.leer',
+        'competencia.leer',
+        'criterio.leer',
+        'evaluacion.leer',
+        'evidencia.registrar',
+        'mejora.leer',
+        'objetivo.leer',
+      ].sort(),
+    );
+  });
+
+  it('DOCENTE no tiene ningún permiso que abra un módulo que no es suyo', () => {
+    const permisos = permisosOrdenados('DOCENTE');
+    for (const ajeno of [
+      'plan.acceder',
+      'plan.leer',
+      'medicion.leer',
+      'atributo.leer',
+      'actas.leer',
+      'evaluacion.acceder',
+      'criterio.acceder',
+      'reporte.generar',
+    ]) {
+      expect(permisos).not.toContain(ajeno);
+    }
+  });
+
+  it('solo el Director tiene docente.gestionar', () => {
+    const quienes = ROLES.filter((r) => r.permisos.includes('docente.gestionar')).map(
+      (r) => r.codigo,
+    );
+    expect(quienes).toEqual(['DIRECTOR_CARRERA']);
+  });
+
+  it('todo permiso asignado a un rol existe en el catálogo', () => {
+    const catalogo = new Set<string>(PERMISOS.map(([codigo]) => codigo));
+    const huerfanos = ROLES.flatMap((r) =>
+      r.permisos.filter((p) => !catalogo.has(p)).map((p) => `${r.codigo}: ${p}`),
+    );
+    expect(huerfanos).toEqual([]);
   });
 });
