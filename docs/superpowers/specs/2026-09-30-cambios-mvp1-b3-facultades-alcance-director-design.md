@@ -54,26 +54,31 @@ export function puedeLeerCarrera(alcance: AlcanceDeLectura, carreraId: string): 
 
 Con el permiso-marca el alcance es `CARRERA` con la carrera a cargo del usuario; sin él, `TODAS`. Un Director sin carrera asignada tiene alcance `CARRERA` con `null`: no puede leer ninguna.
 
-**Puerto.** `AuthorizationPort` gana dos métodos, y reexporta el tipo `AlcanceDeLectura` para que los demás módulos lo importen del puerto y no del dominio de `auth`:
+**Puerto.** Un puerto nuevo y pequeño, `AlcanceDeLecturaPort` (en `auth/application/ports/`), y **no** dos métodos más en `AuthorizationPort`: ese puerto tiene 18 dobles tipados en los tests de otros módulos y añadirle métodos obligaría a tocarlos todos por algo que solo usan cinco casos de uso. El puerto reexporta el tipo `AlcanceDeLectura` para que los demás módulos lo importen de aquí y no del dominio de `auth`:
 - `alcanceDeLectura(usuarioId): Promise<AlcanceDeLectura>`: distingue «sin restricción» (`TODAS`) de «restringido y sin carrera» (`CARRERA` con `carreraId: null`);
 - `puedeLeerCarrera(usuarioId, carreraId): Promise<boolean>`.
 
-`AuthorizationAdapter` los implementa reusando `contextoDe`, como el resto. Un usuario INACTIVO ya se queda sin permisos en `contextoDe`, así que su alcance es `TODAS` pero no tiene nada que leer: la comprobación del permiso de lectura sigue yendo primero.
+`AuthorizationAdapter` implementa los dos puertos reusando `contextoDe`, y en `app.module` el token `ALCANCE_DE_LECTURA` apunta a la misma instancia (`useExisting`). Un usuario INACTIVO ya se queda sin permisos en `contextoDe`, así que su alcance es `TODAS` pero no tiene nada que leer: la comprobación del permiso de lectura sigue yendo primero.
+
+Los cinco casos de uso afectados (`GestionarCarreras`, `GestionarPlanes`, `ConsultarPlan`, `ConsultarHistorial`, `GestionarAsignaturas`) y `ConsultarReportes` reciben el puerto como último parámetro del constructor, **obligatorio**: un valor por defecto «sin restricción» desactivaría la regla en silencio si alguien olvidara cablearlo.
 
 **Casos de uso.** Cada lectura conserva su permiso de siempre y añade el alcance:
 - **Listados:** se fuerzan a la carrera del usuario cuando el alcance es `CARRERA`: `GestionarCarreras.listar`, `GestionarPlanes.listar` (el `carreraId` del filtro se sobrescribe), el listado de planes de `ConsultarReportes`. Sin carrera, el resultado es la lista vacía.
 - **Detalle y sub-recursos por id:** `GestionarCarreras.porId`, `ConsultarPlan`, `ConsultarHistorial` (aprobaciones, justificaciones, historial, comparar: las dos versiones), `GestionarAsignaturas` (lecturas del plan), `GestionarPlanes.versionesDe`. Si la carrera no está en alcance responden `NoEncontrado`, no `AccesoDenegado`: no se revela que existe.
+- **Reportes** (`ConsultarReportes`): `buscarPlanes` fuerza el filtro `carreraId` a la carrera del usuario (sin carrera, lista vacía); `reporteDePlan` comprueba la carrera del plan y responde `NoEncontrado` si no está en alcance; el `panel` es institucional —agrega todas las carreras— y **no se acota**: para un usuario con alcance `CARRERA` responde `AccesoDenegado`. Acotar el panel exigiría reescribir sus consultas de agregación, y un panel «solo de mi carrera» es otro producto.
 - **Fuera:** facultades (no cuelgan de una carrera), catálogos de objetivos y competencias (Bloque 4).
 
 ### 3.3 Web: el Director
 
-`/plan-estudios` deja de ser siempre `FacultadesPage`. Un componente de entrada decide con `puede('lectura.solo_su_carrera')`: si la tiene, muestra `MiCarreraPage`; si no, `FacultadesPage`.
+`/plan-estudios` deja de ser siempre `FacultadesPage`. Un componente de entrada decide con `puede('lectura.solo_su_carrera')`: si la tiene, muestra `CarrerasPage` en el modo nuevo `mi-carrera`; si no, `FacultadesPage`.
 
-`MiCarreraPage` muestra la carrera de `identidad.carreraACargo` como una sola tarjeta, con «Abrir plan» (si tiene plan y `plan.leer`) o «Crear plan» (si no, y `plan.crear` sobre su carrera). Sin facultades, sin buscador, sin otras carreras. Si el Director no tiene carrera asignada, muestra un aviso en vez de la tarjeta.
+No hay una pantalla nueva: como `GET /carreras` ya devuelve solo la carrera del Director (3.2), `CarrerasPage` en modo `mi-carrera` la muestra como una sola tarjeta con sus acciones de siempre («Abrir plan» si tiene plan y `plan.leer`, «Crear plan» si no y `plan.crear` sobre su carrera). Lo que cambia en ese modo: título «Mi carrera», una sola miga («Plan de Estudios»), y sin el enlace «Volver a facultades», sin el buscador y sin el filtro de estado. Si el Director no tiene carrera asignada, en vez de la tarjeta se muestra un aviso.
+
+En **Reportes**, la pestaña «Panel general» no se ofrece a quien tiene `lectura.solo_su_carrera` (el API se la negaría, ver 3.2) y la pantalla abre en «Búsqueda de planes».
 
 ### 3.4 Web: el Administrador
 
-- **Etiqueta.** El enlace del menú y la primera miga se llaman «Facultades» cuando el usuario no tiene `plan.leer`, y «Plan de Estudios» cuando sí. Se decide por permiso y no por nombre de rol: un usuario con ambos roles ve el módulo completo.
+- **Etiqueta.** El enlace del menú, el título de su sección y las migas se llaman «Facultades» cuando el usuario no tiene `plan.leer`, y «Plan de Estudios» cuando sí. En el menú se declara con un campo genérico de `EnlaceNav` y `SeccionNav`, `sinPermiso: { permiso, etiqueta }` («si no tiene este permiso, esta etiqueta»). Se decide por permiso y no por nombre de rol: un usuario con ambos roles ve el módulo completo.
 - **Rutas del plan.** Las rutas `plan-estudios/planes/:planId/*` se agrupan bajo `RutaConPermiso permiso="plan.leer"` con destino `/plan-estudios`. `RutaConPermiso` gana la prop opcional `redirigirA`, cuyo valor por defecto sigue siendo `/`.
 - **Carreras.** `CarrerasPage` deja de pedir `usePlanes()` cuando el usuario no tiene `plan.leer` (habilita la consulta solo con el permiso), y por lo tanto no ofrece «Abrir plan».
 
@@ -82,8 +87,8 @@ Con el permiso-marca el alcance es `CARRERA` con la carrera a cargo del usuario;
 - **Política:** `alcanceDeLectura` y `puedeLeerCarrera` en sus tres casos (sin marca, con marca y carrera, con marca y sin carrera).
 - **Matriz:** `lectura.solo_su_carrera` solo en el Director; el Administrador sin los cinco permisos y con los que conserva; todo permiso de un rol existe en el catálogo (guarda que ya existe).
 - **Casos de uso:** cada lectura de 3.2 en modo acotado (carrera propia sí, ajena `NoEncontrado`, listado filtrado) y en modo sin acotar (sin cambio).
-- **Puerto/adaptador:** `carreraDeLectura` y `puedeLeerCarrera` contra las tres situaciones.
-- **Web:** etiqueta del menú y de las migas según `plan.leer`; `MiCarreraPage` con una sola tarjeta y sus acciones; `RutaConPermiso` con `redirigirA`; `RutasDeLaAplicacion.test.tsx` con el Administrador que teclea una ruta del plan y vuelve a `/plan-estudios`.
+- **Adaptador:** `alcanceDeLectura` y `puedeLeerCarrera` contra Postgres, con un Director con carrera, un Director sin carrera y un Consultor.
+- **Web:** etiqueta del menú y de las migas según `plan.leer`; `CarrerasPage` en modo `mi-carrera` con una sola tarjeta, sin buscador ni enlace a facultades; `CarrerasPage` sin pedir planes cuando no hay `plan.leer`; `RutaConPermiso` con `redirigirA`; `RutasDeLaAplicacion.test.tsx` con el Administrador que teclea una ruta del plan y vuelve a `/plan-estudios`; `ReportesPage` sin la pestaña «Panel general» para quien tiene alcance de carrera.
 - **e2e:** el Administrador crea una segunda carrera por API; el Director no la ve en `GET /carreras` y recibe 404 al pedirla por id; el Administrador ve «Facultades» en el menú y no puede abrir un plan.
 
 ## 4. Riesgos y decisiones abiertas
@@ -91,5 +96,6 @@ Con el permiso-marca el alcance es `CARRERA` con la carrera a cargo del usuario;
 - **El Administrador pierde la lectura de planes.** Es lo que pide RF-CH-008 y revierte una decisión anterior («lee todo, no decide nada académico»). Se le quitan cinco permisos, y un Administrador de prueba que abría planes deja de poder hacerlo. Hay que volver a correr el seed en los entornos existentes.
 - **Es un cambio de contrato para el Director.** Un Director que hoy consultaba planes de otras carreras deja de poder. Es el comportamiento pedido, pero cualquier reporte o enlace que dependiera de eso se rompe.
 - **Un Director sin carrera asignada** no puede leer nada y ve un aviso. Es coherente con que sus escrituras ya exigen carrera.
+- **El Director pierde el «Panel general» de Reportes.** Es un panel institucional (agrega todas las carreras) y no se acota; conserva la búsqueda de planes y el reporte de un plan de su carrera. Si la universidad quiere un panel por carrera, es un requisito aparte.
 - **Los catálogos de objetivos y competencias siguen sin acotar** hasta el Bloque 4. Un Director puede seguir leyéndolos completos por API en el intervalo.
 - **El bloque no toca Facultades del Director:** puede seguir leyendo la lista de facultades (no cuelga de una carrera) aunque su pantalla ya no la muestre.
