@@ -10,7 +10,7 @@ import { DocentesPage } from '@/features/docentes/pages/DocentesPage';
 import { AsignaturasPage } from '@/features/plan-estudios/pages/AsignaturasPage';
 import { CarrerasPage } from '@/features/plan-estudios/pages/CarrerasPage';
 import { CompetenciasPage } from '@/features/plan-estudios/pages/CompetenciasPage';
-import { FacultadesPage } from '@/features/plan-estudios/pages/FacultadesPage';
+import { EntradaPlanEstudios } from '@/features/plan-estudios/pages/EntradaPlanEstudios';
 import { MallaCurricularPage } from '@/features/plan-estudios/pages/MallaCurricularPage';
 import { PlanesMedicionPage } from '@/features/mejora-continua/pages/PlanesMedicionPage';
 import { PlanMedicionPage } from '@/features/mejora-continua/pages/PlanMedicionPage';
@@ -61,7 +61,7 @@ export function RutasDeLaAplicacion() {
           <Route index element={<ResumenPage />} />
 
           <Route element={<RutaConPermiso permiso="plan.acceder" />}>
-            <Route path="plan-estudios" element={<FacultadesPage />} />
+            <Route path="plan-estudios" element={<EntradaPlanEstudios />} />
             <Route path="plan-estudios/facultades/:facultadId" element={<CarrerasPage />} />
             <Route element={<RutaConPermiso permiso="plan.leer" redirigirA="/plan-estudios" />}>
               <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />

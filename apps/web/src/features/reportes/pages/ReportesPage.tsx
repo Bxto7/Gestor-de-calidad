@@ -42,8 +42,11 @@ const TONO_ESTADO: Record<EstadoPlan, 'neutro' | 'progreso' | 'aprobado' | 'acti
 type Pestana = 'panel' | 'busqueda' | 'accesos';
 
 export function ReportesPage() {
-  const [pestana, setPestana] = useState<Pestana>('panel');
   const { puede } = useSesion();
+  // El panel general es institucional: el API se lo niega a quien solo lee su
+  // carrera (RF-CH-009), así que ni se ofrece ni es la pestaña de partida.
+  const verPanel = !puede('lectura.solo_su_carrera');
+  const [pestana, setPestana] = useState<Pestana>(verPanel ? 'panel' : 'busqueda');
 
   // La bitácora exige `auditoria.leer`, que no todos los roles tienen. Se
   // esconde la pestaña en vez de enseñarla y devolver un 403 al pulsarla.
@@ -57,9 +60,11 @@ export function ReportesPage() {
       />
 
       <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="Tipo de reporte">
-        <Pestanya activa={pestana === 'panel'} onClick={() => setPestana('panel')}>
-          Panel general
-        </Pestanya>
+        {verPanel && (
+          <Pestanya activa={pestana === 'panel'} onClick={() => setPestana('panel')}>
+            Panel general
+          </Pestanya>
+        )}
         <Pestanya activa={pestana === 'busqueda'} onClick={() => setPestana('busqueda')}>
           Búsqueda de planes
         </Pestanya>
@@ -70,7 +75,7 @@ export function ReportesPage() {
         )}
       </div>
 
-      {pestana === 'panel' && <PanelGeneral />}
+      {pestana === 'panel' && verPanel && <PanelGeneral />}
       {pestana === 'busqueda' && <BusquedaGlobal />}
       {pestana === 'accesos' && verAccesos && <Accesos />}
     </>

@@ -40,7 +40,8 @@ import { plural } from '../utilidades/formato';
 
 type FiltroEstado = 'todos' | 'Activo' | 'Inactivo';
 
-export function CarrerasPage() {
+export function CarrerasPage({ modo = 'facultad' }: { modo?: 'facultad' | 'mi-carrera' } = {}) {
+  const miCarrera = modo === 'mi-carrera';
   const { facultadId = '' } = useParams();
   const { publicar } = useEncabezado();
   const navegar = useNavigate();
@@ -63,16 +64,18 @@ export function CarrerasPage() {
 
   useEffect(() => {
     publicar({
-      migas: puede('plan.leer')
-        ? [
-            { etiqueta: 'Plan de Estudios', a: '/plan-estudios' },
-            { etiqueta: 'Facultades', a: '/plan-estudios' },
-            { etiqueta: facultad?.nombre ?? 'Carreras' },
-          ]
-        : [
-            { etiqueta: 'Facultades', a: '/plan-estudios' },
-            { etiqueta: facultad?.nombre ?? 'Carreras' },
-          ],
+      migas: miCarrera
+        ? [{ etiqueta: 'Plan de Estudios' }]
+        : puede('plan.leer')
+          ? [
+              { etiqueta: 'Plan de Estudios', a: '/plan-estudios' },
+              { etiqueta: 'Facultades', a: '/plan-estudios' },
+              { etiqueta: facultad?.nombre ?? 'Carreras' },
+            ]
+          : [
+              { etiqueta: 'Facultades', a: '/plan-estudios' },
+              { etiqueta: facultad?.nombre ?? 'Carreras' },
+            ],
       acciones: null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,16 +118,22 @@ export function CarrerasPage() {
   return (
     <>
       <CabeceraSeccion
-        titulo={facultad?.nombre ?? 'Carreras'}
-        descripcion="Carreras profesionales asociadas a esta facultad."
+        titulo={miCarrera ? 'Mi carrera' : (facultad?.nombre ?? 'Carreras')}
+        descripcion={
+          miCarrera
+            ? 'La carrera a tu cargo y su plan de estudios.'
+            : 'Carreras profesionales asociadas a esta facultad.'
+        }
         acciones={
           <>
-            <Link
-              to="/plan-estudios"
-              className="inline-flex h-10 items-center rounded-lg border border-borde px-4 text-sm font-semibold transition hover:border-uc-lila hover:text-uc-primary"
-            >
-              Volver a facultades
-            </Link>
+            {!miCarrera && (
+              <Link
+                to="/plan-estudios"
+                className="inline-flex h-10 items-center rounded-lg border border-borde px-4 text-sm font-semibold transition hover:border-uc-lila hover:text-uc-primary"
+              >
+                Volver a facultades
+              </Link>
+            )}
             {/*
               Las dos formas de bloquear, juntas y a propósito: si el rol no
               puede crear carreras el botón no está —no lo podrá nunca—; si
@@ -149,7 +158,7 @@ export function CarrerasPage() {
         }
       />
 
-      {facultad?.estado === 'Inactivo' && (
+      {!miCarrera && facultad?.estado === 'Inactivo' && (
         <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg">
           Esta facultad está inactiva: no se pueden crear nuevas carreras en ella. Las existentes
           siguen siendo consultables.
@@ -162,39 +171,47 @@ export function CarrerasPage() {
         </p>
       )}
 
-      <div className="mb-5 flex flex-wrap gap-3">
-        <div className="min-w-56 flex-1">
-          <Entrada
-            type="search"
-            placeholder="Buscar por nombre o código…"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            aria-label="Buscar carrera"
-          />
+      {!miCarrera && (
+        <div className="mb-5 flex flex-wrap gap-3">
+          <div className="min-w-56 flex-1">
+            <Entrada
+              type="search"
+              placeholder="Buscar por nombre o código…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              aria-label="Buscar carrera"
+            />
+          </div>
+          <Selector
+            className="w-44"
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value as FiltroEstado)}
+            aria-label="Filtrar por estado"
+          >
+            <option value="todos">Todos los estados</option>
+            <option value="Activo">Activas</option>
+            <option value="Inactivo">Inactivas</option>
+          </Selector>
         </div>
-        <Selector
-          className="w-44"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value as FiltroEstado)}
-          aria-label="Filtrar por estado"
-        >
-          <option value="todos">Todos los estados</option>
-          <option value="Activo">Activas</option>
-          <option value="Inactivo">Inactivas</option>
-        </Selector>
-      </div>
+      )}
 
       {isLoading && <Cargando etiqueta="Cargando carreras…" />}
 
       {!isLoading && visibles.length === 0 && (
         <EstadoVacio
           titulo={
-            busqueda || filtro !== 'todos' ? 'Sin resultados' : 'Esta facultad no tiene carreras'
+            miCarrera
+              ? 'Sin carrera asignada'
+              : busqueda || filtro !== 'todos'
+                ? 'Sin resultados'
+                : 'Esta facultad no tiene carreras'
           }
           detalle={
-            busqueda || filtro !== 'todos'
-              ? 'Ninguna carrera coincide con el criterio de búsqueda.'
-              : 'Registra la primera carrera para poder crear su plan de estudios.'
+            miCarrera
+              ? 'No tienes una carrera asignada. Pide a un administrador que te la asigne para poder gestionar su plan de estudios.'
+              : busqueda || filtro !== 'todos'
+                ? 'Ninguna carrera coincide con el criterio de búsqueda.'
+                : 'Registra la primera carrera para poder crear su plan de estudios.'
           }
         />
       )}
