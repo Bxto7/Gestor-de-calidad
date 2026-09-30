@@ -152,7 +152,7 @@ export class GestionarDocentes {
   private async delaCarrera(actor: Actor, id: string): Promise<DatosUsuario> {
     const carreraId = await this.carreraDe(actor);
     const docente = await this.usuarios.porId(id);
-    if (!docente || docente.carreraId !== carreraId || !esSoloDocente(docente)) {
+    if (docente?.carreraId !== carreraId || !esSoloDocente(docente)) {
       throw new NoEncontrado('el docente', id);
     }
     return docente;

@@ -44,8 +44,15 @@ import {
   type RepositorioGestionUsuariosPort,
 } from './modules/auth/application/ports/gestion-usuarios.port.js';
 import { GestionarUsuarios } from './modules/auth/application/use-cases/gestionar-usuarios.use-case.js';
+import { GestionarDocentes } from './modules/auth/application/use-cases/gestionar-docentes.use-case.js';
+import {
+  DOCENTE_EN_USO,
+  type DocenteEnUsoPort,
+} from './modules/auth/application/ports/docente-en-uso.port.js';
+import { DocenteEnUsoAdapter } from './modules/mejora-continua/evaluacion/infrastructure/persistence/docente-en-uso.adapter.js';
 import { GestionUsuariosRepositoryPrisma } from './modules/auth/infrastructure/persistence/gestion-usuarios.repository.js';
 import { UsuariosController } from './modules/auth/infrastructure/http/usuarios.controller.js';
+import { DocentesDeCarreraController } from './modules/auth/infrastructure/http/docentes-de-carrera.controller.js';
 import { RegistroDeSeguridadBitacora } from './modules/auth/infrastructure/registro-de-seguridad.js';
 
 import type { PublicadorDeEventos } from './shared-kernel/domain-events/domain-event.js';
@@ -383,6 +390,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
   controllers: [
     SesionController,
     UsuariosController,
+    DocentesDeCarreraController,
     FacultadesController,
     CarrerasController,
     EstructuraInstitucionalController,
@@ -481,6 +489,9 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // un identificador, sin que nadie consulte su tabla de usuarios (§3.2).
     { provide: DIRECTORIO_USUARIOS, useClass: DirectorioDeUsuariosAdapter },
     { provide: CONTEO_USUARIOS, useClass: ConteoDeUsuariosAdapter },
+    // La otra dirección: `auth` pregunta si un docente está en uso y
+    // Mejora Continua responde con sus tablas, sin que se lean entre sí (§3.2).
+    { provide: DOCENTE_EN_USO, useClass: DocenteEnUsoAdapter },
     { provide: REPOSITORIO_DOCUMENTOS_MEDICION, useClass: DocumentoMedicionRepositoryPrisma },
     { provide: DATOS_DOCUMENTO_MEDICION, useClass: DatosDocumentoMedicionRepositoryPrisma },
     { provide: REPOSITORIO_DOCUMENTOS_EVALUACION, useClass: DocumentoEvaluacionRepositoryPrisma },
@@ -585,6 +596,23 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
       ) => new GestionarUsuarios(usuarios, seguridad, autorizacion, eventos),
+    },
+    {
+      provide: GestionarDocentes,
+      inject: [
+        REPOSITORIO_GESTION_USUARIOS,
+        SEGURIDAD_PORT,
+        AUTHORIZATION_PORT,
+        DOCENTE_EN_USO,
+        PUBLICADOR_EVENTOS,
+      ],
+      useFactory: (
+        usuarios: RepositorioGestionUsuariosPort,
+        seguridad: SeguridadPort,
+        autorizacion: AuthorizationPort,
+        enUso: DocenteEnUsoPort,
+        eventos: PublicadorDeEventos,
+      ) => new GestionarDocentes(usuarios, seguridad, autorizacion, enUso, eventos),
     },
     {
       provide: ConsultarSesion,
