@@ -24,10 +24,7 @@ import type { RepositorioPlanMejoraPort } from '../../../mejora/application/port
 import { porcentajeDeMeta } from '../../../medicion/domain/value-objects/meta.js';
 import { candidatasParaCargar } from '../../domain/services/candidatas-acciones-acta.js';
 import { calcularPorcentajeMedicionAnterior } from '../../../mejora/application/services/porcentaje-periodo-anterior.js';
-import {
-  formatearCodigoActa,
-  siguienteCorrelativoActa,
-} from '../../domain/value-objects/correlativo-acta.js';
+import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
 import {
   describirTransicion,
   intentarTransicion,
@@ -320,11 +317,7 @@ export class GestionarActas {
         candidata.competenciaId &&
         candidata.periodoId
           ? await calcularPorcentajeMedicionAnterior(
-              {
-                evaluaciones: this.evaluaciones,
-                mediciones: this.mediciones,
-                configuraciones: this.configuraciones,
-              },
+              { evaluaciones: this.evaluaciones, mediciones: this.mediciones, configuraciones: this.configuraciones },
               candidata.planEvaluacionId,
               candidata.competenciaId,
               candidata.periodoId,
@@ -424,14 +417,7 @@ export class GestionarActas {
         : await this.actas.cambiarEstado(id, r.nuevoEstado);
 
     await this.eventos.publicar([
-      new ActaTransicionada(
-        actor,
-        id,
-        acta.codigo,
-        acta.estado,
-        r.nuevoEstado,
-        contexto.comentario,
-      ),
+      new ActaTransicionada(actor, id, acta.codigo, acta.estado, r.nuevoEstado, contexto.comentario),
     ]);
     return actualizada;
   }

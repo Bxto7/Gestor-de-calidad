@@ -22,26 +22,16 @@ function acta(sobre: Partial<ActaParaDocumento> = {}): ActaParaDocumento {
     acuerdo: 'Se deja constancia de la revisión.',
     criterios: [
       {
-        codigo: 'CA-01',
-        nombre: 'Reforzar bibliografía',
-        plazo: new Date('2026-12-01'),
-        recursos: 'Presupuesto adicional',
-        metas: 'Elevar el indicador',
-        responsable: 'Coordinación académica',
+        codigo: 'CA-01', nombre: 'Reforzar bibliografía', plazo: new Date('2026-12-01'),
+        recursos: 'Presupuesto adicional', metas: 'Elevar el indicador', responsable: 'Coordinación académica',
       },
     ],
     objetivos: [],
     competencias: [
       {
-        codigo: 'COMP-01',
-        nombre: 'Diseñar soluciones',
-        plazo: new Date('2026-12-01'),
-        recursos: 'Taller adicional',
-        metas: 'Elevar el logro',
-        responsable: 'Docente responsable',
-        resultado: 75,
-        meta: 70,
-        logrado: true,
+        codigo: 'COMP-01', nombre: 'Diseñar soluciones', plazo: new Date('2026-12-01'),
+        recursos: 'Taller adicional', metas: 'Elevar el logro', responsable: 'Docente responsable',
+        resultado: 75, meta: 70, logrado: true,
       },
     ],
     resumen: { criterios: 1, objetivos: 0, competencias: 1, total: 2 },
@@ -79,10 +69,7 @@ describe('RenderizadorExcelActaJs — hoja ACTA', () => {
   it('escribe la cabecera institucional, el acuerdo y la lista de asistentes', async () => {
     const libro = await abrir(await new RenderizadorExcelActaJs().render(acta()));
     const hoja = libro.getWorksheet('ACTA')!;
-    const valores = hoja
-      .getSheetValues()
-      .flat()
-      .filter((v): v is string => typeof v === 'string');
+    const valores = hoja.getSheetValues().flat().filter((v): v is string => typeof v === 'string');
 
     expect(valores.join(' ')).toContain('UNIVERSIDAD CONTINENTAL');
     expect(valores.join(' ')).toContain('Directora de Escuela');

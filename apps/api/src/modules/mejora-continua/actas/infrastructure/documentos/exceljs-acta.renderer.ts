@@ -52,12 +52,7 @@ export class RenderizadorExcelActaJs implements RenderizadorExcelActaPort {
 function hojaActa(libro: ExcelJS.Workbook, acta: ActaParaDocumento): void {
   const hoja = libro.addWorksheet('ACTA', {
     views: [{ showGridLines: false }],
-    pageSetup: {
-      fitToWidth: 1,
-      fitToHeight: 0,
-      orientation: 'landscape',
-      margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0, footer: 0 },
-    },
+    pageSetup: { fitToWidth: 1, fitToHeight: 0, orientation: 'landscape', margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0, footer: 0 } },
   });
   // §2: la cabecera institucional se repite en cada hoja impresa.
   hoja.pageSetup.printTitlesRow = '1:4';
@@ -66,21 +61,13 @@ function hojaActa(libro: ExcelJS.Workbook, acta: ActaParaDocumento): void {
 
   let fila = 1;
   hoja.mergeCells(fila, 1, fila, 12);
-  celda(hoja, fila, 1, 'UNIVERSIDAD CONTINENTAL', {
-    negrita: true,
-    tamano: 14,
-    alineacion: 'center',
-  });
+  celda(hoja, fila, 1, 'UNIVERSIDAD CONTINENTAL', { negrita: true, tamano: 14, alineacion: 'center' });
   fila++;
   hoja.mergeCells(fila, 1, fila, 12);
   celda(hoja, fila, 1, acta.titulo, { alineacion: 'center' });
   fila++;
   hoja.mergeCells(fila, 1, fila, 12);
-  celda(hoja, fila, 1, 'SISTEMA DE GESTIÓN DE LA CALIDAD', {
-    negrita: true,
-    color: COLOR.blue,
-    alineacion: 'center',
-  });
+  celda(hoja, fila, 1, 'SISTEMA DE GESTIÓN DE LA CALIDAD', { negrita: true, color: COLOR.blue, alineacion: 'center' });
   fila += 2;
 
   fila = barraDeSeccion(hoja, fila, 'I. DATOS DE LA REUNIÓN');
@@ -94,11 +81,7 @@ function hojaActa(libro: ExcelJS.Workbook, acta: ActaParaDocumento): void {
 
   fila = barraDeSeccion(hoja, fila, 'II. ASISTENTES');
   celda(hoja, fila, 1, 'N.º', { negrita: true, fondo: COLOR.blue, color: COLOR.blanco });
-  celda(hoja, fila, 2, 'Nombres y apellidos', {
-    negrita: true,
-    fondo: COLOR.blue,
-    color: COLOR.blanco,
-  });
+  celda(hoja, fila, 2, 'Nombres y apellidos', { negrita: true, fondo: COLOR.blue, color: COLOR.blanco });
   fila++;
   acta.asistentes.forEach((nombre, i) => {
     celda(hoja, fila, 1, i + 1, { fondo: i % 2 === 1 ? COLOR.zebra : undefined });
@@ -114,53 +97,13 @@ function hojaActa(libro: ExcelJS.Workbook, acta: ActaParaDocumento): void {
   fila += 2;
 
   fila = barraDeSeccion(hoja, fila, `IV. PLAN DE MEJORA APROBADO (${acta.resumen.total} acciones)`);
-  fila = subtabla(
-    hoja,
-    fila,
-    `4.1 Criterios de Acreditación (${acta.criterios.length})`,
-    [
-      'Código',
-      'Acción de mejora',
-      'Criterio de acreditación',
-      'Plazo',
-      'Recursos necesarios',
-      'Metas establecidas',
-      'Responsable',
-    ],
-    acta.criterios.map((c) => [
-      c.codigo,
-      c.nombre,
-      c.codigo,
-      formatearFecha(c.plazo),
-      c.recursos,
-      c.metas,
-      c.responsable,
-    ]),
-  );
+  fila = subtabla(hoja, fila, `4.1 Criterios de Acreditación (${acta.criterios.length})`,
+    ['Código', 'Acción de mejora', 'Criterio de acreditación', 'Plazo', 'Recursos necesarios', 'Metas establecidas', 'Responsable'],
+    acta.criterios.map((c) => [c.codigo, c.nombre, c.codigo, formatearFecha(c.plazo), c.recursos, c.metas, c.responsable]));
 
-  fila = subtabla(
-    hoja,
-    fila,
-    `4.2 Objetivos Educacionales (${acta.objetivos.length})`,
-    [
-      'Código',
-      'Acción de mejora',
-      'Objetivo educacional',
-      'Plazo',
-      'Recursos necesarios',
-      'Metas establecidas',
-      'Responsable',
-    ],
-    acta.objetivos.map((o) => [
-      o.codigo,
-      o.nombre,
-      o.codigo,
-      formatearFecha(o.plazo),
-      o.recursos,
-      o.metas,
-      o.responsable,
-    ]),
-  );
+  fila = subtabla(hoja, fila, `4.2 Objetivos Educacionales (${acta.objetivos.length})`,
+    ['Código', 'Acción de mejora', 'Objetivo educacional', 'Plazo', 'Recursos necesarios', 'Metas establecidas', 'Responsable'],
+    acta.objetivos.map((o) => [o.codigo, o.nombre, o.codigo, formatearFecha(o.plazo), o.recursos, o.metas, o.responsable]));
 
   fila = subtablaCompetencias(hoja, fila, acta.competencias);
 
@@ -189,20 +132,10 @@ interface EstiloCelda {
   readonly alineacion?: 'left' | 'center' | 'right';
 }
 
-function celda(
-  hoja: ExcelJS.Worksheet,
-  fila: number,
-  columna: number,
-  valor: unknown,
-  estilo: EstiloCelda,
-): void {
+function celda(hoja: ExcelJS.Worksheet, fila: number, columna: number, valor: unknown, estilo: EstiloCelda): void {
   const c = hoja.getCell(fila, columna);
   c.value = valor as ExcelJS.CellValue;
-  c.font = {
-    bold: estilo.negrita ?? false,
-    size: estilo.tamano ?? 9.5,
-    color: { argb: estilo.color ?? 'FF1A1526' },
-  };
+  c.font = { bold: estilo.negrita ?? false, size: estilo.tamano ?? 9.5, color: { argb: estilo.color ?? 'FF1A1526' } };
   if (estilo.fondo) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: estilo.fondo } };
   c.alignment = { horizontal: estilo.alineacion ?? 'left', vertical: 'middle' };
   c.border = BORDE_FINO;
@@ -210,20 +143,11 @@ function celda(
 
 function barraDeSeccion(hoja: ExcelJS.Worksheet, fila: number, titulo: string): number {
   hoja.mergeCells(fila, 1, fila, 12);
-  celda(hoja, fila, 1, titulo, {
-    negrita: true,
-    tamano: 10,
-    color: COLOR.blanco,
-    fondo: COLOR.navy,
-  });
+  celda(hoja, fila, 1, titulo, { negrita: true, tamano: 10, color: COLOR.blanco, fondo: COLOR.navy });
   return fila + 1;
 }
 
-function tablaClaveValor(
-  hoja: ExcelJS.Worksheet,
-  filaInicial: number,
-  filas: readonly [string, string][],
-): number {
+function tablaClaveValor(hoja: ExcelJS.Worksheet, filaInicial: number, filas: readonly [string, string][]): number {
   let fila = filaInicial;
   for (const [clave, valor] of filas) {
     celda(hoja, fila, 1, clave, { negrita: true, fondo: COLOR.light });
@@ -244,9 +168,7 @@ function subtabla(
   let fila = filaInicial;
   celda(hoja, fila, 1, titulo, { negrita: true, color: COLOR.navy });
   fila++;
-  columnas.forEach((c, i) =>
-    celda(hoja, fila, i + 1, c, { negrita: true, fondo: COLOR.blue, color: COLOR.blanco }),
-  );
+  columnas.forEach((c, i) => celda(hoja, fila, i + 1, c, { negrita: true, fondo: COLOR.blue, color: COLOR.blanco }));
   fila++;
   if (filas.length === 0) {
     hoja.mergeCells(fila, 1, fila, columnas.length);
@@ -254,9 +176,7 @@ function subtabla(
     return fila + 2;
   }
   filas.forEach((valores, i) => {
-    valores.forEach((v, j) =>
-      celda(hoja, fila, j + 1, v, { fondo: i % 2 === 1 ? COLOR.zebra : undefined }),
-    );
+    valores.forEach((v, j) => celda(hoja, fila, j + 1, v, { fondo: i % 2 === 1 ? COLOR.zebra : undefined }));
     fila++;
   });
   return fila + 1;
@@ -273,41 +193,20 @@ function subtablaCompetencias(
   filas: readonly ActaParaDocumento['competencias'][number][],
 ): number {
   let fila = filaInicial;
-  celda(hoja, fila, 1, `4.3 Competencias del Perfil de Egreso (${filas.length})`, {
-    negrita: true,
-    color: COLOR.navy,
-  });
+  celda(hoja, fila, 1, `4.3 Competencias del Perfil de Egreso (${filas.length})`, { negrita: true, color: COLOR.navy });
   fila++;
 
   const filaMeta = fila;
   celda(hoja, filaMeta, 1, 'Meta institucional', { negrita: true, fondo: COLOR.light });
-  celda(
-    hoja,
-    filaMeta,
-    2,
-    filas[0]?.meta !== null && filas[0]?.meta !== undefined ? filas[0].meta / 100 : 0.7,
-    {
-      fondo: COLOR.entrada,
-      color: COLOR.navy,
-    },
-  );
+  celda(hoja, filaMeta, 2, filas[0]?.meta !== null && filas[0]?.meta !== undefined ? filas[0].meta / 100 : 0.7, {
+    fondo: COLOR.entrada,
+    color: COLOR.navy,
+  });
   hoja.getCell(filaMeta, 2).numFmt = '0%';
   fila++;
 
-  const columnas = [
-    'Código',
-    'Competencia',
-    'Acción de mejora',
-    'Resultado',
-    'Estado',
-    'Plazo',
-    'Recursos',
-    'Metas establecidas',
-    'Responsable',
-  ];
-  columnas.forEach((c, i) =>
-    celda(hoja, fila, i + 1, c, { negrita: true, fondo: COLOR.blue, color: COLOR.blanco }),
-  );
+  const columnas = ['Código', 'Competencia', 'Acción de mejora', 'Resultado', 'Estado', 'Plazo', 'Recursos', 'Metas establecidas', 'Responsable'];
+  columnas.forEach((c, i) => celda(hoja, fila, i + 1, c, { negrita: true, fondo: COLOR.blue, color: COLOR.blanco }));
   const filaEncabezado = fila;
   fila++;
 
@@ -327,8 +226,7 @@ function subtablaCompetencias(
     celdaResultado.value = f.resultado === null ? null : f.resultado / 100;
     celdaResultado.numFmt = '0%';
     celdaResultado.border = BORDE_FINO;
-    if (zebra)
-      celdaResultado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebra } };
+    if (zebra) celdaResultado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebra } };
 
     const celdaEstado = hoja.getCell(fila, 5);
     celdaEstado.value = { formula: `IF(D${fila}>=$B$${filaMeta},"LOGRADO","NO LOGRADO")` };
@@ -336,26 +234,8 @@ function subtablaCompetencias(
     hoja.addConditionalFormatting({
       ref: celdaEstado.address,
       rules: [
-        {
-          type: 'containsText',
-          operator: 'containsText',
-          text: 'NO LOGRADO',
-          priority: 1,
-          style: {
-            fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.koBg } },
-            font: { color: { argb: COLOR.koFg } },
-          },
-        },
-        {
-          type: 'containsText',
-          operator: 'containsText',
-          text: 'LOGRADO',
-          priority: 2,
-          style: {
-            fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.okBg } },
-            font: { color: { argb: COLOR.okFg } },
-          },
-        },
+        { type: 'containsText', operator: 'containsText', text: 'NO LOGRADO', priority: 1, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.koBg } }, font: { color: { argb: COLOR.koFg } } } },
+        { type: 'containsText', operator: 'containsText', text: 'LOGRADO', priority: 2, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: COLOR.okBg } }, font: { color: { argb: COLOR.okFg } } } },
       ],
     });
 
@@ -367,25 +247,13 @@ function subtablaCompetencias(
   });
 
   hoja.mergeCells(fila, 1, fila, columnas.length);
-  celda(
-    hoja,
-    fila,
-    1,
-    'El resultado corresponde a la medición directa del periodo anterior. Meta institucional: ver celda B' +
-      filaMeta +
-      '.',
-    { color: COLOR.muted, tamano: 7.5 },
-  );
+  celda(hoja, fila, 1, 'El resultado corresponde a la medición directa del periodo anterior. Meta institucional: ver celda B' + filaMeta + '.', { color: COLOR.muted, tamano: 7.5 });
   fila++;
 
   return fila + 1;
 }
 
-function filaResumen(
-  hoja: ExcelJS.Worksheet,
-  filaInicial: number,
-  acta: ActaParaDocumento,
-): number {
+function filaResumen(hoja: ExcelJS.Worksheet, filaInicial: number, acta: ActaParaDocumento): number {
   const fila = filaInicial;
   celda(hoja, fila, 1, 'Criterios', { negrita: true });
   celda(hoja, fila, 2, acta.resumen.criterios, {});
@@ -421,38 +289,14 @@ function hojaAccionesDatos(libro: ExcelJS.Workbook, acta: ActaParaDocumento): vo
   });
 
   const columnas = [
-    'N.º',
-    'Acta',
-    'Periodo',
-    'Tipo',
-    'Código',
-    'Entidad evaluada',
-    'Acción',
-    'Resultado medición',
-    'Plazo',
-    'Recursos',
-    'Metas',
-    'Responsable',
+    'N.º', 'Acta', 'Periodo', 'Tipo', 'Código', 'Entidad evaluada', 'Acción',
+    'Resultado medición', 'Plazo', 'Recursos', 'Metas', 'Responsable',
   ];
-  columnas.forEach((c, i) =>
-    celda(hoja, 1, i + 1, c, { negrita: true, fondo: COLOR.navy, color: COLOR.blanco }),
-  );
+  columnas.forEach((c, i) => celda(hoja, 1, i + 1, c, { negrita: true, fondo: COLOR.navy, color: COLOR.blanco }));
 
-  const filas: {
-    tipo: keyof typeof ETIQUETA_ASPECTO;
-    datos: ActaParaDocumento['criterios'][number];
-    resultado: string;
-  }[] = [
-    ...acta.criterios.map((c) => ({
-      tipo: 'CRITERIO_ACREDITACION' as const,
-      datos: c,
-      resultado: '',
-    })),
-    ...acta.objetivos.map((o) => ({
-      tipo: 'OBJETIVO_EDUCACIONAL' as const,
-      datos: o,
-      resultado: '',
-    })),
+  const filas: { tipo: keyof typeof ETIQUETA_ASPECTO; datos: ActaParaDocumento['criterios'][number]; resultado: string }[] = [
+    ...acta.criterios.map((c) => ({ tipo: 'CRITERIO_ACREDITACION' as const, datos: c, resultado: '' })),
+    ...acta.objetivos.map((o) => ({ tipo: 'OBJETIVO_EDUCACIONAL' as const, datos: o, resultado: '' })),
     ...acta.competencias.map((c) => ({
       tipo: 'COMPETENCIA' as const,
       datos: c,

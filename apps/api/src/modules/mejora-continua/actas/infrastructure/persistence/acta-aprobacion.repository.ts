@@ -402,10 +402,7 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
   ): Promise<DatosActa> {
     const fila = await this.prisma.actaAprobacion.update({
       where: { id },
-      data: {
-        textoIntroduccion: datos.textoIntroduccion,
-        textoAcuerdoCierre: datos.textoAcuerdoCierre,
-      },
+      data: { textoIntroduccion: datos.textoIntroduccion, textoAcuerdoCierre: datos.textoAcuerdoCierre },
       select: SELECCION,
     });
     return aDatos(fila);

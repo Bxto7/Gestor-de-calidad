@@ -51,12 +51,7 @@ export class RenderizadorPdfActaKit implements RenderizadorPdfActaPort {
     const doc = new PDFDocument({
       size: 'A4',
       layout: 'landscape',
-      margins: {
-        top: MARGEN + ALTO_CABECERA,
-        bottom: MARGEN + ALTO_PIE,
-        left: MARGEN,
-        right: MARGEN,
-      },
+      margins: { top: MARGEN + ALTO_CABECERA, bottom: MARGEN + ALTO_PIE, left: MARGEN, right: MARGEN },
       bufferPages: true,
       info: { Title: acta.titulo, Subject: acta.numeroActa },
     });
@@ -181,11 +176,7 @@ function dibujarCabeceraInstitucional(doc: PDFKit.PDFDocument, acta: ActaParaDoc
  * `pieEnTodasLasPaginas` del renderer genérico (`pdfkit.renderer.ts`).
  */
 /** Escribe el valor de «Página» en la caja de control; la posición debe coincidir con `dibujarCabeceraInstitucional`. */
-function dibujarNumeroDePaginaEnCabecera(
-  doc: PDFKit.PDFDocument,
-  numero: number,
-  total: number,
-): void {
+function dibujarNumeroDePaginaEnCabecera(doc: PDFKit.PDFDocument, numero: number, total: number): void {
   const anchoUtil = doc.page.width - MARGEN * 2;
   const anchoControl = mm(58);
   const xControl = MARGEN + anchoUtil - anchoControl;
@@ -195,9 +186,7 @@ function dibujarNumeroDePaginaEnCabecera(
     .fillColor(COLOR.texto)
     .font('Helvetica')
     .fontSize(6.5)
-    .text(`${numero} de ${total}`, xControl + mm(20), yFila + 2, {
-      width: anchoControl - mm(20) - 2,
-    });
+    .text(`${numero} de ${total}`, xControl + mm(20), yFila + 2, { width: anchoControl - mm(20) - 2 });
 }
 
 function dibujarPieEnTodasLasPaginas(
@@ -276,103 +265,60 @@ function dibujarCuerpo(doc: PDFKit.PDFDocument, acta: ActaParaDocumento): void {
   doc.moveDown();
 
   // Reserva para el bloque inicial de 4.1 (título + cabecera + una fila típica).
-  dibujarBarraDeSeccion(
-    doc,
-    'IV',
-    `PLAN DE MEJORA APROBADO (${acta.resumen.total} acciones)`,
-    mm(45),
-  );
-  dibujarSubtabla(
-    doc,
-    `4.1 Criterios de Acreditación (${acta.criterios.length})`,
-    [
-      { titulo: 'Código', peso: 16 },
-      { titulo: 'Acción de mejora', peso: 62 },
-      { titulo: 'Criterio de acreditación', peso: 28 },
-      { titulo: 'Plazo', peso: 14 },
-      { titulo: 'Recursos necesarios', peso: 24 },
-      { titulo: 'Metas establecidas', peso: 40 },
-      { titulo: 'Responsable', peso: 26 },
-    ],
-    acta.criterios.map((c) => [
-      c.codigo,
-      c.nombre,
-      c.codigo,
-      formatearFecha(c.plazo),
-      c.recursos,
-      c.metas,
-      c.responsable,
-    ]),
-  );
+  dibujarBarraDeSeccion(doc, 'IV', `PLAN DE MEJORA APROBADO (${acta.resumen.total} acciones)`, mm(45));
+  dibujarSubtabla(doc, `4.1 Criterios de Acreditación (${acta.criterios.length})`, [
+    { titulo: 'Código', peso: 16 },
+    { titulo: 'Acción de mejora', peso: 62 },
+    { titulo: 'Criterio de acreditación', peso: 28 },
+    { titulo: 'Plazo', peso: 14 },
+    { titulo: 'Recursos necesarios', peso: 24 },
+    { titulo: 'Metas establecidas', peso: 40 },
+    { titulo: 'Responsable', peso: 26 },
+  ], acta.criterios.map((c) => [c.codigo, c.nombre, c.codigo, formatearFecha(c.plazo), c.recursos, c.metas, c.responsable]));
 
-  dibujarSubtabla(
-    doc,
-    `4.2 Objetivos Educacionales (${acta.objetivos.length})`,
-    [
-      { titulo: 'Código', peso: 16 },
-      { titulo: 'Acción de mejora', peso: 62 },
-      { titulo: 'Objetivo educacional', peso: 28 },
-      { titulo: 'Plazo', peso: 14 },
-      { titulo: 'Recursos necesarios', peso: 24 },
-      { titulo: 'Metas establecidas', peso: 40 },
-      { titulo: 'Responsable', peso: 26 },
-    ],
-    acta.objetivos.map((o) => [
-      o.codigo,
-      o.nombre,
-      o.codigo,
-      formatearFecha(o.plazo),
-      o.recursos,
-      o.metas,
-      o.responsable,
-    ]),
-  );
+  dibujarSubtabla(doc, `4.2 Objetivos Educacionales (${acta.objetivos.length})`, [
+    { titulo: 'Código', peso: 16 },
+    { titulo: 'Acción de mejora', peso: 62 },
+    { titulo: 'Objetivo educacional', peso: 28 },
+    { titulo: 'Plazo', peso: 14 },
+    { titulo: 'Recursos necesarios', peso: 24 },
+    { titulo: 'Metas establecidas', peso: 40 },
+    { titulo: 'Responsable', peso: 26 },
+  ], acta.objetivos.map((o) => [o.codigo, o.nombre, o.codigo, formatearFecha(o.plazo), o.recursos, o.metas, o.responsable]));
 
-  dibujarSubtabla(
-    doc,
-    `4.3 Competencias del Perfil de Egreso (${acta.competencias.length})`,
-    [
-      { titulo: 'Código', peso: 15 },
-      { titulo: 'Competencia', peso: 30 },
-      { titulo: 'Acción de mejora', peso: 52 },
-      { titulo: 'Resultado', peso: 13 },
-      { titulo: 'Estado', peso: 15 },
-      { titulo: 'Plazo', peso: 14 },
-      { titulo: 'Recursos', peso: 22 },
-      { titulo: 'Metas establecidas', peso: 38 },
-      { titulo: 'Responsable', peso: 20 },
-    ],
-    acta.competencias.map((c) => [
-      c.codigo,
-      c.codigo,
-      c.nombre,
-      c.resultado === null ? '—' : `${c.resultado}%`,
-      c.logrado === null ? '—' : c.logrado ? 'LOGRADO' : 'NO LOGRADO',
-      formatearFecha(c.plazo),
-      c.recursos,
-      c.metas,
-      c.responsable,
-    ]),
-    acta.competencias.map((c) => c.logrado),
-  );
+  dibujarSubtabla(doc, `4.3 Competencias del Perfil de Egreso (${acta.competencias.length})`, [
+    { titulo: 'Código', peso: 15 },
+    { titulo: 'Competencia', peso: 30 },
+    { titulo: 'Acción de mejora', peso: 52 },
+    { titulo: 'Resultado', peso: 13 },
+    { titulo: 'Estado', peso: 15 },
+    { titulo: 'Plazo', peso: 14 },
+    { titulo: 'Recursos', peso: 22 },
+    { titulo: 'Metas establecidas', peso: 38 },
+    { titulo: 'Responsable', peso: 20 },
+  ], acta.competencias.map((c) => [
+    c.codigo,
+    c.codigo,
+    c.nombre,
+    c.resultado === null ? '—' : `${c.resultado}%`,
+    c.logrado === null ? '—' : c.logrado ? 'LOGRADO' : 'NO LOGRADO',
+    formatearFecha(c.plazo),
+    c.recursos,
+    c.metas,
+    c.responsable,
+  ]), acta.competencias.map((c) => c.logrado));
 
   dibujarBarraDeSeccion(doc, 'V', 'RESUMEN DEL PLAN DE MEJORA');
   dibujarResumen(doc, acta.resumen);
 
   dibujarBarraDeSeccion(doc, 'VI', 'CONSTANCIA Y RESOLUCIÓN');
-  doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLOR.texto)
-    .text(acta.constanciaYResolucion, { align: 'justify' });
+  doc.font('Helvetica').fontSize(9).fillColor(COLOR.texto).text(acta.constanciaYResolucion, { align: 'justify' });
   doc.moveDown();
   if (acta.ciudadYFecha) {
     doc
       .font('Helvetica-Bold')
       .fontSize(9)
-      .text(`${acta.ciudadYFecha.lugar}, ${formatearFecha(acta.ciudadYFecha.fecha)}`, {
-        align: 'right',
-      });
+      .text(`${acta.ciudadYFecha.lugar}, ${formatearFecha(acta.ciudadYFecha.fecha)}`, { align: 'right' });
   }
 }
 
@@ -402,10 +348,7 @@ function dibujarTablaClaveValor(doc: PDFKit.PDFDocument, filas: readonly [string
   const anchoUtil = doc.page.width - MARGEN * 2;
   const anchoClave = anchoUtil * 0.25;
   for (const [clave, valor] of filas) {
-    const alto = Math.max(
-      mm(6),
-      doc.heightOfString(valor, { width: anchoUtil - anchoClave - 8 }) + 6,
-    );
+    const alto = Math.max(mm(6), doc.heightOfString(valor, { width: anchoUtil - anchoClave - 8 }) + 6);
     if (doc.y + alto > limiteInferior(doc)) doc.addPage();
     doc.rect(MARGEN, doc.y, anchoClave, alto).fill(COLOR.light);
     doc.rect(MARGEN + anchoClave, doc.y, anchoUtil - anchoClave, alto).stroke(COLOR.grid);
@@ -414,9 +357,7 @@ function dibujarTablaClaveValor(doc: PDFKit.PDFDocument, filas: readonly [string
       .font('Helvetica-Bold')
       .fontSize(9)
       .text(clave, MARGEN + 4, doc.y + 3, { width: anchoClave - 8 });
-    doc
-      .font('Helvetica')
-      .text(valor, MARGEN + anchoClave + 4, doc.y + 3, { width: anchoUtil - anchoClave - 8 });
+    doc.font('Helvetica').text(valor, MARGEN + anchoClave + 4, doc.y + 3, { width: anchoUtil - anchoClave - 8 });
     doc.y += alto;
   }
   doc.moveDown();
@@ -531,11 +472,7 @@ function dibujarTabla(
   dibujarCabecera();
 
   if (filas.length === 0) {
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .fillColor(COLOR.muted)
-      .text(siVacia, MARGEN + 4, doc.y + 4);
+    doc.font('Helvetica').fontSize(9).fillColor(COLOR.muted).text(siVacia, MARGEN + 4, doc.y + 4);
     doc.y += mm(8);
     doc.fillColor(COLOR.texto);
     doc.moveDown();
@@ -558,16 +495,8 @@ function dibujarTabla(
     const esLogrado = coloreado?.[indiceFila] ?? null;
     fila.forEach((celda, i) => {
       const estado = esColumnaEstado(i);
-      const fondo =
-        estado && esLogrado !== null
-          ? esLogrado
-            ? COLOR.okBg
-            : COLOR.koBg
-          : indiceFila % 2 === 1
-            ? COLOR.zebra
-            : COLOR.blanco;
-      const tinta =
-        estado && esLogrado !== null ? (esLogrado ? COLOR.okFg : COLOR.koFg) : COLOR.texto;
+      const fondo = estado && esLogrado !== null ? (esLogrado ? COLOR.okBg : COLOR.koBg) : indiceFila % 2 === 1 ? COLOR.zebra : COLOR.blanco;
+      const tinta = estado && esLogrado !== null ? (esLogrado ? COLOR.okFg : COLOR.koFg) : COLOR.texto;
 
       doc.rect(x, yFila, anchos[i]!, alto).fill(fondo).stroke(COLOR.grid);
       fuenteDeCelda(doc, esNegrita(i));
@@ -588,17 +517,13 @@ function dibujarSubtabla(
   filas: readonly string[][],
   coloreado?: readonly (boolean | null)[],
 ): void {
-  dibujarTabla(
-    doc,
-    columnas,
-    filas,
-    'Sin acciones registradas para este periodo.',
-    coloreado,
-    titulo,
-  );
+  dibujarTabla(doc, columnas, filas, 'Sin acciones registradas para este periodo.', coloreado, titulo);
 }
 
-function dibujarResumen(doc: PDFKit.PDFDocument, resumen: ActaParaDocumento['resumen']): void {
+function dibujarResumen(
+  doc: PDFKit.PDFDocument,
+  resumen: ActaParaDocumento['resumen'],
+): void {
   const anchoUtil = doc.page.width - MARGEN * 2;
   const celdas: readonly [string, string][] = [
     ['Criterios', String(resumen.criterios)],
@@ -613,10 +538,7 @@ function dibujarResumen(doc: PDFKit.PDFDocument, resumen: ActaParaDocumento['res
   celdas.forEach(([etiqueta, valor], i) => {
     const x = MARGEN + i * anchoCelda;
     const esTotal = i === celdas.length - 1;
-    doc
-      .rect(x, doc.y, anchoCelda, alto)
-      .fill(esTotal ? COLOR.light : COLOR.blanco)
-      .stroke(COLOR.grid);
+    doc.rect(x, doc.y, anchoCelda, alto).fill(esTotal ? COLOR.light : COLOR.blanco).stroke(COLOR.grid);
     doc
       .fillColor(COLOR.texto)
       .font('Helvetica')

@@ -25,9 +25,9 @@ describe('CrearActaDto', () => {
   });
 
   it('exige que periodoMedicionId, si viene, sea un UUID', () => {
-    expect(
-      fallos(CrearActaDto, { periodoAcademico: '2025-10', periodoMedicionId: 'no-es-uuid' }),
-    ).toContain('periodoMedicionId');
+    expect(fallos(CrearActaDto, { periodoAcademico: '2025-10', periodoMedicionId: 'no-es-uuid' })).toContain(
+      'periodoMedicionId',
+    );
   });
 });
 

@@ -145,12 +145,7 @@ describe('lo que los dos tipos comparten', () => {
       const d = armarDocumentoEvaluacion({ ...BASE, tipo }, 'pdf');
       const titulos = d.secciones.map((s) => s.titulo);
       expect(titulos).toEqual(
-        expect.arrayContaining([
-          'Resumen',
-          'Competencias',
-          'Periodos académicos',
-          'Medición alcanzada',
-        ]),
+        expect.arrayContaining(['Resumen', 'Competencias', 'Periodos académicos', 'Medición alcanzada']),
       );
     }
   });

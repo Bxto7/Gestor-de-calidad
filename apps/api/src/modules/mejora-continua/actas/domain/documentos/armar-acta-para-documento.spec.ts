@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  armarActaParaDocumento,
-  type DatosParaActaDocumento,
-} from './armar-acta-para-documento.js';
+import { armarActaParaDocumento, type DatosParaActaDocumento } from './armar-acta-para-documento.js';
 
 function datos(sobre: Partial<DatosParaActaDocumento> = {}): DatosParaActaDocumento {
   return {
@@ -116,10 +113,7 @@ describe('armarActaParaDocumento', () => {
     const resultado = armarActaParaDocumento(
       datos({
         acciones: [
-          accion('COMPETENCIA', {
-            porcentajeMedicionCompetencia: null,
-            metaCompetenciaSnapshot: null,
-          }),
+          accion('COMPETENCIA', { porcentajeMedicionCompetencia: null, metaCompetenciaSnapshot: null }),
         ],
       }),
     );

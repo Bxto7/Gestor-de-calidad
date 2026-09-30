@@ -49,8 +49,7 @@ export class ActasController {
   @Get()
   @ApiOperation({
     summary: 'Buscar y filtrar actas de aprobación',
-    description:
-      'RF-AC-020. Filtra por periodo académico y estado; busca texto en código y título.',
+    description: 'RF-AC-020. Filtra por periodo académico y estado; busca texto en código y título.',
   })
   async listar(@ActorActual() actor: Actor, @Query() filtro: FiltroActasDto) {
     return this.casos.listar(actor, filtro);
@@ -64,9 +63,7 @@ export class ActasController {
   }
 
   @Get(':id/contenido')
-  @ApiOperation({
-    summary: 'El acta con sus acciones de mejora, enriquecidas con PlanMejora (RF-AC-009)',
-  })
+  @ApiOperation({ summary: 'El acta con sus acciones de mejora, enriquecidas con PlanMejora (RF-AC-009)' })
   @ApiResponse({ status: 404, description: 'El acta no existe.' })
   async contenido(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.casos.obtenerContenido(actor, id);
@@ -104,9 +101,7 @@ export class ActasController {
   }
 
   @Post(':id/acciones/cargar')
-  @ApiOperation({
-    summary: 'Cargar automáticamente las acciones de mejora del periodo (RF-AC-007)',
-  })
+  @ApiOperation({ summary: 'Cargar automáticamente las acciones de mejora del periodo (RF-AC-007)' })
   @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
   async cargarAcciones(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     const cantidad = await this.casos.cargarAccionesDelPeriodo(actor, id);
@@ -116,10 +111,7 @@ export class ActasController {
   @Put(':id/acciones/seleccion')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Incluir o excluir manualmente acciones de mejora (RF-AC-008)' })
-  @ApiResponse({
-    status: 409,
-    description: 'El acta no está en Borrador, o alguna acción no está cargada.',
-  })
+  @ApiResponse({ status: 409, description: 'El acta no está en Borrador, o alguna acción no está cargada.' })
   async actualizarSeleccion(
     @Param('id', ParseUUIDPipe) id: string,
     @ActorActual() actor: Actor,
@@ -129,9 +121,7 @@ export class ActasController {
   }
 
   @Patch(':id/textos')
-  @ApiOperation({
-    summary: 'Editar los textos institucionales de introducción y cierre (RF-AC-011)',
-  })
+  @ApiOperation({ summary: 'Editar los textos institucionales de introducción y cierre (RF-AC-011)' })
   @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
   async editarTextos(
     @Param('id', ParseUUIDPipe) id: string,
@@ -156,13 +146,9 @@ export class ActasController {
   @Post(':id/transiciones')
   @ApiOperation({
     summary: 'Cambiar el estado del acta',
-    description:
-      'RF-AC-013 a 016. Solo hasta Aprobada; Emitida/Histórica llegan con la exportación.',
+    description: 'RF-AC-013 a 016. Solo hasta Aprobada; Emitida/Histórica llegan con la exportación.',
   })
-  @ApiResponse({
-    status: 409,
-    description: 'La transición no aplica desde el estado actual, o hay bloqueos de completitud.',
-  })
+  @ApiResponse({ status: 409, description: 'La transición no aplica desde el estado actual, o hay bloqueos de completitud.' })
   async transicionar(
     @Param('id', ParseUUIDPipe) id: string,
     @ActorActual() actor: Actor,

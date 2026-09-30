@@ -140,9 +140,7 @@ describe('RenderizadorPdfActaKit', () => {
   });
 
   it('una sección sin acciones muestra la fila "Sin acciones registradas"', async () => {
-    const pdf = await new RenderizadorPdfActaKit().render(
-      acta({ criterios: [], objetivos: [], competencias: [] }),
-    );
+    const pdf = await new RenderizadorPdfActaKit().render(acta({ criterios: [], objetivos: [], competencias: [] }));
     const texto = textoDelPdf(pdf);
 
     expect(texto).toContain('Sin acciones registradas para este periodo');
@@ -153,26 +151,12 @@ describe('RenderizadorPdfActaKit', () => {
       acta({
         competencias: [
           {
-            codigo: 'COMP-01',
-            nombre: 'Lograda',
-            plazo: new Date('2026-12-01'),
-            recursos: 'r',
-            metas: 'm',
-            responsable: 'x',
-            resultado: 80,
-            meta: 70,
-            logrado: true,
+            codigo: 'COMP-01', nombre: 'Lograda', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 80, meta: 70, logrado: true,
           },
           {
-            codigo: 'COMP-02',
-            nombre: 'No lograda',
-            plazo: new Date('2026-12-01'),
-            recursos: 'r',
-            metas: 'm',
-            responsable: 'x',
-            resultado: 50,
-            meta: 70,
-            logrado: false,
+            codigo: 'COMP-02', nombre: 'No lograda', plazo: new Date('2026-12-01'),
+            recursos: 'r', metas: 'm', responsable: 'x', resultado: 50, meta: 70, logrado: false,
           },
         ],
       }),
@@ -213,15 +197,7 @@ describe('RenderizadorPdfActaKit', () => {
     });
     const densa = (relleno: number): ActaParaDocumento =>
       acta({
-        asistentes: [
-          'Ana Pérez',
-          'José Ñahui',
-          'Lucía Ávila',
-          'Óscar Núñez',
-          'Carmen Poma',
-          'Miguel Sáenz',
-          'Rocío Béjar',
-        ],
+        asistentes: ['Ana Pérez', 'José Ñahui', 'Lucía Ávila', 'Óscar Núñez', 'Carmen Poma', 'Miguel Sáenz', 'Rocío Béjar'],
         acuerdo: largo.repeat(relleno).trim(),
         criterios: [1, 2, 3, 4].map((i) => accion('CRIT', i)),
         objetivos: [1, 2, 3, 4].map((i) => accion('OBJ', i)),
@@ -242,7 +218,7 @@ describe('RenderizadorPdfActaKit', () => {
       const paginas: string[] = [];
       for (const cuerpo of objetos.values()) {
         if (!/\/Type\s*\/Page\b(?!s)/.test(cuerpo)) continue;
-        const ref = /\/Contents\s+(\d+) 0 R/.exec(cuerpo)?.[1];
+        const ref = (/\/Contents\s+(\d+) 0 R/.exec(cuerpo))?.[1];
         const flujo = ref ? objetos.get(ref)?.match(/stream\n([\s\S]*?)\nendstream/) : null; // PDFKit separa con \n; tolerar \r? recortaría un 0x0D final del flujo comprimido.
         let texto = '';
         if (flujo) {

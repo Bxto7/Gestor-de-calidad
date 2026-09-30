@@ -14,8 +14,7 @@
 
 import { createHash } from 'node:crypto';
 
-export type AspectoAccionDocumento =
-  'CRITERIO_ACREDITACION' | 'OBJETIVO_EDUCACIONAL' | 'COMPETENCIA';
+export type AspectoAccionDocumento = 'CRITERIO_ACREDITACION' | 'OBJETIVO_EDUCACIONAL' | 'COMPETENCIA';
 
 export interface FilaAccionDocumento {
   readonly codigo: string;

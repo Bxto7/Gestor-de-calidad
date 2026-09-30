@@ -256,8 +256,7 @@ export class GenerarDocumentoEvaluacion {
           nombre: cat?.nombre ?? SIN_NOMBRE,
           instrumento: c.instrumento,
           frecuencia: c.frecuencia,
-          responsableNombre:
-            c.responsableId === null ? null : (nombres.get(c.responsableId) ?? null),
+          responsableNombre: c.responsableId === null ? null : (nombres.get(c.responsableId) ?? null),
         };
       }),
       periodos: base.periodos.map((p) => ({ id: p.id, etiqueta: p.etiqueta })),

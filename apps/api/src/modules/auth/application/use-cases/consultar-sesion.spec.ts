@@ -12,7 +12,11 @@ import { describe, expect, it } from 'vitest';
 import type { AuthorizationPort } from '../ports/authorization.port.js';
 import { ConsultarSesion } from './consultar-sesion.use-case.js';
 
-function montar(permisos: string[], carreraACargo: string | null = null, roles: string[] = []) {
+function montar(
+  permisos: string[],
+  carreraACargo: string | null = null,
+  roles: string[] = [],
+) {
   const consultas: string[] = [];
 
   const autorizacion: AuthorizationPort = {

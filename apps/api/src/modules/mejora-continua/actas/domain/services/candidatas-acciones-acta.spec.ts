@@ -9,20 +9,12 @@ describe('candidatasParaCargar', () => {
   });
 
   it('excluye una candidata ya vinculada a esta acta (RF-AC-007: carga idempotente)', () => {
-    const resultado = candidatasParaCargar(
-      [{ id: 'p-1' }, { id: 'p-2' }],
-      new Set(['p-1']),
-      new Set(),
-    );
+    const resultado = candidatasParaCargar([{ id: 'p-1' }, { id: 'p-2' }], new Set(['p-1']), new Set());
     expect(resultado).toEqual([{ id: 'p-2' }]);
   });
 
   it('excluye una candidata ya incluida en un acta Emitida (nota §2 de 2c-AC-A, generalizada)', () => {
-    const resultado = candidatasParaCargar(
-      [{ id: 'p-1' }, { id: 'p-2' }],
-      new Set(),
-      new Set(['p-2']),
-    );
+    const resultado = candidatasParaCargar([{ id: 'p-1' }, { id: 'p-2' }], new Set(), new Set(['p-2']));
     expect(resultado).toEqual([{ id: 'p-1' }]);
   });
 

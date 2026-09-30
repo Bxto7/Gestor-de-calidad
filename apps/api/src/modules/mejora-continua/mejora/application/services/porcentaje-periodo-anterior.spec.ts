@@ -48,11 +48,7 @@ function mediciones(periodos: { id: string; orden: number }[]): RepositorioPlanM
 }
 
 function configuraciones(
-  medicionesGuardadas: {
-    competenciaId: string;
-    periodoId: string;
-    porcentajeAlcanzado: number | null;
-  }[],
+  medicionesGuardadas: { competenciaId: string; periodoId: string; porcentajeAlcanzado: number | null }[],
 ): RepositorioConfiguracionEvaluacionPort {
   return {
     del: async () => ({
@@ -80,9 +76,7 @@ describe('calcularPorcentajeMedicionAnterior', () => {
           { id: 'p1', orden: 1 },
           { id: 'p2', orden: 2 },
         ]),
-        configuraciones: configuraciones([
-          { competenciaId: 'c-1', periodoId: 'p1', porcentajeAlcanzado: 70 },
-        ]),
+        configuraciones: configuraciones([{ competenciaId: 'c-1', periodoId: 'p1', porcentajeAlcanzado: 70 }]),
       },
       'eval-1',
       'c-1',

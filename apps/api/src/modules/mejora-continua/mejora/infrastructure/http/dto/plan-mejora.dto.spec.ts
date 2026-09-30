@@ -40,9 +40,9 @@ describe('RF-PJ-006 a RF-PJ-013 — la definición nace vacía y se completa de 
   });
 
   it('acepta guardar cualquier campo sin que los demás estén llenos todavía', () => {
-    expect(fallos({ ...BASE, causaRaiz: 'Bajo desempeño en la encuesta de egresados' })).toEqual(
-      [],
-    );
+    expect(
+      fallos({ ...BASE, causaRaiz: 'Bajo desempeño en la encuesta de egresados' }),
+    ).toEqual([]);
   });
 
   it('acepta el objeto completamente vacío (justo tras crear el plan, sin editar nada aún)', () => {

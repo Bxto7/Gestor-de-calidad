@@ -49,9 +49,7 @@ import type {
   TrabajoDocumentoActa,
 } from '../ports/documentos-acta.port.js';
 
-const FORMATO: Readonly<
-  Record<TipoDocActa, { extension: string; tipoMime: string; nombre: string }>
-> = {
+const FORMATO: Readonly<Record<TipoDocActa, { extension: string; tipoMime: string; nombre: string }>> = {
   ACTA_PDF: { extension: 'pdf', tipoMime: 'application/pdf', nombre: 'el acta en PDF' },
   ACTA_EXCEL: {
     extension: 'xlsx',
@@ -126,9 +124,7 @@ export class GenerarDocumentoActa {
       });
 
       const bytes =
-        trabajo.tipo === 'ACTA_PDF'
-          ? await this.pdf.render(documento)
-          : await this.excel.render(documento);
+        trabajo.tipo === 'ACTA_PDF' ? await this.pdf.render(documento) : await this.excel.render(documento);
       const ubicacion = await this.almacen.guardar(`${trabajoId}.${extension}`, bytes);
 
       await this.documentos.marcarListo(trabajoId, {

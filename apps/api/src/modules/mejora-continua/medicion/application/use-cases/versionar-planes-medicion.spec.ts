@@ -255,10 +255,7 @@ describe('el alcance por carrera (2c-C)', () => {
   });
 
   it.each([
-    [
-      'generarNuevaVersion',
-      (caso: VersionarPlanesMedicion) => caso.generarNuevaVersion(ACTOR, 'pm-1'),
-    ],
+    ['generarNuevaVersion', (caso: VersionarPlanesMedicion) => caso.generarNuevaVersion(ACTOR, 'pm-1')],
     ['duplicarPlan', (caso: VersionarPlanesMedicion) => caso.duplicarPlan(ACTOR, 'pm-1')],
   ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);

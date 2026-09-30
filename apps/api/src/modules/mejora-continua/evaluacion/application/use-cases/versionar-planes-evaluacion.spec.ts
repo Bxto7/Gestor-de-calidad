@@ -123,12 +123,7 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
 function configuracionDelPlan(sobre: Partial<ConfiguracionDelPlan> = {}): ConfiguracionDelPlan {
   return {
     competencias: [
-      {
-        competenciaId: 'c-1',
-        instrumento: 'Rúbrica',
-        frecuencia: 'Semestral',
-        responsableId: 'u-9',
-      },
+      { competenciaId: 'c-1', instrumento: 'Rúbrica', frecuencia: 'Semestral', responsableId: 'u-9' },
     ],
     mediciones: [
       {
@@ -141,9 +136,7 @@ function configuracionDelPlan(sobre: Partial<ConfiguracionDelPlan> = {}): Config
             asignaturaId: 'a-1',
             entregable: 'Proyecto',
             docenteId: 'd-1',
-            evidencias: [
-              { id: 'evi-1', enlace: 'https://evidencia', descripcion: 'Informe final' },
-            ],
+            evidencias: [{ id: 'evi-1', enlace: 'https://evidencia', descripcion: 'Informe final' }],
           },
         ],
       },
@@ -229,12 +222,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       // origen llegó a configurar — un cruce programado y nunca tocado
       // también necesita su fila vacía en la versión nueva.
       matriz: async () => [
-        {
-          competenciaId: 'c-1',
-          periodoId: 'p-1',
-          realizada: true,
-          realizadaEn: new Date('2026-07-01'),
-        },
+        { competenciaId: 'c-1', periodoId: 'p-1', realizada: true, realizadaEn: new Date('2026-07-01') },
       ],
       programar: async () => [],
       contenidoDe: async () => null,

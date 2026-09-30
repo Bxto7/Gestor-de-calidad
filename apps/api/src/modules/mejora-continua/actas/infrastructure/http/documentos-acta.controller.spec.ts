@@ -6,10 +6,7 @@ import type {
   ConsultarDocumentoActa,
   GenerarDocumentoActa,
 } from '../../application/use-cases/generar-documento-acta.use-case.js';
-import {
-  DocumentosActaController,
-  DocumentosDelActaController,
-} from './documentos-acta.controller.js';
+import { DocumentosActaController, DocumentosDelActaController } from './documentos-acta.controller.js';
 
 const actor = { id: 'u1' } as unknown as Actor;
 

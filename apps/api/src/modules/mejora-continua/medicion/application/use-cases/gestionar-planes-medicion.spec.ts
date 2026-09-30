@@ -621,7 +621,8 @@ describe('el alcance por carrera (2c-C)', () => {
     ['eliminar', (caso: GestionarPlanesMedicion) => caso.eliminar(ACTOR, 'pm-1')],
     [
       'transicionar',
-      (caso: GestionarPlanesMedicion) => caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {}),
+      (caso: GestionarPlanesMedicion) =>
+        caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {}),
     ],
   ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);
