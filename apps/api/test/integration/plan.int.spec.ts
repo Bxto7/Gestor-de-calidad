@@ -281,3 +281,37 @@ describe('RF075 / RF-CH-020 — copiar la malla a una versión nueva', () => {
     expect(copia).toEqual({ codigo: 'ISI-101', horasTeoricas: null });
   });
 });
+
+describe('RF-CH-022 — el motor recibe la condición', () => {
+  it('asignaturasDe la traduce al vocabulario del dominio', async () => {
+    const planId = await crearPlan(1);
+    await prisma.asignatura.createMany({
+      data: [
+        {
+          planId,
+          codigo: 'ISI-101',
+          nombre: 'Obligatoria',
+          descripcion: 'Sumilla sintética.',
+          tipo: 'GENERAL',
+          condicion: 'OBLIGATORIA',
+          creditos: 4,
+        },
+        {
+          planId,
+          codigo: 'ISI-102',
+          nombre: 'Electiva',
+          descripcion: 'Sumilla sintética.',
+          tipo: 'GENERAL',
+          condicion: 'ELECTIVA',
+          creditos: 3,
+        },
+      ],
+    });
+
+    const r = await contenido.asignaturasDe(planId);
+    expect(r.map((a) => [a.codigo, a.condicion])).toEqual([
+      ['ISI-101', 'Obligatoria'],
+      ['ISI-102', 'Electiva'],
+    ]);
+  });
+});

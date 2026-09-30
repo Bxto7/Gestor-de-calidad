@@ -79,6 +79,7 @@ function montar(opciones: {
           competenciaIds: ['c'],
           cicloNumero: 2,
           activa: true,
+          condicion: 'Obligatoria',
           grupoElectivo: null,
         },
         {
@@ -89,6 +90,7 @@ function montar(opciones: {
           competenciaIds: ['c'],
           cicloNumero: null,
           activa: true,
+          condicion: 'Obligatoria',
           grupoElectivo: null,
         },
       ],
@@ -281,6 +283,7 @@ describe('Respuesta para la UI', () => {
           competenciaIds: ['c'],
           cicloNumero: 2,
           activa: true,
+          condicion: 'Obligatoria',
           grupoElectivo: null,
         },
         {
@@ -291,11 +294,74 @@ describe('Respuesta para la UI', () => {
           competenciaIds: [],
           cicloNumero: null,
           activa: false,
+          condicion: 'Obligatoria',
           grupoElectivo: null,
         },
       ],
     });
     const r = await caso.ejecutar({ asignaturaId: 'a-1', cicloNumero: 2, actor: ACTOR });
     expect(r.asignaturasSinCiclo).toBe(0);
+  });
+
+  it('RF-CH-022: una electiva sin ciclo no cuenta como pendiente', async () => {
+    const { caso } = montar({
+      asignaturasTras: [
+        {
+          id: 'a-1',
+          codigo: 'ISI-101',
+          nombre: 'A',
+          creditos: 4,
+          competenciaIds: ['c'],
+          cicloNumero: 2,
+          activa: true,
+          condicion: 'Obligatoria',
+          grupoElectivo: null,
+        },
+        {
+          id: 'a-3',
+          codigo: 'ISI-103',
+          nombre: 'Electiva',
+          creditos: 3,
+          competenciaIds: ['c'],
+          cicloNumero: null,
+          activa: true,
+          condicion: 'Electiva',
+          grupoElectivo: null,
+        },
+      ],
+    });
+    const r = await caso.ejecutar({ asignaturaId: 'a-1', cicloNumero: 2, actor: ACTOR });
+    expect(r.asignaturasSinCiclo).toBe(0);
+  });
+
+  it('RF-CH-022: una electiva con ciclo suma en los créditos de su ciclo', async () => {
+    const { caso } = montar({
+      asignaturasTras: [
+        {
+          id: 'a-1',
+          codigo: 'ISI-101',
+          nombre: 'A',
+          creditos: 4,
+          competenciaIds: ['c'],
+          cicloNumero: 2,
+          activa: true,
+          condicion: 'Obligatoria',
+          grupoElectivo: null,
+        },
+        {
+          id: 'a-4',
+          codigo: 'ISI-104',
+          nombre: 'Electiva ubicada',
+          creditos: 3,
+          competenciaIds: ['c'],
+          cicloNumero: 2,
+          activa: true,
+          condicion: 'Electiva',
+          grupoElectivo: null,
+        },
+      ],
+    });
+    const r = await caso.ejecutar({ asignaturaId: 'a-1', cicloNumero: 2, actor: ACTOR });
+    expect(r.creditosDelCiclo).toBe(7);
   });
 });

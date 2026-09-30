@@ -230,6 +230,7 @@ export class ContenidoRepositoryPrisma implements RepositorioContenidoPort {
       competenciaIds: a.competencias.map((c) => c.competenciaId),
       cicloNumero: a.ciclo?.numero ?? null,
       activa: a.estado === 'ACTIVO',
+      condicion: a.condicion === 'ELECTIVA' ? 'Electiva' : 'Obligatoria',
       grupoElectivo: a.grupo,
     }));
   }

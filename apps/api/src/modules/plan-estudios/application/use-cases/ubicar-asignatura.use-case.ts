@@ -23,6 +23,7 @@ import {
 } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import { AsignaturaUbicada } from '../../domain/events/eventos-asignatura.js';
+import { obligatoriasSinCiclo } from '../../domain/services/motor-de-validaciones.js';
 import { permiteEdicion } from '../../domain/value-objects/estado-plan.js';
 import type { RepositorioContenidoPort, RepositorioPlanPort } from '../ports/repositorios.port.js';
 import type { RepositorioMallaPort } from '../ports/malla.port.js';
@@ -41,7 +42,7 @@ export interface ResultadoUbicacion {
   readonly codigo: string;
   readonly cicloAnterior: number | null;
   readonly cicloNuevo: number | null;
-  /** RF068: cuántas siguen fuera de la malla tras el movimiento. */
+  /** RF068 y RF-CH-022: cuántas obligatorias siguen fuera de la malla tras el movimiento. */
   readonly asignaturasSinCiclo: number;
   /** Créditos del ciclo de destino, para que la UI actualice su contador. */
   readonly creditosDelCiclo: number;
@@ -123,8 +124,9 @@ export class UbicarAsignatura {
       cicloAnterior: anterior,
       cicloNuevo: nuevo,
       // RF068: la UI necesita saber si el bloqueo sigue en pie tras el
-      // movimiento, sin tener que recargar el plan entero.
-      asignaturasSinCiclo: activas.filter((a) => a.cicloNumero === null).length,
+      // movimiento, sin tener que recargar el plan entero. RF-CH-022: una
+      // electiva sin ciclo no es un pendiente.
+      asignaturasSinCiclo: obligatoriasSinCiclo(activas).length,
       creditosDelCiclo:
         nuevo === null
           ? 0

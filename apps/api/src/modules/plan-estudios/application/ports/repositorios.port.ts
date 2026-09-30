@@ -11,6 +11,7 @@
 
 import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import type { EstadoPlan } from '../../domain/value-objects/estado-plan.js';
+import type { CondicionAsignatura } from './asignatura.port.js';
 
 /** Asignatura tal como la necesita el motor de validaciones. */
 export interface AsignaturaDelPlan {
@@ -21,6 +22,11 @@ export interface AsignaturaDelPlan {
   readonly competenciaIds: readonly string[];
   readonly cicloNumero: number | null;
   readonly activa: boolean;
+  /**
+   * RF-CH-022: una electiva puede quedar sin ciclo; una obligatoria, no. La
+   * regla RF068 lo necesita para no contar las electivas como pendientes.
+   */
+  readonly condicion: CondicionAsignatura;
   /**
    * Grupo de electivos al que pertenece, si es una opción de uno.
    *

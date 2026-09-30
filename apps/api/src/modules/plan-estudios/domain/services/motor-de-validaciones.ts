@@ -141,6 +141,23 @@ function esNumero(v: number | null): v is number {
 }
 
 /**
+ * RF068 y RF-CH-022 — lo que de verdad falta ubicar en la malla.
+ *
+ * Solo las obligatorias activas sin ciclo. Una electiva puede quedarse sin
+ * ciclo: se ofrece cuando corresponde y no es un hueco de la malla. Vive aquí y
+ * no repetida en cada consumidor —la regla RF068, el resumen de `/ubicacion` y
+ * el PDF— para que los tres cuenten lo mismo. Genérica porque los documentos la
+ * aplican a su propia forma de asignatura.
+ */
+export function obligatoriasSinCiclo<
+  T extends Pick<AsignaturaDelPlan, 'activa' | 'condicion' | 'cicloNumero'>,
+>(asignaturas: readonly T[]): T[] {
+  return asignaturas.filter(
+    (a) => a.activa && a.condicion === 'Obligatoria' && a.cicloNumero === null,
+  );
+}
+
+/**
  * RF097 - validación integral. Orquesta el resto y consolida un único
  * resultado, que es lo que consumen el banner del hub (RF098) y el bloqueo de
  * transiciones (RF085 / RF091).
@@ -214,17 +231,19 @@ export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
     });
   }
 
-  // RF068 - asignaturas sin ciclo. Bloqueante: su RN1 lo dice explícitamente.
-  const sinCiclo = activas.filter((a) => a.cicloNumero === null);
+  // RF068 - obligatorias sin ciclo. Bloqueante: su RN1 lo dice explícitamente.
+  // RF-CH-022: las electivas pueden quedar sin ciclo y no cuentan.
+  const sinCiclo = obligatoriasSinCiclo(activas);
   if (sinCiclo.length > 0) {
     hallazgos.push({
       codigo: 'ASIGNATURA_SIN_CICLO',
       rf: 'RF068',
       severidad: 'bloqueante',
-      titulo: 'Asignaturas sin ciclo asignado',
+      titulo: 'Asignaturas obligatorias sin ciclo asignado',
       detalle:
         sinCiclo.length +
-        ' asignatura(s) siguen fuera de la malla. Ubícalas en un ciclo desde Malla Curricular.',
+        ' asignatura(s) obligatoria(s) siguen fuera de la malla. Ubícalas en un ciclo ' +
+        'desde Malla Curricular. Las electivas pueden quedar sin ciclo.',
       afectados: sinCiclo.map((a) => a.codigo + ' · ' + a.nombre),
     });
   }

@@ -173,6 +173,37 @@ describe('RF072 — resumen del plan en PDF', () => {
     expect(doc.pie).toContain('25/08/2026');
     expect(doc.pie).toContain('PE-ISI-2018-v1 v1 (Histórico)');
   });
+
+  it('RF-CH-022: una electiva sin ciclo va en «Electivas (sin ciclo)», no en «sin ubicar»', async () => {
+    const doc = armarResumenDelPlan(
+      datos({
+        asignaturas: [
+          asignatura({
+            id: 'e1',
+            codigo: 'ELE01',
+            nombre: 'Electiva libre',
+            condicion: 'Electiva',
+            cicloNumero: null,
+          }),
+        ],
+      }),
+    );
+    const titulos = doc.secciones.map((s) => s.titulo);
+
+    expect(titulos).toContain('Electivas (sin ciclo)');
+    expect(titulos).not.toContain('Asignaturas sin ubicar en la malla');
+    expect(doc.secciones.find((s) => s.titulo === 'Electivas (sin ciclo)')?.tabla?.filas).toEqual([
+      ['ELE01', 'Electiva libre', '4', 'Electiva'],
+    ]);
+  });
+
+  it('RF-CH-022: una obligatoria sin ciclo sigue en «sin ubicar»', async () => {
+    const doc = armarResumenDelPlan(datos({ asignaturas: [asignatura({ cicloNumero: null })] }));
+    const titulos = doc.secciones.map((s) => s.titulo);
+
+    expect(titulos).toContain('Asignaturas sin ubicar en la malla');
+    expect(titulos).not.toContain('Electivas (sin ciclo)');
+  });
 });
 
 describe('RF073 — malla en hoja de cálculo', () => {
@@ -243,6 +274,14 @@ describe('RF073 — malla en hoja de cálculo', () => {
     expect(malla?.tabla?.columnas.map((c) => c.titulo)).not.toContain('Horas teóricas');
     expect(malla?.tabla?.columnas).toHaveLength(10);
     expect(malla?.tabla?.filas[0]).toHaveLength(10);
+  });
+
+  it('RF-CH-022: la electiva sin ciclo lo dice en la columna Ciclo', async () => {
+    const doc = armarMallaParaHojaDeCalculo(
+      datos({ asignaturas: [asignatura({ condicion: 'Electiva', cicloNumero: null })] }),
+    );
+    const filas = doc.secciones.find((s) => s.titulo === 'Malla curricular')?.tabla?.filas ?? [];
+    expect(filas[0]?.[0]).toBe('Electiva (sin ciclo)');
   });
 });
 

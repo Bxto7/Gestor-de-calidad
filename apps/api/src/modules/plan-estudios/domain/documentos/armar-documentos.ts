@@ -16,7 +16,11 @@ import {
   type Seccion,
   type Tabla,
 } from '../../../../platform/documentos/documento.js';
-import { calcularTotalCreditos, creditosPorCiclo } from '../services/motor-de-validaciones.js';
+import {
+  calcularTotalCreditos,
+  creditosPorCiclo,
+  obligatoriasSinCiclo,
+} from '../services/motor-de-validaciones.js';
 import type { EstadoPlan } from '../value-objects/estado-plan.js';
 
 /**
@@ -159,6 +163,8 @@ export function armarResumenDelPlan(datos: DatosParaDocumento): Documento {
 
   const sueltas = seccionSinUbicar(datos);
   if (sueltas) secciones.push(sueltas);
+  const electivas = seccionElectivasSinCiclo(datos);
+  if (electivas) secciones.push(electivas);
 
   return {
     nombreArchivo: `plan-${datos.plan.codigo}-v${datos.plan.version}`,
@@ -245,14 +251,14 @@ function seccionCiclo(datos: DatosParaDocumento, numero: number): Seccion {
 }
 
 /**
- * Asignaturas dadas de alta pero todavía sin ciclo.
+ * Obligatorias dadas de alta pero todavía sin ciclo (RF-CH-022: una electiva sin ciclo no está pendiente).
  *
  * La sección solo aparece si hay alguna. Es lo contrario del criterio de los
  * ciclos vacíos, y a propósito: un ciclo vacío es información —falta contenido
  * ahí—, mientras que un apartado «sin ubicar» vacío no informa de nada.
  */
 function seccionSinUbicar(datos: DatosParaDocumento): Seccion | null {
-  const sueltas = activas(datos).filter((a) => a.cicloNumero === null);
+  const sueltas = obligatoriasSinCiclo(activas(datos));
   if (sueltas.length === 0) return null;
 
   return {
@@ -266,6 +272,35 @@ function seccionSinUbicar(datos: DatosParaDocumento): Seccion | null {
         { titulo: 'Condición', peso: 3 },
       ],
       filas: sueltas.map((a) => [a.codigo, a.nombre, String(a.creditos), etiquetaElectivo(a)]),
+      siVacia: '',
+    },
+  };
+}
+
+/**
+ * RF-CH-022 — electivas que no se ofrecen en un ciclo fijo.
+ *
+ * Van aparte de «sin ubicar» porque no son un pendiente: una electiva puede
+ * quedar sin ciclo. Mezclarlas haría parecer incompleto un plan que no lo está.
+ * Como «sin ubicar», la sección solo aparece si hay alguna.
+ */
+function seccionElectivasSinCiclo(datos: DatosParaDocumento): Seccion | null {
+  const electivas = activas(datos).filter(
+    (a) => a.condicion === 'Electiva' && a.cicloNumero === null,
+  );
+  if (electivas.length === 0) return null;
+
+  return {
+    titulo: 'Electivas (sin ciclo)',
+    parrafos: ['Electivas del plan que no están asociadas a un ciclo concreto.'],
+    tabla: {
+      columnas: [
+        { titulo: 'Código', peso: 2 },
+        { titulo: 'Asignatura', peso: 6 },
+        { titulo: 'Cr.', peso: 1, alineacion: 'derecha' },
+        { titulo: 'Condición', peso: 3 },
+      ],
+      filas: electivas.map((a) => [a.codigo, a.nombre, String(a.creditos), etiquetaElectivo(a)]),
       siVacia: '',
     },
   };
@@ -286,7 +321,11 @@ export function armarMallaParaHojaDeCalculo(datos: DatosParaDocumento): Document
     .slice()
     .sort(porCicloYCodigo)
     .map((a) => [
-      a.cicloNumero === null ? 'Sin ubicar' : String(a.cicloNumero),
+      a.cicloNumero !== null
+        ? String(a.cicloNumero)
+        : a.condicion === 'Electiva'
+          ? 'Electiva (sin ciclo)'
+          : 'Sin ubicar',
       a.codigo,
       a.nombre,
       String(a.creditos),
