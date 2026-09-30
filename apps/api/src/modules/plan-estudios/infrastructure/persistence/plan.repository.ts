@@ -166,7 +166,6 @@ export class PlanRepositoryPrisma implements RepositorioPlanPort {
             tipo: a.tipo,
             condicion: a.condicion,
             creditos: a.creditos,
-            horasTeoricas: a.horasTeoricas,
             cicloId: a.cicloId,
             orden: a.orden,
             estado: a.estado,

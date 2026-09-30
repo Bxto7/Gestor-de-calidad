@@ -18,7 +18,6 @@ function asignatura(sobre: Partial<AsignaturaParaDocumento> = {}): AsignaturaPar
     codigo: 'ASUC01113',
     nombre: 'Cálculo I',
     creditos: 4,
-    horasTeoricas: 2,
     competenciaIds: [],
     cicloNumero: 1,
     activa: true,
@@ -235,6 +234,15 @@ describe('RF073 — malla en hoja de cálculo', () => {
 
     const resumen = doc.secciones.find((s) => s.titulo === 'Resumen por ciclo');
     expect(resumen?.tabla?.filas[0]).toEqual(['Ciclo 1', '2', '3']);
+  });
+
+  it('RF-CH-020: la hoja ya no tiene la columna de horas teóricas', async () => {
+    const doc = armarMallaParaHojaDeCalculo(datos());
+    const malla = doc.secciones.find((s) => s.titulo === 'Malla curricular');
+
+    expect(malla?.tabla?.columnas.map((c) => c.titulo)).not.toContain('Horas teóricas');
+    expect(malla?.tabla?.columnas).toHaveLength(10);
+    expect(malla?.tabla?.filas[0]).toHaveLength(10);
   });
 });
 

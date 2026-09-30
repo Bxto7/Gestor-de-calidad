@@ -125,8 +125,6 @@ export interface Asignatura {
   condicion: CondicionAsignatura;
   /** RF054: mayor a cero. */
   creditos: number;
-  /** RF055: numérico y no negativo. */
-  horasTeoricas: number;
   /** RF049 */
   competenciaIds: string[];
   /** RF061/RF065: una asignatura vive en un único ciclo, o en ninguno. */

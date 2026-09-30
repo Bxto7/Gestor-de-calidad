@@ -76,8 +76,8 @@ const COMPETENCIA_SIN_ATRIBUTO = {
  * enseñar el `<optgroup>` con más de una fila hace falta más de una asignatura.
  */
 const ASIGNATURAS = [
-  { codigo: 'AS-E2E01', nombre: 'Asignatura de pruebas I', creditos: 4, horasTeoricas: 3 },
-  { codigo: 'AS-E2E02', nombre: 'Asignatura de pruebas II', creditos: 3, horasTeoricas: 2 },
+  { codigo: 'AS-E2E01', nombre: 'Asignatura de pruebas I', creditos: 4 },
+  { codigo: 'AS-E2E02', nombre: 'Asignatura de pruebas II', creditos: 3 },
 ] as const;
 
 /**
@@ -223,7 +223,6 @@ async function main(): Promise<void> {
         tipo: 'ESPECIALIDAD',
         condicion: 'OBLIGATORIA',
         creditos: a.creditos,
-        horasTeoricas: a.horasTeoricas,
       },
     });
   }

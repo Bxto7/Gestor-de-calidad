@@ -52,7 +52,6 @@ const ENTRADA: DatosAsignaturaEntrada = {
   tipo: 'General',
   condicion: 'Obligatoria',
   creditos: 4,
-  horasTeoricas: 3,
   competenciaIds: [],
 };
 
@@ -66,7 +65,6 @@ function asignatura(sobre: Partial<DatosAsignatura> = {}): DatosAsignatura {
     tipo: 'General',
     condicion: 'Obligatoria',
     creditos: 4,
-    horasTeoricas: 3,
     cicloNumero: 1,
     orden: 0,
     activa: true,
@@ -253,7 +251,7 @@ describe('RF048 / RF056 — listas cerradas', () => {
   });
 });
 
-describe('RF054 / RF055 — créditos y horas', () => {
+describe('RF054 — créditos', () => {
   it('RF054 RN1: los créditos deben ser mayores a cero', async () => {
     const { caso } = montar();
     for (const creditos of [0, -1]) {
@@ -270,20 +268,28 @@ describe('RF054 / RF055 — créditos y horas', () => {
       /entero/,
     );
   });
+});
 
-  it('RF055 RN1: cero horas teóricas es válido', async () => {
-    // Un curso íntegramente práctico existe; el requisito dice "no negativo",
-    // no "positivo".
+describe('RF-CH-020 — sin horas teóricas', () => {
+  it('crear no pide ni guarda horas teóricas', async () => {
     const { caso, creadas } = montar();
-    await caso.crear(ACTOR, 'plan-1', { ...ENTRADA, horasTeoricas: 0 });
-    expect(creadas[0]?.datos.horasTeoricas).toBe(0);
+    await caso.crear(ACTOR, 'plan-1', ENTRADA);
+    expect(creadas).toHaveLength(1);
+    expect(creadas[0]?.datos).not.toHaveProperty('horasTeoricas');
   });
 
-  it('RF055 RN1: rechaza horas negativas', async () => {
-    const { caso } = montar();
-    await expect(caso.crear(ACTOR, 'plan-1', { ...ENTRADA, horasTeoricas: -1 })).rejects.toThrow(
-      /no negativo/,
-    );
+  it('si un cliente antiguo aún las envía, no llegan al repositorio', async () => {
+    const { caso, creadas } = montar();
+    await caso.crear(ACTOR, 'plan-1', { ...ENTRADA, ...{ horasTeoricas: 3 } });
+    expect(creadas[0]?.datos).not.toHaveProperty('horasTeoricas');
+  });
+
+  it('editar funciona y la auditoría ya no compara horas', async () => {
+    const { caso, actualizadas, publicados } = montar();
+    await caso.editar(ACTOR, 'asig-1', { ...ENTRADA, creditos: 5 });
+    expect(actualizadas[0]).not.toHaveProperty('horasTeoricas');
+    expect(publicados[0]?.detalle).toContain('créditos «4» → «5»');
+    expect(publicados[0]?.detalle).not.toContain('horas');
   });
 });
 

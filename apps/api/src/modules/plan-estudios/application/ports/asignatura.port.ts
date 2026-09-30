@@ -3,7 +3,7 @@
  *
  * Separado de `RepositorioContenidoPort`, que sirve al motor de validaciones y
  * devuelve la proyección mínima que este necesita. Aquí hacen falta todos los
- * atributos —descripción, tipo, condición, horas, competencias— y las
+ * atributos —descripción, tipo, condición, competencias— y las
  * escrituras. Mezclarlos obligaría al motor a cargar datos que no mira.
  */
 
@@ -24,7 +24,6 @@ export interface DatosAsignatura {
   readonly tipo: TipoAsignatura;
   readonly condicion: CondicionAsignatura;
   readonly creditos: number;
-  readonly horasTeoricas: number;
   /** RF051 RN1: el listado tiene que decir si ya está ubicada. */
   readonly cicloNumero: number | null;
   readonly orden: number;
@@ -52,7 +51,6 @@ export interface DatosAsignaturaEntrada {
   readonly tipo: TipoAsignatura;
   readonly condicion: CondicionAsignatura;
   readonly creditos: number;
-  readonly horasTeoricas: number;
   readonly competenciaIds: readonly string[];
 }
 

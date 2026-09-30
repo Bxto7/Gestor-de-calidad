@@ -219,13 +219,10 @@ export class GestionarAsignaturas {
       throw new ReglaDeNegocioViolada(`Condición no válida: ${String(datos.condicion)}.`);
     }
 
-    // RF054 RN1: mayor a cero. RF055 RN1: numérico y no negativo. El CHECK de la
-    // base los repite; aquí se comprueban para dar un mensaje legible.
+    // RF054 RN1: mayor a cero. El CHECK de la base lo repite; aquí se comprueba
+    // para dar un mensaje legible. Las horas teóricas ya no existen (RF-CH-020).
     if (!Number.isInteger(datos.creditos) || datos.creditos < 1) {
       throw new ReglaDeNegocioViolada('Los créditos deben ser un número entero mayor a cero.');
-    }
-    if (!Number.isInteger(datos.horasTeoricas) || datos.horasTeoricas < 0) {
-      throw new ReglaDeNegocioViolada('Las horas teóricas deben ser un número entero no negativo.');
     }
 
     if (await this.asignaturas.existeNombreEnPlan(planId, nombre, idIgnorado)) {
@@ -240,7 +237,6 @@ export class GestionarAsignaturas {
       tipo: datos.tipo,
       condicion: datos.condicion,
       creditos: datos.creditos,
-      horasTeoricas: datos.horasTeoricas,
       competenciaIds,
     };
   }
@@ -304,7 +300,6 @@ function instantanea(a: DatosAsignatura): InstantaneaAsignatura {
     tipo: a.tipo,
     condicion: a.condicion,
     creditos: a.creditos,
-    horasTeoricas: a.horasTeoricas,
     competenciaIds: a.competencias.map((c) => c.id),
   };
 }
@@ -316,7 +311,6 @@ function instantaneaDeEntrada(d: DatosAsignaturaEntrada): InstantaneaAsignatura 
     tipo: d.tipo,
     condicion: d.condicion,
     creditos: d.creditos,
-    horasTeoricas: d.horasTeoricas,
     competenciaIds: d.competenciaIds,
   };
 }

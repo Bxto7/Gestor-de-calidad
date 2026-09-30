@@ -551,8 +551,9 @@ model Asignatura {
 
   /// RF054 RN1: mayor a cero. El CHECK se añade en la migración.
   creditos      Int @db.SmallInt
-  /// RF055 RN1: numérico y no negativo.
-  horasTeoricas Int @map("horas_teoricas") @db.SmallInt
+  /// RF-CH-020: ya no se usa. Se conserva opcional para no perder los datos
+  /// cargados; se borrará en una migración de limpieza cuando nada la lea.
+  horasTeoricas Int? @map("horas_teoricas") @db.SmallInt
 
   /// RF061/RF065: una asignatura ocupa un único ciclo, o ninguno. Que sea una
   /// sola columna hace estructuralmente imposible el duplicado que RF065

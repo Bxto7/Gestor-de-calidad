@@ -71,7 +71,6 @@ function asignatura(sobre: Partial<DatosAsignatura> = {}): DatosAsignatura {
     tipo: 'General',
     condicion: 'Obligatoria',
     creditos: 4,
-    horasTeoricas: 3,
     cicloNumero: 1,
     orden: 0,
     activa: true,

@@ -61,13 +61,13 @@ const CODIGO_PLAN = 'PE-ISI-2018-v1';
 const USUARIO_DE_CARGA = '00000000-0000-0000-0000-000000000000';
 
 /**
- * El plan no trae horas teóricas ni sumillas, y el esquema las exige.
+ * El plan no trae sumillas, y el esquema las exige.
  *
- * Se cargan en cero y con un texto que dice que faltan, en vez de inventar
- * valores plausibles: un 3 puesto a ojo es indistinguible de un dato real y
- * nadie volvería a revisarlo. Un cero y un "pendiente" se ven.
+ * Se cargan con un texto que dice que faltan, en vez de inventar uno
+ * plausible: una sumilla escrita a ojo es indistinguible de la real y nadie
+ * volvería a revisarla. Un "pendiente" se ve. (Las horas teóricas ya no se
+ * cargan: RF-CH-020 las sacó del flujo de asignaturas.)
  */
-const HORAS_DESCONOCIDAS = 0;
 const SUMILLA_PENDIENTE = 'Sumilla pendiente de cargar desde el sílabo oficial de la asignatura.';
 
 async function main(): Promise<void> {
@@ -244,7 +244,6 @@ async function main(): Promise<void> {
       tipo: a.grupoElectivo === 'ELEC GENER' ? ('TRANSVERSAL' as const) : ('ESPECIALIDAD' as const),
       condicion: a.electiva ? ('ELECTIVA' as const) : ('OBLIGATORIA' as const),
       creditos: a.creditos,
-      horasTeoricas: HORAS_DESCONOCIDAS,
       cicloId: ciclos.get(a.ciclo)!,
       grupoElectivoId: a.grupoElectivo ? grupos.get(a.grupoElectivo)! : null,
       orden: indice,
@@ -378,9 +377,7 @@ async function main(): Promise<void> {
     `  · ${sinModelar.length} requisitos que no son una asignatura ("140 créditos aprobados",\n` +
       '    "certificado de inglés B1"). El grafo de dependencias solo enlaza asignaturas.',
   );
-  console.log(
-    `  · Horas teóricas (cargadas en ${HORAS_DESCONOCIDAS}) y sumillas: no están en la fuente.\n`,
-  );
+  console.log('  · Sumillas: no están en la fuente.\n');
 }
 
 main()

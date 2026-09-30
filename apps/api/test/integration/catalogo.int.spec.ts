@@ -82,7 +82,6 @@ async function asignatura(codigo: string, competenciaIds: string[] = []): Promis
       tipo: 'GENERAL',
       condicion: 'OBLIGATORIA',
       creditos: 3,
-      horasTeoricas: 2,
       competencias: { create: competenciaIds.map((competenciaId) => ({ competenciaId })) },
     },
   });

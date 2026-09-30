@@ -229,7 +229,7 @@ export function PlanEstudiosPage() {
     {
       a: `/plan-estudios/planes/${planId}/asignaturas`,
       titulo: 'Asignaturas',
-      detalle: 'Cursos del plan, con créditos, horas y competencias.',
+      detalle: 'Cursos del plan, con créditos y competencias.',
       dato: asignaturas ? `${asignaturas.length} registrada(s)` : '—',
       permiso: 'asignatura.leer',
     },

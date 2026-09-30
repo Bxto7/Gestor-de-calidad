@@ -2,7 +2,7 @@
  * 3.7 Asignaturas — RF047 a RF059.
  *
  * Tarjetas con código autogenerado (RF053), tipo y condición como badges,
- * créditos y horas, chips de competencias vinculadas (RF049) y marca de "sin
+ * créditos, chips de competencias vinculadas (RF049) y marca de "sin
  * ciclo" (RF058). Los filtros de tipo y condición se combinan (RF057 RN1).
  */
 
@@ -56,7 +56,6 @@ const VACIA: DatosAsignatura = {
   tipo: 'Especialidad',
   condicion: 'Obligatoria',
   creditos: 3,
-  horasTeoricas: 2,
   competenciaIds: [],
 };
 
@@ -252,10 +251,6 @@ export function AsignaturasPage() {
                 <dd className="font-semibold tabular-nums">{a.creditos}</dd>
               </div>
               <div className="flex gap-1.5">
-                <dt className="text-tinta-suave">Horas teóricas:</dt>
-                <dd className="font-semibold tabular-nums">{a.horasTeoricas}/sem</dd>
-              </div>
-              <div className="flex gap-1.5">
                 <dt className="text-tinta-suave">Ciclo:</dt>
                 <dd className="font-semibold">
                   {a.cicloNumero ?? <span className="text-alerta-fg">Sin asignar</span>}
@@ -372,7 +367,6 @@ function ModalAsignatura({
           tipo: asignatura.tipo,
           condicion: asignatura.condicion,
           creditos: asignatura.creditos,
-          horasTeoricas: asignatura.horasTeoricas,
           competenciaIds: [...asignatura.competenciaIds],
         }
       : VACIA,
@@ -520,22 +514,6 @@ function ModalAsignatura({
                 value={datos.creditos}
                 onChange={(e) =>
                   setDatos({ ...datos, creditos: Number.parseInt(e.target.value, 10) })
-                }
-              />
-            )}
-          </Campo>
-
-          {/* RF055 RN1: no negativo. */}
-          <Campo etiqueta="Horas teóricas por semana" requerido>
-            {(props) => (
-              <Entrada
-                {...props}
-                type="number"
-                min={0}
-                step={1}
-                value={datos.horasTeoricas}
-                onChange={(e) =>
-                  setDatos({ ...datos, horasTeoricas: Number.parseInt(e.target.value, 10) })
                 }
               />
             )}

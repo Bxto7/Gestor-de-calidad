@@ -64,7 +64,6 @@ async function asignatura(codigo: string, ciclo: number | null, orden: number): 
       tipo: 'ESPECIALIDAD',
       condicion: 'OBLIGATORIA',
       creditos: 3,
-      horasTeoricas: 2,
       cicloId: ciclo === null ? null : cicloIds.get(ciclo)!,
       orden,
     },

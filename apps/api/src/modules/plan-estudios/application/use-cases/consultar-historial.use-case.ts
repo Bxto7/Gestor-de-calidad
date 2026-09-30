@@ -207,9 +207,6 @@ function describirCambios(previa: DatosAsignatura, actual: DatosAsignatura): str
   if (previa.condicion !== actual.condicion) {
     cambios.push(`condición ${previa.condicion} → ${actual.condicion}`);
   }
-  if (previa.horasTeoricas !== actual.horasTeoricas) {
-    cambios.push(`horas ${previa.horasTeoricas} → ${actual.horasTeoricas}`);
-  }
   if (previa.activa !== actual.activa) {
     cambios.push(actual.activa ? 'reactivada' : 'inactivada');
   }

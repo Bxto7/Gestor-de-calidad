@@ -21,7 +21,6 @@ export interface InstantaneaAsignatura {
   readonly tipo: string;
   readonly condicion: string;
   readonly creditos: number;
-  readonly horasTeoricas: number;
   readonly competenciaIds: readonly string[];
 }
 
@@ -97,7 +96,6 @@ function describirCambios(antes: InstantaneaAsignatura, despues: InstantaneaAsig
   texto('tipo', antes.tipo, despues.tipo);
   texto('condición', antes.condicion, despues.condicion);
   texto('créditos', antes.creditos, despues.creditos);
-  texto('horas teóricas', antes.horasTeoricas, despues.horasTeoricas);
 
   // La descripción puede ser larga; se registra que cambió, no el texto entero.
   if (antes.descripcion !== despues.descripcion) cambios.push('se actualizó la descripción');

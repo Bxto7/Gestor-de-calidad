@@ -56,7 +56,6 @@ const SELECCION = {
   tipo: true,
   condicion: true,
   creditos: true,
-  horasTeoricas: true,
   orden: true,
   estado: true,
   creadoEn: true,
@@ -132,7 +131,6 @@ export class AsignaturaRepositoryPrisma implements RepositorioAsignaturaPort {
         tipo: TIPO_A_PRISMA[datos.tipo],
         condicion: CONDICION_A_PRISMA[datos.condicion],
         creditos: datos.creditos,
-        horasTeoricas: datos.horasTeoricas,
         competencias: {
           create: datos.competenciaIds.map((competenciaId) => ({ competenciaId })),
         },
@@ -156,7 +154,6 @@ export class AsignaturaRepositoryPrisma implements RepositorioAsignaturaPort {
           tipo: TIPO_A_PRISMA[datos.tipo],
           condicion: CONDICION_A_PRISMA[datos.condicion],
           creditos: datos.creditos,
-          horasTeoricas: datos.horasTeoricas,
           competencias: {
             create: datos.competenciaIds.map((competenciaId) => ({ competenciaId })),
           },
@@ -243,7 +240,6 @@ function aDominio(fila: FilaAsignatura): DatosAsignatura {
     tipo: TIPO_A_DOMINIO[fila.tipo],
     condicion: CONDICION_A_DOMINIO[fila.condicion],
     creditos: fila.creditos,
-    horasTeoricas: fila.horasTeoricas,
     cicloNumero: fila.ciclo?.numero ?? null,
     orden: fila.orden,
     activa: fila.estado === 'ACTIVO',

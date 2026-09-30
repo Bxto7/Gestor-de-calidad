@@ -50,14 +50,6 @@ export class DatosAsignaturaDto {
   @Max(30)
   creditos!: number;
 
-  // RF055 RN1: numérico y no negativo. Cero es legítimo: un curso íntegramente
-  // práctico no tiene horas teóricas.
-  @Type(() => Number)
-  @IsInt({ message: 'Las horas teóricas deben ser un número entero.' })
-  @Min(0)
-  @Max(40)
-  horasTeoricas!: number;
-
   /** RF049. Puede venir vacío: la exigencia de RN1 la aplica RF094 al aprobar. */
   @IsOptional()
   @IsArray()

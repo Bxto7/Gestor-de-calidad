@@ -32,7 +32,6 @@ export interface AsignaturaParaDocumento {
   readonly codigo: string;
   readonly nombre: string;
   readonly creditos: number;
-  readonly horasTeoricas: number;
   readonly competenciaIds: readonly string[];
   readonly cicloNumero: number | null;
   readonly activa: boolean;
@@ -291,7 +290,6 @@ export function armarMallaParaHojaDeCalculo(datos: DatosParaDocumento): Document
       a.codigo,
       a.nombre,
       String(a.creditos),
-      String(a.horasTeoricas),
       a.tipo,
       a.condicion,
       a.grupoNombre ?? '',
@@ -336,7 +334,6 @@ export function armarMallaParaHojaDeCalculo(datos: DatosParaDocumento): Document
             { titulo: 'Código', peso: 2 },
             { titulo: 'Asignatura', peso: 5 },
             { titulo: 'Créditos', peso: 1, alineacion: 'derecha' },
-            { titulo: 'Horas teóricas', peso: 1, alineacion: 'derecha' },
             { titulo: 'Tipo', peso: 2 },
             { titulo: 'Condición', peso: 2 },
             { titulo: 'Grupo de electivos', peso: 3 },

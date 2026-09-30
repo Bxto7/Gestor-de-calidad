@@ -124,7 +124,6 @@ async function sembrarPlan(): Promise<string> {
       tipo: 'ESPECIALIDAD',
       condicion: 'OBLIGATORIA',
       creditos: 4,
-      horasTeoricas: 2,
       orden: 0,
     },
   });
@@ -139,7 +138,6 @@ async function sembrarPlan(): Promise<string> {
       tipo: 'ESPECIALIDAD',
       condicion: 'OBLIGATORIA',
       creditos: 4,
-      horasTeoricas: 2,
       orden: 0,
     },
   });
@@ -168,7 +166,6 @@ async function sembrarPlan(): Promise<string> {
         tipo: 'ESPECIALIDAD',
         condicion: 'ELECTIVA',
         creditos: 3,
-        horasTeoricas: 2,
         orden: i + 1,
       },
     });
@@ -233,6 +230,12 @@ describe('lectura de los datos del documento', () => {
 
   it('devuelve null si el plan no existe', async () => {
     expect(await datos.datosDe('00000000-0000-0000-0000-000000000001')).toBeNull();
+  });
+
+  it('RF-CH-020: los datos del documento ya no traen horas teóricas', async () => {
+    const d = await datos.datosDe(planId);
+    expect(d?.asignaturas.length).toBeGreaterThan(0);
+    for (const a of d?.asignaturas ?? []) expect(a).not.toHaveProperty('horasTeoricas');
   });
 });
 

@@ -90,7 +90,6 @@ beforeEach(async () => {
       tipo: 'GENERAL',
       condicion: 'OBLIGATORIA',
       creditos: 20,
-      horasTeoricas: 2,
       orden: 0,
     },
   });

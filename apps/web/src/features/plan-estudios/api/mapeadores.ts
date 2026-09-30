@@ -82,7 +82,6 @@ export interface AsignaturaApi {
   tipo: TipoAsignatura;
   condicion: CondicionAsignatura;
   creditos: number;
-  horasTeoricas: number;
   cicloNumero: number | null;
   orden: number;
   activa: boolean;
@@ -202,7 +201,6 @@ export function aAsignatura(a: AsignaturaApi): Asignatura {
     tipo: a.tipo,
     condicion: a.condicion,
     creditos: a.creditos,
-    horasTeoricas: a.horasTeoricas,
     // La API devuelve las competencias enteras porque la ficha las muestra con
     // su código; el modelo del frontend guarda solo los identificadores, que es
     // lo que necesitan las casillas del formulario.

@@ -340,7 +340,6 @@ export interface DatosAsignatura {
   tipo: Asignatura['tipo'];
   condicion: Asignatura['condicion'];
   creditos: number;
-  horasTeoricas: number;
   competenciaIds: string[];
 }
 

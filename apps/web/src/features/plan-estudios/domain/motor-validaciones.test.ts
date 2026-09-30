@@ -64,7 +64,6 @@ function asignatura(sobrescribir: Partial<Asignatura> = {}): Asignatura {
     tipo: 'General',
     condicion: 'Obligatoria',
     creditos: 4,
-    horasTeoricas: 3,
     competenciaIds: ['cpe-1'],
     cicloNumero: 1,
     orden: 0,

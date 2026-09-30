@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,7 +39,6 @@ function asignatura(sobre: Partial<Asignatura> = {}): Asignatura {
     tipo: 'General',
     condicion: 'Obligatoria',
     creditos: 4,
-    horasTeoricas: 3,
     competenciaIds: [],
     cicloNumero: 1,
     orden: 0,
@@ -103,5 +102,40 @@ describe('AsignaturasPage — Inactivar y Reactivar (RF-CH-023)', () => {
     expect(
       await screen.findByText('Ya existe otra asignatura con ese nombre en el plan.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('AsignaturasPage — sin horas teóricas (RF-CH-020)', () => {
+  it('la tarjeta no muestra horas teóricas', async () => {
+    montar();
+    expect(await screen.findByRole('heading', { name: 'Álgebra Lineal' })).toBeInTheDocument();
+    expect(screen.queryByText(/Horas teóricas/)).not.toBeInTheDocument();
+  });
+
+  it('el alta no pide horas y no las envía', async () => {
+    const crear = vi.spyOn(api, 'crearAsignatura').mockResolvedValue(asignatura());
+    montar();
+
+    await userEvent.click(await botonHabilitado('Nueva asignatura'));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nueva asignatura' });
+    expect(within(dialogo).queryByLabelText(/Horas teóricas/)).not.toBeInTheDocument();
+
+    await userEvent.type(within(dialogo).getByLabelText('Nombre*'), 'Estructuras de Datos');
+    await userEvent.type(
+      within(dialogo).getByLabelText('Descripción*'),
+      'Sumilla del curso de estructuras.',
+    );
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() =>
+      expect(crear).toHaveBeenCalledWith('p1', {
+        nombre: 'Estructuras de Datos',
+        descripcion: 'Sumilla del curso de estructuras.',
+        tipo: 'Especialidad',
+        condicion: 'Obligatoria',
+        creditos: 3,
+        competenciaIds: [],
+      }),
+    );
   });
 });

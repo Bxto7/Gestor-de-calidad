@@ -76,7 +76,6 @@ async function crearAsignatura(
       tipo: 'ESPECIALIDAD',
       condicion: 'OBLIGATORIA',
       creditos: 3,
-      horasTeoricas: 2,
       cicloId,
       estado,
     },

@@ -70,7 +70,6 @@ const ASIGNATURA: Asignatura = {
   tipo: 'General',
   condicion: 'Obligatoria',
   creditos: 4,
-  horasTeoricas: 3,
   competenciaIds: [],
   cicloNumero: 1,
   orden: 0,
@@ -84,7 +83,6 @@ const DATOS_ASIGNATURA: api.DatosAsignatura = {
   tipo: 'General',
   condicion: 'Obligatoria',
   creditos: 4,
-  horasTeoricas: 3,
   competenciaIds: [],
 };
 

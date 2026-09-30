@@ -7,7 +7,7 @@
  *    asignatura sin ninguna a mitad de camino;
  *  - que los enumerados de tipo y condición viajen de ida y vuelta sin perderse
  *    entre el vocabulario del dominio y el de PostgreSQL;
- *  - que el CHECK de créditos y horas rechace lo que el dominio ya rechaza, para
+ *  - que el CHECK de créditos rechace lo que el dominio ya rechaza, para
  *    que la base sea la última línea y no la única;
  *  - que el orden del listado ponga al final las asignaturas sin ciclo.
  */
@@ -32,7 +32,6 @@ const ENTRADA: DatosAsignaturaEntrada = {
   tipo: 'General',
   condicion: 'Obligatoria',
   creditos: 4,
-  horasTeoricas: 3,
   competenciaIds: [],
 };
 
@@ -185,12 +184,6 @@ describe('RF049 — vínculo con competencias', () => {
 describe('Los CHECK de la base son la última línea', () => {
   it('RF054: rechaza créditos en cero', async () => {
     await expect(repo.crear(planId, 'ISI-101', { ...ENTRADA, creditos: 0 })).rejects.toThrow();
-  });
-
-  it('RF055: rechaza horas negativas', async () => {
-    await expect(
-      repo.crear(planId, 'ISI-101', { ...ENTRADA, horasTeoricas: -1 }),
-    ).rejects.toThrow();
   });
 
   it('el código no se repite dentro del plan', async () => {
@@ -393,6 +386,33 @@ describe('RF052 — inactivar', () => {
   it('sin dependientes, el impacto viene vacío', async () => {
     const creada = await repo.crear(planId, 'ISI-101', ENTRADA);
     expect((await repo.impactoDeInactivar(creada.id)).dependientes).toEqual([]);
+  });
+});
+
+describe('RF-CH-020 — sin horas teóricas', () => {
+  it('crear deja horas_teoricas en NULL y no la devuelve', async () => {
+    const creada = await repo.crear(planId, 'ISI-101', ENTRADA);
+    const fila = await prisma.asignatura.findUnique({
+      where: { id: creada.id },
+      select: { horasTeoricas: true },
+    });
+
+    expect(fila?.horasTeoricas).toBeNull();
+    expect(creada).not.toHaveProperty('horasTeoricas');
+  });
+
+  it('una fila antigua con horas se sigue editando y su valor no se toca', async () => {
+    const creada = await repo.crear(planId, 'ISI-101', ENTRADA);
+    await prisma.asignatura.update({ where: { id: creada.id }, data: { horasTeoricas: 3 } });
+
+    const editada = await repo.actualizar(creada.id, { ...ENTRADA, creditos: 5 });
+    const fila = await prisma.asignatura.findUnique({
+      where: { id: creada.id },
+      select: { horasTeoricas: true },
+    });
+
+    expect(editada.creditos).toBe(5);
+    expect(fila?.horasTeoricas).toBe(3);
   });
 });
 

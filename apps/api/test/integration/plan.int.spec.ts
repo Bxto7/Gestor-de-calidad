@@ -254,3 +254,30 @@ describe('Eliminación y el invariante de única versión vigente', () => {
     await expect(crearPlan(1, 'VIGENTE', otraCarreraId)).resolves.toBeTruthy();
   });
 });
+
+describe('RF075 / RF-CH-020 — copiar la malla a una versión nueva', () => {
+  it('la copia no arrastra las horas teóricas', async () => {
+    const origen = await crearPlan(1, 'VIGENTE');
+    const destino = await crearPlan(2);
+    await prisma.asignatura.create({
+      data: {
+        planId: origen,
+        codigo: 'ISI-101',
+        nombre: 'Álgebra',
+        descripcion: 'Sumilla sintética.',
+        tipo: 'GENERAL',
+        condicion: 'OBLIGATORIA',
+        creditos: 4,
+        horasTeoricas: 3,
+      },
+    });
+
+    await planes.copiarContenido(origen, destino);
+
+    const copia = await prisma.asignatura.findFirst({
+      where: { planId: destino },
+      select: { codigo: true, horasTeoricas: true },
+    });
+    expect(copia).toEqual({ codigo: 'ISI-101', horasTeoricas: null });
+  });
+});

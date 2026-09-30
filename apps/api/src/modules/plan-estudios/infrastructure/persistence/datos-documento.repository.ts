@@ -119,7 +119,6 @@ function aAsignatura(fila: {
   codigo: string;
   nombre: string;
   creditos: number;
-  horasTeoricas: number;
   estado: string;
   tipo: string;
   condicion: string;
@@ -138,7 +137,6 @@ function aAsignatura(fila: {
     codigo: fila.codigo,
     nombre: fila.nombre,
     creditos: fila.creditos,
-    horasTeoricas: fila.horasTeoricas,
     // El documento no lista competencias por asignatura, pero el cálculo de
     // créditos comparte forma con el motor de validaciones y este campo va ahí.
     competenciaIds: [],
