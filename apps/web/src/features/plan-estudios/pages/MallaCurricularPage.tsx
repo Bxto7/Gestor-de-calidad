@@ -28,6 +28,7 @@ import {
   calcularTotalCreditos,
   ciclosDeCarrera,
   creditosPorCiclo,
+  obligatoriasSinCiclo,
 } from '../domain/motor-validaciones';
 import { TIPOS_ASIGNATURA, type Asignatura, type TipoAsignatura } from '../domain/tipos';
 import { useGenerarDocumento } from '../api/useGenerarDocumento';
@@ -121,6 +122,10 @@ export function MallaCurricularPage() {
   const ciclos = ciclosDeCarrera(carrera);
   // RF063: el listado distingue ubicadas de no ubicadas.
   const sinCiclo = activas.filter((a) => a.cicloNumero === null);
+  // RF068 y RF-CH-022: el panel lista todas las que no tienen ciclo —también
+  // las electivas, que pueden ubicarse si se quiere—, pero solo las
+  // obligatorias bloquean.
+  const pendientes = obligatoriasSinCiclo(activas);
   const disponibles =
     filtroTipo === 'todos' ? sinCiclo : sinCiclo.filter((a) => a.tipo === filtroTipo);
 
@@ -214,11 +219,12 @@ export function MallaCurricularPage() {
         </p>
       )}
 
-      {/* RF068: alerta visible mientras queden asignaturas fuera de la malla. */}
-      {sinCiclo.length > 0 && (
+      {/* RF068: alerta visible mientras queden obligatorias fuera de la malla. */}
+      {pendientes.length > 0 && (
         <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg print:hidden">
-          <strong>{sinCiclo.length} asignatura(s) sin ciclo asignado.</strong> Bloquea el envío del
-          plan a aprobación hasta que todas estén ubicadas.
+          <strong>{pendientes.length} asignatura(s) obligatoria(s) sin ciclo asignado.</strong>{' '}
+          Bloquea el envío del plan a aprobación hasta que todas estén ubicadas. Las electivas
+          pueden quedar sin ciclo.
         </p>
       )}
 

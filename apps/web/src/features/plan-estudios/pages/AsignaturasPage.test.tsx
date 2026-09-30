@@ -139,3 +139,31 @@ describe('AsignaturasPage — sin horas teóricas (RF-CH-020)', () => {
     );
   });
 });
+
+describe('AsignaturasPage — electivas sin ciclo (RF-CH-022)', () => {
+  it('una electiva sin ciclo no dispara la alerta bloqueante', async () => {
+    montar({ asignaturas: [asignatura({ condicion: 'Electiva', cicloNumero: null })] });
+
+    expect(await screen.findByText('Sin ciclo (electiva)')).toBeInTheDocument();
+    expect(screen.queryByText(/sin ciclo asignado/)).not.toBeInTheDocument();
+  });
+
+  it('una obligatoria sin ciclo sigue disparándola, y la cuenta sin la electiva', async () => {
+    montar({
+      asignaturas: [
+        asignatura({ cicloNumero: null }),
+        asignatura({
+          id: 'a2',
+          codigo: 'ISI-102',
+          nombre: 'Electiva libre',
+          condicion: 'Electiva',
+          cicloNumero: null,
+        }),
+      ],
+    });
+
+    expect(
+      await screen.findByText('1 asignatura(s) obligatoria(s) sin ciclo asignado.'),
+    ).toBeInTheDocument();
+  });
+});

@@ -18,6 +18,7 @@ import {
   calcularTotalCreditos,
   ciclosDeCarrera,
   creditosPorCiclo,
+  obligatoriasSinCiclo,
   validarPlan,
   type EntradaValidacion,
 } from './motor-validaciones';
@@ -213,6 +214,64 @@ describe('RF068 — asignaturas sin ciclo', () => {
     );
     const h = validarPlan(e).hallazgos.find((x) => x.codigo === 'ASIGNATURA_SIN_CICLO');
     expect(h?.afectados).toHaveLength(2);
+  });
+});
+
+describe('RF-CH-022 — electivas sin ciclo', () => {
+  it('una obligatoria sin ciclo sigue bloqueando', () => {
+    const e = entradaValida();
+    e.asignaturas.push(asignatura({ id: 'x', codigo: 'ISI-199', cicloNumero: null }));
+    const r = validarPlan(e);
+
+    expect(codigos(r)).toContain('ASIGNATURA_SIN_CICLO');
+    expect(r.tieneBloqueos).toBe(true);
+  });
+
+  it('una electiva sin ciclo no bloquea ni aparece en RF068', () => {
+    const e = entradaValida();
+    e.asignaturas.push(
+      asignatura({ id: 'e', codigo: 'ISI-190', condicion: 'Electiva', cicloNumero: null }),
+    );
+    const r = validarPlan(e);
+
+    expect(codigos(r)).not.toContain('ASIGNATURA_SIN_CICLO');
+    expect(r.tieneBloqueos).toBe(false);
+  });
+
+  it('con obligatorias y electivas sin ciclo, RF068 solo nombra las obligatorias', () => {
+    const e = entradaValida();
+    e.asignaturas.push(
+      asignatura({ id: 'x', codigo: 'ISI-199', cicloNumero: null }),
+      asignatura({ id: 'e', codigo: 'ISI-190', condicion: 'Electiva', cicloNumero: null }),
+    );
+    const h = validarPlan(e).hallazgos.find((x) => x.codigo === 'ASIGNATURA_SIN_CICLO');
+
+    expect(h?.afectados).toEqual(['ISI-199 · Matemática Básica']);
+  });
+
+  it('una electiva con ciclo suma créditos en su ciclo (RF064)', () => {
+    const lista = [
+      asignatura({ id: 'o', creditos: 4, cicloNumero: 1 }),
+      asignatura({ id: 'e', creditos: 3, cicloNumero: 1, condicion: 'Electiva' }),
+    ];
+    expect(creditosPorCiclo(lista, 1)).toBe(7);
+  });
+
+  it('una electiva sin ciclo no entra en ningún ciclo (RN2)', () => {
+    const lista = [asignatura({ id: 'e', creditos: 3, cicloNumero: null, condicion: 'Electiva' })];
+    expect(ciclosDeCarrera(carrera(2)).map((c) => creditosPorCiclo(lista, c))).toEqual([
+      0, 0, 0, 0,
+    ]);
+  });
+
+  it('obligatoriasSinCiclo deja fuera electivas, inactivas y ubicadas', () => {
+    const lista = [
+      asignatura({ id: 'a', codigo: 'A', cicloNumero: null }),
+      asignatura({ id: 'b', codigo: 'B', cicloNumero: null, condicion: 'Electiva' }),
+      asignatura({ id: 'c', codigo: 'C', cicloNumero: null, estado: 'Inactivo' }),
+      asignatura({ id: 'd', codigo: 'D', cicloNumero: 2 }),
+    ];
+    expect(obligatoriasSinCiclo(lista).map((a) => a.codigo)).toEqual(['A']);
   });
 });
 

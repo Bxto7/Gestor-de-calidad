@@ -102,6 +102,22 @@ function esNumero(v: number | null): v is number {
 }
 
 /**
+ * RF068 y RF-CH-022 — lo que de verdad falta ubicar en la malla.
+ *
+ * Espejo de `obligatoriasSinCiclo` del motor de la API: solo las obligatorias
+ * activas sin ciclo. Una electiva puede quedarse sin ciclo. La usan la regla
+ * RF068 y las alertas de Asignaturas y Malla, para que las tres cuenten lo
+ * mismo que el servidor.
+ */
+export function obligatoriasSinCiclo<
+  T extends Pick<Asignatura, 'estado' | 'condicion' | 'cicloNumero'>,
+>(asignaturas: readonly T[]): T[] {
+  return asignaturas.filter(
+    (a) => a.estado === 'Activo' && a.condicion === 'Obligatoria' && a.cicloNumero === null,
+  );
+}
+
+/**
  * RF097 - validación integral. Orquesta el resto y consolida un único
  * resultado, que es lo que consumen el banner del hub (RF098) y el bloqueo de
  * transiciones (RF085 / RF091).
@@ -143,17 +159,19 @@ export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
     });
   }
 
-  // RF068 - asignaturas sin ciclo. Bloqueante: su RN1 lo dice explícitamente.
-  const sinCiclo = activas.filter((a) => a.cicloNumero === null);
+  // RF068 - obligatorias sin ciclo. Bloqueante: su RN1 lo dice explícitamente.
+  // RF-CH-022: las electivas pueden quedar sin ciclo y no cuentan.
+  const sinCiclo = obligatoriasSinCiclo(activas);
   if (sinCiclo.length > 0) {
     hallazgos.push({
       codigo: 'ASIGNATURA_SIN_CICLO',
       rf: 'RF068',
       severidad: 'bloqueante',
-      titulo: 'Asignaturas sin ciclo asignado',
+      titulo: 'Asignaturas obligatorias sin ciclo asignado',
       detalle:
         sinCiclo.length +
-        ' asignatura(s) siguen fuera de la malla. Ubícalas en un ciclo desde Malla Curricular.',
+        ' asignatura(s) obligatoria(s) siguen fuera de la malla. Ubícalas en un ciclo ' +
+        'desde Malla Curricular. Las electivas pueden quedar sin ciclo.',
       afectados: sinCiclo.map((a) => a.codigo + ' · ' + a.nombre),
     });
   }

@@ -35,6 +35,7 @@ import {
 } from '../api/queries';
 import { HistorialModal } from '../components/HistorialModal';
 import { permiteEdicion } from '../domain/estado-plan';
+import { obligatoriasSinCiclo } from '../domain/motor-validaciones';
 import {
   CONDICIONES_ASIGNATURA,
   TIPOS_ASIGNATURA,
@@ -97,9 +98,8 @@ export function AsignaturasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.codigo, planId]);
 
-  const sinCiclo = (asignaturas ?? []).filter(
-    (a) => a.cicloNumero === null && a.estado === 'Activo',
-  );
+  // RF068 y RF-CH-022: solo las obligatorias sin ciclo bloquean.
+  const pendientes = obligatoriasSinCiclo(asignaturas ?? []);
 
   /** RF057 RN1: los filtros son combinables entre sí. */
   const visibles = useMemo(() => {
@@ -135,12 +135,13 @@ export function AsignaturasPage() {
         }
       />
 
-      {/* RF058: aviso de asignaturas fuera de la malla, con salida directa. */}
-      {sinCiclo.length > 0 && (
+      {/* RF058 / RF068: aviso de obligatorias fuera de la malla, con salida directa. */}
+      {pendientes.length > 0 && (
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3">
           <p className="flex-1 text-sm text-alerta-fg">
-            <strong>{sinCiclo.length} asignatura(s) sin ciclo asignado.</strong> Es una validación
-            bloqueante: impide enviar el plan a aprobación.
+            <strong>{pendientes.length} asignatura(s) obligatoria(s) sin ciclo asignado.</strong> Es
+            una validación bloqueante: impide enviar el plan a aprobación. Las electivas pueden
+            quedar sin ciclo.
           </p>
           <Link
             to={`/plan-estudios/planes/${planId}/malla`}
@@ -253,7 +254,12 @@ export function AsignaturasPage() {
               <div className="flex gap-1.5">
                 <dt className="text-tinta-suave">Ciclo:</dt>
                 <dd className="font-semibold">
-                  {a.cicloNumero ?? <span className="text-alerta-fg">Sin asignar</span>}
+                  {a.cicloNumero ??
+                    (a.condicion === 'Electiva' ? (
+                      <span className="text-tinta-suave">Sin ciclo (electiva)</span>
+                    ) : (
+                      <span className="text-alerta-fg">Sin asignar</span>
+                    ))}
                 </dd>
               </div>
             </dl>
