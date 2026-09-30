@@ -154,8 +154,10 @@ describe('AppLayout — entrada «Mis evidencias»', () => {
 });
 
 describe('AppLayout — entrada «Plan de Estudios»', () => {
-  it('aparece cuando el usuario tiene plan.acceder', () => {
-    montar({ puede: (permiso: string) => permiso === 'plan.acceder' });
+  it('aparece como «Plan de Estudios» cuando el usuario tiene plan.acceder y plan.leer', () => {
+    montar({
+      puede: (permiso: string) => permiso === 'plan.acceder' || permiso === 'plan.leer',
+    });
     expect(screen.getByRole('link', { name: 'Plan de Estudios' })).toHaveAttribute(
       'href',
       '/plan-estudios',
@@ -206,6 +208,30 @@ describe('AppLayout — el Docente lee Evaluación y Criterios pero no entra a e
     });
     expect(screen.getByRole('link', { name: 'Planes de Evaluación' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Criterios de Acreditación' })).toBeInTheDocument();
+  });
+});
+
+describe('AppLayout — el módulo se llama «Facultades» para quien no lee planes (RF-CH-007)', () => {
+  it('sin plan.leer el enlace y su sección dicen «Facultades»', () => {
+    montar({
+      puede: (permiso: string) => permiso === 'plan.acceder',
+    });
+
+    expect(screen.getByRole('link', { name: 'Facultades' })).toHaveAttribute(
+      'href',
+      '/plan-estudios',
+    );
+    expect(screen.queryByRole('link', { name: 'Plan de Estudios' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Facultades' })).toBeInTheDocument();
+  });
+
+  it('con plan.leer sigue diciendo «Plan de Estudios»', () => {
+    montar({
+      puede: (permiso: string) => permiso === 'plan.acceder' || permiso === 'plan.leer',
+    });
+
+    expect(screen.getByRole('link', { name: 'Plan de Estudios' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Facultades' })).not.toBeInTheDocument();
   });
 });
 

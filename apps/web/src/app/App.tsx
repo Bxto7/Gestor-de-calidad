@@ -63,16 +63,21 @@ export function RutasDeLaAplicacion() {
           <Route element={<RutaConPermiso permiso="plan.acceder" />}>
             <Route path="plan-estudios" element={<FacultadesPage />} />
             <Route path="plan-estudios/facultades/:facultadId" element={<CarrerasPage />} />
-            <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />
-            <Route path="plan-estudios/planes/:planId/objetivos" element={<ObjetivosPage />} />
-            <Route
-              path="plan-estudios/planes/:planId/competencias"
-              element={<CompetenciasPage />}
-            />
-            <Route path="plan-estudios/planes/:planId/asignaturas" element={<AsignaturasPage />} />
-            <Route path="plan-estudios/planes/:planId/malla" element={<MallaCurricularPage />} />
-            <Route element={<RutaConPermiso permiso="docente.gestionar" />}>
-              <Route path="plan-estudios/planes/:planId/docentes" element={<DocentesPage />} />
+            <Route element={<RutaConPermiso permiso="plan.leer" redirigirA="/plan-estudios" />}>
+              <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />
+              <Route path="plan-estudios/planes/:planId/objetivos" element={<ObjetivosPage />} />
+              <Route
+                path="plan-estudios/planes/:planId/competencias"
+                element={<CompetenciasPage />}
+              />
+              <Route
+                path="plan-estudios/planes/:planId/asignaturas"
+                element={<AsignaturasPage />}
+              />
+              <Route path="plan-estudios/planes/:planId/malla" element={<MallaCurricularPage />} />
+              <Route element={<RutaConPermiso permiso="docente.gestionar" />}>
+                <Route path="plan-estudios/planes/:planId/docentes" element={<DocentesPage />} />
+              </Route>
             </Route>
           </Route>
 

@@ -22,6 +22,7 @@ import {
   Selector,
 } from '@/shared/components/ui';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { impactoInactivarFacultad } from '../api/plan-estudios.api';
 import {
   useCarreras,
@@ -38,6 +39,7 @@ type FiltroEstado = 'todos' | 'Activo' | 'Inactivo';
 
 export function FacultadesPage() {
   const { publicar } = useEncabezado();
+  const { puede } = useSesion();
   const { data: facultades, isLoading } = useFacultades();
   const { data: carreras } = useCarreras();
 
@@ -56,7 +58,9 @@ export function FacultadesPage() {
 
   useEffect(() => {
     publicar({
-      migas: [{ etiqueta: 'Plan de Estudios', a: '/plan-estudios' }, { etiqueta: 'Facultades' }],
+      migas: puede('plan.leer')
+        ? [{ etiqueta: 'Plan de Estudios', a: '/plan-estudios' }, { etiqueta: 'Facultades' }]
+        : [{ etiqueta: 'Facultades' }],
       acciones: null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

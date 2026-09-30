@@ -64,6 +64,25 @@ describe('RutaConPermiso', () => {
     expect(screen.getByText('inicio')).toBeInTheDocument();
   });
 
+  it('redirige al destino indicado en vez de a "/" cuando se pide otro', () => {
+    render(
+      <ContextoSesion.Provider value={{ ...sesionBase, puede: () => false }}>
+        <MemoryRouter initialEntries={['/protegida']}>
+          <Routes>
+            <Route path="/" element={<div>inicio</div>} />
+            <Route path="/otra" element={<div>otra pantalla</div>} />
+            <Route element={<RutaConPermiso permiso="mejora.leer" redirigirA="/otra" />}>
+              <Route path="/protegida" element={<div>contenido protegido</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </ContextoSesion.Provider>,
+    );
+
+    expect(screen.getByText('otra pantalla')).toBeInTheDocument();
+    expect(screen.queryByText('inicio')).not.toBeInTheDocument();
+  });
+
   it('no consulta el alcance por carrera — solo el permiso plano', () => {
     const puedeEn = vi.fn(() => false);
     const dirigeCarrera = vi.fn(() => false);

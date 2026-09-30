@@ -97,8 +97,15 @@ export function useInactivarCarrera(facultadId: string) {
 
 /* ── Planes ───────────────────────────────────────────────────────────── */
 
-export function usePlanes(filtros?: { carreraId?: string; estado?: string }) {
-  return useQuery({ queryKey: claves.planes(filtros), queryFn: () => api.listarPlanes(filtros) });
+export function usePlanes(
+  filtros?: { carreraId?: string; estado?: string },
+  opciones?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: claves.planes(filtros),
+    queryFn: () => api.listarPlanes(filtros),
+    enabled: opciones?.enabled ?? true,
+  });
 }
 
 export function usePlan(id: string) {

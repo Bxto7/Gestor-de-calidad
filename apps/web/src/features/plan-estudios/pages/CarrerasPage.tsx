@@ -47,10 +47,10 @@ export function CarrerasPage() {
 
   const { data: facultades } = useFacultades();
   const { data: carreras, isLoading } = useCarreras(facultadId);
-  const { data: planes } = usePlanes();
+  const { puede, puedeEn } = useSesion();
+  const { data: planes } = usePlanes(undefined, { enabled: puede('plan.leer') });
   const crearPlan = useCrearPlan();
   const inactivar = useInactivarCarrera(facultadId);
-  const { puede, puedeEn } = useSesion();
 
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState<FiltroEstado>('todos');
@@ -63,11 +63,16 @@ export function CarrerasPage() {
 
   useEffect(() => {
     publicar({
-      migas: [
-        { etiqueta: 'Plan de Estudios', a: '/plan-estudios' },
-        { etiqueta: 'Facultades', a: '/plan-estudios' },
-        { etiqueta: facultad?.nombre ?? 'Carreras' },
-      ],
+      migas: puede('plan.leer')
+        ? [
+            { etiqueta: 'Plan de Estudios', a: '/plan-estudios' },
+            { etiqueta: 'Facultades', a: '/plan-estudios' },
+            { etiqueta: facultad?.nombre ?? 'Carreras' },
+          ]
+        : [
+            { etiqueta: 'Facultades', a: '/plan-estudios' },
+            { etiqueta: facultad?.nombre ?? 'Carreras' },
+          ],
       acciones: null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

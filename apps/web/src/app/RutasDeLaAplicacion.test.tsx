@@ -95,16 +95,48 @@ describe('rutas con permiso de acceso', () => {
   });
 
   it('con plan.acceder pero sin docente.gestionar, la sección Docentes vuelve a /', async () => {
-    montarEn('/plan-estudios/planes/p1/docentes', ['plan.acceder']);
+    montarEn('/plan-estudios/planes/p1/docentes', ['plan.acceder', 'plan.leer']);
 
     await waitFor(() => expect(screen.getByTestId('ruta')).toHaveTextContent(/^\/$/));
   });
 
   it('con plan.acceder y docente.gestionar se entra a la sección Docentes', async () => {
-    montarEn('/plan-estudios/planes/p1/docentes', ['plan.acceder', 'docente.gestionar']);
+    montarEn('/plan-estudios/planes/p1/docentes', [
+      'plan.acceder',
+      'plan.leer',
+      'docente.gestionar',
+    ]);
 
     await waitFor(() =>
       expect(screen.getByTestId('ruta')).toHaveTextContent('/plan-estudios/planes/p1/docentes'),
+    );
+  });
+
+  /** Lo que conserva el Administrador desde el Bloque 3: entra al módulo pero no lee planes. */
+  const COMO_ADMINISTRADOR = ['plan.acceder', 'facultad.leer', 'carrera.leer'];
+
+  it.each([
+    '/plan-estudios/planes/p1',
+    '/plan-estudios/planes/p1/objetivos',
+    '/plan-estudios/planes/p1/asignaturas',
+    '/plan-estudios/planes/p1/malla',
+  ])('el Administrador que teclea %s vuelve al listado de facultades', async (ruta) => {
+    montarEn(ruta, COMO_ADMINISTRADOR);
+
+    await waitFor(() => expect(screen.getByTestId('ruta')).toHaveTextContent(/^\/plan-estudios$/));
+  });
+
+  it('el Administrador se queda en el listado de facultades', async () => {
+    montarEn('/plan-estudios', COMO_ADMINISTRADOR);
+
+    await waitFor(() => expect(screen.getByTestId('ruta')).toHaveTextContent(/^\/plan-estudios$/));
+  });
+
+  it('con plan.leer se entra al detalle de un plan', async () => {
+    montarEn('/plan-estudios/planes/p1', ['plan.acceder', 'plan.leer']);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('ruta')).toHaveTextContent('/plan-estudios/planes/p1'),
     );
   });
 });

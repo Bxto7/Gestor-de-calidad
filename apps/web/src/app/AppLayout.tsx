@@ -25,11 +25,19 @@ interface EnlaceNav {
   readonly icono: () => ReactElement;
   readonly exacto: boolean;
   readonly permiso?: string;
+  /**
+   * Etiqueta alternativa: si el usuario NO tiene `permiso`, se muestra `etiqueta`
+   * en lugar de la habitual. Sirve para que el módulo Plan de Estudios se llame
+   * «Facultades» cuando el usuario no lee planes (RF-CH-007).
+   */
+  readonly sinPermiso?: { readonly permiso: string; readonly etiqueta: string };
 }
 
 interface SeccionNav {
   /** `null` para el ítem suelto de arriba (Resumen), sin título de sección. */
   readonly titulo: string | null;
+  /** Título alternativo por permiso; ver `EnlaceNav.sinPermiso`. */
+  readonly sinPermiso?: { readonly permiso: string; readonly etiqueta: string };
   readonly enlaces: readonly EnlaceNav[];
 }
 
@@ -53,10 +61,12 @@ const SECCIONES: readonly SeccionNav[] = [
   },
   {
     titulo: 'Plan de estudios',
+    sinPermiso: { permiso: 'plan.leer', etiqueta: 'Facultades' },
     enlaces: [
       {
         a: '/plan-estudios',
         etiqueta: 'Plan de Estudios',
+        sinPermiso: { permiso: 'plan.leer', etiqueta: 'Facultades' },
         icono: IconoPlan,
         exacto: false,
         permiso: 'plan.acceder',
@@ -277,28 +287,37 @@ export function AppLayout() {
               const visibles = seccion.enlaces.filter((e) => !e.permiso || puede(e.permiso));
               if (visibles.length === 0) return null;
 
-              const contenido = visibles.map(({ a, etiqueta, icono: Icono, exacto }) => (
-                <NavLink
-                  key={a}
-                  to={a}
-                  end={exacto}
-                  className={({ isActive }) =>
-                    [
-                      'flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 text-sm font-semibold transition',
-                      isActive
-                        ? 'border-l-white bg-white/12 text-white'
-                        : 'border-l-transparent text-uc-lila hover:bg-white/8 hover:text-white',
-                    ].join(' ')
-                  }
-                >
-                  <Icono />
-                  {etiqueta}
-                </NavLink>
-              ));
+              const etiquetaDe = (
+                habitual: string,
+                alternativa?: { readonly permiso: string; readonly etiqueta: string },
+              ) => (alternativa && !puede(alternativa.permiso) ? alternativa.etiqueta : habitual);
+              const tituloSeccion =
+                seccion.titulo === null ? null : etiquetaDe(seccion.titulo, seccion.sinPermiso);
+
+              const contenido = visibles.map(
+                ({ a, etiqueta, sinPermiso, icono: Icono, exacto }) => (
+                  <NavLink
+                    key={a}
+                    to={a}
+                    end={exacto}
+                    className={({ isActive }) =>
+                      [
+                        'flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 text-sm font-semibold transition',
+                        isActive
+                          ? 'border-l-white bg-white/12 text-white'
+                          : 'border-l-transparent text-uc-lila hover:bg-white/8 hover:text-white',
+                      ].join(' ')
+                    }
+                  >
+                    <Icono />
+                    {etiquetaDe(etiqueta, sinPermiso)}
+                  </NavLink>
+                ),
+              );
 
               // El ítem suelto de arriba (Resumen, sin título) no lleva
               // cabecera de sección ni puede colapsarse.
-              if (seccion.titulo === null) {
+              if (tituloSeccion === null) {
                 return (
                   <div key="raiz" className="flex flex-col gap-0.5">
                     {contenido}
@@ -306,16 +325,16 @@ export function AppLayout() {
                 );
               }
 
-              const abierta = !colapsadas.has(seccion.titulo);
+              const abierta = !colapsadas.has(tituloSeccion);
               return (
-                <div key={seccion.titulo} className="flex flex-col gap-0.5">
+                <div key={tituloSeccion} className="flex flex-col gap-0.5">
                   <button
                     type="button"
-                    onClick={() => alternarSeccion(seccion.titulo!)}
+                    onClick={() => alternarSeccion(tituloSeccion)}
                     aria-expanded={abierta}
                     className="flex items-center justify-between px-3 py-1.5 text-[11px] font-bold tracking-wide text-uc-lila/70 uppercase transition hover:text-uc-lila"
                   >
-                    {seccion.titulo}
+                    {tituloSeccion}
                     <svg
                       width="12"
                       height="12"

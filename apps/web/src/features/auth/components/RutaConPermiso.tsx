@@ -11,16 +11,26 @@
  * (§3.5), y este guard no debe impedirlo. El acotamiento por carrera lo
  * decide el backend en cada petición, igual que ya lo documenta
  * `RutaProtegida` para la autenticación.
+ *
+ * `redirigirA` es a dónde se manda a quien no tiene el permiso. Por defecto es
+ * `/`, el resumen, que es un destino válido para cualquier rol autenticado.
  */
 
 import { Navigate, Outlet } from 'react-router-dom';
 
 import { useSesion } from '../hooks/contexto-sesion';
 
-export function RutaConPermiso({ permiso }: { permiso: string }) {
+export function RutaConPermiso({
+  permiso,
+  redirigirA = '/',
+}: {
+  permiso: string;
+  /** A dónde se manda a quien no tiene el permiso. Por defecto, el resumen. */
+  redirigirA?: string;
+}) {
   const { puede } = useSesion();
 
-  if (!puede(permiso)) return <Navigate to="/" replace />;
+  if (!puede(permiso)) return <Navigate to={redirigirA} replace />;
 
   return <Outlet />;
 }
