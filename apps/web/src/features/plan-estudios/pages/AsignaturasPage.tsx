@@ -334,6 +334,7 @@ export function AsignaturasPage() {
         <ModalAsignatura
           planId={planId}
           asignatura={editando}
+          competenciasDelPlan={plan?.competenciaIds ?? []}
           onCerrar={() => {
             setCreando(false);
             setEditando(null);
@@ -357,10 +358,13 @@ export function AsignaturasPage() {
 function ModalAsignatura({
   planId,
   asignatura,
+  competenciasDelPlan,
   onCerrar,
 }: {
   planId: string;
   asignatura: Asignatura | null;
+  /** RF-CH-021: las competencias asociadas al plan, las únicas que se ofrecen. */
+  competenciasDelPlan: readonly string[];
   onCerrar: () => void;
 }) {
   // El componente solo existe mientras el modal esta abierto, asi que el estado
@@ -404,10 +408,19 @@ function ModalAsignatura({
     }));
   }
 
-  // Una competencia inactiva no debe poder vincularse a algo nuevo (RF044).
+  // Las vinculadas al abrir el modal: se siguen mostrando aunque se desmarquen,
+  // para que desmarcar no haga desaparecer la casilla.
+  const [vinculadasAlAbrir] = useState(() => new Set(asignatura?.competenciaIds ?? []));
+  const delPlan = new Set(competenciasDelPlan);
+
+  // RF-CH-021: se ofrecen solo las competencias activas del plan (una inactiva
+  // tampoco puede vincularse a algo nuevo, RF044). Las que la asignatura ya
+  // tenía y no cumplen se muestran marcadas, para poder desvincularlas: el
+  // servidor rechaza volver a guardarlas.
   const seleccionables = (competencias ?? []).filter(
-    (c) => c.estado === 'Activo' || datos.competenciaIds.includes(c.id),
+    (c) => (c.estado === 'Activo' && delPlan.has(c.id)) || vinculadasAlAbrir.has(c.id),
   );
+  const hayAjenasMarcadas = datos.competenciaIds.some((id) => !delPlan.has(id));
 
   return (
     <Modal
@@ -537,7 +550,9 @@ function ModalAsignatura({
 
           {seleccionables.length === 0 ? (
             <p className="rounded-lg bg-superficie-tenue px-3 py-2.5 text-sm text-tinta-suave">
-              No hay competencias registradas todavía. Créalas primero en la sección Competencias.
+              {delPlan.size === 0
+                ? 'Este plan no tiene competencias. Asócialas primero en la sección Competencias.'
+                : 'Ninguna de las competencias del plan está activa.'}
             </p>
           ) : (
             <div className="grid gap-1.5 rounded-lg border border-borde p-3 sm:grid-cols-2">
@@ -555,6 +570,9 @@ function ModalAsignatura({
                     {c.estado === 'Inactivo' && (
                       <span className="ml-1 text-xs text-tinta-tenue">(inactiva)</span>
                     )}
+                    {!delPlan.has(c.id) && (
+                      <span className="ml-1 text-xs text-alerta-fg">(fuera del plan)</span>
+                    )}
                   </span>
                 </label>
               ))}
@@ -565,6 +583,12 @@ function ModalAsignatura({
             <p className="mt-2 text-xs font-medium text-estado-progreso-fg">
               Puedes guardar sin competencias, pero el plan no podrá aprobarse hasta vincular al
               menos una.
+            </p>
+          )}
+          {hayAjenasMarcadas && (
+            <p className="mt-2 text-xs font-medium text-alerta-fg">
+              Las competencias marcadas «fuera del plan» no se pueden guardar: desmárcalas o
+              asócialas al plan desde la sección Competencias.
             </p>
           )}
         </fieldset>

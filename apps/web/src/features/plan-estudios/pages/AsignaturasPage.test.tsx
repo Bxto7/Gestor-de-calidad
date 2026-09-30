@@ -167,3 +167,70 @@ describe('AsignaturasPage — electivas sin ciclo (RF-CH-022)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('AsignaturasPage — competencias del modal (RF-CH-021)', () => {
+  const CATALOGO: Competencia[] = [
+    { id: 'cp-1', codigo: 'CPE-01', nombre: 'Del plan', estado: 'Activo', atributos: [] },
+    { id: 'cp-2', codigo: 'CPE-02', nombre: 'Competencia ajena', estado: 'Activo', atributos: [] },
+    {
+      id: 'cp-3',
+      codigo: 'CPE-03',
+      nombre: 'Del plan inactiva',
+      estado: 'Inactivo',
+      atributos: [],
+    },
+  ];
+
+  async function abrir(boton: string, titulo: string): Promise<HTMLElement> {
+    await userEvent.click(await botonHabilitado(boton));
+    return screen.findByRole('dialog', { name: titulo });
+  }
+
+  it('solo ofrece las competencias activas del plan', async () => {
+    montar({ plan: { ...PLAN, competenciaIds: ['cp-1', 'cp-3'] }, competencias: CATALOGO });
+    const dialogo = await abrir('Nueva asignatura', 'Nueva asignatura');
+
+    expect(await within(dialogo).findByRole('checkbox', { name: /CPE-01/ })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('checkbox', { name: /CPE-02/ })).not.toBeInTheDocument();
+    expect(within(dialogo).queryByRole('checkbox', { name: /CPE-03/ })).not.toBeInTheDocument();
+  });
+
+  it('si el plan no tiene competencias, lo dice y remite a la sección Competencias', async () => {
+    montar({ plan: { ...PLAN, competenciaIds: [] }, competencias: CATALOGO });
+    const dialogo = await abrir('Nueva asignatura', 'Nueva asignatura');
+
+    expect(
+      await within(dialogo).findByText(
+        'Este plan no tiene competencias. Asócialas primero en la sección Competencias.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('una competencia ya vinculada que no es del plan se ve marcada y se puede quitar', async () => {
+    const editar = vi.spyOn(api, 'editarAsignatura').mockResolvedValue(asignatura());
+    montar({
+      plan: { ...PLAN, competenciaIds: ['cp-1'] },
+      competencias: CATALOGO,
+      asignaturas: [asignatura({ competenciaIds: ['cp-1', 'cp-2'] })],
+    });
+    const dialogo = await abrir('Editar', 'Editar asignatura');
+
+    const ajena = await within(dialogo).findByRole('checkbox', {
+      name: /CPE-02.*\(fuera del plan\)/,
+    });
+    expect(ajena).toBeChecked();
+
+    await userEvent.click(ajena);
+    // Sigue a la vista, desmarcada: desaparecer al desmarcarla confundiría.
+    expect(within(dialogo).getByRole('checkbox', { name: /CPE-02/ })).not.toBeChecked();
+
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() =>
+      expect(editar).toHaveBeenCalledWith(
+        'a1',
+        expect.objectContaining({ competenciaIds: ['cp-1'] }),
+      ),
+    );
+  });
+});
