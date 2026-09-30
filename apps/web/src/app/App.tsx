@@ -46,88 +46,86 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Las rutas, separadas de los proveedores para poder montarlas en una prueba con
+ * otra sesión y comprobar qué permiso guarda cada grupo.
+ */
+export function RutasDeLaAplicacion() {
+  return (
+    <Routes>
+      <Route path="/acceso" element={<AccesoPage />} />
+
+      {/* Todo lo demás exige sesión iniciada. */}
+      <Route element={<RutaProtegida />}>
+        <Route element={<AppLayout />}>
+          <Route index element={<ResumenPage />} />
+
+          <Route element={<RutaConPermiso permiso="plan.acceder" />}>
+            <Route path="plan-estudios" element={<FacultadesPage />} />
+            <Route path="plan-estudios/facultades/:facultadId" element={<CarrerasPage />} />
+            <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />
+            <Route path="plan-estudios/planes/:planId/objetivos" element={<ObjetivosPage />} />
+            <Route
+              path="plan-estudios/planes/:planId/competencias"
+              element={<CompetenciasPage />}
+            />
+            <Route path="plan-estudios/planes/:planId/asignaturas" element={<AsignaturasPage />} />
+            <Route path="plan-estudios/planes/:planId/malla" element={<MallaCurricularPage />} />
+            <Route element={<RutaConPermiso permiso="docente.gestionar" />}>
+              <Route path="plan-estudios/planes/:planId/docentes" element={<DocentesPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<RutaConPermiso permiso="atributo.leer" />}>
+            <Route path="acreditacion/atributos" element={<AtributosPage />} />
+          </Route>
+          <Route element={<RutaConPermiso permiso="criterio.acceder" />}>
+            <Route path="acreditacion/criterios" element={<CriteriosPage />} />
+          </Route>
+
+          <Route element={<RutaConPermiso permiso="medicion.leer" />}>
+            <Route path="mejora-continua/medicion" element={<PlanesMedicionPage />} />
+            <Route path="mejora-continua/medicion/:id" element={<PlanMedicionPage />} />
+          </Route>
+          <Route element={<RutaConPermiso permiso="evaluacion.acceder" />}>
+            <Route path="mejora-continua/evaluacion" element={<PlanesEvaluacionPage />} />
+            <Route path="mejora-continua/evaluacion/:id" element={<PlanEvaluacionPage />} />
+          </Route>
+          <Route element={<RutaConPermiso permiso="mejora.leer" />}>
+            <Route path="mejora-continua/mejora" element={<PlanesMejoraPage />} />
+            <Route path="mejora-continua/mejora/:id" element={<PlanMejoraPage />} />
+          </Route>
+          <Route element={<RutaConPermiso permiso="actas.leer" />}>
+            <Route path="mejora-continua/actas" element={<ActasPage />} />
+            <Route path="mejora-continua/actas/:id" element={<ActaPage />} />
+          </Route>
+
+          <Route element={<RutaConPermiso permiso="evidencia.registrar" />}>
+            <Route path="mis-evidencias" element={<MisEvidenciasPage />} />
+          </Route>
+
+          <Route element={<RutaConPermiso permiso="plan.leer" />}>
+            <Route path="reportes" element={<ReportesPage />} />
+            <Route path="reportes/planes/:planId" element={<ReportePlanPage />} />
+          </Route>
+
+          <Route element={<RutaConPermiso permiso="usuario.gestionar" />}>
+            <Route path="usuarios" element={<UsuariosPage />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Route>
+    </Routes>
+  );
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ProveedorSesion>
-          <Routes>
-            <Route path="/acceso" element={<AccesoPage />} />
-
-            {/* Todo lo demás exige sesión iniciada. */}
-            <Route element={<RutaProtegida />}>
-              <Route element={<AppLayout />}>
-                <Route index element={<ResumenPage />} />
-
-                <Route element={<RutaConPermiso permiso="plan.acceder" />}>
-                  <Route path="plan-estudios" element={<FacultadesPage />} />
-                  <Route path="plan-estudios/facultades/:facultadId" element={<CarrerasPage />} />
-                  <Route path="plan-estudios/planes/:planId" element={<PlanEstudiosPage />} />
-                  <Route
-                    path="plan-estudios/planes/:planId/objetivos"
-                    element={<ObjetivosPage />}
-                  />
-                  <Route
-                    path="plan-estudios/planes/:planId/competencias"
-                    element={<CompetenciasPage />}
-                  />
-                  <Route
-                    path="plan-estudios/planes/:planId/asignaturas"
-                    element={<AsignaturasPage />}
-                  />
-                  <Route
-                    path="plan-estudios/planes/:planId/malla"
-                    element={<MallaCurricularPage />}
-                  />
-                  <Route element={<RutaConPermiso permiso="docente.gestionar" />}>
-                    <Route
-                      path="plan-estudios/planes/:planId/docentes"
-                      element={<DocentesPage />}
-                    />
-                  </Route>
-                </Route>
-
-                <Route element={<RutaConPermiso permiso="atributo.leer" />}>
-                  <Route path="acreditacion/atributos" element={<AtributosPage />} />
-                </Route>
-                <Route element={<RutaConPermiso permiso="criterio.acceder" />}>
-                  <Route path="acreditacion/criterios" element={<CriteriosPage />} />
-                </Route>
-
-                <Route element={<RutaConPermiso permiso="medicion.leer" />}>
-                  <Route path="mejora-continua/medicion" element={<PlanesMedicionPage />} />
-                  <Route path="mejora-continua/medicion/:id" element={<PlanMedicionPage />} />
-                </Route>
-                <Route element={<RutaConPermiso permiso="evaluacion.acceder" />}>
-                  <Route path="mejora-continua/evaluacion" element={<PlanesEvaluacionPage />} />
-                  <Route path="mejora-continua/evaluacion/:id" element={<PlanEvaluacionPage />} />
-                </Route>
-                <Route element={<RutaConPermiso permiso="mejora.leer" />}>
-                  <Route path="mejora-continua/mejora" element={<PlanesMejoraPage />} />
-                  <Route path="mejora-continua/mejora/:id" element={<PlanMejoraPage />} />
-                </Route>
-                <Route element={<RutaConPermiso permiso="actas.leer" />}>
-                  <Route path="mejora-continua/actas" element={<ActasPage />} />
-                  <Route path="mejora-continua/actas/:id" element={<ActaPage />} />
-                </Route>
-
-                <Route element={<RutaConPermiso permiso="evidencia.registrar" />}>
-                  <Route path="mis-evidencias" element={<MisEvidenciasPage />} />
-                </Route>
-
-                <Route element={<RutaConPermiso permiso="plan.leer" />}>
-                  <Route path="reportes" element={<ReportesPage />} />
-                  <Route path="reportes/planes/:planId" element={<ReportePlanPage />} />
-                </Route>
-
-                <Route element={<RutaConPermiso permiso="usuario.gestionar" />}>
-                  <Route path="usuarios" element={<UsuariosPage />} />
-                </Route>
-
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Route>
-          </Routes>
+          <RutasDeLaAplicacion />
         </ProveedorSesion>
       </BrowserRouter>
     </QueryClientProvider>
