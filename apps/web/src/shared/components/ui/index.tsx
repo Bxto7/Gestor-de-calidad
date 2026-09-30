@@ -286,10 +286,12 @@ export function Modal({
       >
         <header className="flex items-start gap-4 border-b border-borde px-6 py-4">
           <div className="min-w-0 flex-1">
-            <h2 id={idTitulo} className="text-lg font-extrabold tracking-tight">
+            <h2 id={idTitulo} className="text-lg font-extrabold tracking-tight wrap-break-word">
               {titulo}
             </h2>
-            {descripcion && <p className="mt-1 text-sm text-tinta-suave">{descripcion}</p>}
+            {descripcion && (
+              <p className="mt-1 text-sm text-tinta-suave wrap-break-word">{descripcion}</p>
+            )}
           </div>
           <button
             type="button"
@@ -311,7 +313,13 @@ export function Modal({
             </svg>
           </button>
         </header>
-        <div data-cuerpo className="max-h-[60vh] overflow-y-auto px-6 py-5">
+        {/*
+          RF-CH-025: `overflow-x-hidden` para que ningún contenido —un texto
+          largo sin espacios, una tabla— abra una barra horizontal en el
+          diálogo. No sustituye al ajuste de línea de cada texto: lo que no
+          cabe se parte, no se esconde.
+        */}
+        <div data-cuerpo className="max-h-[60vh] overflow-x-hidden overflow-y-auto px-6 py-5">
           {children}
         </div>
         {pie && (

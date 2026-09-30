@@ -55,8 +55,8 @@ export function HistorialModal({
                 {i < eventos.length - 1 && <span className="w-px flex-1 bg-borde" />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-tinta">{e.accion}</p>
-                <p className="mt-0.5 text-sm text-tinta-suave">{e.detalle}</p>
+                <p className="text-sm font-bold text-tinta wrap-break-word">{e.accion}</p>
+                <p className="mt-0.5 text-sm text-tinta-suave wrap-break-word">{e.detalle}</p>
                 {/* RF080: ninguna modificación es anónima. */}
                 <p className="mt-1 text-xs text-tinta-tenue">
                   {e.usuario} · {formatearFechaHora(e.fecha)}
