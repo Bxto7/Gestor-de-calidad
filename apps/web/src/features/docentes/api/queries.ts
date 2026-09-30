@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as api from './docentes.api';
 
-const CLAVE = ['docentes'] as const;
+/**
+ * Con prefijo `carrera`: la clave `['docentes']` ya la usa el catálogo de
+ * responsables de Evaluación (`GET /docentes`, solo activos) y compartirla haría
+ * que un listado sirviera datos del otro.
+ */
+const CLAVE = ['carrera', 'docentes'] as const;
 
 export function useDocentes() {
   return useQuery({ queryKey: CLAVE, queryFn: api.listarDocentes });
