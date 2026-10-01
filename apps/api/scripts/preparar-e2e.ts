@@ -186,10 +186,12 @@ async function main(): Promise<void> {
       );
     }
 
+    // RF-CH-017: la competencia es de la carrera E2E, como si se hubiera
+    // creado dentro de su plan.
     const fila = await prisma.competencia.upsert({
       where: { codigo: c.codigo },
-      update: { nombre: c.nombre, estado: 'ACTIVO' },
-      create: { codigo: c.codigo, nombre: c.nombre },
+      update: { nombre: c.nombre, estado: 'ACTIVO', carreraId: carrera.id },
+      create: { codigo: c.codigo, nombre: c.nombre, carreraId: carrera.id },
     });
 
     // El upsert no puede reemplazar el conjunto de atributos en un solo paso.
@@ -207,8 +209,16 @@ async function main(): Promise<void> {
 
   const sinAtributo = await prisma.competencia.upsert({
     where: { codigo: COMPETENCIA_SIN_ATRIBUTO.codigo },
-    update: { nombre: COMPETENCIA_SIN_ATRIBUTO.nombre, estado: 'ACTIVO' },
-    create: { codigo: COMPETENCIA_SIN_ATRIBUTO.codigo, nombre: COMPETENCIA_SIN_ATRIBUTO.nombre },
+    update: {
+      nombre: COMPETENCIA_SIN_ATRIBUTO.nombre,
+      estado: 'ACTIVO',
+      carreraId: carrera.id,
+    },
+    create: {
+      codigo: COMPETENCIA_SIN_ATRIBUTO.codigo,
+      nombre: COMPETENCIA_SIN_ATRIBUTO.nombre,
+      carreraId: carrera.id,
+    },
   });
   // Idempotente en los dos sentidos: si alguien le asoció un atributo a mano entre
   // dos corridas, aquí vuelve a quedar sin ninguno.
@@ -236,7 +246,7 @@ async function main(): Promise<void> {
   }
 
   await planDeMedicionVigente(plan.id);
-  await planDeMedicionIndirectaAprobada(plan.id);
+  await planDeMedicionIndirectaAprobada(plan.id, carrera.id);
   await criterioYObjetivoDePrueba(carrera.id);
 
   console.log(
@@ -251,8 +261,8 @@ async function main(): Promise<void> {
 
 /**
  * Un Criterio de Acreditación (de la carrera E2E) y un Objetivo Educacional
- * (catálogo institucional, sin carrera propia — ver el comentario de
- * `ObjetivoEducacional` en el schema), ambos ACTIVO.
+ * de la misma carrera (RF-CH-015), ambos ACTIVO. El objetivo no se vincula a
+ * ningún plan: el Vigente E2E no tiene objetivos.
  *
  * Los necesita el recorrido E2E de los tres aspectos de Plan de Mejora
  * (Task 7, 2c-J-E): sin al menos uno de cada, el desplegable "Elemento" del
@@ -275,11 +285,12 @@ async function criterioYObjetivoDePrueba(carreraId: string): Promise<void> {
 
   await prisma.objetivoEducacional.upsert({
     where: { codigo: 'OE-E2E-01' },
-    update: { nombre: 'Objetivo educacional de prueba', estado: 'ACTIVO' },
+    update: { nombre: 'Objetivo educacional de prueba', estado: 'ACTIVO', carreraId },
     create: {
       codigo: 'OE-E2E-01',
       nombre: 'Objetivo educacional de prueba',
       descripcion: 'Objetivo educacional sembrado para la suite E2E.',
+      carreraId,
     },
   });
 }
@@ -401,7 +412,10 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
  * tendría ninguna fila que enseñar allí y la comprobación no tendría nada que
  * negar — el mismo motivo que ya vale para el plan Directo de arriba.
  */
-async function planDeMedicionIndirectaAprobada(planEstudiosId: string): Promise<void> {
+async function planDeMedicionIndirectaAprobada(
+  planEstudiosId: string,
+  carreraId: string,
+): Promise<void> {
   const codigo = 'PM-PE-E2E-v1-I-v1';
 
   const existente = await prisma.planMedicion.findUnique({ where: { codigo } });
@@ -419,8 +433,12 @@ async function planDeMedicionIndirectaAprobada(planEstudiosId: string): Promise<
 
   const competencia = await prisma.competencia.upsert({
     where: { codigo: COMPETENCIA_INDIRECTA.codigo },
-    update: { nombre: COMPETENCIA_INDIRECTA.nombre, estado: 'ACTIVO' },
-    create: { codigo: COMPETENCIA_INDIRECTA.codigo, nombre: COMPETENCIA_INDIRECTA.nombre },
+    update: { nombre: COMPETENCIA_INDIRECTA.nombre, estado: 'ACTIVO', carreraId },
+    create: {
+      codigo: COMPETENCIA_INDIRECTA.codigo,
+      nombre: COMPETENCIA_INDIRECTA.nombre,
+      carreraId,
+    },
   });
 
   await prisma.competenciaAtributo.deleteMany({ where: { competenciaId: competencia.id } });

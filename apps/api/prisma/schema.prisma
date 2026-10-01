@@ -272,6 +272,10 @@ model Carrera {
   planes    PlanEstudios[]
   criterios CriterioAcreditacion[]
 
+  /// RF-CH-015 / RF-CH-017: objetivos y competencias creados en sus planes.
+  objetivos    ObjetivoEducacional[]
+  competencias Competencia[]
+
   /// RF015 RN1: el mismo nombre puede repetirse entre facultades, pero no
   /// dentro de una.
   @@unique([facultadId, nombre])
@@ -349,10 +353,16 @@ model ObjetivoEducacional {
   descripcion String           @db.Text
   estado      EstadoActivacion @default(ACTIVO)
 
+  /// RF-CH-015: la carrera del plan en el que se creó. El nombre es único por
+  /// carrera (índice parcial en SQL, ver la migración). Nula solo en filas
+  /// anteriores a este cambio que no se pudieron atribuir a una sola carrera.
+  carreraId String? @map("carrera_id") @db.Uuid
+
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
-  planes PlanObjetivo[]
+  carrera Carrera?       @relation(fields: [carreraId], references: [id], onDelete: Restrict)
+  planes  PlanObjetivo[]
 
   @@map("objetivos_educacionales")
   @@schema("objetivos_educacionales")
@@ -400,9 +410,15 @@ model Competencia {
   nombre String           @db.VarChar(300)
   estado EstadoActivacion @default(ACTIVO)
 
+  /// RF-CH-017: la carrera del plan en el que se creó. El nombre es único por
+  /// carrera (índice parcial en SQL, ver la migración). Nula solo en filas
+  /// anteriores a este cambio que no se pudieron atribuir a una sola carrera.
+  carreraId String? @map("carrera_id") @db.Uuid
+
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
+  carrera     Carrera?                @relation(fields: [carreraId], references: [id], onDelete: Restrict)
   atributos   CompetenciaAtributo[]
   planes      PlanCompetencia[]
   asignaturas AsignaturaCompetencia[]

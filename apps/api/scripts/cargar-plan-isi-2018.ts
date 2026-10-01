@@ -138,10 +138,11 @@ async function main(): Promise<void> {
       return id;
     });
 
+    // RF-CH-017: las competencias del plan ISI son de la carrera ISI.
     const fila = await prisma.competencia.upsert({
       where: { codigo: c.codigo },
-      create: { codigo: c.codigo, nombre: c.nombre },
-      update: { nombre: c.nombre },
+      create: { codigo: c.codigo, nombre: c.nombre, carreraId: carrera.id },
+      update: { nombre: c.nombre, carreraId: carrera.id },
     });
     competencias.set(c.codigo, fila.id);
 
@@ -162,10 +163,16 @@ async function main(): Promise<void> {
 
   const objetivos: string[] = [];
   for (const o of OBJETIVOS) {
+    // RF-CH-015: los objetivos del plan ISI son de la carrera ISI.
     const fila = await prisma.objetivoEducacional.upsert({
       where: { codigo: o.codigo },
-      create: { codigo: o.codigo, nombre: o.nombre, descripcion: o.descripcion },
-      update: { nombre: o.nombre, descripcion: o.descripcion },
+      create: {
+        codigo: o.codigo,
+        nombre: o.nombre,
+        descripcion: o.descripcion,
+        carreraId: carrera.id,
+      },
+      update: { nombre: o.nombre, descripcion: o.descripcion, carreraId: carrera.id },
     });
     objetivos.push(fila.id);
   }
