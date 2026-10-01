@@ -22,6 +22,7 @@
 1. El Bloque 4 se parte en 4a (hecho y fusionado) y 4b (este).
 2. «Eliminar» un objetivo o una competencia de un plan en Borrador o En revisión significa **quitarlo del plan y borrar el registro solo si ningún otro plan ni flujo lo usa**. Si otro plan lo sigue vinculando, el registro se queda. Si este plan o Mejora Continua lo usan, se bloquea con el motivo.
 3. Objetivos y competencias pasan a tener **carrera propia**: columna nueva `carrera_id` (FK, nullable) en ambas tablas. Se fija sola con la carrera del plan al crearlos dentro de él. Las filas existentes se rellenan desde sus vínculos con planes cuando todos apuntan a una sola carrera; las ambiguas o sin vínculo quedan en NULL y se cuentan en la migración. El **nombre es único por carrera**: se abandona la unicidad global. El código (OE-01, CPE-01) sigue siendo un correlativo global. `objetivo.gestionar` y `competencia.gestionar` pasan a ser permisos acotados a la carrera.
+4. **Mejora Continua bloquea solo cuando se va a borrar el registro** (confirmado por el usuario): quitar un elemento de un plan en Borrador o En revisión nunca consulta a Mejora Continua mientras otro plan lo siga vinculando. Un plan de medición solo existe sobre un plan Aprobado o Vigente, así que un Borrador no tiene datos de Mejora Continua propios.
 
 ## 2. Estado actual (verificado en código)
 
@@ -123,7 +124,7 @@
   4. El elemento está vinculado al plan (404 si no).
   5. Uso:
      - Competencia usada por asignaturas **de este plan**: se bloquea con sus códigos, p. ej. «La usan ASUC01110, ASUC01112. Quítala de esas asignaturas primero».
-     - Uso en Mejora Continua según el puerto de §3.7: se bloquea con sus `motivos`.
+     - Uso en Mejora Continua según el puerto de §3.7: se bloquea con sus `motivos`, **pero solo si, al quitar el vínculo, ya no quedaría ningún otro plan que lo vincule y por tanto habría que borrar la fila** (decisión 4). Si otro plan, por ejemplo el Vigente, conserva el vínculo, el elemento se quita de este plan sin consultar a Mejora Continua.
   6. Se quita el vínculo. Si ya no queda ningún `plan_objetivo`/`plan_competencia` ni `asignatura_competencia`, se borra la fila en la misma transacción. `competencia_atributo` cae en cascada.
 - **Auditoría:**
   - Eventos nuevos `ObjetivoQuitadoDelPlan` (`eventos-objetivo.ts`) y `CompetenciaQuitadaDelPlan` (`eventos-catalogo.ts`), con el código del elemento y del plan.
@@ -209,7 +210,7 @@ Son 11 tareas en un solo plan. Si hiciera falta partirlo, el corte natural es 4b
 
 ## 5. Riesgos y puntos abiertos
 
-- **El bloqueo por Mejora Continua es más estricto de lo necesario (decisión 2).** Un plan de medición solo existe sobre planes Aprobados o Vigentes (`gestionar-planes-medicion.use-case.ts:86-91`), así que un plan en Borrador o En revisión nunca tiene datos de Mejora Continua propios. Con la regla tal cual, en una versión nueva no se podría quitar ninguna competencia que se mida en el plan Vigente, aunque el registro no se borre y el Vigente no cambie. **Propuesta, pendiente de confirmar:** aplicar la comprobación de Mejora Continua solo cuando el registro se vaya a borrar (ningún otro plan lo vincula). §3.5 aplica la regla aprobada mientras no se decida.
+- **Resuelto (decisión 4): el bloqueo por Mejora Continua solo aplica cuando se va a borrar el registro.** Se conserva el razonamiento original: un plan de medición solo existe sobre planes Aprobados o Vigentes (`gestionar-planes-medicion.use-case.ts:86-91`), así que un plan en Borrador o En revisión nunca tiene datos de Mejora Continua propios. Con la regla literal, en una versión nueva no se podría quitar ninguna competencia que se mida en el plan Vigente, aunque el registro no se borre y el Vigente no cambie. Por eso §3.5 aplica la comprobación de Mejora Continua solo cuando el registro se vaya a borrar (ningún otro plan lo vincula).
 - **Los objetivos no viven en `plan-estudios`.** El diseño aprobado ponía el puerto «en uso» en `plan-estudios/application/ports`. Hacen falta dos puertos (§3.7), uno nuevo hacia `plan-estudios` (`PlanParaObjetivosPort`, §3.3), ampliar dos guardias de aislamiento y que el repositorio de objetivos escriba `plan_objetivo` como excepción declarada (§3.4).
 - **Filas heredadas con carrera NULL** (por ejemplo `OE-E2E-01`). Con el permiso acotado, `puede()` deniega con carrera `null` (`politica-de-autorizacion.ts:100-107`): nadie podrá editarlas, inactivarlas ni borrarlas, y el Director no las verá en el listado sin plan. Además, el índice parcial no las cubre: una fila nueva puede repetir el nombre de una heredada, y dos heredadas podrían repetirse entre sí (hoy no ocurre, por la comprobación global). Hay que decidir si se acepta o si se ofrece asignarles carrera más adelante.
 - **Premisa rota en el esquema:** «en `plan_estudios` nada se borra físicamente» (`schema.prisma:757-761`). Los ids sin FK de Mejora Continua quedan protegidos solo por el puerto «en uso». Hay que actualizar ese comentario.
