@@ -70,7 +70,11 @@ export interface RepositorioPlanPort {
 
   eliminar(id: string): Promise<void>;
 
-  /** Copia la malla al generar una nueva versión (RF075). */
+  /**
+   * Copia la malla al generar una nueva versión (RF075), y los vínculos del
+   * plan con objetivos y competencias (RF-CH-015 / RF-CH-017): los registros
+   * son los mismos, compartidos entre versiones.
+   */
   copiarContenido(desdePlanId: string, haciaPlanId: string): Promise<void>;
 
   /**

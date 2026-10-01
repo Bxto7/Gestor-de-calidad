@@ -282,6 +282,69 @@ describe('RF075 / RF-CH-020 — copiar la malla a una versión nueva', () => {
   });
 });
 
+describe('RF075 / RF-CH-015 / RF-CH-017 — la versión nueva conserva objetivos y competencias', () => {
+  async function asignaturaEn(planId: string): Promise<void> {
+    await prisma.asignatura.create({
+      data: {
+        planId,
+        codigo: 'ISI-101',
+        nombre: 'Álgebra',
+        descripcion: 'Sumilla sintética.',
+        tipo: 'GENERAL',
+        condicion: 'OBLIGATORIA',
+        creditos: 4,
+      },
+    });
+  }
+
+  it('copia los vínculos del plan con objetivos y competencias', async () => {
+    const origen = await crearPlan(1, 'VIGENTE');
+    const destino = await crearPlan(2);
+    await asignaturaEn(origen);
+    await prisma.planObjetivo.createMany({
+      data: [
+        { planId: origen, objetivoId: objetivos[0]! },
+        { planId: origen, objetivoId: objetivos[1]! },
+      ],
+    });
+    await prisma.planCompetencia.create({
+      data: { planId: origen, competenciaId: competencias[0]! },
+    });
+
+    await planes.copiarContenido(origen, destino);
+
+    expect((await contenido.objetivoIdsDe(destino)).sort()).toEqual(
+      [objetivos[0]!, objetivos[1]!].sort(),
+    );
+    expect(await contenido.competenciaIdsDe(destino)).toEqual([competencias[0]!]);
+  });
+
+  it('también cuando el origen no tiene asignaturas', async () => {
+    const origen = await crearPlan(1, 'VIGENTE');
+    const destino = await crearPlan(2);
+    await prisma.planObjetivo.create({ data: { planId: origen, objetivoId: objetivos[2]! } });
+    await prisma.planCompetencia.create({
+      data: { planId: origen, competenciaId: competencias[1]! },
+    });
+
+    await planes.copiarContenido(origen, destino);
+
+    expect(await contenido.objetivoIdsDe(destino)).toEqual([objetivos[2]!]);
+    expect(await contenido.competenciaIdsDe(destino)).toEqual([competencias[1]!]);
+  });
+
+  it('el origen conserva sus vínculos y los registros son los mismos, no copias', async () => {
+    const origen = await crearPlan(1, 'VIGENTE');
+    const destino = await crearPlan(2);
+    await prisma.planObjetivo.create({ data: { planId: origen, objetivoId: objetivos[0]! } });
+
+    await planes.copiarContenido(origen, destino);
+
+    expect(await contenido.objetivoIdsDe(origen)).toEqual([objetivos[0]!]);
+    expect(await prisma.objetivoEducacional.count()).toBe(3);
+  });
+});
+
 describe('RF-CH-022 — el motor recibe la condición', () => {
   it('asignaturasDe la traduce al vocabulario del dominio', async () => {
     const planId = await crearPlan(1);

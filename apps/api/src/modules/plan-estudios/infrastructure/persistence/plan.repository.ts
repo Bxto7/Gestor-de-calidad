@@ -139,23 +139,49 @@ export class PlanRepositoryPrisma implements RepositorioPlanPort {
   }
 
   /**
-   * RF075: copia la malla a la versión nueva.
+   * RF075: copia la malla a la versión nueva, y con ella los vínculos del plan
+   * con objetivos y competencias (RF-CH-015 / RF-CH-017).
    *
-   * Los identificadores se renuevan a propósito: si se conservaran, editar la
-   * copia tocaría también el original. Las competencias de cada asignatura se
-   * rehacen apuntando a la asignatura nueva.
+   * Los identificadores de las asignaturas se renuevan a propósito: si se
+   * conservaran, editar la copia tocaría también el original. Las competencias
+   * de cada asignatura se rehacen apuntando a la asignatura nueva.
+   *
+   * Los objetivos y competencias del plan, en cambio, son los mismos registros
+   * —de la misma carrera— compartidos entre versiones: solo se copia el
+   * vínculo. Sin él, la versión nueva nacía sin ninguno y toda asignatura
+   * copiada quedaba con competencias «fuera del plan» (RF-CH-021).
    *
    * El ciclo se conserva tal cual porque los ciclos pertenecen a la carrera
    * (§3.3), no al plan: la versión nueva usa exactamente los mismos.
    */
   async copiarContenido(desdePlanId: string, haciaPlanId: string): Promise<void> {
-    const origen = await this.prisma.asignatura.findMany({
-      where: { planId: desdePlanId },
-      include: { competencias: { select: { competenciaId: true } } },
-    });
-    if (origen.length === 0) return;
+    const [origen, objetivos, competencias] = await Promise.all([
+      this.prisma.asignatura.findMany({
+        where: { planId: desdePlanId },
+        include: { competencias: { select: { competenciaId: true } } },
+      }),
+      this.prisma.planObjetivo.findMany({
+        where: { planId: desdePlanId },
+        select: { objetivoId: true },
+      }),
+      this.prisma.planCompetencia.findMany({
+        where: { planId: desdePlanId },
+        select: { competenciaId: true },
+      }),
+    ]);
 
     await this.prisma.$transaction(async (tx) => {
+      if (objetivos.length > 0) {
+        await tx.planObjetivo.createMany({
+          data: objetivos.map((o) => ({ planId: haciaPlanId, objetivoId: o.objetivoId })),
+        });
+      }
+      if (competencias.length > 0) {
+        await tx.planCompetencia.createMany({
+          data: competencias.map((c) => ({ planId: haciaPlanId, competenciaId: c.competenciaId })),
+        });
+      }
+
       for (const a of origen) {
         const nueva = await tx.asignatura.create({
           data: {
