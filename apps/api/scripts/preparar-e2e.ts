@@ -38,6 +38,7 @@ import { existsSync } from 'node:fs';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 
+import { sembrarAtributosIcacit } from '../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaClient } from '../src/platform/database/generated/client.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -127,6 +128,10 @@ async function main(): Promise<void> {
     skipDuplicates: true,
   });
 
+  // Bloque 5: cada carrera tiene sus propios atributos del graduado. La E2E los
+  // recibe como una carrera de desarrollo; la suite los usa por nombre.
+  await sembrarAtributosIcacit(prisma, carrera.id);
+
   // Los planes de medición de esta carrera se borran en cada preparación: la
   // suite crea uno por ejecución y el correlativo de versión no debe arrastrar
   // el histórico de corridas anteriores.
@@ -172,18 +177,15 @@ async function main(): Promise<void> {
   });
 
   const atributos = new Map(
-    (await prisma.atributoGraduado.findMany({ where: { marco: 'ICACIT' } })).map((a) => [
-      a.codigo,
-      a.id,
-    ]),
+    (
+      await prisma.atributoGraduado.findMany({ where: { carreraId: carrera.id, marco: 'ICACIT' } })
+    ).map((a) => [a.codigo, a.id]),
   );
 
   for (const c of COMPETENCIAS) {
     const atributoId = atributos.get(c.atributo);
     if (!atributoId) {
-      throw new Error(
-        `El atributo ${c.atributo} no existe. Ejecuta antes \`npx tsx prisma/seed.ts\`.`,
-      );
+      throw new Error(`El atributo ${c.atributo} no existe en la carrera E2E.`);
     }
 
     // RF-CH-017: la competencia es de la carrera E2E, como si se hubiera
@@ -422,13 +424,10 @@ async function planDeMedicionIndirectaAprobada(
   if (existente) return;
 
   const atributo = await prisma.atributoGraduado.findFirst({
-    where: { marco: 'ICACIT', codigo: COMPETENCIA_INDIRECTA.atributo },
+    where: { carreraId, marco: 'ICACIT', codigo: COMPETENCIA_INDIRECTA.atributo },
   });
   if (!atributo) {
-    throw new Error(
-      `El atributo ${COMPETENCIA_INDIRECTA.atributo} no existe. Ejecuta antes ` +
-        '`npx tsx prisma/seed.ts`.',
-    );
+    throw new Error(`El atributo ${COMPETENCIA_INDIRECTA.atributo} no existe en la carrera E2E.`);
   }
 
   const competencia = await prisma.competencia.upsert({

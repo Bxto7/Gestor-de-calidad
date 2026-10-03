@@ -14,6 +14,7 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { ReportesRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/reportes.repository.js';
 
@@ -35,7 +36,7 @@ beforeEach(async () => {
              academico.carreras, academico.facultades
     RESTART IDENTITY CASCADE`);
 
-  // Los atributos de ICACIT los siembra `prisma/seed.ts` y no se tocan. Sí se
+  // Los atributos de ICACIT se siembran abajo en la carrera ISI. Sí se
   // limpian los marcos desechables que otro archivo de pruebas haya dejado: sin
   // esto, el recuento de este panel depende de qué se ejecutó antes.
   await prisma.atributoGraduado.deleteMany({ where: { marco: { not: 'ICACIT' } } });
@@ -52,6 +53,7 @@ beforeEach(async () => {
     },
   });
   carreraId = isi.id;
+  await sembrarAtributosIcacit(prisma, isi.id);
 
   const enfermeria = await prisma.carrera.create({
     data: { facultadId: salud.id, nombre: 'Enfermería', codigo: 'ENF', duracionAnios: 1 },

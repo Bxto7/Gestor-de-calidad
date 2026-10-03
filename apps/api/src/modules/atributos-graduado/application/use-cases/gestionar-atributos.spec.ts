@@ -49,6 +49,7 @@ function denegar(): AuthorizationPort {
 function atributo(sobre: Partial<DatosAtributoCompleto> = {}): DatosAtributoCompleto {
   return {
     id: 'atr-1',
+    carreraId: 'car-1',
     marco: 'ICACIT',
     codigo: 'AG-I01',
     nombre: 'Conocimientos de ingeniería',
@@ -66,7 +67,8 @@ function repo(sobre: Partial<RepositorioAtributoPort> = {}): RepositorioAtributo
     porId: async () => atributo(),
     codigoExiste: async () => false,
     ultimoOrden: async () => 11,
-    crear: async (marco, codigo, nombre, orden) => atributo({ marco, codigo, nombre, orden }),
+    crear: async (carreraId, marco, codigo, nombre, orden) =>
+      atributo({ carreraId, marco, codigo, nombre, orden }),
     actualizar: async (id, codigo, nombre) => atributo({ id, codigo, nombre }),
     cambiarEstado: async (id, activo) => atributo({ id, activo }),
     impactoDeInactivar: async () => ({ competenciasVinculadas: 0, planesVinculados: 0 }),
@@ -94,7 +96,7 @@ describe('RF120 — registrar atributo del graduado', () => {
     const { publicador, vistos } = capturarEventos();
     const caso = new GestionarAtributos(repo(), permitirTodo(), publicador);
 
-    const creado = await caso.crear(ACTOR, 'AG-I12', 'Pensamiento sistémico');
+    const creado = await caso.crear(ACTOR, 'car-1', 'AG-I12', 'Pensamiento sistémico');
 
     expect(creado.codigo).toBe('AG-I12');
     expect(creado.orden).toBe(12);
@@ -108,13 +110,15 @@ describe('RF120 — registrar atributo del graduado', () => {
       capturarEventos().publicador,
     );
 
-    await expect(caso.crear(ACTOR, 'AG-I01', 'Duplicado')).rejects.toThrow(ReglaDeNegocioViolada);
+    await expect(caso.crear(ACTOR, 'car-1', 'AG-I01', 'Duplicado')).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
   });
 
   it('exige el permiso de gestión', async () => {
     const caso = new GestionarAtributos(repo(), denegar(), capturarEventos().publicador);
 
-    await expect(caso.crear(ACTOR, 'AG-I12', 'Pensamiento sistémico')).rejects.toThrow(
+    await expect(caso.crear(ACTOR, 'car-1', 'AG-I12', 'Pensamiento sistémico')).rejects.toThrow(
       AccesoDenegado,
     );
   });
@@ -122,7 +126,9 @@ describe('RF120 — registrar atributo del graduado', () => {
   it('rechaza un nombre en blanco', async () => {
     const caso = new GestionarAtributos(repo(), permitirTodo(), capturarEventos().publicador);
 
-    await expect(caso.crear(ACTOR, 'AG-I12', '   ')).rejects.toThrow(ReglaDeNegocioViolada);
+    await expect(caso.crear(ACTOR, 'car-1', 'AG-I12', '   ')).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
   });
 
   it('no publica ningún evento si la creación se rechaza', async () => {
@@ -133,9 +139,78 @@ describe('RF120 — registrar atributo del graduado', () => {
       publicador,
     );
 
-    await expect(caso.crear(ACTOR, 'AG-I01', 'Duplicado')).rejects.toThrow();
+    await expect(caso.crear(ACTOR, 'car-1', 'AG-I01', 'Duplicado')).rejects.toThrow();
 
     expect(vistos).toHaveLength(0);
+  });
+
+  it('el código y el orden se calculan dentro de la carrera, no del marco entero', async () => {
+    const vistos: { operacion: string; carreraId: string; marco: string }[] = [];
+    const caso = new GestionarAtributos(
+      repo({
+        codigoExiste: async (carreraId, marco) => {
+          vistos.push({ operacion: 'codigoExiste', carreraId, marco });
+          return false;
+        },
+        ultimoOrden: async (carreraId, marco) => {
+          vistos.push({ operacion: 'ultimoOrden', carreraId, marco });
+          return 3;
+        },
+        crear: async (carreraId, marco, codigo, nombre, orden) => {
+          vistos.push({ operacion: 'crear', carreraId, marco });
+          return atributo({ carreraId, marco, codigo, nombre, orden });
+        },
+      }),
+      permitirTodo(),
+      capturarEventos().publicador,
+    );
+
+    const creado = await caso.crear(ACTOR, 'car-2', 'AG-I12', 'Pensamiento sistémico');
+
+    expect(creado.orden).toBe(4);
+    expect(creado.carreraId).toBe('car-2');
+    expect(vistos).toEqual([
+      { operacion: 'codigoExiste', carreraId: 'car-2', marco: 'ICACIT' },
+      { operacion: 'ultimoOrden', carreraId: 'car-2', marco: 'ICACIT' },
+      { operacion: 'crear', carreraId: 'car-2', marco: 'ICACIT' },
+    ]);
+  });
+
+  it('listar pide los atributos de la carrera indicada', async () => {
+    let pedida = '';
+    const caso = new GestionarAtributos(
+      repo({
+        listar: async (carreraId) => {
+          pedida = carreraId;
+          return [];
+        },
+      }),
+      permitirTodo(),
+      capturarEventos().publicador,
+    );
+
+    await caso.listar(ACTOR, 'car-2');
+
+    expect(pedida).toBe('car-2');
+  });
+
+  it('editar revalida el código dentro de la carrera del atributo', async () => {
+    let consultada = '';
+    const caso = new GestionarAtributos(
+      repo({
+        porId: async () => atributo({ carreraId: 'car-9' }),
+        codigoExiste: async (carreraId) => {
+          consultada = carreraId;
+          return false;
+        },
+      }),
+      permitirTodo(),
+      capturarEventos().publicador,
+    );
+
+    await caso.editar(ACTOR, 'atr-1', 'AG-I01', 'Nombre nuevo');
+
+    expect(consultada).toBe('car-9');
   });
 });
 
@@ -171,7 +246,7 @@ describe('RF121 — editar atributo del graduado', () => {
     let recibido: string | undefined = 'no-invocado';
     const caso = new GestionarAtributos(
       repo({
-        codigoExiste: async (_marco, _codigo, exceptoId) => {
+        codigoExiste: async (_carreraId, _marco, _codigo, exceptoId) => {
           recibido = exceptoId;
           return false;
         },
@@ -191,7 +266,7 @@ describe('RF122 y RF128 — listar y buscar', () => {
     let filtro: FiltroAcreditacion | undefined;
     const caso = new GestionarAtributos(
       repo({
-        listar: async (_marco, f) => {
+        listar: async (_carreraId, _marco, f) => {
           filtro = f;
           return [];
         },
@@ -200,7 +275,7 @@ describe('RF122 y RF128 — listar y buscar', () => {
       capturarEventos().publicador,
     );
 
-    await caso.listar(ACTOR, { texto: 'ingeniería' });
+    await caso.listar(ACTOR, 'car-1', { texto: 'ingeniería' });
 
     expect(filtro?.texto).toBe('ingeniería');
   });
@@ -208,7 +283,7 @@ describe('RF122 y RF128 — listar y buscar', () => {
   it('listar exige permiso de lectura', async () => {
     const caso = new GestionarAtributos(repo(), denegar(), capturarEventos().publicador);
 
-    await expect(caso.listar(ACTOR)).rejects.toThrow(AccesoDenegado);
+    await expect(caso.listar(ACTOR, 'car-1')).rejects.toThrow(AccesoDenegado);
   });
 });
 

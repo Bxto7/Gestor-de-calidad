@@ -124,6 +124,7 @@ import {
 import { GestionarAtributos } from './modules/atributos-graduado/application/use-cases/gestionar-atributos.use-case.js';
 import { AtributoRepositoryPrisma } from './modules/atributos-graduado/infrastructure/persistence/atributos.repository.js';
 import {
+  AtributosDeCarreraController,
   AtributosController,
   AtributosDelPlanController,
 } from './modules/atributos-graduado/infrastructure/http/atributos.controller.js';
@@ -427,6 +428,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     ObjetivosDelPlanController,
     CompetenciasController,
     CompetenciasDelPlanController,
+    AtributosDeCarreraController,
     AtributosController,
     AtributosDelPlanController,
     CriteriosDeCarreraController,

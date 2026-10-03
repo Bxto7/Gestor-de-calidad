@@ -31,6 +31,7 @@ import { existsSync } from 'node:fs';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 
+import { sembrarAtributosIcacit } from '../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaClient } from '../src/platform/database/generated/client.js';
 import {
   ASIGNATURAS,
@@ -113,17 +114,16 @@ async function main(): Promise<void> {
     ]),
   );
   resumen.push(`${totalCiclos} ciclos`);
+  await sembrarAtributosIcacit(prisma, carrera.id);
 
   /* ── Catálogo institucional ────────────────────────────────────────── */
 
   const competencias = new Map<string, string>();
-  // Los atributos del graduado los siembra `prisma/seed.ts`: son el estándar de
-  // ICACIT, no un dato de esta universidad. Aquí solo se enlazan.
+  // Los atributos de la carrera ISI se siembran arriba con `sembrarAtributosIcacit`; aquí solo se enlazan.
   const atributos = new Map(
-    (await prisma.atributoGraduado.findMany({ where: { marco: 'ICACIT' } })).map((a) => [
-      a.codigo,
-      a.id,
-    ]),
+    (
+      await prisma.atributoGraduado.findMany({ where: { carreraId: carrera.id, marco: 'ICACIT' } })
+    ).map((a) => [a.codigo, a.id]),
   );
 
   for (const c of COMPETENCIAS) {
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
       if (!id) {
         throw new Error(
           `La competencia ${c.codigo} apunta al atributo ${codigo}, que no existe. ` +
-            '¿Se ejecutó el seed?',
+            '¿Se sembraron los atributos de la carrera?',
         );
       }
       return id;

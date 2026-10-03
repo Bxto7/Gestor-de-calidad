@@ -16,14 +16,16 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { AtributoRepositoryPrisma } from '../../src/modules/atributos-graduado/infrastructure/persistence/atributos.repository.js';
+import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
 const atributos = new AtributoRepositoryPrisma(prisma);
 
-/** Marco desechable: no se toca el catálogo ICACIT que siembra el seed. */
+/** Marco desechable: el catálogo ICACIT de cada carrera no se toca. */
 const MARCO = 'PRUEBA';
 
+let carreraId: string;
 let planId: string;
 let otroPlanId: string;
 
@@ -44,6 +46,8 @@ beforeEach(async () => {
   const carrera = await prisma.carrera.create({
     data: { facultadId: facultad.id, nombre: 'Sistemas', codigo: 'ISI', duracionAnios: 2 },
   });
+  carreraId = carrera.id;
+  await sembrarAtributosIcacit(prisma, carrera.id);
 
   const plan = await prisma.planEstudios.create({
     data: {
@@ -74,73 +78,121 @@ afterAll(async () => {
 
 describe('RF120 y RF121 — unicidad del código dentro del marco', () => {
   it('el mismo código en otro marco no es un choque', async () => {
-    await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
 
-    expect(await atributos.codigoExiste(MARCO, 'AG-X01')).toBe(true);
+    expect(await atributos.codigoExiste(carreraId, MARCO, 'AG-X01')).toBe(true);
     // ICACIT ya trae AG-I01; el marco de prueba no lo ve.
-    expect(await atributos.codigoExiste(MARCO, 'AG-I01')).toBe(false);
-    expect(await atributos.codigoExiste('ICACIT', 'AG-I01')).toBe(true);
+    expect(await atributos.codigoExiste(carreraId, MARCO, 'AG-I01')).toBe(false);
+    expect(await atributos.codigoExiste(carreraId, 'ICACIT', 'AG-I01')).toBe(true);
   });
 
   it('`exceptoId` excluye el propio registro', async () => {
-    const creado = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    const creado = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
 
-    expect(await atributos.codigoExiste(MARCO, 'AG-X01', creado.id)).toBe(false);
+    expect(await atributos.codigoExiste(carreraId, MARCO, 'AG-X01', creado.id)).toBe(false);
   });
 
   it('el índice único respalda la comprobación de la aplicación', async () => {
-    await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
 
     // Si la comprobación previa se saltara, la base tiene que negarse igual.
-    await expect(atributos.crear(MARCO, 'AG-X01', 'Otro', 2)).rejects.toThrow();
+    await expect(atributos.crear(carreraId, MARCO, 'AG-X01', 'Otro', 2)).rejects.toThrow();
+  });
+
+  it('el mismo código en dos carreras no es un choque: cada carrera tiene el suyo', async () => {
+    const otra = await prisma.carrera.create({
+      data: {
+        facultadId: (await prisma.facultad.findFirstOrThrow()).id,
+        nombre: 'Civil',
+        codigo: 'CIV',
+        duracionAnios: 2,
+      },
+    });
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
+
+    expect(await atributos.codigoExiste(carreraId, MARCO, 'AG-X01')).toBe(true);
+    expect(await atributos.codigoExiste(otra.id, MARCO, 'AG-X01')).toBe(false);
+    await expect(atributos.crear(otra.id, MARCO, 'AG-X01', 'Uno', 1)).resolves.toBeDefined();
+  });
+
+  it('el orden y el listado son por carrera', async () => {
+    const otra = await prisma.carrera.create({
+      data: {
+        facultadId: (await prisma.facultad.findFirstOrThrow()).id,
+        nombre: 'Civil',
+        codigo: 'CIV',
+        duracionAnios: 2,
+      },
+    });
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 7);
+
+    expect(await atributos.ultimoOrden(otra.id, MARCO)).toBe(0);
+    expect(await atributos.listar(otra.id, MARCO)).toEqual([]);
+    expect(await atributos.listar(carreraId, MARCO)).toHaveLength(1);
+  });
+
+  it('una carrera nueva empieza sin atributos (decisión 2)', async () => {
+    const otra = await prisma.carrera.create({
+      data: {
+        facultadId: (await prisma.facultad.findFirstOrThrow()).id,
+        nombre: 'Civil',
+        codigo: 'CIV',
+        duracionAnios: 2,
+      },
+    });
+
+    expect(await atributos.listar(otra.id, 'ICACIT')).toEqual([]);
   });
 });
 
 describe('RF122 y RF128 — listado y búsqueda', () => {
   it('la búsqueda aplica sobre código y sobre nombre', async () => {
-    await atributos.crear(MARCO, 'AG-X01', 'Trabajo en equipo', 1);
-    await atributos.crear(MARCO, 'AG-X02', 'Ética profesional', 2);
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Trabajo en equipo', 1);
+    await atributos.crear(carreraId, MARCO, 'AG-X02', 'Ética profesional', 2);
 
-    expect(await atributos.listar(MARCO, { texto: 'AG-X01' })).toHaveLength(1);
-    expect(await atributos.listar(MARCO, { texto: 'equipo' })).toHaveLength(1);
-    expect(await atributos.listar(MARCO, { texto: 'zzz' })).toHaveLength(0);
+    expect(await atributos.listar(carreraId, MARCO, { texto: 'AG-X01' })).toHaveLength(1);
+    expect(await atributos.listar(carreraId, MARCO, { texto: 'equipo' })).toHaveLength(1);
+    expect(await atributos.listar(carreraId, MARCO, { texto: 'zzz' })).toHaveLength(0);
   });
 
   it('la búsqueda no distingue mayúsculas', async () => {
-    await atributos.crear(MARCO, 'AG-X01', 'Trabajo en equipo', 1);
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Trabajo en equipo', 1);
 
-    expect(await atributos.listar(MARCO, { texto: 'EQUIPO' })).toHaveLength(1);
+    expect(await atributos.listar(carreraId, MARCO, { texto: 'EQUIPO' })).toHaveLength(1);
   });
 
   it('RN1: el listado sale ordenado por código', async () => {
-    await atributos.crear(MARCO, 'AG-X02', 'Dos', 2);
-    await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
 
-    expect((await atributos.listar(MARCO)).map((a) => a.codigo)).toEqual(['AG-X01', 'AG-X02']);
+    expect((await atributos.listar(carreraId, MARCO)).map((a) => a.codigo)).toEqual([
+      'AG-X01',
+      'AG-X02',
+    ]);
   });
 
   it('el filtro de estado separa activos de inactivos', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
-    await atributos.crear(MARCO, 'AG-X02', 'Dos', 2);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
+    await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
     await atributos.cambiarEstado(a.id, false);
 
-    expect(await atributos.listar(MARCO, { activo: true })).toHaveLength(1);
-    expect(await atributos.listar(MARCO, { activo: false })).toHaveLength(1);
-    expect(await atributos.listar(MARCO)).toHaveLength(2);
+    expect(await atributos.listar(carreraId, MARCO, { activo: true })).toHaveLength(1);
+    expect(await atributos.listar(carreraId, MARCO, { activo: false })).toHaveLength(1);
+    expect(await atributos.listar(carreraId, MARCO)).toHaveLength(2);
   });
 
   it('`ultimoOrden` devuelve cero en un marco vacío', async () => {
-    expect(await atributos.ultimoOrden('MARCO-INEXISTENTE')).toBe(0);
+    expect(await atributos.ultimoOrden(carreraId, 'MARCO-INEXISTENTE')).toBe(0);
 
-    await atributos.crear(MARCO, 'AG-X01', 'Uno', 7);
-    expect(await atributos.ultimoOrden(MARCO)).toBe(7);
+    await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 7);
+    expect(await atributos.ultimoOrden(carreraId, MARCO)).toBe(7);
   });
 });
 
 describe('RF122 — declaración por plan', () => {
   it('reemplaza el conjunto completo, no acumula', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
-    const b = await atributos.crear(MARCO, 'AG-X02', 'Dos', 2);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
+    const b = await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
 
     await atributos.declararEnPlan(planId, [a.id]);
     expect((await atributos.delPlan(planId)).map((x) => x.codigo)).toEqual(['AG-X01']);
@@ -150,7 +202,7 @@ describe('RF122 — declaración por plan', () => {
   });
 
   it('la lista vacía deja el plan sin atributos', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
     await atributos.declararEnPlan(planId, [a.id]);
 
     await atributos.declararEnPlan(planId, []);
@@ -159,8 +211,8 @@ describe('RF122 — declaración por plan', () => {
   });
 
   it('lo que declara un plan no afecta a otro', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
-    const b = await atributos.crear(MARCO, 'AG-X02', 'Dos', 2);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
+    const b = await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
 
     await atributos.declararEnPlan(planId, [a.id]);
     await atributos.declararEnPlan(otroPlanId, [b.id]);
@@ -170,8 +222,8 @@ describe('RF122 — declaración por plan', () => {
   });
 
   it('los atributos del plan salen ordenados por código', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X02', 'Dos', 2);
-    const b = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
+    const b = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
 
     await atributos.declararEnPlan(planId, [a.id, b.id]);
 
@@ -179,8 +231,8 @@ describe('RF122 — declaración por plan', () => {
   });
 
   it('`inexistentesOInactivos` delata los que no sirven', async () => {
-    const activo = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
-    const inactivo = await atributos.crear(MARCO, 'AG-X02', 'Dos', 2);
+    const activo = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
+    const inactivo = await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
     await atributos.cambiarEstado(inactivo.id, false);
     const fantasma = '00000000-0000-4000-8000-000000000000';
 
@@ -192,7 +244,7 @@ describe('RF122 — declaración por plan', () => {
 
 describe('RF123 — impacto de inactivar', () => {
   it('cuenta competencias y planes vinculados', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
     await prisma.competencia.create({
       data: {
         codigo: 'CPE-01',
@@ -209,7 +261,7 @@ describe('RF123 — impacto de inactivar', () => {
   });
 
   it('inactivar conserva la fila y sus vínculos', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
     await atributos.declararEnPlan(planId, [a.id]);
 
     await atributos.cambiarEstado(a.id, false);
@@ -222,7 +274,7 @@ describe('RF123 — impacto de inactivar', () => {
   });
 
   it('`onDelete: Restrict` impide borrar un atributo que un plan declara', async () => {
-    const a = await atributos.crear(MARCO, 'AG-X01', 'Uno', 1);
+    const a = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
     await atributos.declararEnPlan(planId, [a.id]);
 
     await expect(prisma.atributoGraduado.delete({ where: { id: a.id } })).rejects.toThrow();

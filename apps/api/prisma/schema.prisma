@@ -273,8 +273,10 @@ model Carrera {
   criterios CriterioAcreditacion[]
 
   /// RF-CH-015 / RF-CH-017: objetivos y competencias creados en sus planes.
+  /// RF-CH-027: cada carrera tiene sus propios atributos del graduado.
   objetivos    ObjetivoEducacional[]
   competencias Competencia[]
+  atributos    AtributoGraduado[]
 
   /// RF015 RN1: el mismo nombre puede repetirse entre facultades, pero no
   /// dentro de una.
@@ -389,16 +391,24 @@ model AtributoGraduado {
   /// Orden de presentación dentro del marco, para listarlos como el estándar.
   orden  Int    @db.SmallInt
 
-  /// RF123: inactivar conserva el histórico. No se borra físicamente.
+  /// RF123: inactivar conserva el histórico. RF-CH-029 permite eliminar uno que
+  /// ninguna competencia ni plan use.
   estado EstadoActivacion @default(ACTIVO)
+
+  /// RF-CH-027: la carrera a la que pertenece. Cada carrera tiene su copia de
+  /// los atributos del marco y puede editarlos, inactivarlos o eliminarlos sin
+  /// afectar a otra. Una carrera nueva empieza sin ninguno.
+  carreraId String @map("carrera_id") @db.Uuid
 
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(6)
 
+  carrera      Carrera               @relation(fields: [carreraId], references: [id], onDelete: Restrict)
   competencias CompetenciaAtributo[]
   planes       PlanAtributo[]
 
-  @@unique([marco, codigo])
+  @@unique([carreraId, marco, codigo])
+  @@index([carreraId])
   @@map("atributos_graduado")
   @@schema("atributos_graduado")
 }

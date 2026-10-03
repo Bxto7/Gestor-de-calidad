@@ -18,6 +18,7 @@ import type {
 
 const SELECCION = {
   id: true,
+  carreraId: true,
   marco: true,
   codigo: true,
   nombre: true,
@@ -28,6 +29,7 @@ const SELECCION = {
 
 interface Fila {
   id: string;
+  carreraId: string;
   marco: string;
   codigo: string;
   nombre: string;
@@ -39,6 +41,7 @@ interface Fila {
 function aDatos(fila: Fila): DatosAtributoCompleto {
   return {
     id: fila.id,
+    carreraId: fila.carreraId,
     marco: fila.marco,
     codigo: fila.codigo,
     nombre: fila.nombre,
@@ -63,11 +66,16 @@ function porTexto(texto: string) {
 export class AtributoRepositoryPrisma implements RepositorioAtributoPort {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** RF122 RN1: orden por código. */
-  async listar(marco: string, filtro?: FiltroAcreditacion): Promise<DatosAtributoCompleto[]> {
+  /** RF122 RN1: orden por código. Solo los de la carrera. */
+  async listar(
+    carreraId: string,
+    marco: string,
+    filtro?: FiltroAcreditacion,
+  ): Promise<DatosAtributoCompleto[]> {
     const texto = filtro?.texto?.trim();
     const filas = await this.prisma.atributoGraduado.findMany({
       where: {
+        carreraId,
         marco,
         ...(filtro?.activo === undefined
           ? {}
@@ -88,30 +96,36 @@ export class AtributoRepositoryPrisma implements RepositorioAtributoPort {
     return fila ? aDatos(fila) : null;
   }
 
-  async codigoExiste(marco: string, codigo: string, exceptoId?: string): Promise<boolean> {
+  async codigoExiste(
+    carreraId: string,
+    marco: string,
+    codigo: string,
+    exceptoId?: string,
+  ): Promise<boolean> {
     const total = await this.prisma.atributoGraduado.count({
-      where: { marco, codigo, ...(exceptoId ? { NOT: { id: exceptoId } } : {}) },
+      where: { carreraId, marco, codigo, ...(exceptoId ? { NOT: { id: exceptoId } } : {}) },
     });
     return total > 0;
   }
 
-  /** Cero si el marco aún no tiene atributos: el primero queda en orden 1. */
-  async ultimoOrden(marco: string): Promise<number> {
+  /** Cero si la carrera aún no tiene atributos en el marco: el primero queda en orden 1. */
+  async ultimoOrden(carreraId: string, marco: string): Promise<number> {
     const r = await this.prisma.atributoGraduado.aggregate({
-      where: { marco },
+      where: { carreraId, marco },
       _max: { orden: true },
     });
     return r._max.orden ?? 0;
   }
 
   async crear(
+    carreraId: string,
     marco: string,
     codigo: string,
     nombre: string,
     orden: number,
   ): Promise<DatosAtributoCompleto> {
     const fila = await this.prisma.atributoGraduado.create({
-      data: { marco, codigo, nombre, orden },
+      data: { carreraId, marco, codigo, nombre, orden },
       select: SELECCION,
     });
     return aDatos(fila);

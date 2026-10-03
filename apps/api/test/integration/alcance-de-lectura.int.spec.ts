@@ -18,6 +18,7 @@ import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educaciona
 import { PlanParaObjetivosAdapter } from '../../src/modules/plan-estudios/infrastructure/plan-para-objetivos.adapter.js';
 import { ElementoCurricularEnUsoAdapter } from '../../src/modules/mejora-continua/infrastructure/persistence/elemento-curricular-en-uso.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
+import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
@@ -186,6 +187,7 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    await sembrarAtributosIcacit(prisma, sis);
     const atributo = await prisma.atributoGraduado.findFirstOrThrow({ orderBy: { orden: 'asc' } });
     for (const [codigo, carreraId] of [
       ['CPE-01', sis],
@@ -207,6 +209,7 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
+    await sembrarAtributosIcacit(prisma, sis);
     const atributo = await prisma.atributoGraduado.findFirstOrThrow({ orderBy: { orden: 'asc' } });
     for (const [codigo, carreraId] of [
       ['CPE-01', sis],

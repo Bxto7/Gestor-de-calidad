@@ -8,6 +8,8 @@
 
 export interface DatosAtributoCompleto {
   readonly id: string;
+  /** RF-CH-027: cada atributo es de una carrera. */
+  readonly carreraId: string;
   readonly marco: string;
   readonly codigo: string;
   readonly nombre: string;
@@ -31,12 +33,22 @@ export interface ImpactoAtributo {
 }
 
 export interface RepositorioAtributoPort {
-  listar(marco: string, filtro?: FiltroAcreditacion): Promise<DatosAtributoCompleto[]>;
+  listar(
+    carreraId: string,
+    marco: string,
+    filtro?: FiltroAcreditacion,
+  ): Promise<DatosAtributoCompleto[]>;
   porId(id: string): Promise<DatosAtributoCompleto | null>;
-  codigoExiste(marco: string, codigo: string, exceptoId?: string): Promise<boolean>;
-  ultimoOrden(marco: string): Promise<number>;
+  codigoExiste(
+    carreraId: string,
+    marco: string,
+    codigo: string,
+    exceptoId?: string,
+  ): Promise<boolean>;
+  ultimoOrden(carreraId: string, marco: string): Promise<number>;
 
   crear(
+    carreraId: string,
     marco: string,
     codigo: string,
     nombre: string,

@@ -42,10 +42,14 @@ export class GestionarAtributos {
     private readonly eventos: PublicadorDeEventos,
   ) {}
 
-  /** RF122 y RF128: listado con búsqueda sobre código y nombre. */
-  async listar(actor: Actor, filtro?: FiltroAcreditacion): Promise<DatosAtributoCompleto[]> {
+  /** RF122 y RF128: listado con búsqueda sobre código y nombre, de una carrera. */
+  async listar(
+    actor: Actor,
+    carreraId: string,
+    filtro?: FiltroAcreditacion,
+  ): Promise<DatosAtributoCompleto[]> {
     await this.exigir(actor, 'atributo.leer');
-    return this.atributos.listar(MARCO_VIGENTE, filtro);
+    return this.atributos.listar(carreraId, MARCO_VIGENTE, filtro);
   }
 
   async porId(actor: Actor, id: string): Promise<DatosAtributoCompleto> {
@@ -53,20 +57,31 @@ export class GestionarAtributos {
     return this.exigirAtributo(id);
   }
 
-  /** RF120: el código es único dentro del marco. */
-  async crear(actor: Actor, codigo: string, nombre: string): Promise<DatosAtributoCompleto> {
+  /** RF120: el código es único dentro de la carrera y el marco. */
+  async crear(
+    actor: Actor,
+    carreraId: string,
+    codigo: string,
+    nombre: string,
+  ): Promise<DatosAtributoCompleto> {
     await this.exigir(actor, 'atributo.gestionar');
     const limpio = validarNombre(nombre);
     const codigoLimpio = validarCodigo(codigo);
 
-    if (await this.atributos.codigoExiste(MARCO_VIGENTE, codigoLimpio)) {
+    if (await this.atributos.codigoExiste(carreraId, MARCO_VIGENTE, codigoLimpio)) {
       throw new ReglaDeNegocioViolada(
         `Ya existe un atributo del graduado con el código ${codigoLimpio} en el marco ${MARCO_VIGENTE}.`,
       );
     }
 
-    const orden = (await this.atributos.ultimoOrden(MARCO_VIGENTE)) + 1;
-    const creado = await this.atributos.crear(MARCO_VIGENTE, codigoLimpio, limpio, orden);
+    const orden = (await this.atributos.ultimoOrden(carreraId, MARCO_VIGENTE)) + 1;
+    const creado = await this.atributos.crear(
+      carreraId,
+      MARCO_VIGENTE,
+      codigoLimpio,
+      limpio,
+      orden,
+    );
 
     await this.eventos.publicar([
       new AtributoCreado(actor, creado.id, creado.codigo, creado.nombre),
@@ -86,7 +101,7 @@ export class GestionarAtributos {
     const limpio = validarNombre(nombre);
     const codigoLimpio = validarCodigo(codigo);
 
-    if (await this.atributos.codigoExiste(MARCO_VIGENTE, codigoLimpio, id)) {
+    if (await this.atributos.codigoExiste(previo.carreraId, MARCO_VIGENTE, codigoLimpio, id)) {
       throw new ReglaDeNegocioViolada(
         `Ya existe otro atributo del graduado con el código ${codigoLimpio}.`,
       );

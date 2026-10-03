@@ -1,8 +1,8 @@
 /**
  * Controllers de atributos del graduado. Movidos de `plan-estudios`
- * (Fase 0d). Los atributos cuelgan de la raíz (`/atributos`) porque son
- * catálogo del marco, compartido entre planes; su declaración por plan
- * cuelga del plan (`/planes/:planId/atributos`).
+ * (Fase 0d). Desde el Bloque 5 cada carrera tiene los suyos: se listan y crean
+ * por carrera y se operan por id; su declaración por plan cuelga del plan
+ * (`/planes/:planId/atributos`).
  */
 
 import {
@@ -28,27 +28,50 @@ import {
   FiltroAtributoDto,
 } from './dto/atributos.dto.js';
 
+/**
+ * RF-CH-027 y RF-CH-028: los atributos cuelgan de la carrera al crearlos y
+ * listarlos —ahí es donde pertenecen— y de la raíz al operar sobre uno concreto,
+ * que ya lleva su carrera dentro. Mismo reparto que los criterios.
+ */
+@ApiTags('Atributos del graduado')
+@ApiBearerAuth()
+@Controller('carreras/:carreraId/atributos')
+export class AtributosDeCarreraController {
+  constructor(private readonly atributos: GestionarAtributos) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Listar los atributos del graduado de una carrera',
+    description: 'RF122, RF128 y RF-CH-028. Búsqueda sobre código y nombre, ordenado por código.',
+  })
+  async listar(
+    @Param('carreraId', ParseUUIDPipe) carreraId: string,
+    @ActorActual() actor: Actor,
+    @Query() filtro: FiltroAtributoDto,
+  ) {
+    return this.atributos.listar(actor, carreraId, filtro);
+  }
+
+  @Post()
+  @ApiOperation({
+    summary: 'Registrar un atributo del graduado en una carrera',
+    description: 'RF120 y RF-CH-027.',
+  })
+  @ApiResponse({ status: 409, description: 'El código ya existe en la carrera y el marco.' })
+  async crear(
+    @Param('carreraId', ParseUUIDPipe) carreraId: string,
+    @ActorActual() actor: Actor,
+    @Body() dto: DatosAtributoDto,
+  ) {
+    return this.atributos.crear(actor, carreraId, dto.codigo, dto.nombre);
+  }
+}
+
 @ApiTags('Atributos del graduado')
 @ApiBearerAuth()
 @Controller('atributos')
 export class AtributosController {
   constructor(private readonly atributos: GestionarAtributos) {}
-
-  @Get()
-  @ApiOperation({
-    summary: 'Listar atributos del graduado',
-    description: 'RF122 y RF128. Búsqueda sobre código y nombre, ordenado por código.',
-  })
-  async listar(@ActorActual() actor: Actor, @Query() filtro: FiltroAtributoDto) {
-    return this.atributos.listar(actor, filtro);
-  }
-
-  @Post()
-  @ApiOperation({ summary: 'Registrar un atributo del graduado', description: 'RF120.' })
-  @ApiResponse({ status: 409, description: 'El código ya existe en el marco.' })
-  async crear(@ActorActual() actor: Actor, @Body() dto: DatosAtributoDto) {
-    return this.atributos.crear(actor, dto.codigo, dto.nombre);
-  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de un atributo del graduado' })

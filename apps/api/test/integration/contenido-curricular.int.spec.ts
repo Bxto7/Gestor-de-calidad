@@ -12,6 +12,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { AcademicoCrossModuloAdapter } from '../../src/modules/academico/infrastructure/academico-cross-modulo.adapter.js';
 import { CarreraRepositoryPrisma } from '../../src/modules/academico/infrastructure/persistence/academico.repository.js';
 import { ContenidoCurricularAdapter } from '../../src/modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
+import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
@@ -33,6 +34,7 @@ beforeEach(async () => {
     data: { facultadId: facultad.id, nombre: 'Sistemas', codigo: 'ISI', duracionAnios: 5 },
   });
   carreraId = carrera.id;
+  await sembrarAtributosIcacit(prisma, carrera.id);
 });
 
 afterAll(async () => {

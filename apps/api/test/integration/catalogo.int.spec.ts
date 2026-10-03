@@ -13,6 +13,7 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { CompetenciaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
 import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
@@ -35,9 +36,9 @@ beforeEach(async () => {
              academico.facultades
     RESTART IDENTITY CASCADE`);
 
-  // Los atributos de ICACIT no se tocan: los siembra `prisma/seed.ts` y son el
-  // estándar, no un dato de la prueba. Sí se limpian los marcos desechables que
-  // alguna prueba haya creado, para no arrastrarlos a la siguiente.
+  // Los atributos de ICACIT los siembra el propio `beforeEach` en la carrera de
+  // la prueba (el `TRUNCATE` de `carreras` los vacía en cascada). Sí se limpian
+  // los marcos desechables que alguna prueba haya creado.
   await prisma.atributoGraduado.deleteMany({ where: { marco: { not: 'ICACIT' } } });
 
   const facultad = await prisma.facultad.create({ data: { nombre: 'Ingeniería' } });
@@ -45,6 +46,7 @@ beforeEach(async () => {
     data: { facultadId: facultad.id, nombre: 'Sistemas', codigo: 'ISI', duracionAnios: 2 },
   });
   carreraId = carrera.id;
+  await sembrarAtributosIcacit(prisma, carrera.id);
 
   const plan = await prisma.planEstudios.create({
     data: {
@@ -327,7 +329,7 @@ describe('Unicidad de nombre', () => {
 });
 
 describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
-  /** Los once atributos los siembra `prisma/seed.ts`; aquí solo se leen. */
+  /** Los once atributos los siembra el `beforeEach`; aquí solo se leen. */
   async function atributo(codigo: string): Promise<string> {
     const a = await prisma.atributoGraduado.findFirstOrThrow({
       where: { marco: 'ICACIT', codigo },
@@ -335,7 +337,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
     return a.id;
   }
 
-  it('el seed dejó los once atributos de ICACIT', async () => {
+  it('la carrera de la prueba tiene los once atributos de ICACIT', async () => {
     expect(await competencias.atributos('ICACIT')).toHaveLength(11);
   });
 
@@ -439,7 +441,13 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
       // dejaría ausente para el resto de la ejecución, porque el `beforeEach`
       // no vacía ni resiembra los atributos —son del seed, no de la prueba—.
       const efimero = await prisma.atributoGraduado.create({
-        data: { marco: 'PRUEBA', codigo: 'X-01', nombre: 'Atributo desechable', orden: 1 },
+        data: {
+          carreraId,
+          marco: 'PRUEBA',
+          codigo: 'X-01',
+          nombre: 'Atributo desechable',
+          orden: 1,
+        },
       });
       const creada = await competenciaSuelta('CPE-01', 'Competencia', [efimero.id]);
 
@@ -452,7 +460,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
 
     it('la cobertura no mezcla marcos', async () => {
       await prisma.atributoGraduado.create({
-        data: { marco: 'OTRO', codigo: 'Z-01', nombre: 'De otro marco', orden: 1 },
+        data: { carreraId, marco: 'OTRO', codigo: 'Z-01', nombre: 'De otro marco', orden: 1 },
       });
       expect(await competencias.cobertura('ICACIT')).toHaveLength(11);
     });
