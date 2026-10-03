@@ -227,6 +227,7 @@ export function ObjetivosPage() {
       {(creando || editando !== null) && (
         <ModalObjetivo
           objetivo={editando}
+          planId={planId}
           onCerrar={() => {
             setCreando(false);
             setEditando(null);
@@ -238,9 +239,11 @@ export function ObjetivosPage() {
 }
 
 function ModalObjetivo({
+  planId,
   objetivo,
   onCerrar,
 }: {
+  planId: string;
   objetivo: ObjetivoEducacional | null;
   onCerrar: () => void;
 }) {
@@ -250,7 +253,7 @@ function ModalObjetivo({
   const [descripcion, setDescripcion] = useState(objetivo?.descripcion ?? '');
   const [error, setError] = useState<string | null>(null);
 
-  const crear = useCrearObjetivo();
+  const crear = useCrearObjetivo(planId);
   const editar = useEditarObjetivo();
   const guardando = crear.isPending || editar.isPending;
 

@@ -96,23 +96,24 @@ describe('aislamiento de plan-estudios hacia academico', () => {
 
 describe('aislamiento de plan-estudios hacia objetivos-educacionales', () => {
   const DE_OBJETIVOS = /(^|\/)objetivos-educacionales\//;
-  const PUERTO_PERMITIDO_OBJETIVOS = 'ports/objetivos-cross-modulo.port.js';
+  // `plan-para-objetivos.port.js` (Bloque 4b): objetivos define lo que necesita
+  // saber de un plan y `plan-estudios` lo implementa con su repositorio.
+  const PUERTOS_PERMITIDOS_OBJETIVOS = [
+    'ports/objetivos-cross-modulo.port.js',
+    'ports/plan-para-objetivos.port.js',
+  ];
 
-  it('solo importa de objetivos-educacionales el puerto cross-módulo', () => {
+  it('solo importa de objetivos-educacionales sus puertos', () => {
     const vistos = importsDe().filter(({ importado }) => DE_OBJETIVOS.test(importado));
     const infractores = vistos
-      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_OBJETIVOS))
+      .filter(({ importado }) => !PUERTOS_PERMITIDOS_OBJETIVOS.some((p) => importado.endsWith(p)))
       .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);
-    // Sin control positivo `vistos.not.toEqual([])` a propósito: hoy
-    // plan-estudios no consume nada de objetivos-educacionales —a diferencia
-    // de academico, donde sí hay un consumo real (crear un plan necesita la
-    // carrera). Verificado de primera mano (Task 6): ningún archivo de
-    // plan-estudios tiene un `import ... from` real hacia
-    // objetivos-educacionales; las únicas coincidencias de la cadena son
-    // menciones en comentarios de documentación. Si en el futuro aparece un
-    // consumo real, agregar aquí el control positivo correspondiente.
+    // Control positivo: desde el Bloque 4b hay un consumo real
+    // (`PlanParaObjetivosAdapter`). Sin esto, un patrón que dejara de casar
+    // compararía `[]` con `[]` y seguiría en verde.
+    expect(vistos).not.toEqual([]);
   });
 
   it('reconoce un import prohibido de objetivos-educacionales escrito en relativo', () => {

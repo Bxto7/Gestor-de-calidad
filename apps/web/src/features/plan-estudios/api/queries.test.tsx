@@ -170,7 +170,7 @@ const CASOS: readonly Caso[] = [
     nombre: 'crear un objetivo',
     preparar: () => vi.spyOn(api, 'crearObjetivo').mockResolvedValue(OBJETIVO),
     useEjecutar: () => {
-      const m = useCrearObjetivo();
+      const m = useCrearObjetivo('p1');
       return () => m.mutateAsync({ nombre: 'Objetivo', descripcion: 'Descripción.' });
     },
   },

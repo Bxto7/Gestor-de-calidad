@@ -28,9 +28,12 @@ export class ObjetivoCreado extends DomainEvent {
     readonly entidadId: string,
     codigo: string,
     nombreObjetivo: string,
+    /** RF-CH-015: el plan en el que se creó. */
+    codigoPlan?: string,
   ) {
     super(actor);
-    this.detalle = `Objetivo educacional ${codigo} «${nombreObjetivo}» creado.`;
+    const enPlan = codigoPlan ? ` en el plan ${codigoPlan}` : '';
+    this.detalle = `Objetivo educacional ${codigo} «${nombreObjetivo}» creado${enPlan}.`;
   }
 }
 

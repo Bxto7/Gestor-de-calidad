@@ -53,6 +53,8 @@ export class ObjetivoRepositoryPrisma implements RepositorioObjetivoPort {
       where: {
         ...dondeEstado(filtro?.activo),
         ...(filtro?.texto ? dondeTexto(filtro.texto) : {}),
+        ...(filtro?.planId ? { planes: { some: { planId: filtro.planId } } } : {}),
+        ...(filtro?.carreraId ? { carreraId: filtro.carreraId } : {}),
       },
       // Por código: es correlativo, así que ordena por antigüedad de alta, que
       // es como se lee un catálogo numerado.
@@ -75,9 +77,25 @@ export class ObjetivoRepositoryPrisma implements RepositorioObjetivoPort {
     return filas.map((f) => f.codigo);
   }
 
-  async crear(codigo: string, nombre: string, descripcion: string): Promise<DatosObjetivo> {
+  /**
+   * RF-CH-015 RN1: la fila y su vínculo con el plan en una sola escritura
+   * anidada, que Prisma ejecuta en una transacción.
+   *
+   * Excepción deliberada de aislamiento, como las de `catalogo.repository.ts`:
+   * `plan_objetivo` vive en el esquema `plan_estudios`, pero el alta y su
+   * vínculo tienen que ser atómicos, y una transacción no se puede partir entre
+   * repositorios de dos módulos. Este repositorio solo escribe y borra esa fila
+   * puente; nunca lee ni toca la tabla de planes.
+   */
+  async crearEnPlan(
+    planId: string,
+    carreraId: string,
+    codigo: string,
+    nombre: string,
+    descripcion: string,
+  ): Promise<DatosObjetivo> {
     const fila = await this.prisma.objetivoEducacional.create({
-      data: { codigo, nombre, descripcion },
+      data: { codigo, nombre, descripcion, carreraId, planes: { create: { planId } } },
       include: { _count: { select: { planes: true } } },
     });
     return aObjetivo(fila);
@@ -108,10 +126,16 @@ export class ObjetivoRepositoryPrisma implements RepositorioObjetivoPort {
     await this.prisma.objetivoEducacional.delete({ where: { id } });
   }
 
-  async existeNombre(nombre: string, idIgnorado?: string): Promise<boolean> {
+  async existeNombre(
+    nombre: string,
+    carreraId: string | null,
+    idIgnorado?: string,
+  ): Promise<boolean> {
     const fila = await this.prisma.objetivoEducacional.findFirst({
       where: {
         nombre: { equals: nombre, mode: 'insensitive' },
+        // `null` busca entre las filas sin carrera: Prisma lo traduce a IS NULL.
+        carreraId,
         ...(idIgnorado ? { id: { not: idIgnorado } } : {}),
       },
       select: { id: true },
@@ -126,6 +150,7 @@ function aObjetivo(fila: {
   nombre: string;
   descripcion: string;
   estado: string;
+  carreraId: string | null;
   creadoEn: Date;
   _count: { planes: number };
 }): DatosObjetivo {
@@ -135,6 +160,7 @@ function aObjetivo(fila: {
     nombre: fila.nombre,
     descripcion: fila.descripcion,
     activo: fila.estado === 'ACTIVO',
+    carreraId: fila.carreraId,
     planesVinculados: fila._count.planes,
     creadoEn: fila.creadoEn,
   };

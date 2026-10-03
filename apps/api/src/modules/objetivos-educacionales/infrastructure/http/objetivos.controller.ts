@@ -1,7 +1,7 @@
 /**
  * Controller de objetivos educacionales. Movido de `plan-estudios`
- * (Fase 0c). Cuelga de la raíz (`/objetivos`), no de un plan: es
- * catálogo institucional, compartido por toda la universidad.
+ * (Fase 0c). Cuelga de la raíz (`/objetivos`); desde el Bloque 4b
+ * cada objetivo es de una carrera y se crea dentro de un plan (RF-CH-015).
  */
 
 import {
@@ -23,6 +23,7 @@ import { ActorActual } from '../../../auth/infrastructure/http/jwt.guard.js';
 import { GestionarObjetivos } from '../../application/use-cases/gestionar-objetivos.use-case.js';
 import {
   CambiarEstadoObjetivoDto,
+  CrearObjetivoDto,
   DatosObjetivoDto,
   FiltroObjetivoDto,
 } from './dto/objetivos.dto.js';
@@ -36,7 +37,8 @@ export class ObjetivosController {
   @Get()
   @ApiOperation({
     summary: 'Listar objetivos educacionales',
-    description: 'RF035 y RF039. Cada fila trae cuántos planes lo tienen asociado.',
+    description:
+      'RF035, RF039 y RF-CH-015. Con planId, solo los del plan. Cada fila trae cuántos planes lo tienen asociado.',
   })
   async listar(@ActorActual() actor: Actor, @Query() filtro: FiltroObjetivoDto) {
     return this.objetivos.listar(actor, filtro);
@@ -51,12 +53,18 @@ export class ObjetivosController {
 
   @Post()
   @ApiOperation({
-    summary: 'Registrar un objetivo educacional',
-    description: 'RF033 y RF034. El código correlativo (OE-01…) lo genera el sistema.',
+    summary: 'Registrar un objetivo educacional dentro de un plan',
+    description:
+      'RF033, RF034 y RF-CH-015. El código correlativo (OE-01…) lo genera el sistema; ' +
+      'la carrera es la del plan, y el objetivo queda vinculado a él.',
   })
-  @ApiResponse({ status: 409, description: 'Ya existe otro objetivo con ese nombre.' })
-  async crear(@ActorActual() actor: Actor, @Body() dto: DatosObjetivoDto) {
-    return this.objetivos.crear(actor, dto.nombre, dto.descripcion);
+  @ApiResponse({ status: 404, description: 'El plan no existe o no es de tu carrera.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Ya existe otro con ese nombre en la carrera, o el plan no admite cambios.',
+  })
+  async crear(@ActorActual() actor: Actor, @Body() dto: CrearObjetivoDto) {
+    return this.objetivos.crear(actor, dto.planId, dto.nombre, dto.descripcion);
   }
 
   @Patch(':id')

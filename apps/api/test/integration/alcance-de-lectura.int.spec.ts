@@ -8,6 +8,9 @@ import { NoEncontrado } from '../../src/shared-kernel/errors/errores.js';
 import { GestionarCompetencias } from '../../src/modules/plan-estudios/application/use-cases/gestionar-catalogo.use-case.js';
 import { CompetenciaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
 import { PlanRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/plan.repository.js';
+import { GestionarObjetivos } from '../../src/modules/objetivos-educacionales/application/use-cases/gestionar-objetivos.use-case.js';
+import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
+import { PlanParaObjetivosAdapter } from '../../src/modules/plan-estudios/infrastructure/plan-para-objetivos.adapter.js';
 import { ElementoCurricularEnUsoAdapter } from '../../src/modules/mejora-continua/infrastructure/persistence/elemento-curricular-en-uso.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
@@ -220,5 +223,81 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
       gestionarCompetencias().quitarDelPlan(como(director), planCiv, ajena),
     ).rejects.toBeInstanceOf(NoEncontrado);
     expect(await prisma.planCompetencia.count({ where: { planId: planCiv } })).toBe(1);
+  });
+});
+
+function gestionarObjetivos(): GestionarObjetivos {
+  return new GestionarObjetivos(
+    new ObjetivoRepositoryPrisma(prisma),
+    new PlanParaObjetivosAdapter(new PlanRepositoryPrisma(prisma)),
+    adaptador,
+    sinBitacora,
+    adaptador,
+  );
+}
+
+async function objetivoEn(
+  codigo: string,
+  carreraId: string | null,
+  planId?: string,
+): Promise<string> {
+  const o = await prisma.objetivoEducacional.create({
+    data: {
+      codigo,
+      nombre: `Objetivo ${codigo}`,
+      descripcion: 'Descripción sintética.',
+      carreraId,
+      ...(planId ? { planes: { create: { planId } } } : {}),
+    },
+  });
+  return o.id;
+}
+
+describe('RF-CH-015 / RF-CH-009 — objetivos según el alcance de lectura', () => {
+  it('el Director lista sin planId solo los de su carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    await objetivoEn('OE-01', sis);
+    await objetivoEn('OE-02', civ);
+    await objetivoEn('OE-03', null);
+
+    const r = await gestionarObjetivos().listar(como(director));
+    expect(r.map((o) => o.codigo)).toEqual(['OE-01']);
+  });
+
+  it('el Director recibe NoEncontrado al pedir los de un plan de otra carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const planCiv = await planDe(civ, 'PE-CIV-2026-v1');
+    await objetivoEn('OE-02', civ, planCiv);
+
+    await expect(
+      gestionarObjetivos().listar(como(director), { planId: planCiv }),
+    ).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('el Director recibe NoEncontrado al leer por id un objetivo de otra carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const ajeno = await objetivoEn('OE-02', civ);
+
+    await expect(gestionarObjetivos().porId(como(director), ajeno)).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('el Coordinador sin planId recibe el catálogo entero, también las filas sin carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
+    await objetivoEn('OE-01', sis);
+    await objetivoEn('OE-02', civ);
+    await objetivoEn('OE-03', null);
+
+    const r = await gestionarObjetivos().listar(como(coordinador));
+    expect(r.map((o) => o.codigo)).toEqual(['OE-01', 'OE-02', 'OE-03']);
   });
 });

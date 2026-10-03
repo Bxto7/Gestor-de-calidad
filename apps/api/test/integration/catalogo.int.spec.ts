@@ -112,6 +112,14 @@ async function competenciaSuelta(
   return datos;
 }
 
+/** Un objetivo creado directamente, sin plan ni carrera (ver `competenciaSuelta`). */
+async function objetivoSuelto(codigo: string, nombre: string, descripcion: string) {
+  const fila = await prisma.objetivoEducacional.create({ data: { codigo, nombre, descripcion } });
+  const datos = await objetivos.porId(fila.id);
+  if (!datos) throw new Error(`No se pudo releer el objetivo ${codigo}.`);
+  return datos;
+}
+
 /** Una carrera más, con un plan en Borrador. */
 async function otraCarreraConPlan(): Promise<{ carrera: string; plan: string }> {
   const facultad = await prisma.facultad.create({ data: { nombre: 'Ingeniería Civil' } });
@@ -132,8 +140,8 @@ async function otraCarreraConPlan(): Promise<{ carrera: string; plan: string }> 
 
 describe('Unicidad de código', () => {
   it('el código del objetivo es único en todo el sistema', async () => {
-    await objetivos.crear('OE-01', 'Primero', 'Descripción.');
-    await expect(objetivos.crear('OE-01', 'Segundo', 'Descripción.')).rejects.toThrow();
+    await objetivoSuelto('OE-01', 'Primero', 'Descripción.');
+    await expect(objetivoSuelto('OE-01', 'Segundo', 'Descripción.')).rejects.toThrow();
   });
 
   it('el de la competencia también', async () => {
@@ -143,19 +151,19 @@ describe('Unicidad de código', () => {
 
   it('objetivo y competencia no comparten espacio de códigos', async () => {
     // Prefijos distintos, tablas distintas: no hay colisión posible.
-    await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     await expect(competenciaSuelta('CPE-01', 'Competencia', [])).resolves.toBeTruthy();
   });
 });
 
 describe('RF038 — recuento de vínculos del objetivo', () => {
   it('nace sin vínculos', async () => {
-    const creado = await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    const creado = await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     expect(creado.planesVinculados).toBe(0);
   });
 
   it('cuenta los planes que lo usan', async () => {
-    const creado = await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    const creado = await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     await prisma.planObjetivo.createMany({
       data: [
         { planId, objetivoId: creado.id },
@@ -168,7 +176,7 @@ describe('RF038 — recuento de vínculos del objetivo', () => {
 
   it('el listado también trae el recuento', async () => {
     // La UI lo necesita para avisar antes de que el usuario pulse eliminar.
-    const creado = await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    const creado = await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     await prisma.planObjetivo.create({ data: { planId, objetivoId: creado.id } });
 
     const [fila] = await objetivos.listar();
@@ -178,14 +186,14 @@ describe('RF038 — recuento de vínculos del objetivo', () => {
   it('la base impide borrar uno vinculado, aunque la aplicación fallara', async () => {
     // `onDelete: Restrict` es la garantía; la comprobación del caso de uso solo
     // aporta el mensaje legible.
-    const creado = await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    const creado = await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     await prisma.planObjetivo.create({ data: { planId, objetivoId: creado.id } });
 
     await expect(objetivos.eliminar(creado.id)).rejects.toThrow();
   });
 
   it('borrar uno sin vínculos funciona y desaparece del listado', async () => {
-    const creado = await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    const creado = await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     await objetivos.eliminar(creado.id);
 
     expect(await objetivos.porId(creado.id)).toBeNull();
@@ -193,7 +201,7 @@ describe('RF038 — recuento de vínculos del objetivo', () => {
   });
 
   it('inactivar conserva el registro y su vínculo', async () => {
-    const creado = await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
+    const creado = await objetivoSuelto('OE-01', 'Objetivo', 'Descripción.');
     await prisma.planObjetivo.create({ data: { planId, objetivoId: creado.id } });
 
     const inactivo = await objetivos.cambiarEstado(creado.id, false);
@@ -301,19 +309,19 @@ describe('RF039 / RF046 — búsqueda', () => {
 
 describe('Unicidad de nombre', () => {
   it('detecta el repetido sin distinguir mayúsculas', async () => {
-    await objetivos.crear('OE-01', 'Formar profesionales íntegros', 'Descripción.');
-    expect(await objetivos.existeNombre('FORMAR PROFESIONALES ÍNTEGROS')).toBe(true);
+    await objetivoSuelto('OE-01', 'Formar profesionales íntegros', 'Descripción.');
+    expect(await objetivos.existeNombre('FORMAR PROFESIONALES ÍNTEGROS', null)).toBe(true);
   });
 
   it('se excluye a sí mismo al editar', async () => {
-    const creado = await objetivos.crear('OE-01', 'Formar profesionales', 'Descripción.');
-    expect(await objetivos.existeNombre('Formar profesionales', creado.id)).toBe(false);
+    const creado = await objetivoSuelto('OE-01', 'Formar profesionales', 'Descripción.');
+    expect(await objetivos.existeNombre('Formar profesionales', null, creado.id)).toBe(false);
   });
 
   it('objetivo y competencia no compiten por el mismo nombre', async () => {
     // Son catálogos distintos: que un objetivo y una competencia se llamen
     // parecido es normal y no debe bloquearse.
-    await objetivos.crear('OE-01', 'Resolver problemas', 'Descripción.');
+    await objetivoSuelto('OE-01', 'Resolver problemas', 'Descripción.');
     await expect(competenciaSuelta('CPE-01', 'Resolver problemas', [])).resolves.toBeTruthy();
   });
 });

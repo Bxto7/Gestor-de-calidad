@@ -34,6 +34,7 @@ function director(carrera: string | null = ISI): ContextoDeAutorizacion {
       'plan.nueva_version',
       'malla.editar',
       'competencia.gestionar',
+      'objetivo.gestionar',
     ]),
     carreraACargo: carrera,
   };
@@ -130,18 +131,18 @@ describe('Clasificación de permisos', () => {
       'asignatura.gestionar',
       'malla.editar',
       'competencia.gestionar',
+      'objetivo.gestionar',
     ]) {
       expect(esPermisoAcotadoACarrera(p), p).toBe(true);
     }
   });
 
-  it('las de lectura y las de catálogo no lo están', () => {
+  it('las de lectura no lo están', () => {
     for (const p of [
       'plan.leer',
       'plan.leer_historico',
       'facultad.leer',
       'carrera.leer',
-      'objetivo.gestionar',
       'reporte.generar',
       'auditoria.leer',
     ]) {
@@ -160,6 +161,12 @@ describe('RF-CH-015 / RF-CH-017 — el catálogo de la carrera', () => {
 
   it('competencia.gestionar sin carrera no se concede: una fila sin carrera no la gestiona nadie', () => {
     expect(puede(director(ISI), 'competencia.gestionar', null).permitido).toBe(false);
+  });
+
+  it('objetivo.gestionar también: su carrera sí, otra no, sin carrera nadie', () => {
+    expect(puede(director(ISI), 'objetivo.gestionar', ISI).permitido).toBe(true);
+    expect(puede(director(ISI), 'objetivo.gestionar', IIN).permitido).toBe(false);
+    expect(puede(director(ISI), 'objetivo.gestionar', null).permitido).toBe(false);
   });
 });
 

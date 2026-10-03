@@ -250,10 +250,12 @@ export function useObjetivos() {
   return useQuery({ queryKey: claves.objetivos, queryFn: api.listarObjetivos });
 }
 
-export function useCrearObjetivo() {
+export function useCrearObjetivo(planId: string) {
   return useMutacionConInvalidacion(
-    (v: { nombre: string; descripcion: string }) => api.crearObjetivo(v.nombre, v.descripcion),
-    [claves.objetivos, ['plan']],
+    (v: { nombre: string; descripcion: string }) =>
+      api.crearObjetivo(planId, v.nombre, v.descripcion),
+    // El objetivo nuevo queda vinculado al plan: su detalle cambia.
+    [claves.objetivos, claves.plan(planId)],
   );
 }
 

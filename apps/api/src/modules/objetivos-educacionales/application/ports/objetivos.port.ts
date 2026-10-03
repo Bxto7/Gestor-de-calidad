@@ -18,6 +18,11 @@ export interface DatosObjetivo {
   readonly nombre: string;
   readonly descripcion: string;
   readonly activo: boolean;
+  /**
+   * RF-CH-015: la carrera del plan en el que se creó. `null` solo en filas
+   * anteriores al Bloque 4b que no se pudieron atribuir a una sola carrera.
+   */
+  readonly carreraId: string | null;
   /** RF038: cuántos planes lo usan. Cero habilita el borrado. */
   readonly planesVinculados: number;
   readonly creadoEn: Date;
@@ -27,6 +32,10 @@ export interface DatosObjetivo {
 export interface FiltroObjetivo {
   readonly texto?: string;
   readonly activo?: boolean;
+  /** RF-CH-015: solo los vinculados a este plan. */
+  readonly planId?: string;
+  /** RF-CH-009: solo los de esta carrera (el alcance de un Director). */
+  readonly carreraId?: string;
 }
 
 export interface RepositorioObjetivoPort {
@@ -34,12 +43,23 @@ export interface RepositorioObjetivoPort {
   porId(id: string): Promise<DatosObjetivo | null>;
   codigos(): Promise<string[]>;
 
-  crear(codigo: string, nombre: string, descripcion: string): Promise<DatosObjetivo>;
+  /**
+   * RF-CH-015 RN1: crea el objetivo con la carrera del plan y lo vincula a él
+   * en la misma escritura.
+   */
+  crearEnPlan(
+    planId: string,
+    carreraId: string,
+    codigo: string,
+    nombre: string,
+    descripcion: string,
+  ): Promise<DatosObjetivo>;
   actualizar(id: string, nombre: string, descripcion: string): Promise<DatosObjetivo>;
   cambiarEstado(id: string, activo: boolean): Promise<DatosObjetivo>;
   eliminar(id: string): Promise<void>;
 
-  existeNombre(nombre: string, idIgnorado?: string): Promise<boolean>;
+  /** RF-CH-015: el nombre se repite como mucho una vez por carrera, sin distinguir mayúsculas. */
+  existeNombre(nombre: string, carreraId: string | null, idIgnorado?: string): Promise<boolean>;
 }
 
 export const REPOSITORIO_OBJETIVO = Symbol('RepositorioObjetivoPort');

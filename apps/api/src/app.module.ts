@@ -95,6 +95,11 @@ import {
 import { ObjetivoRepositoryPrisma } from './modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
 import { ObjetivosCrossModuloAdapter } from './modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import {
+  PLAN_PARA_OBJETIVOS,
+  type PlanParaObjetivosPort,
+} from './modules/objetivos-educacionales/application/ports/plan-para-objetivos.port.js';
+import { PlanParaObjetivosAdapter } from './modules/plan-estudios/infrastructure/plan-para-objetivos.adapter.js';
+import {
   REPOSITORIO_CRITERIO,
   type RepositorioCriterioPort,
 } from './modules/plan-estudios/application/ports/acreditacion.port.js';
@@ -472,6 +477,9 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     { provide: REPOSITORIO_BITACORA, useClass: BitacoraRepositoryPrisma },
     { provide: REPOSITORIO_OBJETIVO, useClass: ObjetivoRepositoryPrisma },
     { provide: OBJETIVOS_CROSS_MODULO, useClass: ObjetivosCrossModuloAdapter },
+    // La frontera al revés: `objetivos-educacionales` define lo que necesita de
+    // un plan y `plan-estudios` lo implementa (Bloque 4b).
+    { provide: PLAN_PARA_OBJETIVOS, useClass: PlanParaObjetivosAdapter },
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
     { provide: REPOSITORIO_ATRIBUTO, useClass: AtributoRepositoryPrisma },
     { provide: REPOSITORIO_CRITERIO, useClass: CriterioRepositoryPrisma },
@@ -649,12 +657,20 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarObjetivos,
-      inject: [REPOSITORIO_OBJETIVO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_OBJETIVO,
+        PLAN_PARA_OBJETIVOS,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         objetivos: RepositorioObjetivoPort,
+        planes: PlanParaObjetivosPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarObjetivos(objetivos, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarObjetivos(objetivos, planes, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarCompetencias,

@@ -1,13 +1,10 @@
 /**
- * Pruebas de objetivos educacionales.
+ * Pruebas de objetivos educacionales (RF033–RF039, RF-CH-015).
  *
- * Copiado de `plan-estudios/application/use-cases/gestionar-catalogo.spec.ts`
- * (Fase 0c) — solo la parte de `GestionarObjetivos`; `GestionarCompetencias`
- * se queda donde estaba.
- *
- * El foco está en la frontera entre inactivar y eliminar, que es donde este
- * caso de uso puede hacer daño: borrar algo que un plan histórico ya usaba
- * dejaría ese plan describiendo un objetivo que no existe.
+ * Dos focos. La frontera entre inactivar y eliminar: borrar algo que un plan
+ * histórico ya usaba lo dejaría describiendo un objetivo que no existe. Y,
+ * desde el Bloque 4b, el alcance: contra qué carrera se autoriza cada escritura
+ * y qué ve quien solo lee su carrera.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -22,35 +19,37 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type {
   DatosObjetivo,
   FiltroObjetivo,
   RepositorioObjetivoPort,
 } from '../ports/objetivos.port.js';
+import type {
+  PlanParaObjetivos,
+  PlanParaObjetivosPort,
+} from '../ports/plan-para-objetivos.port.js';
 import { GestionarObjetivos } from './gestionar-objetivos.use-case.js';
 
-const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
+const ACTOR: Actor = { id: 'u-1', nombre: 'Directora de carrera' };
+const ISI = 'car-isi';
+const IIN = 'car-iin';
 
-function permitirTodo(): AuthorizationPort {
+function sinRestriccion(): AlcanceDeLecturaPort {
   return {
-    puede: async () => ({ permitido: true }),
-    permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
-    rolesDe: async () => [],
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
   };
 }
 
-function denegar(): AuthorizationPort {
+/** Un Director: solo lee la carrera indicada (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
   return {
-    puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
-    permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
-    rolesDe: async () => [],
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
   };
 }
-
-/* ── Objetivos educacionales ──────────────────────────────────────────── */
 
 function objetivo(sobre: Partial<DatosObjetivo> = {}): DatosObjetivo {
   return {
@@ -59,8 +58,20 @@ function objetivo(sobre: Partial<DatosObjetivo> = {}): DatosObjetivo {
     nombre: 'Formar profesionales íntegros',
     descripcion: 'Descripción sintética del objetivo educacional.',
     activo: true,
+    carreraId: ISI,
     planesVinculados: 0,
     creadoEn: new Date('2026-01-01'),
+    ...sobre,
+  };
+}
+
+function plan(sobre: Partial<PlanParaObjetivos> = {}): PlanParaObjetivos {
+  return {
+    id: 'plan-1',
+    codigo: 'PE-ISI-2026-v2',
+    carreraId: ISI,
+    estado: 'Borrador',
+    editable: true,
     ...sobre,
   };
 }
@@ -68,16 +79,21 @@ function objetivo(sobre: Partial<DatosObjetivo> = {}): DatosObjetivo {
 function montarObjetivos(
   opciones: {
     existente?: DatosObjetivo | null;
+    plan?: PlanParaObjetivos | null;
     nombreDuplicado?: boolean;
     codigos?: string[];
-    autorizacion?: AuthorizationPort;
+    /** `false` deniega todo; una función decide por permiso. */
+    permitido?: boolean | ((permiso: string) => boolean);
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
-  const creados: { codigo: string; nombre: string }[] = [];
+  const creados: { planId: string; carreraId: string; codigo: string; nombre: string }[] = [];
   const eliminados: string[] = [];
   const filtros: (FiltroObjetivo | undefined)[] = [];
-  const exclusiones: (string | undefined)[] = [];
+  const nombresConsultados: { nombre: string; carreraId: string | null; idIgnorado?: string }[] =
+    [];
+  const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
 
   const repo: RepositorioObjetivoPort = {
     listar: async (filtro) => {
@@ -86,69 +102,210 @@ function montarObjetivos(
     },
     porId: async () => (opciones.existente === undefined ? objetivo() : opciones.existente),
     codigos: async () => opciones.codigos ?? [],
-    crear: async (codigo, nombre, descripcion) => {
-      creados.push({ codigo, nombre });
-      return objetivo({ codigo, nombre, descripcion });
+    crearEnPlan: async (planId, carreraId, codigo, nombre, descripcion) => {
+      creados.push({ planId, carreraId, codigo, nombre });
+      return objetivo({ codigo, nombre, descripcion, carreraId, planesVinculados: 1 });
     },
     actualizar: async (_id, nombre, descripcion) => objetivo({ nombre, descripcion }),
     cambiarEstado: async (_id, activo) => objetivo({ activo }),
     eliminar: async (id) => void eliminados.push(id),
-    existeNombre: async (_nombre, idIgnorado) => {
-      exclusiones.push(idIgnorado);
+    existeNombre: async (nombre, carreraId, idIgnorado) => {
+      nombresConsultados.push({ nombre, carreraId, idIgnorado });
       return opciones.nombreDuplicado ?? false;
     },
   };
 
-  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
-  const caso = new GestionarObjetivos(repo, opciones.autorizacion ?? permitirTodo(), eventos);
+  const planes: PlanParaObjetivosPort = {
+    planPorId: async () => (opciones.plan === undefined ? plan() : opciones.plan),
+  };
 
-  return { caso, publicados, creados, eliminados, filtros, exclusiones };
+  const permitido = opciones.permitido ?? true;
+  const autorizacion: AuthorizationPort = {
+    puede: async (_usuarioId, permiso, carreraId) => {
+      autorizaciones.push({ permiso, carreraId: carreraId ?? null });
+      const ok = typeof permitido === 'function' ? permitido(permiso) : permitido;
+      return ok ? { permitido: true } : { permitido: false, motivo: 'Falta el permiso.' };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => ISI,
+    rolesDe: async () => [],
+  };
+
+  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+  const caso = new GestionarObjetivos(
+    repo,
+    planes,
+    autorizacion,
+    eventos,
+    opciones.alcance ?? sinRestriccion(),
+  );
+
+  return { caso, publicados, creados, eliminados, filtros, nombresConsultados, autorizaciones };
 }
 
-describe('RF033 / RF034 — registrar objetivo', () => {
+describe('RF033 / RF034 / RF-CH-015 — registrar objetivo dentro del plan', () => {
   it('genera el primer código correlativo', async () => {
     const { caso, creados } = montarObjetivos({ codigos: [] });
-    await caso.crear(ACTOR, 'Formar profesionales íntegros', 'Descripción suficiente.');
+    await caso.crear(ACTOR, 'plan-1', 'Formar profesionales íntegros', 'Descripción suficiente.');
     expect(creados[0]?.codigo).toBe('OE-01');
   });
 
   it('continúa el correlativo', async () => {
     const { caso, creados } = montarObjetivos({ codigos: ['OE-01', 'OE-02'] });
-    await caso.crear(ACTOR, 'Otro objetivo', 'Descripción suficiente.');
+    await caso.crear(ACTOR, 'plan-1', 'Otro objetivo', 'Descripción suficiente.');
     expect(creados[0]?.codigo).toBe('OE-03');
+  });
+
+  it('lo crea con la carrera del plan y vinculado a él', async () => {
+    const { caso, creados } = montarObjetivos({ plan: plan({ carreraId: IIN }) });
+    await caso.crear(ACTOR, 'plan-1', 'Formar profesionales', 'Descripción suficiente.');
+    expect(creados[0]).toMatchObject({ planId: 'plan-1', carreraId: IIN });
   });
 
   it('RN1: exige nombre y descripción', async () => {
     const { caso } = montarObjetivos();
-    await expect(caso.crear(ACTOR, '   ', 'Descripción.')).rejects.toThrow(/nombre .* obligatorio/);
-    await expect(caso.crear(ACTOR, 'Objetivo', '  ')).rejects.toThrow(/descripción .* obligatoria/);
+    await expect(caso.crear(ACTOR, 'plan-1', '   ', 'Descripción.')).rejects.toThrow(
+      /nombre .* obligatorio/,
+    );
+    await expect(caso.crear(ACTOR, 'plan-1', 'Objetivo', '  ')).rejects.toThrow(
+      /descripción .* obligatoria/,
+    );
   });
 
   it('colapsa los espacios internos del nombre', async () => {
     const { caso, creados } = montarObjetivos();
-    await caso.crear(ACTOR, 'Formar   profesionales', 'Descripción suficiente.');
+    await caso.crear(ACTOR, 'plan-1', 'Formar   profesionales', 'Descripción suficiente.');
     expect(creados[0]?.nombre).toBe('Formar profesionales');
   });
 
-  it('rechaza un nombre repetido', async () => {
-    const { caso, creados } = montarObjetivos({ nombreDuplicado: true });
-    await expect(caso.crear(ACTOR, 'Repetido', 'Descripción.')).rejects.toThrow(/Ya existe otro/);
+  it('rechaza un nombre repetido dentro de la carrera del plan', async () => {
+    const { caso, creados, nombresConsultados } = montarObjetivos({ nombreDuplicado: true });
+    await expect(caso.crear(ACTOR, 'plan-1', 'Repetido', 'Descripción.')).rejects.toThrow(
+      /Ya existe otro/,
+    );
     expect(creados).toHaveLength(0);
+    expect(nombresConsultados[0]).toMatchObject({ nombre: 'Repetido', carreraId: ISI });
   });
 
-  it('el alta queda en la bitácora', async () => {
+  it('el alta queda en la bitácora con el plan', async () => {
     const { caso, publicados } = montarObjetivos();
-    await caso.crear(ACTOR, 'Formar profesionales', 'Descripción suficiente.');
+    await caso.crear(ACTOR, 'plan-1', 'Formar profesionales', 'Descripción suficiente.');
     expect(publicados[0]?.nombre).toBe('objetivo.creado');
     expect(publicados[0]?.detalle).toContain('Objetivo educacional OE-01');
+    expect(publicados[0]?.detalle).toContain('PE-ISI-2026-v2');
+  });
+
+  it('autoriza objetivo.gestionar contra la carrera del plan', async () => {
+    const { caso, autorizaciones } = montarObjetivos({ plan: plan({ carreraId: IIN }) });
+    await caso.crear(ACTOR, 'plan-1', 'Formar profesionales', 'Descripción suficiente.');
+    expect(autorizaciones).toContainEqual({ permiso: 'objetivo.gestionar', carreraId: IIN });
   });
 
   it('deniega sin permiso, antes de tocar nada', async () => {
-    const { caso, creados } = montarObjetivos({ autorizacion: denegar() });
-    await expect(caso.crear(ACTOR, 'Objetivo', 'Descripción.')).rejects.toBeInstanceOf(
+    const { caso, creados } = montarObjetivos({ permitido: false });
+    await expect(caso.crear(ACTOR, 'plan-1', 'Objetivo', 'Descripción.')).rejects.toBeInstanceOf(
       AccesoDenegado,
     );
     expect(creados).toHaveLength(0);
+  });
+
+  it('con el plan Vigente no se crea nada', async () => {
+    const { caso, creados } = montarObjetivos({
+      plan: plan({ estado: 'Vigente', editable: false }),
+    });
+    await expect(caso.crear(ACTOR, 'plan-1', 'Objetivo', 'Descripción.')).rejects.toThrow(
+      'El plan está en estado Vigente y no admite cambios. Genera una nueva versión para modificarlo.',
+    );
+    expect(creados).toHaveLength(0);
+  });
+
+  it('un plan inexistente da NoEncontrado', async () => {
+    const { caso } = montarObjetivos({ plan: null });
+    await expect(caso.crear(ACTOR, 'plan-x', 'Objetivo', 'Descripción.')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('un plan de otra carrera, para quien solo lee la suya, da NoEncontrado y no crea nada', async () => {
+    const { caso, creados, autorizaciones } = montarObjetivos({
+      plan: plan({ carreraId: IIN }),
+      alcance: soloCarrera(ISI),
+    });
+    await expect(caso.crear(ACTOR, 'plan-1', 'Objetivo', 'Descripción.')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+    expect(creados).toHaveLength(0);
+    expect(autorizaciones.map((a) => a.permiso)).toEqual(['objetivo.leer']);
+  });
+});
+
+describe('RF035 / RF039 / RF-CH-015 / RF-CH-009 — consulta de objetivos', () => {
+  it('con planId pide solo los del plan', async () => {
+    const { caso, filtros } = montarObjetivos();
+    await caso.listar(ACTOR, { planId: 'plan-1', texto: 'íntegros' });
+    expect(filtros[0]).toMatchObject({ planId: 'plan-1', texto: 'íntegros' });
+    expect(filtros[0]?.carreraId).toBeUndefined();
+  });
+
+  it('con planId de otra carrera responde NoEncontrado sin consultar el catálogo', async () => {
+    const { caso, filtros } = montarObjetivos({
+      plan: plan({ carreraId: IIN }),
+      alcance: soloCarrera(ISI),
+    });
+    await expect(caso.listar(ACTOR, { planId: 'plan-1' })).rejects.toBeInstanceOf(NoEncontrado);
+    expect(filtros).toHaveLength(0);
+  });
+
+  it('sin planId, quien lee solo su carrera recibe los de su carrera', async () => {
+    const { caso, filtros } = montarObjetivos({ alcance: soloCarrera(ISI) });
+    await caso.listar(ACTOR);
+    expect(filtros[0]).toMatchObject({ carreraId: ISI });
+  });
+
+  it('sin planId y sin carrera asignada no recibe ninguno', async () => {
+    const { caso, filtros } = montarObjetivos({ alcance: soloCarrera(null) });
+    expect(await caso.listar(ACTOR)).toEqual([]);
+    expect(filtros).toHaveLength(0);
+  });
+
+  it('sin planId y sin restricción recibe el catálogo entero, como Mejora Continua', async () => {
+    const { caso, filtros } = montarObjetivos();
+    await caso.listar(ACTOR, { texto: 'íntegros', activo: true });
+    expect(filtros[0]?.texto).toBe('íntegros');
+    expect(filtros[0]?.activo).toBe(true);
+    expect(filtros[0]?.carreraId).toBeUndefined();
+    expect(filtros[0]?.planId).toBeUndefined();
+  });
+
+  it('leer exige permiso', async () => {
+    const { caso } = montarObjetivos({ permitido: false });
+    await expect(caso.listar(ACTOR)).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('el detalle da 404 en vez de null', async () => {
+    const { caso } = montarObjetivos({ existente: null });
+    await expect(caso.porId(ACTOR, 'x')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('el detalle de un objetivo de otra carrera responde NoEncontrado', async () => {
+    const { caso } = montarObjetivos({
+      existente: objetivo({ carreraId: IIN }),
+      alcance: soloCarrera(ISI),
+    });
+    await expect(caso.porId(ACTOR, 'obj-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('un objetivo sin carrera no lo ve quien solo lee la suya, y sí quien no tiene restricción', async () => {
+    const sinCarrera = objetivo({ carreraId: null });
+    await expect(
+      montarObjetivos({ existente: sinCarrera, alcance: soloCarrera(ISI) }).caso.porId(
+        ACTOR,
+        'obj-1',
+      ),
+    ).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(
+      montarObjetivos({ existente: sinCarrera }).caso.porId(ACTOR, 'obj-1'),
+    ).resolves.toMatchObject({ id: 'obj-1' });
   });
 });
 
@@ -160,10 +317,15 @@ describe('RF036 — editar objetivo', () => {
     );
   });
 
-  it('se excluye a sí mismo de la comprobación de nombre', async () => {
-    const { caso, exclusiones } = montarObjetivos();
+  it('se excluye a sí mismo y busca el nombre en la carrera de la fila', async () => {
+    const { caso, nombresConsultados, autorizaciones } = montarObjetivos({
+      existente: objetivo({ carreraId: IIN }),
+    });
     await caso.editar(ACTOR, 'obj-1', 'Formar profesionales íntegros', 'Descripción.');
-    expect(exclusiones).toEqual(['obj-1']);
+    expect(nombresConsultados).toEqual([
+      { nombre: 'Formar profesionales íntegros', carreraId: IIN, idIgnorado: 'obj-1' },
+    ]);
+    expect(autorizaciones).toContainEqual({ permiso: 'objetivo.gestionar', carreraId: IIN });
   });
 
   it('la bitácora conserva el nombre anterior', async () => {
@@ -190,6 +352,27 @@ describe('RF036 — editar objetivo', () => {
     await caso.editar(ACTOR, 'obj-1', actual.nombre, actual.descripcion);
     expect(publicados[0]?.detalle).toContain('sin cambios');
   });
+
+  it('editar, inactivar o borrar uno de otra carrera, para quien solo lee la suya, da NoEncontrado', async () => {
+    for (const intento of [
+      (c: GestionarObjetivos) => c.editar(ACTOR, 'obj-1', 'Otro nombre', 'Descripción.'),
+      (c: GestionarObjetivos) => c.cambiarEstado(ACTOR, 'obj-1', false),
+      (c: GestionarObjetivos) => c.eliminar(ACTOR, 'obj-1'),
+    ]) {
+      const { caso, eliminados } = montarObjetivos({
+        existente: objetivo({ carreraId: IIN }),
+        alcance: soloCarrera(ISI),
+      });
+      await expect(intento(caso)).rejects.toBeInstanceOf(NoEncontrado);
+      expect(eliminados).toHaveLength(0);
+    }
+  });
+
+  it('una fila sin carrera se autoriza con carrera null, que la política deniega', async () => {
+    const { caso, autorizaciones } = montarObjetivos({ existente: objetivo({ carreraId: null }) });
+    await caso.cambiarEstado(ACTOR, 'obj-1', false);
+    expect(autorizaciones).toContainEqual({ permiso: 'objetivo.gestionar', carreraId: null });
+  });
 });
 
 describe('RF037 / RF038 — inactivar frente a eliminar', () => {
@@ -212,14 +395,16 @@ describe('RF037 / RF038 — inactivar frente a eliminar', () => {
     expect(publicados[0]?.detalle).not.toContain('vínculo');
   });
 
-  it('RF038: eliminar uno sin vínculos sí se permite', async () => {
-    const { caso, eliminados } = montarObjetivos({ existente: objetivo({ planesVinculados: 0 }) });
+  it('RF038: eliminar uno sin vínculos sí se permite y se autoriza contra su carrera', async () => {
+    const { caso, eliminados, autorizaciones } = montarObjetivos({
+      existente: objetivo({ planesVinculados: 0, carreraId: IIN }),
+    });
     await caso.eliminar(ACTOR, 'obj-1');
     expect(eliminados).toEqual(['obj-1']);
+    expect(autorizaciones).toContainEqual({ permiso: 'objetivo.gestionar', carreraId: IIN });
   });
 
   it('RF038 RN1: eliminar uno vinculado se rechaza', async () => {
-    // Borrarlo dejaría a un plan histórico describiendo un objetivo inexistente.
     const { caso, eliminados } = montarObjetivos({ existente: objetivo({ planesVinculados: 2 }) });
     await expect(caso.eliminar(ACTOR, 'obj-1')).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
     expect(eliminados).toHaveLength(0);
@@ -231,8 +416,6 @@ describe('RF037 / RF038 — inactivar frente a eliminar', () => {
   });
 
   it('el borrado se audita antes de perder el registro', async () => {
-    // Después de borrar, el código y el nombre ya no existen en ninguna parte:
-    // el evento es lo único que quedará de ese objetivo.
     const { caso, publicados } = montarObjetivos();
     await caso.eliminar(ACTOR, 'obj-1');
     expect(publicados[0]?.nombre).toBe('objetivo.eliminado');
@@ -243,23 +426,5 @@ describe('RF037 / RF038 — inactivar frente a eliminar', () => {
   it('404 al eliminar algo que no existe', async () => {
     const { caso } = montarObjetivos({ existente: null });
     await expect(caso.eliminar(ACTOR, 'x')).rejects.toBeInstanceOf(NoEncontrado);
-  });
-});
-
-describe('RF035 / RF039 — consulta de objetivos', () => {
-  it('traslada el filtro al repositorio', async () => {
-    const { caso, filtros } = montarObjetivos();
-    await caso.listar(ACTOR, { texto: 'íntegros', activo: true });
-    expect(filtros[0]).toEqual({ texto: 'íntegros', activo: true });
-  });
-
-  it('leer exige permiso', async () => {
-    const { caso } = montarObjetivos({ autorizacion: denegar() });
-    await expect(caso.listar(ACTOR)).rejects.toBeInstanceOf(AccesoDenegado);
-  });
-
-  it('el detalle da 404 en vez de null', async () => {
-    const { caso } = montarObjetivos({ existente: null });
-    await expect(caso.porId(ACTOR, 'x')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

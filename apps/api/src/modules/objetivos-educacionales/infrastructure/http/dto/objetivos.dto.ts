@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 import { Recortado } from '../../../../../platform/http/recortado.js';
 
 export class DatosObjetivoDto {
@@ -17,6 +17,12 @@ export class DatosObjetivoDto {
   descripcion!: string;
 }
 
+/** RF-CH-015 RN1: el alta va siempre dentro de un plan, que fija la carrera. */
+export class CrearObjetivoDto extends DatosObjetivoDto {
+  @IsUUID('4', { message: 'El objetivo se crea dentro de un plan: falta su identificador.' })
+  planId!: string;
+}
+
 /** RF039: búsqueda por texto, más filtro de estado. */
 export class FiltroObjetivoDto {
   @IsOptional()
@@ -27,6 +33,11 @@ export class FiltroObjetivoDto {
   @Transform(({ value }: { value: unknown }) => value === 'true' || value === true)
   @IsBoolean()
   activo?: boolean;
+
+  /** RF-CH-015: solo los vinculados a este plan. */
+  @IsOptional()
+  @IsUUID('4')
+  planId?: string;
 }
 
 export class CambiarEstadoObjetivoDto {

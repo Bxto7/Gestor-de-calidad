@@ -256,11 +256,13 @@ export async function listarObjetivos(): Promise<ObjetivoEducacional[]> {
   return (await cliente.get<ObjetivoApi[]>('/objetivos')).map(aObjetivo);
 }
 
+/** RF-CH-015: se crea dentro del plan, que le da su carrera y lo vincula. */
 export async function crearObjetivo(
+  planId: string,
   nombre: string,
   descripcion: string,
 ): Promise<ObjetivoEducacional> {
-  return aObjetivo(await cliente.post<ObjetivoApi>('/objetivos', { nombre, descripcion }));
+  return aObjetivo(await cliente.post<ObjetivoApi>('/objetivos', { planId, nombre, descripcion }));
 }
 
 export async function editarObjetivo(
