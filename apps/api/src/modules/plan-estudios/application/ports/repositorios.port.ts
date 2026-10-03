@@ -76,15 +76,6 @@ export interface RepositorioPlanPort {
    * son los mismos, compartidos entre versiones.
    */
   copiarContenido(desdePlanId: string, haciaPlanId: string): Promise<void>;
-
-  /**
-   * RF028 / RF029: reemplaza el conjunto asociado al plan.
-   *
-   * Reemplaza en vez de añadir porque la pantalla trabaja con una lista de
-   * casillas marcadas: lo que envía es el estado final, no un incremento.
-   */
-  asociarObjetivos(planId: string, objetivoIds: readonly string[]): Promise<void>;
-  asociarCompetencias(planId: string, competenciaIds: readonly string[]): Promise<void>;
 }
 
 export interface RepositorioContenidoPort {

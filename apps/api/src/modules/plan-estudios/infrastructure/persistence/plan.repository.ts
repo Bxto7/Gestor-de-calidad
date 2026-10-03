@@ -117,27 +117,6 @@ export class PlanRepositoryPrisma implements RepositorioPlanPort {
     await this.prisma.planEstudios.delete({ where: { id } });
   }
 
-  async asociarObjetivos(planId: string, objetivoIds: readonly string[]): Promise<void> {
-    // Borrar y volver a insertar dentro de una transacción: calcular el
-    // diferencial daría el mismo resultado con más código, y a medias dejaría
-    // el plan sin ningún objetivo asociado.
-    await this.prisma.$transaction([
-      this.prisma.planObjetivo.deleteMany({ where: { planId } }),
-      this.prisma.planObjetivo.createMany({
-        data: objetivoIds.map((objetivoId) => ({ planId, objetivoId })),
-      }),
-    ]);
-  }
-
-  async asociarCompetencias(planId: string, competenciaIds: readonly string[]): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.planCompetencia.deleteMany({ where: { planId } }),
-      this.prisma.planCompetencia.createMany({
-        data: competenciaIds.map((competenciaId) => ({ planId, competenciaId })),
-      }),
-    ]);
-  }
-
   /**
    * RF075: copia la malla a la versión nueva, y con ella los vínculos del plan
    * con objetivos y competencias (RF-CH-015 / RF-CH-017).

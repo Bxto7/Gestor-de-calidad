@@ -3,8 +3,6 @@
  *
  * Lo que se comprueba aquí y con dobles no se puede:
  *
- *  - que el reemplazo de objetivos y competencias asociados sea atómico y no
- *    deje el plan sin ninguno a mitad de camino;
  *  - que el orden de los listados sea el que la pantalla espera —los planes por
  *    fecha descendente, las versiones por número descendente— y no el que
  *    PostgreSQL devuelva por casualidad;
@@ -159,75 +157,10 @@ describe('RF076 / RF091 — versiones de una carrera', () => {
   });
 });
 
-describe('RF028 / RF029 — asociaciones del plan', () => {
-  it('guarda los objetivos asociados', async () => {
-    const planId = await crearPlan(1);
-    await planes.asociarObjetivos(planId, [objetivos[0]!, objetivos[1]!]);
-
-    expect((await contenido.objetivoIdsDe(planId)).sort()).toEqual(
-      [objetivos[0]!, objetivos[1]!].sort(),
-    );
-  });
-
-  it('reemplaza por completo, no acumula', async () => {
-    const planId = await crearPlan(1);
-    await planes.asociarObjetivos(planId, [objetivos[0]!, objetivos[1]!]);
-    await planes.asociarObjetivos(planId, [objetivos[2]!]);
-
-    expect(await contenido.objetivoIdsDe(planId)).toEqual([objetivos[2]!]);
-  });
-
-  it('una lista vacía desasocia todo', async () => {
-    const planId = await crearPlan(1);
-    await planes.asociarObjetivos(planId, [objetivos[0]!]);
-    await planes.asociarObjetivos(planId, []);
-
-    expect(await contenido.objetivoIdsDe(planId)).toEqual([]);
-  });
-
-  it('objetivos y competencias son independientes', async () => {
-    // Reasociar objetivos no debe vaciar las competencias del plan.
-    const planId = await crearPlan(1);
-    await planes.asociarCompetencias(planId, [competencias[0]!]);
-    await planes.asociarObjetivos(planId, [objetivos[0]!]);
-
-    expect(await contenido.competenciaIdsDe(planId)).toEqual([competencias[0]!]);
-  });
-
-  it('dos planes pueden compartir el mismo objetivo', async () => {
-    // Es un catálogo institucional: que dos planes lo usen es lo normal.
-    const a = await crearPlan(1);
-    const b = await crearPlan(2);
-    await planes.asociarObjetivos(a, [objetivos[0]!]);
-    await planes.asociarObjetivos(b, [objetivos[0]!]);
-
-    expect(await contenido.objetivoIdsDe(a)).toEqual([objetivos[0]!]);
-    expect(await contenido.objetivoIdsDe(b)).toEqual([objetivos[0]!]);
-  });
-
-  it('asociar un objetivo inexistente lo rechaza la clave foránea', async () => {
-    // Por eso el caso de uso comprueba antes: aquí el mensaje sería de PostgreSQL.
-    const planId = await crearPlan(1);
-    await expect(
-      planes.asociarObjetivos(planId, ['00000000-0000-0000-0000-000000000000']),
-    ).rejects.toThrow();
-  });
-
-  it('un objetivo asociado ya no se puede borrar', async () => {
-    // RF038 se apoya en esto: el `Restrict` protege el histórico del plan.
-    const planId = await crearPlan(1);
-    await planes.asociarObjetivos(planId, [objetivos[0]!]);
-
-    await expect(
-      prisma.objetivoEducacional.delete({ where: { id: objetivos[0]! } }),
-    ).rejects.toThrow();
-  });
-});
-
 describe('Eliminación y el invariante de única versión vigente', () => {
   it('eliminar un plan se lleva sus asociaciones', async () => {
     const planId = await crearPlan(1);
-    await planes.asociarObjetivos(planId, [objetivos[0]!]);
+    await prisma.planObjetivo.create({ data: { planId, objetivoId: objetivos[0]! } });
 
     await planes.eliminar(planId);
 
@@ -238,7 +171,7 @@ describe('Eliminación y el invariante de única versión vigente', () => {
   it('no deja huérfano el objetivo del catálogo', async () => {
     // Se borra el vínculo, no el objetivo: sigue disponible para otros planes.
     const planId = await crearPlan(1);
-    await planes.asociarObjetivos(planId, [objetivos[0]!]);
+    await prisma.planObjetivo.create({ data: { planId, objetivoId: objetivos[0]! } });
     await planes.eliminar(planId);
 
     expect(await prisma.objetivoEducacional.count()).toBe(3);

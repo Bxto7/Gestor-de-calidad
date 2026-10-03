@@ -21,7 +21,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -34,7 +33,6 @@ import { ConsultarPlan } from '../../application/use-cases/consultar-plan.use-ca
 import { ConsultarHistorial } from '../../application/use-cases/consultar-historial.use-case.js';
 import { GestionarPlanes } from '../../application/use-cases/gestionar-planes.use-case.js';
 import {
-  AsociarAlPlanDto,
   CambiarEstadoDto,
   CompararDto,
   CrearPlanDto,
@@ -97,21 +95,6 @@ export class PlanesController {
         ? {}
         : { fechaVigencia: dto.fechaVigencia === null ? null : new Date(dto.fechaVigencia) }),
     });
-  }
-
-  @Put(':id/asociaciones')
-  @ApiOperation({
-    summary: 'Asociar objetivos y competencias al plan',
-    description:
-      'RF028 y RF029. Cada lista enviada reemplaza por completo a la anterior: ' +
-      'la pantalla manda el estado final de sus casillas, no un incremento.',
-  })
-  async asociar(
-    @Param('id', ParseUUIDPipe) id: string,
-    @ActorActual() actor: Actor,
-    @Body() dto: AsociarAlPlanDto,
-  ) {
-    return this.gestionar.asociar(actor, id, dto);
   }
 
   @Delete(':id')

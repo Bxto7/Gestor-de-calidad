@@ -163,14 +163,6 @@ export function useEditarPlan(planId: string) {
   );
 }
 
-export function useAsociarAlPlan(planId: string) {
-  return useMutacionConInvalidacion(
-    (cambios: { objetivoIds?: string[]; competenciaIds?: string[] }) =>
-      api.asociarAlPlan(planId, cambios),
-    [claves.plan(planId), claves.auditoria('Plan', planId)],
-  );
-}
-
 export function useCambiarEstadoPlan(planId: string) {
   return useMutacionConInvalidacion(
     (v: {

@@ -74,8 +74,6 @@ function montar(
   const publicados: DomainEvent[] = [];
   const guardados: PlanDeEstudios[] = [];
   const eliminados: string[] = [];
-  const objetivosAsociados: readonly string[][] = [];
-  const competenciasAsociadas: readonly string[][] = [];
   const filtros: (FiltroPlanes | undefined)[] = [];
 
   const repo = {
@@ -91,10 +89,6 @@ function montar(
     guardar: async (ps: readonly PlanDeEstudios[]) => void guardados.push(...ps),
     eliminar: async (id: string) => void eliminados.push(id),
     copiarContenido: async () => undefined,
-    asociarObjetivos: async (_id: string, ids: readonly string[]) =>
-      void (objetivosAsociados as string[][]).push([...ids]),
-    asociarCompetencias: async (_id: string, ids: readonly string[]) =>
-      void (competenciasAsociadas as string[][]).push([...ids]),
   } as unknown as RepositorioPlanPort;
 
   const contenido = {
@@ -130,8 +124,6 @@ function montar(
     publicados,
     guardados,
     eliminados,
-    objetivosAsociados,
-    competenciasAsociadas,
     filtros,
   };
 }
@@ -239,54 +231,6 @@ describe('RF021 / RF023 — editar', () => {
     await expect(caso.editar(ACTOR, 'x', { duracionAnios: 4 })).rejects.toBeInstanceOf(
       NoEncontrado,
     );
-  });
-});
-
-describe('RF028 / RF029 — asociar objetivos y competencias', () => {
-  it('reemplaza el conjunto entero', async () => {
-    const { caso, objetivosAsociados } = montar();
-    await caso.asociar(ACTOR, 'plan-1', { objetivoIds: ['o-1', 'o-2'] });
-    expect(objetivosAsociados[0]).toEqual(['o-1', 'o-2']);
-  });
-
-  it('una lista vacía desasocia todo', async () => {
-    const { caso, objetivosAsociados } = montar();
-    await caso.asociar(ACTOR, 'plan-1', { objetivoIds: [] });
-    expect(objetivosAsociados[0]).toEqual([]);
-  });
-
-  it('descarta duplicados', async () => {
-    const { caso, competenciasAsociadas } = montar();
-    await caso.asociar(ACTOR, 'plan-1', { competenciaIds: ['c-1', 'c-1', 'c-2'] });
-    expect(competenciasAsociadas[0]).toEqual(['c-1', 'c-2']);
-  });
-
-  it('lo que no se envía no se toca', async () => {
-    // Enviar solo objetivos no debe vaciar las competencias del plan.
-    const { caso, objetivosAsociados, competenciasAsociadas } = montar();
-    await caso.asociar(ACTOR, 'plan-1', { objetivoIds: ['o-1'] });
-    expect(objetivosAsociados).toHaveLength(1);
-    expect(competenciasAsociadas).toHaveLength(0);
-  });
-
-  it('RF027: no se asocia nada con el plan congelado', async () => {
-    const { caso, objetivosAsociados } = montar({ existente: plan('Aprobado') });
-    await expect(caso.asociar(ACTOR, 'plan-1', { objetivoIds: ['o-1'] })).rejects.toThrow(
-      /no admite cambios/,
-    );
-    expect(objetivosAsociados).toHaveLength(0);
-  });
-
-  it('la bitácora dice cuántos quedaron', async () => {
-    const { caso, publicados } = montar();
-    await caso.asociar(ACTOR, 'plan-1', { objetivoIds: ['o-1', 'o-2'], competenciaIds: ['c-1'] });
-    expect(publicados[0]?.detalle).toContain('2 objetivo(s) y 1 competencia(s)');
-  });
-
-  it('sin cambios no ensucia la bitácora', async () => {
-    const { caso, publicados } = montar();
-    await caso.asociar(ACTOR, 'plan-1', {});
-    expect(publicados).toHaveLength(0);
   });
 });
 

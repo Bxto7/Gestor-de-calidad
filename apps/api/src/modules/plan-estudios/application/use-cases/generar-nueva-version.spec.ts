@@ -64,8 +64,6 @@ function montar(opciones: {
     copiarContenido: async (desde, hacia) => void copias.push({ desde, hacia }),
     listar: async () => [],
     versionesDeCarrera: async () => [],
-    asociarObjetivos: async () => undefined,
-    asociarCompetencias: async () => undefined,
   };
 
   const carrera =

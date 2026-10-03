@@ -53,11 +53,6 @@ export interface CambiosPlan {
   readonly fechaVigencia?: Date | null;
 }
 
-export interface Asociaciones {
-  readonly objetivoIds?: readonly string[];
-  readonly competenciaIds?: readonly string[];
-}
-
 export class GestionarPlanes {
   constructor(
     private readonly planes: RepositorioPlanPort,
@@ -159,47 +154,6 @@ export class GestionarPlanes {
     await this.eventos.publicar([
       new PlanEditado(actor, plan.id, plan.codigo, describir(antes, plan)),
     ]);
-    return resumen(plan);
-  }
-
-  /**
-   * RF028 / RF029: asocia objetivos y competencias al plan.
-   *
-   * Reemplaza el conjunto entero en vez de añadir, porque la pantalla envía el
-   * estado final de una lista de casillas. Se comprueba antes que existan: un
-   * identificador inventado produciría una violación de clave foránea con un
-   * mensaje de PostgreSQL en vez de uno legible.
-   */
-  async asociar(actor: Actor, id: string, cambios: Asociaciones): Promise<ResumenPlan> {
-    const plan = await this.exigirPlan(id);
-    await this.exigir(actor, 'plan.editar', plan.carreraId);
-
-    // RF027: los objetivos y competencias del plan son datos generales.
-    if (!plan.esEditable) {
-      throw new ReglaDeNegocioViolada(
-        `El plan está en estado ${plan.estado} y no admite cambios. ` +
-          'Genera una nueva versión para modificarlo.',
-      );
-    }
-
-    const partes: string[] = [];
-
-    if (cambios.objetivoIds) {
-      const unicos = [...new Set(cambios.objetivoIds)];
-      await this.planes.asociarObjetivos(id, unicos);
-      partes.push(`${unicos.length} objetivo(s)`);
-    }
-    if (cambios.competenciaIds) {
-      const unicos = [...new Set(cambios.competenciaIds)];
-      await this.planes.asociarCompetencias(id, unicos);
-      partes.push(`${unicos.length} competencia(s)`);
-    }
-
-    if (partes.length > 0) {
-      await this.eventos.publicar([
-        new PlanEditado(actor, plan.id, plan.codigo, `asociado a ${partes.join(' y ')}`),
-      ]);
-    }
     return resumen(plan);
   }
 

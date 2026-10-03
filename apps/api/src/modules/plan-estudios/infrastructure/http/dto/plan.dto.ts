@@ -1,7 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayUnique,
-  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -76,21 +74,6 @@ export class EditarPlanDto {
   @ValidateIf((_objeto, valor) => valor !== null && valor !== undefined)
   @IsDateString({}, { message: 'La fecha de vigencia debe tener formato de fecha.' })
   fechaVigencia?: string | null;
-}
-
-/** RF028 y RF029: cada lista, si viene, reemplaza a la anterior por completo. */
-export class AsociarAlPlanDto {
-  @IsOptional()
-  @IsArray()
-  @ArrayUnique()
-  @IsUUID('4', { each: true })
-  objetivoIds?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @ArrayUnique()
-  @IsUUID('4', { each: true })
-  competenciaIds?: string[];
 }
 
 /** RF024 / RF030 / RF031: filtros combinables del listado. */

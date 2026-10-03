@@ -121,8 +121,6 @@ function montar(opciones: {
     copiarContenido: async () => {},
     listar: async () => [],
     versionesDeCarrera: async () => [],
-    asociarObjetivos: async () => undefined,
-    asociarCompetencias: async () => undefined,
   };
 
   const aprobaciones: RepositorioAprobacionesPort = {

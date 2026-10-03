@@ -161,14 +161,6 @@ export async function editarPlan(
   return aPlanResumen(await cliente.patch<ResumenPlanApi>(`/planes/${id}`, cambios));
 }
 
-/** RF028 / RF029: cada lista enviada reemplaza por completo a la anterior. */
-export async function asociarAlPlan(
-  id: string,
-  cambios: { objetivoIds?: string[]; competenciaIds?: string[] },
-): Promise<PlanEstudios> {
-  return aPlanResumen(await cliente.put<ResumenPlanApi>(`/planes/${id}/asociaciones`, cambios));
-}
-
 export async function eliminarPlan(id: string): Promise<void> {
   await cliente.delete(`/planes/${id}`);
 }
