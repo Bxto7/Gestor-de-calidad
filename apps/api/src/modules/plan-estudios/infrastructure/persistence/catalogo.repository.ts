@@ -105,7 +105,11 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
    * las competencias solo enseñaría los atributos ya mapeados, y lo que hay que
    * ver son los que se quedaron sin ninguna.
    */
-  async cobertura(marco: string, planId?: string): Promise<CoberturaAtributo[]> {
+  async cobertura(
+    marco: string,
+    planId?: string,
+    carreraId?: string,
+  ): Promise<CoberturaAtributo[]> {
     const filas = await this.prisma.atributoGraduado.findMany({
       where: { marco },
       orderBy: { orden: 'asc' },
@@ -117,6 +121,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
             competencia: {
               estado: 'ACTIVO',
               ...(planId ? { planes: { some: { planId } } } : {}),
+              ...(carreraId ? { carreraId } : {}),
             },
           },
           select: { competencia: { select: { id: true, codigo: true, nombre: true } } },

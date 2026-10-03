@@ -70,9 +70,10 @@ export interface RepositorioCompetenciaPort {
 
   /**
    * Los atributos del marco, con las competencias que cubren cada uno. Con
-   * `planId`, solo cuentan las vinculadas a ese plan.
+   * `planId`, solo cuentan las vinculadas a ese plan; con `carreraId` (el
+   * alcance de un Director), solo las de esa carrera.
    */
-  cobertura(marco: string, planId?: string): Promise<CoberturaAtributo[]>;
+  cobertura(marco: string, planId?: string, carreraId?: string): Promise<CoberturaAtributo[]>;
 
   /** Para poder asignar el atributo al crear o editar una competencia. */
   atributos(marco: string): Promise<DatosAtributo[]>;

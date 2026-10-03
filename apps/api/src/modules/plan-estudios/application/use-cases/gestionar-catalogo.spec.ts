@@ -112,6 +112,7 @@ function montarCompetencias(
   const eliminadas: string[] = [];
   const filtros: (FiltroCatalogo | undefined)[] = [];
   const coberturas: (string | undefined)[] = [];
+  const coberturasPorCarrera: (string | undefined)[] = [];
   const nombresConsultados: { nombre: string; carreraId: string | null }[] = [];
   const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
   const quitadas: { planId: string; id: string; borrarRegistro: boolean }[] = [];
@@ -125,8 +126,9 @@ function montarCompetencias(
     },
     porId: async () => (opciones.existente === undefined ? competencia() : opciones.existente),
     codigos: async () => opciones.codigos ?? [],
-    cobertura: async (_marco, planId) => {
+    cobertura: async (_marco, planId, carreraId) => {
       coberturas.push(planId);
+      coberturasPorCarrera.push(carreraId);
       return [];
     },
     atributos: async () => [],
@@ -202,6 +204,7 @@ function montarCompetencias(
     eliminadas,
     filtros,
     coberturas,
+    coberturasPorCarrera,
     nombresConsultados,
     autorizaciones,
     quitadas,
@@ -359,6 +362,26 @@ describe('RF-CH-017 / RF-CH-009 — listar y leer', () => {
     const { caso, coberturas } = montarCompetencias();
     await caso.cobertura(ACTOR, 'plan-1');
     expect(coberturas).toEqual(['plan-1']);
+  });
+
+  it('la cobertura sin planId, para quien lee solo su carrera, se acota a ella', async () => {
+    const { caso, coberturasPorCarrera } = montarCompetencias({ alcance: soloCarrera(ISI) });
+    await caso.cobertura(ACTOR);
+    expect(coberturasPorCarrera).toEqual([ISI]);
+  });
+
+  it('la cobertura sin planId y sin carrera asignada no consulta competencias', async () => {
+    const { caso, coberturas } = montarCompetencias({ alcance: soloCarrera(null) });
+    const r = await caso.cobertura(ACTOR);
+    expect(coberturas).toHaveLength(0);
+    expect(r.every((a) => a.competencias.length === 0)).toBe(true);
+  });
+
+  it('la cobertura sin planId y sin restricción es la del catálogo entero', async () => {
+    const { caso, coberturas, coberturasPorCarrera } = montarCompetencias();
+    await caso.cobertura(ACTOR);
+    expect(coberturas).toEqual([undefined]);
+    expect(coberturasPorCarrera).toEqual([undefined]);
   });
 
   it('la cobertura con planId de otra carrera responde NoEncontrado', async () => {

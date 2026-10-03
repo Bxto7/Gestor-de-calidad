@@ -182,6 +182,48 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     expect(r.map((c) => c.codigo)).toEqual(['CPE-01']);
   });
 
+  it('la cobertura sin planId del Director solo cuenta las competencias de su carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const atributo = await prisma.atributoGraduado.findFirstOrThrow({ orderBy: { orden: 'asc' } });
+    for (const [codigo, carreraId] of [
+      ['CPE-01', sis],
+      ['CPE-02', civ],
+      ['CPE-03', null],
+    ] as const) {
+      const id = await competenciaEn(codigo, carreraId);
+      await prisma.competenciaAtributo.create({
+        data: { competenciaId: id, atributoId: atributo.id },
+      });
+    }
+
+    const r = await gestionarCompetencias().cobertura(como(director));
+    const codigos = r.flatMap((a) => a.competencias.map((c) => c.codigo));
+    expect(codigos).toEqual(['CPE-01']);
+  });
+
+  it('la cobertura sin planId del Coordinador cuenta el catálogo entero', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
+    const atributo = await prisma.atributoGraduado.findFirstOrThrow({ orderBy: { orden: 'asc' } });
+    for (const [codigo, carreraId] of [
+      ['CPE-01', sis],
+      ['CPE-02', civ],
+      ['CPE-03', null],
+    ] as const) {
+      const id = await competenciaEn(codigo, carreraId);
+      await prisma.competenciaAtributo.create({
+        data: { competenciaId: id, atributoId: atributo.id },
+      });
+    }
+
+    const r = await gestionarCompetencias().cobertura(como(coordinador));
+    const codigos = r.flatMap((a) => a.competencias.map((c) => c.codigo));
+    expect(codigos).toEqual(['CPE-01', 'CPE-02', 'CPE-03']);
+  });
+
   it('el Director recibe NoEncontrado al pedir las de un plan de otra carrera', async () => {
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');

@@ -125,15 +125,27 @@ export class GestionarCompetencias {
 
   /**
    * Cobertura del marco: qué atributo desarrolla cada competencia y cuál no
-   * desarrolla ninguna (§6.2). Con `planId`, la del plan (RF-CH-017).
+   * desarrolla ninguna (§6.2). Con `planId`, la del plan (RF-CH-017). Sin él,
+   * el mismo alcance que `listar`: quien lee solo su carrera cuenta solo las
+   * suyas (ninguna si no tiene carrera asignada); los demás, el catálogo entero.
    *
    * Se devuelven todos los atributos, también los vacíos, porque el hallazgo
    * que importa es el que falta.
    */
   async cobertura(actor: Actor, planId?: string): Promise<CoberturaAtributo[]> {
     await this.exigir(actor, 'competencia.leer', null);
-    if (planId) await this.planLegible(actor, planId);
-    return this.competencias.cobertura(MARCO_VIGENTE, planId);
+    if (planId) {
+      await this.planLegible(actor, planId);
+      return this.competencias.cobertura(MARCO_VIGENTE, planId);
+    }
+
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    if (alcance.tipo === 'TODAS') return this.competencias.cobertura(MARCO_VIGENTE);
+    if (alcance.carreraId === null) {
+      const atributos = await this.competencias.atributos(MARCO_VIGENTE);
+      return atributos.map((a) => ({ ...a, competencias: [] }));
+    }
+    return this.competencias.cobertura(MARCO_VIGENTE, undefined, alcance.carreraId);
   }
 
   /**
