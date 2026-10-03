@@ -28,6 +28,7 @@ import {
   useEditarAsignatura,
   useEditarCompetencia,
   useEditarObjetivo,
+  useEliminarAsignatura,
   useInactivarAsignatura,
   useInactivarCompetencia,
   useInactivarObjetivo,
@@ -230,6 +231,14 @@ const CASOS: readonly Caso[] = [
     useEjecutar: () => {
       const m = useQuitarCompetenciaDelPlan('p1');
       return () => m.mutateAsync('cp-1');
+    },
+  },
+  {
+    nombre: 'eliminar una asignatura',
+    preparar: () => vi.spyOn(api, 'eliminarAsignatura').mockResolvedValue(undefined),
+    useEjecutar: () => {
+      const m = useEliminarAsignatura('p1');
+      return () => m.mutateAsync('a1');
     },
   },
 ];

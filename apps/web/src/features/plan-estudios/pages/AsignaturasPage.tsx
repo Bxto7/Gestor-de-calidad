@@ -30,6 +30,7 @@ import {
   useCompetencias,
   useCrearAsignatura,
   useEditarAsignatura,
+  useEliminarAsignatura,
   useInactivarAsignatura,
   usePlan,
 } from '../api/queries';
@@ -68,6 +69,7 @@ export function AsignaturasPage() {
   const { data: asignaturas, isLoading } = useAsignaturas(planId);
   const { data: competencias } = useCompetencias(planId);
   const inactivar = useInactivarAsignatura(planId);
+  const eliminar = useEliminarAsignatura(planId);
 
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<'todos' | TipoAsignatura>('todos');
@@ -76,6 +78,7 @@ export function AsignaturasPage() {
   const [editando, setEditando] = useState<Asignatura | null>(null);
   const [creando, setCreando] = useState(false);
   const [historialDe, setHistorialDe] = useState<Asignatura | null>(null);
+  const [eliminando, setEliminando] = useState<Asignatura | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const editable = plan ? permiteEdicion(plan.estado) : false;
@@ -322,6 +325,12 @@ export function AsignaturasPage() {
                 >
                   {a.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
                 </Boton>
+                {/* RF-CH-019: borrar solo con el plan editable; si no, se inactiva. */}
+                {editable && (
+                  <Boton variante="fantasma" tamano="sm" onClick={() => setEliminando(a)}>
+                    Eliminar
+                  </Boton>
+                )}
               </SiPuede>
             </div>
           </article>
@@ -351,6 +360,49 @@ export function AsignaturasPage() {
           titulo={`${historialDe.codigo} · ${historialDe.nombre}`}
         />
       )}
+
+      <Modal
+        abierto={eliminando !== null}
+        onCerrar={() => setEliminando(null)}
+        titulo="Eliminar asignatura"
+        ancho="sm"
+        pie={
+          <>
+            <Boton
+              variante="secundario"
+              onClick={() => setEliminando(null)}
+              disabled={eliminar.isPending}
+            >
+              Cancelar
+            </Boton>
+            <Boton
+              variante="peligro"
+              disabled={eliminar.isPending}
+              onClick={() => {
+                if (!eliminando) return;
+                setError(null);
+                eliminar
+                  .mutateAsync(eliminando.id)
+                  .then(() => setEliminando(null))
+                  .catch((e: unknown) => {
+                    setError(e instanceof Error ? e.message : 'No se pudo eliminar la asignatura.');
+                    setEliminando(null);
+                  });
+              }}
+            >
+              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Boton>
+          </>
+        }
+      >
+        {eliminando && (
+          <p className="text-sm">
+            Se eliminará <strong>{eliminando.codigo}</strong> «{eliminando.nombre}» de este plan,
+            con sus competencias vinculadas. Esta acción no se puede deshacer. Si solo quieres
+            retirarla de la malla, inactívala.
+          </p>
+        )}
+      </Modal>
     </>
   );
 }

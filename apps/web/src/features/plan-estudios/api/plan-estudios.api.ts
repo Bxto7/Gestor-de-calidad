@@ -381,6 +381,14 @@ export async function inactivarAsignatura(id: string, activa: boolean): Promise<
   return aAsignatura(await cliente.patch<AsignaturaApi>(`/asignaturas/${id}/estado`, { activa }));
 }
 
+/**
+ * RF-CH-019: borra la asignatura de un plan en Borrador o En revisión. El
+ * servidor lo rechaza si otra asignatura la requiere o Mejora Continua la usa.
+ */
+export async function eliminarAsignatura(id: string): Promise<void> {
+  await cliente.delete(`/asignaturas/${id}`);
+}
+
 /** RF052: a qué afecta inactivarla, para poder avisar antes de confirmar. */
 export async function impactoInactivarAsignatura(id: string): Promise<{
   dependientes: string[];

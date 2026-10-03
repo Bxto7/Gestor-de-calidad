@@ -392,6 +392,14 @@ export function useInactivarAsignatura(planId: string) {
   );
 }
 
+/** RF-CH-019: cambia la lista, el detalle del plan y el uso de las competencias. */
+export function useEliminarAsignatura(planId: string) {
+  return useMutacionConInvalidacion(
+    (id: string) => api.eliminarAsignatura(id),
+    [claves.asignaturas(planId), claves.plan(planId), claves.competencias],
+  );
+}
+
 /** RF061 / RF062 / RF070 / RF071: toda la malla se mueve por aquí. */
 export function useUbicarAsignatura(planId: string) {
   return useMutacionConInvalidacion(

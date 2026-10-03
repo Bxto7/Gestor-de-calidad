@@ -242,3 +242,41 @@ describe('AsignaturasPage — nombres de competencias del plan (RF-CH-017)', () 
     expect(api.listarCompetencias).toHaveBeenCalledWith('p1');
   });
 });
+
+describe('AsignaturasPage — eliminar (RF-CH-019)', () => {
+  it('pide confirmación y elimina la asignatura', async () => {
+    const eliminar = vi.spyOn(api, 'eliminarAsignatura').mockResolvedValue(undefined);
+    montar();
+
+    await userEvent.click(await botonHabilitado('Eliminar'));
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminar asignatura' });
+    expect(dialogo).toHaveTextContent('ISI-101');
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar' }));
+
+    await waitFor(() => expect(eliminar).toHaveBeenCalledWith('a1'));
+  });
+
+  it('si el servidor lo rechaza, muestra su motivo', async () => {
+    vi.spyOn(api, 'eliminarAsignatura').mockRejectedValue(
+      new ErrorDeNegocio(
+        'No se puede eliminar ISI-101: es requisito de ISI-201. Inactívala si ya no debe dictarse.',
+        409,
+      ),
+    );
+    montar();
+
+    await userEvent.click(await botonHabilitado('Eliminar'));
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminar asignatura' });
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar' }));
+
+    expect(await screen.findByText(/es requisito de ISI-201/)).toBeInTheDocument();
+  });
+
+  it('con el plan Vigente no se ofrece', async () => {
+    montar({ plan: { ...PLAN, estado: 'Vigente' } });
+    // «Editar» deshabilitado prueba que el plan Vigente ya llegó.
+    const editar = await screen.findByRole('button', { name: 'Editar' });
+    await waitFor(() => expect(editar).toBeDisabled());
+    expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
+  });
+});
