@@ -1,13 +1,16 @@
 /**
- * 3.5 Objetivos Educacionales — RF033 a RF039, más la asociación al plan
- * (RF028) que el hub necesita para RF095.
+ * 3.5 Objetivos Educacionales — RF033 a RF039, RF-CH-015 y RF-CH-016.
  *
- * Los objetivos son un catálogo global, no del plan: el plan solo marca cuáles
- * de ellos adopta. Por eso la tabla tiene dos columnas de acción distintas —
- * "asociar al plan" y "editar el catálogo".
+ * Desde el Bloque 4b la sección muestra solo los objetivos del plan en curso.
+ * Crear uno aquí lo asocia a este plan y a su carrera; «Eliminar» lo quita del
+ * plan, y el servidor borra además el registro si ningún otro plan lo usa.
+ * Las dos escrituras sobre el plan exigen el permiso sobre su carrera y que el
+ * plan admita cambios (Borrador o En revisión). Editar e inactivar actúan
+ * sobre el registro, que puede estar en varias versiones del plan.
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
@@ -22,16 +25,15 @@ import {
   EstadoVacio,
   Modal,
 } from '@/shared/components/ui';
-import { useParams } from 'react-router-dom';
 
 import {
-  useAsociarAlPlan,
   useCarreras,
   useCrearObjetivo,
   useEditarObjetivo,
   useInactivarObjetivo,
   useObjetivos,
   usePlan,
+  useQuitarObjetivoDelPlan,
 } from '../api/queries';
 import { permiteEdicion } from '../domain/estado-plan';
 import type { ObjetivoEducacional } from '../domain/tipos';
@@ -42,18 +44,18 @@ export function ObjetivosPage() {
 
   const { data: plan } = usePlan(planId);
   const { data: carreras } = useCarreras();
-  const { data: objetivos, isLoading } = useObjetivos();
-  const asociar = useAsociarAlPlan(planId);
+  const { data: objetivos, isLoading } = useObjetivos(planId);
   const inactivar = useInactivarObjetivo();
+  const quitar = useQuitarObjetivoDelPlan(planId);
 
   const [busqueda, setBusqueda] = useState('');
   const [editando, setEditando] = useState<ObjetivoEducacional | null>(null);
   const [creando, setCreando] = useState(false);
+  const [eliminando, setEliminando] = useState<ObjetivoEducacional | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const carrera = carreras?.find((c) => c.id === plan?.carreraId);
   const editable = plan ? permiteEdicion(plan.estado) : false;
-  const asociados = useMemo(() => new Set(plan?.objetivoIds ?? []), [plan?.objetivoIds]);
 
   useEffect(() => {
     publicar({
@@ -76,16 +78,15 @@ export function ObjetivosPage() {
     );
   }, [objetivos, busqueda]);
 
-  function alternarAsociacion(id: string) {
-    if (!plan) return;
+  function confirmarEliminacion(o: ObjetivoEducacional) {
     setError(null);
-    const siguiente = asociados.has(id)
-      ? plan.objetivoIds.filter((x) => x !== id)
-      : [...plan.objetivoIds, id];
-
-    asociar.mutateAsync({ objetivoIds: siguiente }).catch((e: unknown) => {
-      setError(e instanceof Error ? e.message : 'No se pudo actualizar la asociación.');
-    });
+    quitar
+      .mutateAsync(o.id)
+      .then(() => setEliminando(null))
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : 'No se pudo eliminar el objetivo.');
+        setEliminando(null);
+      });
   }
 
   return (
@@ -94,23 +95,33 @@ export function ObjetivosPage() {
         titulo="Objetivos Educacionales"
         descripcion={
           carrera
-            ? `Catálogo institucional. Marca los que adopta el plan de ${carrera.nombre}.`
-            : 'Catálogo institucional de objetivos educacionales.'
+            ? `Objetivos del plan de ${carrera.nombre}. Los que crees aquí quedan en este plan.`
+            : 'Objetivos educacionales de este plan.'
         }
         acciones={
-          <SiPuede permiso="objetivo.gestionar">
-            <Boton variante="primario" onClick={() => setCreando(true)}>
-              Nuevo objetivo
-            </Boton>
-          </SiPuede>
+          // RF-CH-015 RN1: crear solo tiene sentido con el plan editable, y
+          // sobre la carrera del plan (el permiso está acotado a ella).
+          editable ? (
+            <SiPuede permiso="objetivo.gestionar" carreraId={plan?.carreraId}>
+              <Boton variante="primario" onClick={() => setCreando(true)}>
+                Nuevo objetivo
+              </Boton>
+            </SiPuede>
+          ) : null
         }
       />
 
       {/* RF095: el plan necesita al menos uno. */}
-      {plan && asociados.size === 0 && (
+      {plan?.objetivoIds.length === 0 && (
         <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg">
           Este plan no tiene ningún objetivo educacional asociado. Es una validación bloqueante: sin
           al menos uno no podrá enviarse a revisión.
+        </p>
+      )}
+
+      {plan && !editable && (
+        <p className="mb-5 rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave">
+          Este plan está en estado {plan.estado} y no admite cambios.
         </p>
       )}
 
@@ -135,23 +146,20 @@ export function ObjetivosPage() {
 
       {!isLoading && visibles.length === 0 && (
         <EstadoVacio
-          titulo={busqueda ? 'Sin resultados' : 'Aún no hay objetivos educacionales'}
+          titulo={busqueda ? 'Sin resultados' : 'Este plan aún no tiene objetivos educacionales'}
           detalle={
             busqueda
               ? 'Ningún objetivo coincide con la búsqueda.'
-              : 'Registra el primer objetivo para poder asociarlo al plan.'
+              : 'Crea el primero con «Nuevo objetivo»: quedará asociado a este plan y a su carrera.'
           }
         />
       )}
 
       {visibles.length > 0 && (
         <div className="overflow-x-auto rounded-2xl border border-borde bg-superficie">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-borde text-xs tracking-wider text-tinta-suave uppercase">
-                <th scope="col" className="px-5 py-3 font-bold">
-                  En el plan
-                </th>
                 <th scope="col" className="px-5 py-3 font-bold">
                   Código
                 </th>
@@ -169,17 +177,6 @@ export function ObjetivosPage() {
             <tbody className="divide-y divide-borde">
               {visibles.map((o) => (
                 <tr key={o.id} className="align-top">
-                  <td className="px-5 py-4">
-                    {/* RF028: asociación al plan. Un objetivo inactivo no se asocia. */}
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-uc-primary"
-                      checked={asociados.has(o.id)}
-                      disabled={!editable || asociar.isPending || o.estado === 'Inactivo'}
-                      onChange={() => alternarAsociacion(o.id)}
-                      aria-label={`Asociar ${o.codigo} al plan`}
-                    />
-                  </td>
                   <td className="px-5 py-4 font-mono text-xs font-bold text-uc-primary">
                     {o.codigo}
                   </td>
@@ -192,7 +189,7 @@ export function ObjetivosPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex justify-end gap-1">
-                      <SiPuede permiso="objetivo.gestionar">
+                      <SiPuede permiso="objetivo.gestionar" carreraId={plan?.carreraId}>
                         <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(o)}>
                           Editar
                         </Boton>
@@ -212,6 +209,11 @@ export function ObjetivosPage() {
                         >
                           {o.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
                         </Boton>
+                        {editable && (
+                          <Boton variante="fantasma" tamano="sm" onClick={() => setEliminando(o)}>
+                            Eliminar
+                          </Boton>
+                        )}
                       </SiPuede>
                     </div>
                   </td>
@@ -226,14 +228,47 @@ export function ObjetivosPage() {
           correcto y no hace falta un efecto que lo sincronice. */}
       {(creando || editando !== null) && (
         <ModalObjetivo
-          objetivo={editando}
           planId={planId}
+          objetivo={editando}
           onCerrar={() => {
             setCreando(false);
             setEditando(null);
           }}
         />
       )}
+
+      {/* RF-CH-016: misma confirmación que eliminar un plan en Borrador. */}
+      <Modal
+        abierto={eliminando !== null}
+        onCerrar={() => setEliminando(null)}
+        titulo="Eliminar objetivo del plan"
+        ancho="sm"
+        pie={
+          <>
+            <Boton
+              variante="secundario"
+              onClick={() => setEliminando(null)}
+              disabled={quitar.isPending}
+            >
+              Cancelar
+            </Boton>
+            <Boton
+              variante="peligro"
+              disabled={quitar.isPending}
+              onClick={() => eliminando && confirmarEliminacion(eliminando)}
+            >
+              {quitar.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Boton>
+          </>
+        }
+      >
+        {eliminando && (
+          <p className="text-sm">
+            Se quitará <strong>{eliminando.codigo}</strong> de este plan. Si ningún otro plan lo
+            usa, el objetivo se borrará del todo y no se podrá recuperar.
+          </p>
+        )}
+      </Modal>
     </>
   );
 }

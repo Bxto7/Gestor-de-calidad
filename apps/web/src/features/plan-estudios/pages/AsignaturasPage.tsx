@@ -66,7 +66,7 @@ export function AsignaturasPage() {
 
   const { data: plan } = usePlan(planId);
   const { data: asignaturas, isLoading } = useAsignaturas(planId);
-  const { data: competencias } = useCompetencias();
+  const { data: competencias } = useCompetencias(planId);
   const inactivar = useInactivarAsignatura(planId);
 
   const [busqueda, setBusqueda] = useState('');

@@ -33,18 +33,29 @@ const PLAN: PlanEstudios = {
   creadoEn: '2026-01-01T00:00:00.000Z',
 };
 
-function montar(competencia: Competencia) {
-  vi.spyOn(api, 'obtenerPlan').mockResolvedValue(PLAN);
+function montar(
+  opciones: { competencias?: Competencia[]; plan?: PlanEstudios; carreraACargo?: string } = {},
+) {
+  vi.spyOn(api, 'obtenerPlan').mockResolvedValue(opciones.plan ?? PLAN);
   vi.spyOn(api, 'listarAsignaturas').mockResolvedValue([]);
-  vi.spyOn(api, 'listarCompetencias').mockResolvedValue([competencia]);
+  const listar = vi
+    .spyOn(api, 'listarCompetencias')
+    .mockResolvedValue(opciones.competencias ?? [COMPETENCIA]);
   // El panel de cobertura ICACIT se monta siempre en esta página.
-  vi.spyOn(api, 'obtenerCobertura').mockResolvedValue([]);
+  const cobertura = vi.spyOn(api, 'obtenerCobertura').mockResolvedValue([]);
   vi.spyOn(api, 'listarAtributos').mockResolvedValue([]);
-  return montarPagina(<CompetenciasPage />, {
+  montarPagina(<CompetenciasPage />, {
     permisos: ['competencia.leer', 'competencia.gestionar'],
     ruta: '/plan-estudios/planes/p1/competencias',
     patron: '/plan-estudios/planes/:planId/competencias',
+    ...(opciones.carreraACargo ? { carreraACargo: opciones.carreraACargo } : {}),
   });
+  return { listar, cobertura };
+}
+
+/** Un plan cuya competencia aparece en la tabla y en el aviso de la cabecera. */
+async function esperarFila(): Promise<void> {
+  await screen.findByText('Resolver problemas de ingeniería');
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -54,7 +65,7 @@ describe('CompetenciasPage — Inactivar y Reactivar (RF-CH-023)', () => {
     const cambiar = vi
       .spyOn(api, 'inactivarCompetencia')
       .mockResolvedValue({ ...COMPETENCIA, estado: 'Inactivo' });
-    montar(COMPETENCIA);
+    montar();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Inactivar' }));
 
@@ -63,7 +74,7 @@ describe('CompetenciasPage — Inactivar y Reactivar (RF-CH-023)', () => {
 
   it('«Reactivar» pide el estado activo', async () => {
     const cambiar = vi.spyOn(api, 'inactivarCompetencia').mockResolvedValue(COMPETENCIA);
-    montar({ ...COMPETENCIA, estado: 'Inactivo' });
+    montar({ competencias: [{ ...COMPETENCIA, estado: 'Inactivo' }] });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Reactivar' }));
 
@@ -74,7 +85,7 @@ describe('CompetenciasPage — Inactivar y Reactivar (RF-CH-023)', () => {
     vi.spyOn(api, 'inactivarCompetencia').mockRejectedValue(
       new ErrorDeNegocio('Ya existe otra competencia activa con ese nombre.', 409),
     );
-    montar({ ...COMPETENCIA, estado: 'Inactivo' });
+    montar({ competencias: [{ ...COMPETENCIA, estado: 'Inactivo' }] });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Reactivar' }));
 
@@ -87,7 +98,7 @@ describe('CompetenciasPage — Inactivar y Reactivar (RF-CH-023)', () => {
 describe('CompetenciasPage — alta dentro del plan (RF-CH-017)', () => {
   it('«Nueva competencia» envía el plan en curso', async () => {
     const crear = vi.spyOn(api, 'crearCompetencia').mockResolvedValue(COMPETENCIA);
-    montar(COMPETENCIA);
+    montar();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Nueva competencia' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Nueva competencia' });
@@ -95,5 +106,73 @@ describe('CompetenciasPage — alta dentro del plan (RF-CH-017)', () => {
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
 
     await waitFor(() => expect(crear).toHaveBeenCalledWith('p1', 'Gestionar proyectos', []));
+  });
+});
+
+describe('CompetenciasPage — solo las del plan (RF-CH-017)', () => {
+  it('pide solo las competencias y la cobertura del plan en curso', async () => {
+    const { listar, cobertura } = montar();
+    await esperarFila();
+    expect(listar).toHaveBeenCalledWith('p1');
+    expect(cobertura).toHaveBeenCalledWith('p1');
+  });
+
+  it('ya no ofrece casillas para asociar competencias del catálogo', async () => {
+    montar();
+    await esperarFila();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('con la lista vacía lo dice y ofrece «Nueva competencia»', async () => {
+    montar({ competencias: [] });
+    expect(await screen.findByText('Este plan aún no tiene competencias')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Nueva competencia' })).toBeInTheDocument();
+  });
+
+  it('con el plan Vigente no ofrece «Nueva competencia» ni «Eliminar»', async () => {
+    montar({ plan: { ...PLAN, estado: 'Vigente' } });
+    await esperarFila();
+    await screen.findByText('Este plan está en estado Vigente y no admite cambios.');
+    expect(screen.queryByRole('button', { name: 'Nueva competencia' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+  });
+
+  it('en un plan de otra carrera no ofrece ninguna acción de gestión', async () => {
+    montar({ plan: { ...PLAN, carreraId: 'c2', estado: 'Vigente' }, carreraACargo: 'c1' });
+    await esperarFila();
+    await screen.findByText('Este plan está en estado Vigente y no admite cambios.');
+    for (const nombre of ['Nueva competencia', 'Editar', 'Inactivar', 'Eliminar']) {
+      expect(screen.queryByRole('button', { name: nombre }), nombre).not.toBeInTheDocument();
+    }
+  });
+});
+
+describe('CompetenciasPage — eliminar del plan (RF-CH-018)', () => {
+  it('pide confirmación, avisa del borrado y quita la competencia del plan', async () => {
+    const quitar = vi.spyOn(api, 'quitarCompetenciaDelPlan').mockResolvedValue(undefined);
+    montar();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminar competencia del plan' });
+    expect(dialogo).toHaveTextContent('Si ningún otro plan ni asignatura la usa');
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar' }));
+
+    await waitFor(() => expect(quitar).toHaveBeenCalledWith('p1', 'cp-1'));
+  });
+
+  it('si la usan asignaturas del plan, muestra el motivo del servidor', async () => {
+    vi.spyOn(api, 'quitarCompetenciaDelPlan').mockRejectedValue(
+      new ErrorDeNegocio('La usan ASUC01110, ASUC01112. Quítala de esas asignaturas primero.', 409),
+    );
+    montar();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminar competencia del plan' });
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar' }));
+
+    expect(
+      await screen.findByText('La usan ASUC01110, ASUC01112. Quítala de esas asignaturas primero.'),
+    ).toBeInTheDocument();
   });
 });

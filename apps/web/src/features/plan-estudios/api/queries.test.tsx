@@ -32,6 +32,8 @@ import {
   useInactivarCompetencia,
   useInactivarObjetivo,
   useJustificarRegla,
+  useQuitarCompetenciaDelPlan,
+  useQuitarObjetivoDelPlan,
   useUbicarAsignatura,
 } from './queries';
 
@@ -212,6 +214,22 @@ const CASOS: readonly Caso[] = [
     useEjecutar: () => {
       const m = useInactivarCompetencia();
       return () => m.mutateAsync({ id: 'cp-1', activo: false });
+    },
+  },
+  {
+    nombre: 'quitar un objetivo del plan',
+    preparar: () => vi.spyOn(api, 'quitarObjetivoDelPlan').mockResolvedValue(undefined),
+    useEjecutar: () => {
+      const m = useQuitarObjetivoDelPlan('p1');
+      return () => m.mutateAsync('oe-1');
+    },
+  },
+  {
+    nombre: 'quitar una competencia del plan',
+    preparar: () => vi.spyOn(api, 'quitarCompetenciaDelPlan').mockResolvedValue(undefined),
+    useEjecutar: () => {
+      const m = useQuitarCompetenciaDelPlan('p1');
+      return () => m.mutateAsync('cp-1');
     },
   },
 ];

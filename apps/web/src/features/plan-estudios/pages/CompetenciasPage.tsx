@@ -1,10 +1,12 @@
 /**
- * 3.6 Competencias — RF040 a RF046, más la asociación a nivel de plan (RF029).
+ * 3.6 Competencias — RF040 a RF046, RF-CH-017 y RF-CH-018.
  *
  * Mismo patrón que Objetivos Educacionales, con dos diferencias que vienen de
  * los RF: la competencia no tiene descripción (RF040 solo exige nombre) y se
- * vincula además a cada asignatura (RF049), lo que hace que su eliminación
- * tenga que revisar dos integridades referenciales (RF045).
+ * vincula además a cada asignatura (RF049). Desde el Bloque 4b la sección
+ * muestra solo las del plan; «Eliminar» la quita del plan y el servidor la
+ * bloquea si la usan asignaturas del plan, o borra el registro si ningún otro
+ * plan ni asignatura la usa.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -25,13 +27,13 @@ import {
 } from '@/shared/components/ui';
 import {
   useAsignaturas,
-  useAsociarAlPlan,
-  useCompetencias,
   useAtributos,
+  useCompetencias,
   useCrearCompetencia,
   useEditarCompetencia,
   useInactivarCompetencia,
   usePlan,
+  useQuitarCompetenciaDelPlan,
 } from '../api/queries';
 import { permiteEdicion } from '../domain/estado-plan';
 import type { Competencia } from '../domain/tipos';
@@ -42,20 +44,20 @@ export function CompetenciasPage() {
   const { publicar } = useEncabezado();
 
   const { data: plan } = usePlan(planId);
-  const { data: competencias, isLoading } = useCompetencias();
+  const { data: competencias, isLoading } = useCompetencias(planId);
   const { data: asignaturas } = useAsignaturas(planId);
-  const asociar = useAsociarAlPlan(planId);
   const inactivar = useInactivarCompetencia();
+  const quitar = useQuitarCompetenciaDelPlan(planId);
 
   const [busqueda, setBusqueda] = useState('');
   const [editando, setEditando] = useState<Competencia | null>(null);
   const [creando, setCreando] = useState(false);
+  const [eliminando, setEliminando] = useState<Competencia | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const editable = plan ? permiteEdicion(plan.estado) : false;
-  const asociadas = useMemo(() => new Set(plan?.competenciaIds ?? []), [plan?.competenciaIds]);
 
-  /** Cuántas asignaturas del plan usan cada competencia: contexto para RF045. */
+  /** Cuántas asignaturas del plan usan cada competencia: contexto para RF-CH-018. */
   const usoEnAsignaturas = useMemo(() => {
     const mapa = new Map<string, number>();
     for (const a of asignaturas ?? []) {
@@ -85,31 +87,39 @@ export function CompetenciasPage() {
     );
   }, [competencias, busqueda]);
 
-  function alternarAsociacion(id: string) {
-    if (!plan) return;
+  function confirmarEliminacion(c: Competencia) {
     setError(null);
-    const siguiente = asociadas.has(id)
-      ? plan.competenciaIds.filter((x) => x !== id)
-      : [...plan.competenciaIds, id];
-
-    asociar.mutateAsync({ competenciaIds: siguiente }).catch((e: unknown) => {
-      setError(e instanceof Error ? e.message : 'No se pudo actualizar la asociación.');
-    });
+    quitar
+      .mutateAsync(c.id)
+      .then(() => setEliminando(null))
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : 'No se pudo eliminar la competencia.');
+        setEliminando(null);
+      });
   }
 
   return (
     <>
       <CabeceraSeccion
         titulo="Competencias"
-        descripcion="Catálogo institucional. Se vinculan al plan y, por separado, a cada asignatura."
+        descripcion="Competencias de este plan. Las que crees aquí quedan en este plan y se vinculan, por separado, a cada asignatura."
         acciones={
-          <SiPuede permiso="competencia.gestionar">
-            <Boton variante="primario" onClick={() => setCreando(true)}>
-              Nueva competencia
-            </Boton>
-          </SiPuede>
+          // RF-CH-017 RN1: crear solo con el plan editable y sobre su carrera.
+          editable ? (
+            <SiPuede permiso="competencia.gestionar" carreraId={plan?.carreraId}>
+              <Boton variante="primario" onClick={() => setCreando(true)}>
+                Nueva competencia
+              </Boton>
+            </SiPuede>
+          ) : null
         }
       />
+
+      {plan && !editable && (
+        <p className="mb-5 rounded-xl border border-borde bg-superficie-tenue px-4 py-3 text-sm text-tinta-suave">
+          Este plan está en estado {plan.estado} y no admite cambios.
+        </p>
+      )}
 
       {error && (
         <p className="mb-5 rounded-xl border border-alerta-borde bg-alerta-bg px-4 py-3 text-sm text-alerta-fg">
@@ -117,8 +127,8 @@ export function CompetenciasPage() {
         </p>
       )}
 
-      {/* §6.2: qué atributo del graduado cubre cada competencia, y cuál no. */}
-      <CoberturaIcacit />
+      {/* §6.2: qué atributo del graduado cubren las competencias del plan, y cuál no. */}
+      <CoberturaIcacit planId={planId} />
 
       <div className="mb-5">
         <Entrada
@@ -135,23 +145,20 @@ export function CompetenciasPage() {
 
       {!isLoading && visibles.length === 0 && (
         <EstadoVacio
-          titulo={busqueda ? 'Sin resultados' : 'Aún no hay competencias'}
+          titulo={busqueda ? 'Sin resultados' : 'Este plan aún no tiene competencias'}
           detalle={
             busqueda
               ? 'Ninguna competencia coincide con la búsqueda.'
-              : 'Registra la primera competencia para poder vincularla a las asignaturas.'
+              : 'Crea la primera con «Nueva competencia»: quedará en este plan y podrás vincularla a sus asignaturas.'
           }
         />
       )}
 
       {visibles.length > 0 && (
         <div className="overflow-x-auto rounded-2xl border border-borde bg-superficie">
-          <table className="w-full min-w-[680px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-borde text-xs tracking-wider text-tinta-suave uppercase">
-                <th scope="col" className="px-5 py-3 font-bold">
-                  En el plan
-                </th>
                 <th scope="col" className="px-5 py-3 font-bold">
                   Código
                 </th>
@@ -177,17 +184,6 @@ export function CompetenciasPage() {
                 const uso = usoEnAsignaturas.get(c.id) ?? 0;
                 return (
                   <tr key={c.id}>
-                    <td className="px-5 py-4">
-                      {/* RF029: asociación a nivel de plan. */}
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-uc-primary"
-                        checked={asociadas.has(c.id)}
-                        disabled={!editable || asociar.isPending || c.estado === 'Inactivo'}
-                        onChange={() => alternarAsociacion(c.id)}
-                        aria-label={`Asociar ${c.codigo} al plan`}
-                      />
-                    </td>
                     <td className="px-5 py-4 font-mono text-xs font-bold text-uc-primary">
                       {c.codigo}
                     </td>
@@ -226,7 +222,7 @@ export function CompetenciasPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
-                        <SiPuede permiso="competencia.gestionar">
+                        <SiPuede permiso="competencia.gestionar" carreraId={plan?.carreraId}>
                           <Boton variante="fantasma" tamano="sm" onClick={() => setEditando(c)}>
                             Editar
                           </Boton>
@@ -248,6 +244,11 @@ export function CompetenciasPage() {
                           >
                             {c.estado === 'Activo' ? 'Inactivar' : 'Reactivar'}
                           </Boton>
+                          {editable && (
+                            <Boton variante="fantasma" tamano="sm" onClick={() => setEliminando(c)}>
+                              Eliminar
+                            </Boton>
+                          )}
                         </SiPuede>
                       </div>
                     </td>
@@ -263,14 +264,47 @@ export function CompetenciasPage() {
           correcto y no hace falta un efecto que lo sincronice. */}
       {(creando || editando !== null) && (
         <ModalCompetencia
-          competencia={editando}
           planId={planId}
+          competencia={editando}
           onCerrar={() => {
             setCreando(false);
             setEditando(null);
           }}
         />
       )}
+
+      {/* RF-CH-018: misma confirmación que eliminar un plan en Borrador. */}
+      <Modal
+        abierto={eliminando !== null}
+        onCerrar={() => setEliminando(null)}
+        titulo="Eliminar competencia del plan"
+        ancho="sm"
+        pie={
+          <>
+            <Boton
+              variante="secundario"
+              onClick={() => setEliminando(null)}
+              disabled={quitar.isPending}
+            >
+              Cancelar
+            </Boton>
+            <Boton
+              variante="peligro"
+              disabled={quitar.isPending}
+              onClick={() => eliminando && confirmarEliminacion(eliminando)}
+            >
+              {quitar.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Boton>
+          </>
+        }
+      >
+        {eliminando && (
+          <p className="text-sm">
+            Se quitará <strong>{eliminando.codigo}</strong> de este plan. Si ningún otro plan ni
+            asignatura la usa, la competencia se borrará del todo y no se podrá recuperar.
+          </p>
+        )}
+      </Modal>
     </>
   );
 }

@@ -252,8 +252,12 @@ export async function compararVersiones(idA: string, idB: string): Promise<Difer
 
 /* ── Objetivos educacionales (RF033-RF039) ────────────────────────────── */
 
-export async function listarObjetivos(): Promise<ObjetivoEducacional[]> {
-  return (await cliente.get<ObjetivoApi[]>('/objetivos')).map(aObjetivo);
+/**
+ * RF-CH-015: con `planId`, solo los del plan. Sin él, el catálogo que el
+ * servidor deje ver: lo usan los selectores de Mejora Continua.
+ */
+export async function listarObjetivos(planId?: string): Promise<ObjetivoEducacional[]> {
+  return (await cliente.get<ObjetivoApi[]>('/objetivos', { planId })).map(aObjetivo);
 }
 
 /** RF-CH-015: se crea dentro del plan, que le da su carrera y lo vincula. */
@@ -282,10 +286,16 @@ export async function eliminarObjetivo(id: string): Promise<void> {
   await cliente.delete(`/objetivos/${id}`);
 }
 
+/** RF-CH-016: lo quita del plan; el servidor borra el registro si nadie más lo usa. */
+export async function quitarObjetivoDelPlan(planId: string, id: string): Promise<void> {
+  await cliente.delete(`/planes/${planId}/objetivos/${id}`);
+}
+
 /* ── Competencias (RF040-RF046) ───────────────────────────────────────── */
 
-export async function listarCompetencias(): Promise<Competencia[]> {
-  return (await cliente.get<CompetenciaApi[]>('/competencias')).map(aCompetencia);
+/** RF-CH-017: con `planId`, solo las del plan. Sin él, el catálogo que el servidor deje ver. */
+export async function listarCompetencias(planId?: string): Promise<Competencia[]> {
+  return (await cliente.get<CompetenciaApi[]>('/competencias', { planId })).map(aCompetencia);
 }
 
 /** RF-CH-017: se crea dentro del plan, que le da su carrera y la vincula. */
@@ -323,8 +333,8 @@ export async function listarAtributos(): Promise<AtributoGraduado[]> {
  * Esos son los que una acreditación busca, y no aparecerían recorriendo el
  * catálogo de competencias.
  */
-export async function obtenerCobertura(): Promise<CoberturaAtributo[]> {
-  return cliente.get<CoberturaAtributo[]>('/competencias/cobertura');
+export async function obtenerCobertura(planId?: string): Promise<CoberturaAtributo[]> {
+  return cliente.get<CoberturaAtributo[]>('/competencias/cobertura', { planId });
 }
 
 export async function inactivarCompetencia(id: string, activo: boolean): Promise<Competencia> {
@@ -336,6 +346,11 @@ export async function inactivarCompetencia(id: string, activo: boolean): Promise
 /** RF045: solo si no la usa ninguna asignatura ni ningún plan. */
 export async function eliminarCompetencia(id: string): Promise<void> {
   await cliente.delete(`/competencias/${id}`);
+}
+
+/** RF-CH-018: la quita del plan; el servidor borra el registro si nadie más la usa. */
+export async function quitarCompetenciaDelPlan(planId: string, id: string): Promise<void> {
+  await cliente.delete(`/planes/${planId}/competencias/${id}`);
 }
 
 /* ── Asignaturas (RF047-RF059) ────────────────────────────────────────── */

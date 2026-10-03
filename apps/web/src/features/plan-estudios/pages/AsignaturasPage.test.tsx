@@ -234,3 +234,11 @@ describe('AsignaturasPage — competencias del modal (RF-CH-021)', () => {
     );
   });
 });
+
+describe('AsignaturasPage — nombres de competencias del plan (RF-CH-017)', () => {
+  it('las tarjetas piden las competencias del plan en curso', async () => {
+    montar();
+    await screen.findByRole('heading', { name: 'Álgebra Lineal' });
+    expect(api.listarCompetencias).toHaveBeenCalledWith('p1');
+  });
+});

@@ -13,8 +13,9 @@ import { useState } from 'react';
 
 import { useCobertura } from '../api/queries';
 
-export function CoberturaIcacit() {
-  const { data: cobertura } = useCobertura();
+/** RF-CH-017: la cobertura de las competencias del plan, no la del catálogo. */
+export function CoberturaIcacit({ planId }: { planId: string }) {
+  const { data: cobertura } = useCobertura(planId);
   const [abierto, setAbierto] = useState(false);
 
   if (!cobertura || cobertura.length === 0) return null;

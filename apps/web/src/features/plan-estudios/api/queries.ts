@@ -31,10 +31,15 @@ export const claves = {
    */
   planDetalle: (id: string) => ['plan', id, 'detalle'] as const,
   versiones: (carreraId: string) => ['versiones', carreraId] as const,
+  /** Prefijo de todas las listas de objetivos: invalidarlo las alcanza a todas. */
   objetivos: ['objetivos'] as const,
+  /** RF-CH-015: los de un plan, o el catálogo sin plan (Mejora Continua). */
+  objetivosDe: (planId?: string) => ['objetivos', planId ?? 'todos'] as const,
+  /** Prefijo de competencias, atributos y cobertura. */
   competencias: ['competencias'] as const,
+  competenciasDe: (planId?: string) => ['competencias', planId ?? 'todas'] as const,
   atributos: ['competencias', 'atributos'] as const,
-  cobertura: ['competencias', 'cobertura'] as const,
+  coberturaDe: (planId?: string) => ['competencias', 'cobertura', planId ?? 'todas'] as const,
   asignaturas: (planId: string) => ['asignaturas', planId] as const,
   auditoria: (entidad: string, id: string) => ['auditoria', entidad, id] as const,
   aprobaciones: (planId: string) => ['aprobaciones', planId] as const,
@@ -239,15 +244,19 @@ export function useJustificarRegla(planId: string) {
  * RF-CH-024: todo lo que cambia lo que el motor de validaciones mira invalida
  * también el detalle del plan (`claves.plan(planId)` es prefijo de
  * `planDetalle`), porque de ahí sale `accionesDisponibles` y con ello si
- * «Enviar a Revisión» está habilitado. Objetivos y competencias son un
- * catálogo global y sus mutaciones no conocen un plan: invalidan el prefijo
- * `['plan']` entero, que solo refresca las consultas montadas.
+ * «Enviar a Revisión» está habilitado. Editar o inactivar un objetivo o
+ * una competencia no conoce el plan desde el que se hace (el registro puede
+ * estar en varios): invalida el prefijo `['plan']` entero. Crear y quitar sí lo
+ * conocen e invalidan el suyo.
  */
 
 /* ── Objetivos y competencias ─────────────────────────────────────────── */
 
-export function useObjetivos() {
-  return useQuery({ queryKey: claves.objetivos, queryFn: api.listarObjetivos });
+export function useObjetivos(planId?: string) {
+  return useQuery({
+    queryKey: claves.objetivosDe(planId),
+    queryFn: () => api.listarObjetivos(planId),
+  });
 }
 
 export function useCrearObjetivo(planId: string) {
@@ -278,6 +287,14 @@ export function useEliminarObjetivo() {
   return useMutacionConInvalidacion((id: string) => api.eliminarObjetivo(id), [claves.objetivos]);
 }
 
+/** RF-CH-016: cambia los objetivos del plan, su detalle y lo que el motor valida. */
+export function useQuitarObjetivoDelPlan(planId: string) {
+  return useMutacionConInvalidacion(
+    (id: string) => api.quitarObjetivoDelPlan(planId, id),
+    [claves.objetivos, claves.plan(planId), claves.asignaturas(planId)],
+  );
+}
+
 /** §6.2: los atributos del marco, para el selector del formulario. */
 export function useAtributos() {
   return useQuery({ queryKey: claves.atributos, queryFn: api.listarAtributos });
@@ -289,12 +306,18 @@ export function useAtributos() {
  * Hija de `competencias` en la clave: cambiar el mapeo de una competencia
  * cambia la cobertura, y así una sola invalidación alcanza a las dos.
  */
-export function useCobertura() {
-  return useQuery({ queryKey: claves.cobertura, queryFn: api.obtenerCobertura });
+export function useCobertura(planId?: string) {
+  return useQuery({
+    queryKey: claves.coberturaDe(planId),
+    queryFn: () => api.obtenerCobertura(planId),
+  });
 }
 
-export function useCompetencias() {
-  return useQuery({ queryKey: claves.competencias, queryFn: api.listarCompetencias });
+export function useCompetencias(planId?: string) {
+  return useQuery({
+    queryKey: claves.competenciasDe(planId),
+    queryFn: () => api.listarCompetencias(planId),
+  });
 }
 
 export function useCrearCompetencia(planId: string) {
@@ -327,6 +350,14 @@ export function useEliminarCompetencia() {
   return useMutacionConInvalidacion(
     (id: string) => api.eliminarCompetencia(id),
     [claves.competencias],
+  );
+}
+
+/** RF-CH-018: cambia las competencias del plan, su cobertura y su detalle. */
+export function useQuitarCompetenciaDelPlan(planId: string) {
+  return useMutacionConInvalidacion(
+    (id: string) => api.quitarCompetenciaDelPlan(planId, id),
+    [claves.competencias, claves.plan(planId), claves.asignaturas(planId)],
   );
 }
 
