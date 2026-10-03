@@ -28,15 +28,19 @@ const RAIZ = import.meta.dirname;
 /**
  * Lo único que este módulo puede importar del Plan de Estudios.
  *
- * Tres puertos: `contenido-curricular.port.js` (existente, de
+ * Cuatro puertos: `contenido-curricular.port.js` (existente, de
  * `medicion`/`evaluacion`), `acreditacion-cross-modulo.port.js` (de `mejora` —
- * RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B) y `plan-vigente.port.js`
- * (de `resumen`, la vista de inicio del Director).
+ * RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B), `plan-vigente.port.js`
+ * (de `resumen`, la vista de inicio del Director) y
+ * `elemento-curricular-en-uso.port.js` (Bloque 4b: `plan-estudios` pregunta si
+ * puede borrar una competencia o una asignatura y Mejora Continua lo
+ * implementa con sus tablas, como `docente-en-uso.port.js` con `auth`).
  */
 const PUERTO_PERMITIDO = [
   'ports/contenido-curricular.port.js',
   'ports/acreditacion-cross-modulo.port.js',
   'ports/plan-vigente.port.js',
+  'ports/elemento-curricular-en-uso.port.js',
 ];
 
 /**
@@ -207,14 +211,19 @@ describe('aislamiento de mejora-continua hacia objetivos-educacionales', () => {
   // en `PUERTO_PERMITIDO` —esa lista solo se filtra sobre lo que
   // `DE_PLAN_ESTUDIOS` ya capturó, así que una entrada ahí nunca se evaluaría.
   const DE_OBJETIVOS_EDUCACIONALES = /(^|\/)objetivos-educacionales\//;
-  const PUERTO_PERMITIDO_OBJETIVOS = 'ports/objetivos-cross-modulo.port.js';
+  // `objetivo-en-uso.port.js` (Bloque 4b): objetivos pregunta si puede borrar
+  // un objetivo y Mejora Continua responde con `planes_mejora`.
+  const PUERTOS_PERMITIDOS_OBJETIVOS = [
+    'ports/objetivos-cross-modulo.port.js',
+    'ports/objetivo-en-uso.port.js',
+  ];
 
-  it('solo importa de objetivos-educacionales el puerto cross-módulo', () => {
+  it('solo importa de objetivos-educacionales sus dos puertos', () => {
     const vistos = importsDe().filter(({ importado }) =>
       DE_OBJETIVOS_EDUCACIONALES.test(importado),
     );
     const infractores = vistos
-      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_OBJETIVOS))
+      .filter(({ importado }) => !PUERTOS_PERMITIDOS_OBJETIVOS.some((p) => importado.endsWith(p)))
       .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);

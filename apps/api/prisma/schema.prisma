@@ -772,9 +772,11 @@ enum EstadoMedicion {
 ///
 /// `planEstudiosId` no lleva clave foránea a propósito: apunta a otro esquema y
 /// §3.2 prohíbe que dos módulos compartan tablas. La validez se comprueba con
-/// `ContenidoCurricularPort` antes de escribir. Es sostenible porque los
-/// identificadores son inmutables y en `plan_estudios` nada se borra
-/// físicamente: se inactiva.
+/// `ContenidoCurricularPort` antes de escribir. Desde el Bloque 4b
+/// (RF-CH-016, 018 y 019) en `plan_estudios` sí se borran objetivos,
+/// competencias y asignaturas de planes en Borrador o En revisión: lo que
+/// protege estos ids es `ElementoCurricularEnUsoPort`/`ObjetivoEnUsoPort`, que
+/// Mejora Continua responde antes de cada borrado.
 model PlanMedicion {
   id             String         @id @default(uuid()) @db.Uuid
   planEstudiosId String         @map("plan_estudios_id") @db.Uuid

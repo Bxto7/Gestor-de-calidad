@@ -54,6 +54,9 @@ import {
   type DocenteEnUsoPort,
 } from './modules/auth/application/ports/docente-en-uso.port.js';
 import { DocenteEnUsoAdapter } from './modules/mejora-continua/evaluacion/infrastructure/persistence/docente-en-uso.adapter.js';
+import { ElementoCurricularEnUsoAdapter } from './modules/mejora-continua/infrastructure/persistence/elemento-curricular-en-uso.adapter.js';
+import { ELEMENTO_CURRICULAR_EN_USO } from './modules/plan-estudios/application/ports/elemento-curricular-en-uso.port.js';
+import { OBJETIVO_EN_USO } from './modules/objetivos-educacionales/application/ports/objetivo-en-uso.port.js';
 import { GestionUsuariosRepositoryPrisma } from './modules/auth/infrastructure/persistence/gestion-usuarios.repository.js';
 import { UsuariosController } from './modules/auth/infrastructure/http/usuarios.controller.js';
 import { DocentesDeCarreraController } from './modules/auth/infrastructure/http/docentes-de-carrera.controller.js';
@@ -498,6 +501,11 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // La otra dirección: `auth` pregunta si un docente está en uso y
     // Mejora Continua responde con sus tablas, sin que se lean entre sí (§3.2).
     { provide: DOCENTE_EN_USO, useClass: DocenteEnUsoAdapter },
+    // Bloque 4b: `plan-estudios` y `objetivos-educacionales` preguntan si
+    // pueden borrar un elemento curricular; Mejora Continua responde con sus
+    // tablas. Un solo adaptador cumple los dos puertos.
+    { provide: ELEMENTO_CURRICULAR_EN_USO, useClass: ElementoCurricularEnUsoAdapter },
+    { provide: OBJETIVO_EN_USO, useExisting: ELEMENTO_CURRICULAR_EN_USO },
     { provide: REPOSITORIO_DOCUMENTOS_MEDICION, useClass: DocumentoMedicionRepositoryPrisma },
     { provide: DATOS_DOCUMENTO_MEDICION, useClass: DatosDocumentoMedicionRepositoryPrisma },
     { provide: REPOSITORIO_DOCUMENTOS_EVALUACION, useClass: DocumentoEvaluacionRepositoryPrisma },
