@@ -516,3 +516,63 @@ describe('RF-CH-017 — nombre único por carrera', () => {
     ).resolves.toBeTruthy();
   });
 });
+
+describe('RF-CH-018 — quitar del plan', () => {
+  it('quitar el último vínculo con borrarRegistro borra la competencia y sus atributos', async () => {
+    const ag = (
+      await prisma.atributoGraduado.findFirstOrThrow({
+        where: { marco: 'ICACIT', codigo: 'AG-I08' },
+      })
+    ).id;
+    const creada = await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Única', [ag]);
+
+    await competencias.quitarDelPlan(planId, creada.id, true);
+
+    expect(await competencias.porId(creada.id)).toBeNull();
+    expect(await prisma.competenciaAtributo.count({ where: { competenciaId: creada.id } })).toBe(0);
+  });
+
+  it('sin borrarRegistro solo quita el vínculo de este plan: el otro plan la conserva', async () => {
+    const creada = await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Compartida', []);
+    await prisma.planCompetencia.create({ data: { planId: otroPlanId, competenciaId: creada.id } });
+
+    await competencias.quitarDelPlan(planId, creada.id, false);
+
+    expect(await competencias.vinculadaAlPlan(planId, creada.id)).toBe(false);
+    expect(await competencias.vinculadaAlPlan(otroPlanId, creada.id)).toBe(true);
+    expect((await competencias.porId(creada.id))?.planesVinculados).toBe(1);
+  });
+
+  it('si otro plan la vincula, pedir el borrado falla y no quita nada', async () => {
+    // El `Restrict` de `plan_competencia` es la última línea si el caso de uso
+    // calculara mal, o si otro plan la vinculara entre la consulta y el borrado.
+    const creada = await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Compartida', []);
+    await prisma.planCompetencia.create({ data: { planId: otroPlanId, competenciaId: creada.id } });
+
+    await expect(competencias.quitarDelPlan(planId, creada.id, true)).rejects.toThrow();
+    expect(await competencias.vinculadaAlPlan(planId, creada.id)).toBe(true);
+  });
+
+  it('asignaturasDelPlanQueLaUsan devuelve solo las de ese plan, ordenadas', async () => {
+    const creada = await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Usada', []);
+    await asignatura('ISI-102', [creada.id]);
+    await asignatura('ISI-101', [creada.id]);
+    await prisma.asignatura.create({
+      data: {
+        planId: otroPlanId,
+        codigo: 'ISI-901',
+        nombre: 'De otro plan',
+        descripcion: 'Sumilla sintética.',
+        tipo: 'GENERAL',
+        condicion: 'OBLIGATORIA',
+        creditos: 3,
+        competencias: { create: { competenciaId: creada.id } },
+      },
+    });
+
+    expect(await competencias.asignaturasDelPlanQueLaUsan(planId, creada.id)).toEqual([
+      'ISI-101',
+      'ISI-102',
+    ]);
+  });
+});

@@ -112,6 +112,26 @@ export class ElementoCatalogoEliminado extends DomainEvent {
   }
 }
 
+/**
+ * RF-CH-018: la competencia deja de estar en un plan. Si además se borra el
+ * registro, el caso de uso publica también `ElementoCatalogoEliminado`.
+ */
+export class CompetenciaQuitadaDelPlan extends DomainEvent {
+  readonly nombre = 'catalogo.quitada_del_plan';
+  readonly entidad = 'Competencia' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    codigoPlan: string,
+  ) {
+    super(actor);
+    this.detalle = `Competencia ${codigo} quitada del plan ${codigoPlan}.`;
+  }
+}
+
 /** Orden estable: la lista viene de una tabla puente, que no garantiza ninguno. */
 function ordenados(codigos: readonly string[]): string[] {
   return [...codigos].sort((a, b) => a.localeCompare(b, 'es'));

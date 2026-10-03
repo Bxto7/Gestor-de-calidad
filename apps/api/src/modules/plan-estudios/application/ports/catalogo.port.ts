@@ -95,6 +95,20 @@ export interface RepositorioCompetenciaPort {
   cambiarEstado(id: string, activa: boolean): Promise<DatosCompetencia>;
   eliminar(id: string): Promise<void>;
 
+  /** RF-CH-018: si la competencia está vinculada a ese plan. */
+  vinculadaAlPlan(planId: string, competenciaId: string): Promise<boolean>;
+
+  /** RF-CH-018: códigos de las asignaturas de ese plan que la usan, ordenados. */
+  asignaturasDelPlanQueLaUsan(planId: string, competenciaId: string): Promise<string[]>;
+
+  /**
+   * RF-CH-018: quita el vínculo con el plan y, si `borrarRegistro`, borra la
+   * fila en la misma transacción (`competencia_atributo` cae en cascada). Si
+   * entretanto otro plan o asignatura la hubiera vinculado, el `Restrict` de la
+   * base impide el borrado y la transacción entera se deshace.
+   */
+  quitarDelPlan(planId: string, competenciaId: string, borrarRegistro: boolean): Promise<void>;
+
   /** RF-CH-017: el nombre se repite como mucho una vez por carrera, sin distinguir mayúsculas. */
   existeNombre(nombre: string, carreraId: string | null, idIgnorado?: string): Promise<boolean>;
 }

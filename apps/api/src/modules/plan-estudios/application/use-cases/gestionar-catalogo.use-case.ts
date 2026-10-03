@@ -13,6 +13,12 @@
  *    de los planes que ya lo usaban. Es el camino normal.
  *  - RF045 permite eliminar por la raíz solo lo que no tiene ni un vínculo.
  *
+ * RF-CH-018 añade una tercera vía: **quitar del plan**. Quita el vínculo y,
+ * si ya no queda ningún plan ni asignatura que la use, borra el registro.
+ * Mejora Continua solo se consulta cuando se va a borrar el registro: si otro
+ * plan —por ejemplo el Vigente— la conserva, la fila sigue existiendo y nada
+ * de Mejora Continua queda huérfano.
+ *
  * Orden de comprobación de toda operación: permiso de lectura (sin carrera);
  * existencia y alcance —fuera de él responde NoEncontrado, como si no
  * existiera (RF-CH-009)—; permiso de gestión acotado a la carrera; y, al
@@ -21,6 +27,7 @@
 
 import type {
   Actor,
+  DomainEvent,
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
 import {
@@ -32,6 +39,7 @@ import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcan
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import {
+  CompetenciaQuitadaDelPlan,
   ElementoCatalogoCreado,
   ElementoCatalogoEditado,
   ElementoCatalogoEliminado,
@@ -44,6 +52,7 @@ import type {
   DatosCompetencia,
   RepositorioCompetenciaPort,
 } from '../ports/catalogo.port.js';
+import type { ElementoCurricularEnUsoPort } from '../ports/elemento-curricular-en-uso.port.js';
 import type { RepositorioPlanPort } from '../ports/repositorios.port.js';
 
 /**
@@ -66,6 +75,7 @@ export class GestionarCompetencias {
   constructor(
     private readonly competencias: RepositorioCompetenciaPort,
     private readonly planes: RepositorioPlanPort,
+    private readonly enUso: ElementoCurricularEnUsoPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
     private readonly alcance: AlcanceDeLecturaPort,
@@ -241,6 +251,58 @@ export class GestionarCompetencias {
       new ElementoCatalogoEliminado(actor, 'Competencia', id, actual.codigo, actual.nombre),
     ]);
     await this.competencias.eliminar(id);
+  }
+
+  /**
+   * RF-CH-018 — quitar una competencia del plan (Borrador o En revisión).
+   *
+   * Se bloquea si la usan asignaturas de este plan. Se calcula si el registro
+   * se borraría —ningún otro plan la vincula y ninguna asignatura de otro plan
+   * la usa— y solo entonces se pregunta a Mejora Continua (decisión 4 de la
+   * especificación). Los eventos se publican antes de escribir: si la fila se
+   * borra, el código y el nombre ya no existirían en ninguna parte.
+   */
+  async quitarDelPlan(actor: Actor, planId: string, id: string): Promise<void> {
+    await this.exigir(actor, 'competencia.leer', null);
+    const plan = await this.planLegible(actor, planId);
+    await this.exigir(actor, 'competencia.gestionar', plan.carreraId);
+    exigirEditable(plan);
+
+    const actual = await this.competencias.porId(id);
+    if (!actual || !(await this.competencias.vinculadaAlPlan(planId, id))) {
+      throw new NoEncontrado('la competencia en el plan', id);
+    }
+
+    const usadaPor = await this.competencias.asignaturasDelPlanQueLaUsan(planId, id);
+    if (usadaPor.length > 0) {
+      throw new ReglaDeNegocioViolada(
+        `La usan ${usadaPor.join(', ')}. Quítala de esas asignaturas primero.`,
+      );
+    }
+
+    // Llegados aquí, ninguna asignatura de este plan la usa: las que cuenta
+    // `asignaturasVinculadas` son de otros planes.
+    const seBorra = actual.planesVinculados === 1 && actual.asignaturasVinculadas === 0;
+    if (seBorra) {
+      const uso = await this.enUso.competenciaEnUso(id);
+      if (uso.enUso) {
+        throw new ReglaDeNegocioViolada(
+          `No se puede quitar ${actual.codigo}: ningún otro plan la usa y borrarla dejaría ` +
+            `sin referencia a Mejora Continua (${uso.motivos.join('; ')}).`,
+        );
+      }
+    }
+
+    const eventos: DomainEvent[] = [
+      new CompetenciaQuitadaDelPlan(actor, id, actual.codigo, plan.codigo),
+    ];
+    if (seBorra) {
+      eventos.push(
+        new ElementoCatalogoEliminado(actor, 'Competencia', id, actual.codigo, actual.nombre),
+      );
+    }
+    await this.eventos.publicar(eventos);
+    await this.competencias.quitarDelPlan(planId, id, seBorra);
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */

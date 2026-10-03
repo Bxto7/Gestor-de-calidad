@@ -136,3 +136,31 @@ export class CompetenciasController {
     await this.competencias.eliminar(actor, id);
   }
 }
+
+@ApiTags('Competencias')
+@ApiBearerAuth()
+@Controller('planes/:planId/competencias')
+export class CompetenciasDelPlanController {
+  constructor(private readonly competencias: GestionarCompetencias) {}
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Quitar una competencia del plan',
+    description:
+      'RF-CH-018. Solo con el plan en Borrador o En revisión. Si ningún otro plan ni ' +
+      'asignatura la usa, el registro se borra; Mejora Continua se consulta solo entonces.',
+  })
+  @ApiResponse({ status: 404, description: 'El plan o la competencia no existen o no son tuyos.' })
+  @ApiResponse({
+    status: 409,
+    description: 'El plan no admite cambios, la usan asignaturas del plan o Mejora Continua.',
+  })
+  async quitar(
+    @Param('planId', ParseUUIDPipe) planId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+  ) {
+    await this.competencias.quitarDelPlan(actor, planId, id);
+  }
+}

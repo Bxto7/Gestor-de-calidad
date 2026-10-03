@@ -8,6 +8,7 @@ import { NoEncontrado } from '../../src/shared-kernel/errors/errores.js';
 import { GestionarCompetencias } from '../../src/modules/plan-estudios/application/use-cases/gestionar-catalogo.use-case.js';
 import { CompetenciaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
 import { PlanRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/plan.repository.js';
+import { ElementoCurricularEnUsoAdapter } from '../../src/modules/mejora-continua/infrastructure/persistence/elemento-curricular-en-uso.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
@@ -153,6 +154,7 @@ function gestionarCompetencias(): GestionarCompetencias {
   return new GestionarCompetencias(
     new CompetenciaRepositoryPrisma(prisma),
     new PlanRepositoryPrisma(prisma),
+    new ElementoCurricularEnUsoAdapter(prisma),
     adaptador,
     sinBitacora,
     adaptador,
@@ -205,5 +207,18 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
 
     const r = await gestionarCompetencias().listar(como(coordinador));
     expect(r.map((c) => c.codigo)).toEqual(['CPE-01', 'CPE-02', 'CPE-03']);
+  });
+
+  it('el Director no puede quitar una competencia de un plan de otra carrera: NoEncontrado y nada cambia', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const planCiv = await planDe(civ, 'PE-CIV-2026-v1');
+    const ajena = await competenciaEn('CPE-02', civ, planCiv);
+
+    await expect(
+      gestionarCompetencias().quitarDelPlan(como(director), planCiv, ajena),
+    ).rejects.toBeInstanceOf(NoEncontrado);
+    expect(await prisma.planCompetencia.count({ where: { planId: planCiv } })).toBe(1);
   });
 });

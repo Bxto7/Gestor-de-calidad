@@ -55,7 +55,10 @@ import {
 } from './modules/auth/application/ports/docente-en-uso.port.js';
 import { DocenteEnUsoAdapter } from './modules/mejora-continua/evaluacion/infrastructure/persistence/docente-en-uso.adapter.js';
 import { ElementoCurricularEnUsoAdapter } from './modules/mejora-continua/infrastructure/persistence/elemento-curricular-en-uso.adapter.js';
-import { ELEMENTO_CURRICULAR_EN_USO } from './modules/plan-estudios/application/ports/elemento-curricular-en-uso.port.js';
+import {
+  ELEMENTO_CURRICULAR_EN_USO,
+  type ElementoCurricularEnUsoPort,
+} from './modules/plan-estudios/application/ports/elemento-curricular-en-uso.port.js';
 import { OBJETIVO_EN_USO } from './modules/objetivos-educacionales/application/ports/objetivo-en-uso.port.js';
 import { GestionUsuariosRepositoryPrisma } from './modules/auth/infrastructure/persistence/gestion-usuarios.repository.js';
 import { UsuariosController } from './modules/auth/infrastructure/http/usuarios.controller.js';
@@ -324,7 +327,10 @@ import {
   AsignaturasController,
   AsignaturasDelPlanController,
 } from './modules/plan-estudios/infrastructure/http/asignaturas.controller.js';
-import { CompetenciasController } from './modules/plan-estudios/infrastructure/http/catalogo.controller.js';
+import {
+  CompetenciasController,
+  CompetenciasDelPlanController,
+} from './modules/plan-estudios/infrastructure/http/catalogo.controller.js';
 import { ObjetivosController } from './modules/objetivos-educacionales/infrastructure/http/objetivos.controller.js';
 import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
 import {
@@ -408,6 +414,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     AsignaturasController,
     ObjetivosController,
     CompetenciasController,
+    CompetenciasDelPlanController,
     AtributosController,
     AtributosDelPlanController,
     CriteriosDeCarreraController,
@@ -654,6 +661,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       inject: [
         REPOSITORIO_COMPETENCIA,
         REPOSITORIO_PLAN,
+        ELEMENTO_CURRICULAR_EN_USO,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
         ALCANCE_DE_LECTURA,
@@ -661,10 +669,11 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       useFactory: (
         competencias: RepositorioCompetenciaPort,
         planes: RepositorioPlanPort,
+        enUso: ElementoCurricularEnUsoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
         alcance: AlcanceDeLecturaPort,
-      ) => new GestionarCompetencias(competencias, planes, autorizacion, eventos, alcance),
+      ) => new GestionarCompetencias(competencias, planes, enUso, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarAtributos,

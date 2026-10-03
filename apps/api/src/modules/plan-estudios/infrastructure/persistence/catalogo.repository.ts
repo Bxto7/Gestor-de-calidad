@@ -229,6 +229,36 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     await this.prisma.competencia.delete({ where: { id } });
   }
 
+  async vinculadaAlPlan(planId: string, competenciaId: string): Promise<boolean> {
+    const fila = await this.prisma.planCompetencia.findUnique({
+      where: { planId_competenciaId: { planId, competenciaId } },
+      select: { planId: true },
+    });
+    return fila !== null;
+  }
+
+  async asignaturasDelPlanQueLaUsan(planId: string, competenciaId: string): Promise<string[]> {
+    const filas = await this.prisma.asignatura.findMany({
+      where: { planId, competencias: { some: { competenciaId } } },
+      select: { codigo: true },
+      orderBy: { codigo: 'asc' },
+    });
+    return filas.map((f) => f.codigo);
+  }
+
+  async quitarDelPlan(
+    planId: string,
+    competenciaId: string,
+    borrarRegistro: boolean,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.planCompetencia.delete({
+        where: { planId_competenciaId: { planId, competenciaId } },
+      });
+      if (borrarRegistro) await tx.competencia.delete({ where: { id: competenciaId } });
+    });
+  }
+
   async existeNombre(
     nombre: string,
     carreraId: string | null,

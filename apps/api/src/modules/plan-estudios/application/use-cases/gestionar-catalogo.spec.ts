@@ -28,6 +28,7 @@ import type {
   FiltroCatalogo,
   RepositorioCompetenciaPort,
 } from '../ports/catalogo.port.js';
+import type { UsoDeElemento } from '../ports/elemento-curricular-en-uso.port.js';
 import type { RepositorioPlanPort } from '../ports/repositorios.port.js';
 import { GestionarCompetencias } from './gestionar-catalogo.use-case.js';
 
@@ -98,6 +99,12 @@ function montarCompetencias(
     /** `false` deniega todo; una función decide por permiso. */
     permitido?: boolean | ((permiso: string) => boolean);
     alcance?: AlcanceDeLecturaPort;
+    /** RF-CH-018: si la competencia está vinculada al plan (por defecto sí). */
+    vinculada?: boolean;
+    /** Códigos de las asignaturas del plan que la usan. */
+    usadaPor?: string[];
+    /** Lo que responde Mejora Continua. */
+    enUso?: UsoDeElemento;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -107,6 +114,9 @@ function montarCompetencias(
   const coberturas: (string | undefined)[] = [];
   const nombresConsultados: { nombre: string; carreraId: string | null }[] = [];
   const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
+  const quitadas: { planId: string; id: string; borrarRegistro: boolean }[] = [];
+  const consultasEnUso: string[] = [];
+  const orden: string[] = [];
 
   const repo: RepositorioCompetenciaPort = {
     listar: async (filtro) => {
@@ -134,6 +144,12 @@ function montarCompetencias(
       competencia({ nombre, atributos: atributos(atributoIds) }),
     cambiarEstado: async (_id, activa) => competencia({ activa }),
     eliminar: async (id) => void eliminadas.push(id),
+    vinculadaAlPlan: async () => opciones.vinculada ?? true,
+    asignaturasDelPlanQueLaUsan: async () => opciones.usadaPor ?? [],
+    quitarDelPlan: async (planId, id, borrarRegistro) => {
+      orden.push('quitar');
+      quitadas.push({ planId, id, borrarRegistro });
+    },
     existeNombre: async (nombre, carreraId) => {
       nombresConsultados.push({ nombre, carreraId });
       return opciones.nombreDuplicado ?? false;
@@ -156,10 +172,24 @@ function montarCompetencias(
     rolesDe: async () => [],
   };
 
-  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+  const enUso = {
+    competenciaEnUso: async (id: string) => {
+      consultasEnUso.push(id);
+      return opciones.enUso ?? { enUso: false, motivos: [] };
+    },
+    asignaturaEnUso: async () => ({ enUso: false, motivos: [] }),
+  };
+
+  const eventos: PublicadorDeEventos = {
+    publicar: async (e) => {
+      orden.push('eventos');
+      publicados.push(...e);
+    },
+  };
   const caso = new GestionarCompetencias(
     repo,
     planes,
+    enUso,
     autorizacion,
     eventos,
     opciones.alcance ?? sinRestriccion(),
@@ -174,6 +204,9 @@ function montarCompetencias(
     coberturas,
     nombresConsultados,
     autorizaciones,
+    quitadas,
+    consultasEnUso,
+    orden,
   };
 }
 
@@ -495,5 +528,120 @@ describe('RF124–RF126 — regresión tras introducir PlanAtributo', () => {
     });
     await caso.editar(ACTOR, 'cpe-1', 'Aprendizaje autónomo', []);
     expect(publicados[0]?.detalle).toContain('AG-I06 → ninguno');
+  });
+});
+
+describe('RF-CH-018 — quitar una competencia del plan', () => {
+  it('con otro plan que la vincula, solo quita el vínculo y no consulta a Mejora Continua', async () => {
+    const { caso, quitadas, consultasEnUso, publicados } = montarCompetencias({
+      existente: competencia({ planesVinculados: 2 }),
+      enUso: { enUso: true, motivos: ['está en 1 plan(es) de medición'] },
+    });
+
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1');
+
+    expect(quitadas).toEqual([{ planId: 'plan-1', id: 'cpe-1', borrarRegistro: false }]);
+    expect(consultasEnUso).toEqual([]);
+    expect(publicados.map((e) => e.nombre)).toEqual(['catalogo.quitada_del_plan']);
+    expect(publicados[0]?.detalle).toBe('Competencia CPE-01 quitada del plan PE-ISI-2026-v2.');
+  });
+
+  it('con asignaturas de otro plan que la usan, tampoco se borra', async () => {
+    const { caso, quitadas, consultasEnUso } = montarCompetencias({
+      existente: competencia({ planesVinculados: 1, asignaturasVinculadas: 3 }),
+    });
+
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1');
+
+    expect(quitadas[0]?.borrarRegistro).toBe(false);
+    expect(consultasEnUso).toEqual([]);
+  });
+
+  it('como último vínculo consulta a Mejora Continua y, si no la usa, borra el registro', async () => {
+    const { caso, quitadas, consultasEnUso, publicados } = montarCompetencias({
+      existente: competencia({ planesVinculados: 1 }),
+    });
+
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1');
+
+    expect(consultasEnUso).toEqual(['cpe-1']);
+    expect(quitadas).toEqual([{ planId: 'plan-1', id: 'cpe-1', borrarRegistro: true }]);
+    expect(publicados.map((e) => e.nombre)).toEqual([
+      'catalogo.quitada_del_plan',
+      'catalogo.eliminado',
+    ]);
+  });
+
+  it('como último vínculo y en uso en Mejora Continua, se bloquea con sus motivos', async () => {
+    const { caso, quitadas, publicados } = montarCompetencias({
+      existente: competencia({ planesVinculados: 1 }),
+      enUso: { enUso: true, motivos: ['está en 1 plan(es) de medición'] },
+    });
+
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1')).rejects.toThrow(
+      'No se puede quitar CPE-01: ningún otro plan la usa y borrarla dejaría sin referencia a ' +
+        'Mejora Continua (está en 1 plan(es) de medición).',
+    );
+    expect(quitadas).toHaveLength(0);
+    expect(publicados).toHaveLength(0);
+  });
+
+  it('usada por asignaturas de este plan, se bloquea con sus códigos', async () => {
+    const { caso, quitadas } = montarCompetencias({ usadaPor: ['ASUC01110', 'ASUC01112'] });
+
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1')).rejects.toThrow(
+      'La usan ASUC01110, ASUC01112. Quítala de esas asignaturas primero.',
+    );
+    expect(quitadas).toHaveLength(0);
+  });
+
+  it('los eventos se publican antes de quitar: después el registro puede no existir', async () => {
+    const { caso, orden } = montarCompetencias({ existente: competencia({ planesVinculados: 1 }) });
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1');
+    expect(orden).toEqual(['eventos', 'quitar']);
+  });
+
+  it('con el plan Vigente se rechaza sin tocar nada', async () => {
+    const { caso, quitadas } = montarCompetencias({ plan: plan('Vigente') });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1')).rejects.toThrow(
+      'El plan está en estado Vigente y no admite cambios. Genera una nueva versión para modificarlo.',
+    );
+    expect(quitadas).toHaveLength(0);
+  });
+
+  it('también En revisión se puede quitar', async () => {
+    const { caso, quitadas } = montarCompetencias({
+      plan: plan('En revisión'),
+      existente: competencia({ planesVinculados: 2 }),
+    });
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1');
+    expect(quitadas).toHaveLength(1);
+  });
+
+  it('una competencia que no está en el plan da NoEncontrado', async () => {
+    const { caso, quitadas } = montarCompetencias({ vinculada: false });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(quitadas).toHaveLength(0);
+  });
+
+  it('un plan de otra carrera, para quien solo lee la suya, da NoEncontrado y no quita nada', async () => {
+    const { caso, quitadas } = montarCompetencias({
+      plan: plan('Borrador', IIN),
+      alcance: soloCarrera(ISI),
+    });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(quitadas).toHaveLength(0);
+  });
+
+  it('autoriza la gestión contra la carrera del plan y sin ella da AccesoDenegado', async () => {
+    const { caso, quitadas, autorizaciones } = montarCompetencias({
+      plan: plan('Borrador', IIN),
+      permitido: (p) => p !== 'competencia.gestionar',
+    });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'cpe-1')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    expect(autorizaciones).toContainEqual({ permiso: 'competencia.gestionar', carreraId: IIN });
+    expect(quitadas).toHaveLength(0);
   });
 });
