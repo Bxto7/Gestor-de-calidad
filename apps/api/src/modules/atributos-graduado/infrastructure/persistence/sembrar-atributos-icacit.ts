@@ -31,3 +31,26 @@ export async function sembrarAtributosIcacit(
   }
   return ATRIBUTOS_ICACIT.length;
 }
+
+/**
+ * Crea solo los atributos de ICACIT que la carrera no tiene y nunca toca los
+ * existentes: ni nombre, ni orden, ni estado. Es lo que usa la carga histórica
+ * del plan ISI 2018, que se puede volver a ejecutar sobre una carrera ya en uso
+ * sin deshacer lo que un Coordinador editó o inactivó. Devuelve cuántos creó.
+ */
+export async function crearAtributosIcacitFaltantes(
+  prisma: Pick<PrismaClient, 'atributoGraduado'>,
+  carreraId: string,
+): Promise<number> {
+  const { count } = await prisma.atributoGraduado.createMany({
+    data: ATRIBUTOS_ICACIT.map((a, indice) => ({
+      carreraId,
+      marco: MARCO_ICACIT,
+      codigo: a.codigo,
+      nombre: a.nombre,
+      orden: indice + 1,
+    })),
+    skipDuplicates: true,
+  });
+  return count;
+}

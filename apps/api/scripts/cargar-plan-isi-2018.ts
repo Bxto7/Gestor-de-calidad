@@ -31,7 +31,7 @@ import { existsSync } from 'node:fs';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 
-import { sembrarAtributosIcacit } from '../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+import { crearAtributosIcacitFaltantes } from '../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaClient } from '../src/platform/database/generated/client.js';
 import {
   ASIGNATURAS,
@@ -114,12 +114,14 @@ async function main(): Promise<void> {
     ]),
   );
   resumen.push(`${totalCiclos} ciclos`);
-  await sembrarAtributosIcacit(prisma, carrera.id);
+  await crearAtributosIcacitFaltantes(prisma, carrera.id);
 
   /* ── Catálogo institucional ────────────────────────────────────────── */
 
   const competencias = new Map<string, string>();
-  // Los atributos de la carrera ISI se siembran arriba con `sembrarAtributosIcacit`; aquí solo se enlazan.
+  // Los atributos de la carrera ISI se completan arriba con
+  // `crearAtributosIcacitFaltantes` (solo crea los que faltan, sin pisar lo que
+  // ya editó un Coordinador); aquí solo se enlazan.
   const atributos = new Map(
     (
       await prisma.atributoGraduado.findMany({ where: { carreraId: carrera.id, marco: 'ICACIT' } })

@@ -8,7 +8,22 @@
 -- empieza sin atributos (decisión 2 del diseño).
 --
 -- Una competencia sin carrera (heredada del 4b) no se puede remapear sin
--- adivinar: su vínculo se elimina y el aviso dice cuántos y de qué competencias.
+-- adivinar: su vínculo se elimina. El `RAISE NOTICE` de la sección
+-- `aviso-sin-carrera` NO se ve en la salida de `prisma migrate deploy` (se
+-- comprobó contra una base desechable con una competencia sin carrera vinculada:
+-- la salida no lo muestra), así que no es una señal fiable. ANTES de desplegar,
+-- ejecutar esta consulta y guardar su resultado; lista los vínculos que se
+-- perderán (sin filas = no se pierde nada):
+--
+--   SELECT c."codigo" AS competencia, g."codigo" AS atributo
+--     FROM "plan_estudios"."competencia_atributo" AS ca
+--     JOIN "plan_estudios"."competencias" AS c ON c."id" = ca."competencia_id"
+--     JOIN "atributos_graduado"."atributos_graduado" AS g ON g."id" = ca."atributo_id"
+--    WHERE c."carrera_id" IS NULL
+--    ORDER BY 1, 2;
+--
+-- Los eventos de `auditoria.audit_log` conservan los ids de los atributos
+-- globales borrados: no hay otra huella de ellos en la base tras la migración.
 --
 -- Todo el archivo corre como una sola transacción: PostgreSQL ejecuta un
 -- comando multi-sentencia en una transacción implícita.
