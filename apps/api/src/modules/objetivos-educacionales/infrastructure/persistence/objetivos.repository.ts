@@ -126,6 +126,22 @@ export class ObjetivoRepositoryPrisma implements RepositorioObjetivoPort {
     await this.prisma.objetivoEducacional.delete({ where: { id } });
   }
 
+  async vinculadoAlPlan(planId: string, objetivoId: string): Promise<boolean> {
+    // Misma excepción de aislamiento que `crearEnPlan`: solo la fila puente.
+    const fila = await this.prisma.planObjetivo.findUnique({
+      where: { planId_objetivoId: { planId, objetivoId } },
+      select: { planId: true },
+    });
+    return fila !== null;
+  }
+
+  async quitarDelPlan(planId: string, objetivoId: string, borrarRegistro: boolean): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.planObjetivo.delete({ where: { planId_objetivoId: { planId, objetivoId } } });
+      if (borrarRegistro) await tx.objetivoEducacional.delete({ where: { id: objetivoId } });
+    });
+  }
+
   async existeNombre(
     nombre: string,
     carreraId: string | null,

@@ -12,6 +12,10 @@
  * autoriza contra la del plan; editar, inactivar y el borrado raíz, contra la
  * de la fila.
  *
+ * RF-CH-016 añade **quitar del plan**: quita el vínculo y, si ya ningún otro
+ * plan lo usa, borra el registro. Mejora Continua solo se consulta cuando se
+ * va a borrar el registro (decisión 4 de la especificación).
+ *
  * Orden de comprobación: permiso de lectura (sin carrera); existencia y
  * alcance —fuera de él NoEncontrado (RF-CH-009)—; permiso de gestión acotado a
  * la carrera; y, al escribir en un plan, que el plan admita cambios.
@@ -19,6 +23,7 @@
 
 import type {
   Actor,
+  DomainEvent,
   PublicadorDeEventos,
 } from '../../../../shared-kernel/domain-events/domain-event.js';
 import {
@@ -33,8 +38,10 @@ import {
   ObjetivoEditado,
   ObjetivoEliminado,
   ObjetivoEstadoCambiado,
+  ObjetivoQuitadoDelPlan,
 } from '../../domain/events/eventos-objetivo.js';
 import { limpiarNombre, siguienteCodigoObjetivo } from '../../domain/value-objects/codigos.js';
+import type { ObjetivoEnUsoPort } from '../ports/objetivo-en-uso.port.js';
 import type { DatosObjetivo, RepositorioObjetivoPort } from '../ports/objetivos.port.js';
 import type {
   PlanParaObjetivos,
@@ -53,6 +60,7 @@ export class GestionarObjetivos {
   constructor(
     private readonly objetivos: RepositorioObjetivoPort,
     private readonly planes: PlanParaObjetivosPort,
+    private readonly enUso: ObjetivoEnUsoPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
     private readonly alcance: AlcanceDeLecturaPort,
@@ -172,6 +180,44 @@ export class GestionarObjetivos {
     // necesita el detalle ya no existirían en ninguna parte.
     await this.eventos.publicar([new ObjetivoEliminado(actor, id, actual.codigo, actual.nombre)]);
     await this.objetivos.eliminar(id);
+  }
+
+  /**
+   * RF-CH-016 — quitar un objetivo del plan (Borrador o En revisión).
+   *
+   * Si otro plan —por ejemplo el Vigente— lo sigue vinculando, se quita sin
+   * preguntar a Mejora Continua: el registro sigue existiendo. Si este era el
+   * último vínculo, el registro se borraría y entonces sí se pregunta. Los
+   * eventos se publican antes de escribir.
+   */
+  async quitarDelPlan(actor: Actor, planId: string, id: string): Promise<void> {
+    await this.exigir(actor, 'objetivo.leer', null);
+    const plan = await this.planLegible(actor, planId);
+    await this.exigir(actor, 'objetivo.gestionar', plan.carreraId);
+    exigirEditable(plan);
+
+    const actual = await this.objetivos.porId(id);
+    if (!actual || !(await this.objetivos.vinculadoAlPlan(planId, id))) {
+      throw new NoEncontrado('el objetivo educacional en el plan', id);
+    }
+
+    const seBorra = actual.planesVinculados === 1;
+    if (seBorra) {
+      const uso = await this.enUso.objetivoEnUso(id);
+      if (uso.enUso) {
+        throw new ReglaDeNegocioViolada(
+          `No se puede quitar ${actual.codigo}: ningún otro plan lo usa y borrarlo dejaría ` +
+            `sin referencia a Mejora Continua (${uso.motivos.join('; ')}).`,
+        );
+      }
+    }
+
+    const eventos: DomainEvent[] = [
+      new ObjetivoQuitadoDelPlan(actor, id, actual.codigo, plan.codigo),
+    ];
+    if (seBorra) eventos.push(new ObjetivoEliminado(actor, id, actual.codigo, actual.nombre));
+    await this.eventos.publicar(eventos);
+    await this.objetivos.quitarDelPlan(planId, id, seBorra);
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */

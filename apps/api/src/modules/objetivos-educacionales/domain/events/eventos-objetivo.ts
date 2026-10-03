@@ -101,3 +101,23 @@ export class ObjetivoEliminado extends DomainEvent {
     this.detalle = `Objetivo educacional ${codigo} «${nombreObjetivo}» eliminado definitivamente.`;
   }
 }
+
+/**
+ * RF-CH-016: el objetivo deja de estar en un plan. Si además se borra el
+ * registro, el caso de uso publica también `ObjetivoEliminado`.
+ */
+export class ObjetivoQuitadoDelPlan extends DomainEvent {
+  readonly nombre = 'objetivo.quitado_del_plan';
+  readonly entidad = 'Objetivo' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    codigoPlan: string,
+  ) {
+    super(actor);
+    this.detalle = `Objetivo educacional ${codigo} quitado del plan ${codigoPlan}.`;
+  }
+}

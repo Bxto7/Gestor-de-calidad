@@ -59,7 +59,10 @@ import {
   ELEMENTO_CURRICULAR_EN_USO,
   type ElementoCurricularEnUsoPort,
 } from './modules/plan-estudios/application/ports/elemento-curricular-en-uso.port.js';
-import { OBJETIVO_EN_USO } from './modules/objetivos-educacionales/application/ports/objetivo-en-uso.port.js';
+import {
+  OBJETIVO_EN_USO,
+  type ObjetivoEnUsoPort,
+} from './modules/objetivos-educacionales/application/ports/objetivo-en-uso.port.js';
 import { GestionUsuariosRepositoryPrisma } from './modules/auth/infrastructure/persistence/gestion-usuarios.repository.js';
 import { UsuariosController } from './modules/auth/infrastructure/http/usuarios.controller.js';
 import { DocentesDeCarreraController } from './modules/auth/infrastructure/http/docentes-de-carrera.controller.js';
@@ -336,7 +339,10 @@ import {
   CompetenciasController,
   CompetenciasDelPlanController,
 } from './modules/plan-estudios/infrastructure/http/catalogo.controller.js';
-import { ObjetivosController } from './modules/objetivos-educacionales/infrastructure/http/objetivos.controller.js';
+import {
+  ObjetivosController,
+  ObjetivosDelPlanController,
+} from './modules/objetivos-educacionales/infrastructure/http/objetivos.controller.js';
 import { MallaRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/malla.repository.js';
 import {
   REPOSITORIO_REPORTES,
@@ -418,6 +424,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     AsignaturasDelPlanController,
     AsignaturasController,
     ObjetivosController,
+    ObjetivosDelPlanController,
     CompetenciasController,
     CompetenciasDelPlanController,
     AtributosController,
@@ -660,6 +667,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       inject: [
         REPOSITORIO_OBJETIVO,
         PLAN_PARA_OBJETIVOS,
+        OBJETIVO_EN_USO,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
         ALCANCE_DE_LECTURA,
@@ -667,10 +675,11 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
       useFactory: (
         objetivos: RepositorioObjetivoPort,
         planes: PlanParaObjetivosPort,
+        enUso: ObjetivoEnUsoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
         alcance: AlcanceDeLecturaPort,
-      ) => new GestionarObjetivos(objetivos, planes, autorizacion, eventos, alcance),
+      ) => new GestionarObjetivos(objetivos, planes, enUso, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarCompetencias,

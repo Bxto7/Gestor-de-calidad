@@ -230,6 +230,7 @@ function gestionarObjetivos(): GestionarObjetivos {
   return new GestionarObjetivos(
     new ObjetivoRepositoryPrisma(prisma),
     new PlanParaObjetivosAdapter(new PlanRepositoryPrisma(prisma)),
+    new ElementoCurricularEnUsoAdapter(prisma),
     adaptador,
     sinBitacora,
     adaptador,
@@ -299,5 +300,18 @@ describe('RF-CH-015 / RF-CH-009 — objetivos según el alcance de lectura', () 
 
     const r = await gestionarObjetivos().listar(como(coordinador));
     expect(r.map((o) => o.codigo)).toEqual(['OE-01', 'OE-02', 'OE-03']);
+  });
+
+  it('el Director no puede quitar un objetivo de un plan de otra carrera: NoEncontrado y nada cambia', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const planCiv = await planDe(civ, 'PE-CIV-2026-v1');
+    const ajeno = await objetivoEn('OE-02', civ, planCiv);
+
+    await expect(
+      gestionarObjetivos().quitarDelPlan(como(director), planCiv, ajeno),
+    ).rejects.toBeInstanceOf(NoEncontrado);
+    expect(await prisma.planObjetivo.count({ where: { planId: planCiv } })).toBe(1);
   });
 });

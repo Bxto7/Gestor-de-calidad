@@ -103,3 +103,48 @@ describe('ObjetivoRepositoryPrisma (RF-CH-015)', () => {
     expect((await objetivos.codigos()).sort()).toEqual(['OE-01', 'OE-02']);
   });
 });
+
+describe('RF-CH-016 — quitar del plan', () => {
+  it('quitar el último vínculo con borrarRegistro borra el objetivo', async () => {
+    const o = await objetivos.crearEnPlan(planId, carreraId, 'OE-01', 'Único', 'x');
+    await objetivos.quitarDelPlan(planId, o.id, true);
+    expect(await objetivos.porId(o.id)).toBeNull();
+  });
+
+  it('sin borrarRegistro solo quita el vínculo de este plan: el otro plan lo conserva', async () => {
+    const otro = await prisma.planEstudios.create({
+      data: {
+        carreraId,
+        codigo: 'PE-ISI-2027-v2',
+        version: 2,
+        estado: 'VIGENTE',
+        duracionAnios: 5,
+      },
+    });
+    const o = await objetivos.crearEnPlan(planId, carreraId, 'OE-01', 'Compartido', 'x');
+    await prisma.planObjetivo.create({ data: { planId: otro.id, objetivoId: o.id } });
+
+    await objetivos.quitarDelPlan(planId, o.id, false);
+
+    expect(await objetivos.vinculadoAlPlan(planId, o.id)).toBe(false);
+    expect(await objetivos.vinculadoAlPlan(otro.id, o.id)).toBe(true);
+    expect((await objetivos.porId(o.id))?.planesVinculados).toBe(1);
+  });
+
+  it('si otro plan lo vincula, pedir el borrado falla y no quita nada', async () => {
+    const otro = await prisma.planEstudios.create({
+      data: {
+        carreraId,
+        codigo: 'PE-ISI-2027-v2',
+        version: 2,
+        estado: 'VIGENTE',
+        duracionAnios: 5,
+      },
+    });
+    const o = await objetivos.crearEnPlan(planId, carreraId, 'OE-01', 'Compartido', 'x');
+    await prisma.planObjetivo.create({ data: { planId: otro.id, objetivoId: o.id } });
+
+    await expect(objetivos.quitarDelPlan(planId, o.id, true)).rejects.toThrow();
+    expect(await objetivos.vinculadoAlPlan(planId, o.id)).toBe(true);
+  });
+});

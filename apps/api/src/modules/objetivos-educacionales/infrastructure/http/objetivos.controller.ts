@@ -106,3 +106,28 @@ export class ObjetivosController {
     await this.objetivos.eliminar(actor, id);
   }
 }
+
+@ApiTags('Objetivos educacionales')
+@ApiBearerAuth()
+@Controller('planes/:planId/objetivos')
+export class ObjetivosDelPlanController {
+  constructor(private readonly objetivos: GestionarObjetivos) {}
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Quitar un objetivo educacional del plan',
+    description:
+      'RF-CH-016. Solo con el plan en Borrador o En revisión. Si ningún otro plan lo usa, ' +
+      'el registro se borra; Mejora Continua se consulta solo entonces.',
+  })
+  @ApiResponse({ status: 404, description: 'El plan o el objetivo no existen o no son tuyos.' })
+  @ApiResponse({ status: 409, description: 'El plan no admite cambios o Mejora Continua lo usa.' })
+  async quitar(
+    @Param('planId', ParseUUIDPipe) planId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActorActual() actor: Actor,
+  ) {
+    await this.objetivos.quitarDelPlan(actor, planId, id);
+  }
+}

@@ -21,6 +21,7 @@ import {
 } from '../../../../shared-kernel/errors/errores.js';
 import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
+import type { UsoDeObjetivo } from '../ports/objetivo-en-uso.port.js';
 import type {
   DatosObjetivo,
   FiltroObjetivo,
@@ -85,6 +86,10 @@ function montarObjetivos(
     /** `false` deniega todo; una función decide por permiso. */
     permitido?: boolean | ((permiso: string) => boolean);
     alcance?: AlcanceDeLecturaPort;
+    /** RF-CH-016: si el objetivo está vinculado al plan (por defecto sí). */
+    vinculado?: boolean;
+    /** Lo que responde Mejora Continua. */
+    enUso?: UsoDeObjetivo;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -94,6 +99,9 @@ function montarObjetivos(
   const nombresConsultados: { nombre: string; carreraId: string | null; idIgnorado?: string }[] =
     [];
   const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
+  const quitados: { planId: string; id: string; borrarRegistro: boolean }[] = [];
+  const consultasEnUso: string[] = [];
+  const orden: string[] = [];
 
   const repo: RepositorioObjetivoPort = {
     listar: async (filtro) => {
@@ -109,6 +117,11 @@ function montarObjetivos(
     actualizar: async (_id, nombre, descripcion) => objetivo({ nombre, descripcion }),
     cambiarEstado: async (_id, activo) => objetivo({ activo }),
     eliminar: async (id) => void eliminados.push(id),
+    vinculadoAlPlan: async () => opciones.vinculado ?? true,
+    quitarDelPlan: async (planId, id, borrarRegistro) => {
+      orden.push('quitar');
+      quitados.push({ planId, id, borrarRegistro });
+    },
     existeNombre: async (nombre, carreraId, idIgnorado) => {
       nombresConsultados.push({ nombre, carreraId, idIgnorado });
       return opciones.nombreDuplicado ?? false;
@@ -131,16 +144,40 @@ function montarObjetivos(
     rolesDe: async () => [],
   };
 
-  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+  const enUso = {
+    objetivoEnUso: async (id: string) => {
+      consultasEnUso.push(id);
+      return opciones.enUso ?? { enUso: false, motivos: [] };
+    },
+  };
+
+  const eventos: PublicadorDeEventos = {
+    publicar: async (e) => {
+      orden.push('eventos');
+      publicados.push(...e);
+    },
+  };
   const caso = new GestionarObjetivos(
     repo,
     planes,
+    enUso,
     autorizacion,
     eventos,
     opciones.alcance ?? sinRestriccion(),
   );
 
-  return { caso, publicados, creados, eliminados, filtros, nombresConsultados, autorizaciones };
+  return {
+    caso,
+    publicados,
+    creados,
+    eliminados,
+    filtros,
+    nombresConsultados,
+    autorizaciones,
+    quitados,
+    consultasEnUso,
+    orden,
+  };
 }
 
 describe('RF033 / RF034 / RF-CH-015 — registrar objetivo dentro del plan', () => {
@@ -426,5 +463,95 @@ describe('RF037 / RF038 — inactivar frente a eliminar', () => {
   it('404 al eliminar algo que no existe', async () => {
     const { caso } = montarObjetivos({ existente: null });
     await expect(caso.eliminar(ACTOR, 'x')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+});
+
+describe('RF-CH-016 — quitar un objetivo del plan', () => {
+  it('con otro plan que lo vincula, solo quita el vínculo y no consulta a Mejora Continua', async () => {
+    const { caso, quitados, consultasEnUso, publicados } = montarObjetivos({
+      existente: objetivo({ planesVinculados: 2 }),
+      enUso: { enUso: true, motivos: ['lo usan 1 plan(es) de mejora'] },
+    });
+
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1');
+
+    expect(quitados).toEqual([{ planId: 'plan-1', id: 'obj-1', borrarRegistro: false }]);
+    expect(consultasEnUso).toEqual([]);
+    expect(publicados.map((e) => e.nombre)).toEqual(['objetivo.quitado_del_plan']);
+    expect(publicados[0]?.detalle).toBe(
+      'Objetivo educacional OE-01 quitado del plan PE-ISI-2026-v2.',
+    );
+  });
+
+  it('como último vínculo consulta a Mejora Continua y, si no lo usa, borra el registro', async () => {
+    const { caso, quitados, consultasEnUso, publicados } = montarObjetivos({
+      existente: objetivo({ planesVinculados: 1 }),
+    });
+
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1');
+
+    expect(consultasEnUso).toEqual(['obj-1']);
+    expect(quitados).toEqual([{ planId: 'plan-1', id: 'obj-1', borrarRegistro: true }]);
+    expect(publicados.map((e) => e.nombre)).toEqual([
+      'objetivo.quitado_del_plan',
+      'objetivo.eliminado',
+    ]);
+  });
+
+  it('como último vínculo y en uso en Mejora Continua, se bloquea con sus motivos', async () => {
+    const { caso, quitados, publicados } = montarObjetivos({
+      existente: objetivo({ planesVinculados: 1 }),
+      enUso: { enUso: true, motivos: ['lo usan 1 plan(es) de mejora'] },
+    });
+
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1')).rejects.toThrow(
+      'No se puede quitar OE-01: ningún otro plan lo usa y borrarlo dejaría sin referencia a ' +
+        'Mejora Continua (lo usan 1 plan(es) de mejora).',
+    );
+    expect(quitados).toHaveLength(0);
+    expect(publicados).toHaveLength(0);
+  });
+
+  it('los eventos se publican antes de quitar', async () => {
+    const { caso, orden } = montarObjetivos({ existente: objetivo({ planesVinculados: 1 }) });
+    await caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1');
+    expect(orden).toEqual(['eventos', 'quitar']);
+  });
+
+  it('con el plan Vigente se rechaza sin tocar nada', async () => {
+    const { caso, quitados } = montarObjetivos({
+      plan: plan({ estado: 'Vigente', editable: false }),
+    });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1')).rejects.toThrow(
+      'El plan está en estado Vigente y no admite cambios. Genera una nueva versión para modificarlo.',
+    );
+    expect(quitados).toHaveLength(0);
+  });
+
+  it('un objetivo que no está en el plan da NoEncontrado', async () => {
+    const { caso, quitados } = montarObjetivos({ vinculado: false });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(quitados).toHaveLength(0);
+  });
+
+  it('un plan de otra carrera, para quien solo lee la suya, da NoEncontrado y no quita nada', async () => {
+    const { caso, quitados } = montarObjetivos({
+      plan: plan({ carreraId: IIN }),
+      alcance: soloCarrera(ISI),
+    });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(quitados).toHaveLength(0);
+  });
+
+  it('autoriza la gestión contra la carrera del plan y sin ella da AccesoDenegado', async () => {
+    const { caso, quitados, autorizaciones } = montarObjetivos({
+      plan: plan({ carreraId: IIN }),
+      permitido: (p) => p !== 'objetivo.gestionar',
+    });
+    await expect(caso.quitarDelPlan(ACTOR, 'plan-1', 'obj-1')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    expect(autorizaciones).toContainEqual({ permiso: 'objetivo.gestionar', carreraId: IIN });
+    expect(quitados).toHaveLength(0);
   });
 });

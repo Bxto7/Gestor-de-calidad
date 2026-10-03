@@ -59,6 +59,16 @@ export interface RepositorioObjetivoPort {
   eliminar(id: string): Promise<void>;
 
   /** RF-CH-015: el nombre se repite como mucho una vez por carrera, sin distinguir mayúsculas. */
+  /** RF-CH-016: si el objetivo está vinculado a ese plan. */
+  vinculadoAlPlan(planId: string, objetivoId: string): Promise<boolean>;
+
+  /**
+   * RF-CH-016: quita el vínculo con el plan y, si `borrarRegistro`, borra la
+   * fila en la misma transacción. Si entretanto otro plan lo hubiera vinculado,
+   * el `Restrict` de la base impide el borrado y todo se deshace.
+   */
+  quitarDelPlan(planId: string, objetivoId: string, borrarRegistro: boolean): Promise<void>;
+
   existeNombre(nombre: string, carreraId: string | null, idIgnorado?: string): Promise<boolean>;
 }
 
