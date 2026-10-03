@@ -18,12 +18,36 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AcademicoCrossModuloPort } from '../../../academico/application/ports/academico-cross-modulo.port.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type { CriterioEnUsoPort } from '../ports/criterio-en-uso.port.js';
 import type { DatosCriterio, RepositorioCriterioPort } from '../ports/criterios.port.js';
 import { GestionarCriterios } from './gestionar-criterios.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
+
+const ISI = 'car-1';
+const IIN = 'car-iin';
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Quien lee solo una carrera (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
+/** Un Coordinador de ISI: lee todo, solo gestiona lo de ISI. */
+const SOLO_GESTIONA_ISI = (permiso: string, carreraId: string | null): boolean =>
+  permiso === 'criterio.gestionar' ? carreraId === ISI : true;
 
 function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
   return {
@@ -40,10 +64,12 @@ function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
 function montarCriterios(
   opciones: {
     repo?: Partial<RepositorioCriterioPort>;
-    /** `false` deniega todo; una función decide por permiso. */
-    permitido?: boolean | ((permiso: string) => boolean);
+    /** `false` deniega todo; una función decide por permiso y carrera. */
+    permitido?: boolean | ((permiso: string, carreraId: string | null) => boolean);
     /** Lo que responde Mejora Continua. */
     planesDeMejora?: number;
+    carreraExiste?: boolean;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -67,11 +93,20 @@ function montarCriterios(
     },
   };
 
+  const carreras: AcademicoCrossModuloPort = {
+    carreraPorId: async (id) =>
+      opciones.carreraExiste === false
+        ? null
+        : { id, nombre: 'Sistemas', codigo: 'ISI', activa: true },
+    carrerasActivas: async () => [],
+  };
+
   const permitido = opciones.permitido ?? true;
   const autorizacion: AuthorizationPort = {
     puede: async (_usuarioId, permiso, carreraId) => {
       autorizaciones.push({ permiso, carreraId: carreraId ?? null });
-      const ok = typeof permitido === 'function' ? permitido(permiso) : permitido;
+      const ok =
+        typeof permitido === 'function' ? permitido(permiso, carreraId ?? null) : permitido;
       return ok ? { permitido: true } : { permitido: false, motivo: 'Falta el permiso.' };
     },
     permisosDe: async () => new Set(),
@@ -81,7 +116,14 @@ function montarCriterios(
 
   const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
 
-  const caso = new GestionarCriterios(repo, enUso, autorizacion, eventos);
+  const caso = new GestionarCriterios(
+    repo,
+    carreras,
+    enUso,
+    autorizacion,
+    eventos,
+    opciones.alcance ?? sinRestriccion(),
+  );
   return { caso, publicados, autorizaciones, consultasEnUso };
 }
 
@@ -223,5 +265,135 @@ describe('RF131 — listar por carrera', () => {
     await caso.listar(ACTOR, 'car-7');
 
     expect(recibida).toBe('car-7');
+  });
+});
+
+describe('Orden de comprobación (RF-CH-030, RF-CH-031)', () => {
+  it('(1) sin permiso de lectura: AccesoDenegado, antes de mirar la carrera', async () => {
+    const { caso, autorizaciones } = montarCriterios({ permitido: false, carreraExiste: false });
+
+    await expect(caso.listar(ACTOR, ISI)).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(autorizaciones).toEqual([{ permiso: 'criterio.leer', carreraId: null }]);
+  });
+
+  it('(2) una carrera inexistente es NoEncontrado al listar y al crear', async () => {
+    const { caso, autorizaciones } = montarCriterios({
+      carreraExiste: false,
+      permitido: (permiso) => permiso === 'criterio.leer',
+    });
+
+    await expect(caso.listar(ACTOR, ISI)).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.crear(ACTOR, ISI, 'C-02', 'Nuevo')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(autorizaciones.some((a) => a.permiso === 'criterio.gestionar')).toBe(false);
+  });
+
+  it('(2) quien lee solo su carrera y pide otra recibe NoEncontrado, nunca AccesoDenegado', async () => {
+    const { caso, autorizaciones } = montarCriterios({
+      alcance: soloCarrera(ISI),
+      permitido: (permiso) => permiso === 'criterio.leer',
+    });
+
+    await expect(caso.listar(ACTOR, IIN)).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.crear(ACTOR, IIN, 'C-02', 'Nuevo')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(autorizaciones.some((a) => a.permiso === 'criterio.gestionar')).toBe(false);
+  });
+
+  it('(3) el Coordinador lee otra carrera (alcance TODAS) pero no escribe en ella: AccesoDenegado', async () => {
+    const { caso } = montarCriterios({ permitido: SOLO_GESTIONA_ISI });
+
+    // DEJA CONSTANCIA: el alcance de lectura del Coordinador no lo limita a su carrera.
+    await expect(caso.listar(ACTOR, IIN)).resolves.toHaveLength(1);
+    await expect(caso.crear(ACTOR, IIN, 'C-02', 'Nuevo')).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('(3) antes del 409: sin permiso de gestión no se llega a mirar el código repetido', async () => {
+    let comprobo = false;
+    const { caso } = montarCriterios({
+      permitido: SOLO_GESTIONA_ISI,
+      repo: {
+        codigoExiste: async () => {
+          comprobo = true;
+          return true;
+        },
+      },
+    });
+
+    await expect(caso.crear(ACTOR, IIN, 'C-01', 'Duplicado')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    expect(comprobo).toBe(false);
+  });
+
+  it('una carrera sin criterios devuelve la lista vacía, no un error (flujo alterno de RF-CH-031)', async () => {
+    const { caso } = montarCriterios({ repo: { listar: async () => [] } });
+
+    expect(await caso.listar(ACTOR, ISI)).toEqual([]);
+  });
+});
+
+describe('Operaciones por id: alcance de la fila y gestión contra su carrera', () => {
+  const deOtraCarrera = { porId: async () => criterio({ carreraId: IIN }) };
+
+  it('porId: el criterio de otra carrera, para quien lee solo la suya, es NoEncontrado', async () => {
+    const { caso } = montarCriterios({ alcance: soloCarrera(ISI), repo: deOtraCarrera });
+
+    await expect(caso.porId(ACTOR, 'cri-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('editar y cambiar el estado: fuera de alcance es NoEncontrado y no se escribe nada', async () => {
+    let escribio = false;
+    const { caso, publicados } = montarCriterios({
+      alcance: soloCarrera(ISI),
+      repo: {
+        ...deOtraCarrera,
+        actualizar: async (id, codigo, nombre) => {
+          escribio = true;
+          return criterio({ id, codigo, nombre });
+        },
+        cambiarEstado: async (id, activo) => {
+          escribio = true;
+          return criterio({ id, activo });
+        },
+      },
+    });
+
+    await expect(caso.editar(ACTOR, 'cri-1', 'C-01', 'Nombre')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+    await expect(caso.cambiarEstado(ACTOR, 'cri-1', false)).rejects.toBeInstanceOf(NoEncontrado);
+    expect(escribio).toBe(false);
+    expect(publicados).toHaveLength(0);
+  });
+
+  it('el Coordinador de otra carrera recibe AccesoDenegado al editar y al cambiar el estado', async () => {
+    const { caso, autorizaciones } = montarCriterios({
+      permitido: SOLO_GESTIONA_ISI,
+      repo: deOtraCarrera,
+    });
+
+    await expect(caso.editar(ACTOR, 'cri-1', 'C-01', 'Nombre')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    await expect(caso.cambiarEstado(ACTOR, 'cri-1', false)).rejects.toBeInstanceOf(AccesoDenegado);
+    // Se autoriza contra la carrera de la fila, no contra una que llegue de fuera.
+    expect(autorizaciones).toContainEqual({ permiso: 'criterio.gestionar', carreraId: IIN });
+  });
+
+  it('el impacto de un criterio de otra carrera, para quien lee solo la suya, es NoEncontrado y no pregunta a Mejora Continua', async () => {
+    const { caso, consultasEnUso } = montarCriterios({
+      alcance: soloCarrera(ISI),
+      repo: deOtraCarrera,
+    });
+
+    await expect(caso.impactoDeInactivar(ACTOR, 'cri-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(consultasEnUso).toEqual([]);
+  });
+
+  it('el impacto exige solo permiso de lectura, nunca el de gestión', async () => {
+    const { caso, autorizaciones } = montarCriterios();
+
+    await caso.impactoDeInactivar(ACTOR, 'cri-1');
+
+    expect(autorizaciones.map((a) => a.permiso)).toEqual(['criterio.leer']);
   });
 });

@@ -741,13 +741,22 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarCriterios,
-      inject: [REPOSITORIO_CRITERIO, CRITERIO_EN_USO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_CRITERIO,
+        ACADEMICO_CROSS_MODULO,
+        CRITERIO_EN_USO,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         criterios: RepositorioCriterioPort,
+        carreras: AcademicoCrossModuloPort,
         enUso: CriterioEnUsoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarCriterios(criterios, enUso, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarCriterios(criterios, carreras, enUso, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarPlanesMedicion,

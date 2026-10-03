@@ -1,13 +1,17 @@
 /**
- * Casos de uso de los criterios de acreditación (RF129–RF132).
+ * Casos de uso de los criterios de acreditación (RF129–RF132, RF-CH-030/031).
  *
  * El criterio pertenece a una carrera y no a un plan de estudios: describe al
- * programa, que sobrevive a sus sucesivos planes. Su código es único dentro de
- * la carrera, no en todo el sistema: dos programas pueden llamar «C-01» a
- * criterios distintos sin que eso sea un choque.
+ * programa, que sobrevive a sus sucesivos planes. Su código es único dentro de la
+ * carrera, no en todo el sistema: dos programas pueden llamar «C-01» a criterios
+ * distintos sin que eso sea un choque.
  *
- * Por eso la autorización se pide **con** carrera, a diferencia de los
- * atributos del graduado: el Director gestiona los criterios de la suya.
+ * `criterio.gestionar` está acotado a la carrera que el usuario dirige. Orden de
+ * comprobación: (1) permiso de lectura; (2) existencia y alcance de lectura de la
+ * carrera —de la ruta o de la fila—: inexistente o fuera del alcance es
+ * NoEncontrado (RF-CH-009), nunca AccesoDenegado; (3) permiso de gestión acotado;
+ * (4) reglas de negocio. El Coordinador, el único que gestiona, tiene alcance de
+ * lectura `TODAS`: lee otras carreras y lo que se le rechaza es escribir.
  */
 
 import type {
@@ -19,6 +23,8 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AcademicoCrossModuloPort } from '../../../academico/application/ports/academico-cross-modulo.port.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import {
   CriterioCreado,
@@ -37,9 +43,11 @@ import type {
 export class GestionarCriterios {
   constructor(
     private readonly criterios: RepositorioCriterioPort,
+    private readonly carreras: AcademicoCrossModuloPort,
     private readonly enUso: CriterioEnUsoPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF131 RN1: el listado sale ordenado por código; lo garantiza el adaptador. */
@@ -48,24 +56,27 @@ export class GestionarCriterios {
     carreraId: string,
     filtro?: FiltroAcreditacion,
   ): Promise<DatosCriterio[]> {
-    await this.exigir(actor, 'criterio.leer', carreraId);
+    await this.exigir(actor, 'criterio.leer', null);
+    await this.carreraLegible(actor, carreraId);
     return this.criterios.listar(carreraId, filtro);
   }
 
   async porId(actor: Actor, id: string): Promise<DatosCriterio> {
-    const criterio = await this.exigirCriterio(id);
-    await this.exigir(actor, 'criterio.leer', criterio.carreraId);
-    return criterio;
+    await this.exigir(actor, 'criterio.leer', null);
+    return this.criterioLegible(actor, id);
   }
 
-  /** RF129: el código es único dentro de la carrera. */
+  /** RF129 y RF-CH-030: el código es único dentro de la carrera de la ruta. */
   async crear(
     actor: Actor,
     carreraId: string,
     codigo: string,
     nombre: string,
   ): Promise<DatosCriterio> {
+    await this.exigir(actor, 'criterio.leer', null);
+    await this.carreraLegible(actor, carreraId);
     await this.exigir(actor, 'criterio.gestionar', carreraId);
+
     const limpio = validarNombre(nombre);
     const codigoLimpio = validarCodigo(codigo);
 
@@ -85,8 +96,7 @@ export class GestionarCriterios {
 
   /** RF130: revalida unicidad excluyendo el propio registro. RN2: queda auditado. */
   async editar(actor: Actor, id: string, codigo: string, nombre: string): Promise<DatosCriterio> {
-    const previo = await this.exigirCriterio(id);
-    await this.exigir(actor, 'criterio.gestionar', previo.carreraId);
+    const previo = await this.filaGestionable(actor, id);
     const limpio = validarNombre(nombre);
     const codigoLimpio = validarCodigo(codigo);
 
@@ -104,17 +114,16 @@ export class GestionarCriterios {
     return editado;
   }
 
-  /** RF132: el aviso previo. Leer el impacto no muta nada. */
+  /** RF132: el aviso previo. Leer el impacto no muta nada, así que basta el permiso de lectura. */
   async impactoDeInactivar(actor: Actor, id: string): Promise<ImpactoCriterio> {
-    const criterio = await this.exigirCriterio(id);
-    await this.exigir(actor, 'criterio.leer', criterio.carreraId);
+    await this.exigir(actor, 'criterio.leer', null);
+    await this.criterioLegible(actor, id);
     return { planesMejoraVinculados: await this.enUso.contarPlanesDeMejora(id) };
   }
 
-  /** RF132 RN1: no se elimina físicamente. RN2: lo ya asociado se conserva. */
+  /** RF132 RN1: inactivar conserva el registro. RN2: lo ya asociado se conserva. */
   async cambiarEstado(actor: Actor, id: string, activo: boolean): Promise<DatosCriterio> {
-    const previo = await this.exigirCriterio(id);
-    await this.exigir(actor, 'criterio.gestionar', previo.carreraId);
+    const previo = await this.filaGestionable(actor, id);
 
     if (previo.activo === activo) {
       throw new ReglaDeNegocioViolada(
@@ -128,13 +137,34 @@ export class GestionarCriterios {
     return cambiado;
   }
 
-  private async exigirCriterio(id: string): Promise<DatosCriterio> {
-    const encontrado = await this.criterios.porId(id);
-    if (!encontrado) throw new NoEncontrado('el criterio de acreditación', id);
-    return encontrado;
+  /* ── Apoyo ──────────────────────────────────────────────────────────── */
+
+  /** Lectura, existencia, alcance y gestión sobre la carrera de la fila. */
+  private async filaGestionable(actor: Actor, id: string): Promise<DatosCriterio> {
+    await this.exigir(actor, 'criterio.leer', null);
+    const actual = await this.criterioLegible(actor, id);
+    await this.exigir(actor, 'criterio.gestionar', actual.carreraId);
+    return actual;
   }
 
-  private async exigir(actor: Actor, permiso: string, carreraId: string): Promise<void> {
+  /** El criterio existe y su carrera entra en el alcance de lectura; si no, NoEncontrado. */
+  private async criterioLegible(actor: Actor, id: string): Promise<DatosCriterio> {
+    const criterio = await this.criterios.porId(id);
+    if (!criterio || !(await this.alcance.puedeLeerCarrera(actor.id, criterio.carreraId))) {
+      throw new NoEncontrado('el criterio de acreditación', id);
+    }
+    return criterio;
+  }
+
+  /** La carrera existe y entra en el alcance de lectura; si no, NoEncontrado. */
+  private async carreraLegible(actor: Actor, carreraId: string): Promise<void> {
+    const carrera = await this.carreras.carreraPorId(carreraId);
+    if (!carrera || !(await this.alcance.puedeLeerCarrera(actor.id, carreraId))) {
+      throw new NoEncontrado('la carrera', carreraId);
+    }
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
