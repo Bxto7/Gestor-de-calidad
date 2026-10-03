@@ -79,3 +79,29 @@ describe('aislamiento de acreditacion hacia plan-estudios y mejora-continua', ()
     expect(DE_MEJORA_CONTINUA.test('./mejora-continua-legacy.js')).toBe(false);
   });
 });
+
+describe('aislamiento de acreditacion hacia academico', () => {
+  // El spec del Bloque 5 solo preveía `plan-estudios` y `mejora-continua`; la
+  // existencia de la carrera se comprueba con el puerto que `academico` ya
+  // expone para eso (404 en vez de lista vacía), y solo ese.
+  const DE_ACADEMICO = /(^|\/)academico\//;
+  const PUERTO_PERMITIDO_ACADEMICO = 'ports/academico-cross-modulo.port.js';
+
+  it('de academico solo importa el puerto cross-módulo', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_ACADEMICO.test(importado));
+    const infractores = vistos
+      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_ACADEMICO))
+      .map(({ archivo, importado }) => `${archivo} → ${importado}`);
+
+    expect(infractores).toEqual([]);
+    // Control positivo: `GestionarAtributos` y `GestionarCriterios` lo consumen.
+    expect(vistos).not.toEqual([]);
+  });
+
+  it('reconoce un import prohibido de academico escrito en relativo', () => {
+    expect(
+      DE_ACADEMICO.test('../../academico/infrastructure/persistence/academico.repository.js'),
+    ).toBe(true);
+    expect(DE_ACADEMICO.test('./academico-legacy.js')).toBe(false);
+  });
+});

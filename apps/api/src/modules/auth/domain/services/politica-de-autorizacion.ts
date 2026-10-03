@@ -49,6 +49,11 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
   // esa carrera.
   'competencia.gestionar',
   'objetivo.gestionar',
+  // Bloque 5 (RF-CH-027, RF-CH-030): atributos y criterios tienen carrera propia.
+  // Los lee quien tenga el permiso de lectura según su alcance; los gestiona solo
+  // quien dirige esa carrera.
+  'atributo.gestionar',
+  'criterio.gestionar',
 
   // Mejora Continua, por la misma razón que los de arriba: el rol dice
   // «de su carrera». Los dos `.leer` quedan fuera a propósito, como los de

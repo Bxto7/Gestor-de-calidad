@@ -183,10 +183,10 @@ export class AtributoRepositoryPrisma implements RepositorioAtributoPort {
     return this.delPlan(planId);
   }
 
-  async inexistentesOInactivos(ids: readonly string[]): Promise<string[]> {
+  async noUtilizablesEnCarrera(carreraId: string, ids: readonly string[]): Promise<string[]> {
     if (ids.length === 0) return [];
     const validos = await this.prisma.atributoGraduado.findMany({
-      where: { id: { in: [...ids] }, estado: 'ACTIVO' },
+      where: { id: { in: [...ids] }, carreraId, estado: 'ACTIVO' },
       select: { id: true },
     });
     const encontrados = new Set(validos.map((v) => v.id));

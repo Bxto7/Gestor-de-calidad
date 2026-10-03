@@ -118,15 +118,19 @@ describe('aislamiento de plan-estudios hacia objetivos-educacionales', () => {
 
 describe('aislamiento de plan-estudios hacia acreditacion', () => {
   const DE_ACREDITACION = /(^|\/)acreditacion\//;
+  // `plan-para-acreditacion.port.js` (Bloque 5): `acreditacion` define lo que
+  // necesita saber de un plan y `plan-estudios` lo implementa con su repositorio.
+  const PUERTO_PERMITIDO_ACREDITACION = 'ports/plan-para-acreditacion.port.js';
 
-  // Por ahora no importa nada de `acreditacion`; la Tarea 3 añade el único
-  // puerto permitido (`plan-para-acreditacion.port.js`) y su control positivo.
-  it('no importa nada de acreditacion', () => {
-    const infractores = importsDe()
-      .filter(({ importado }) => DE_ACREDITACION.test(importado))
+  it('solo importa de acreditacion el puerto del plan', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_ACREDITACION.test(importado));
+    const infractores = vistos
+      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO_ACREDITACION))
       .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);
+    // Control positivo: `PlanParaAcreditacionAdapter` es un consumo real.
+    expect(vistos).not.toEqual([]);
   });
 
   it('reconoce un import prohibido de acreditacion escrito en relativo', () => {

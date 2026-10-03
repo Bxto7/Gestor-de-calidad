@@ -1,9 +1,15 @@
 /**
- * Pruebas de los atributos del graduado.
+ * Pruebas de los atributos del graduado (RF120–RF123, RF128 y RF-CH-027/028).
  *
- * El foco está en la unicidad del código dentro del marco, que es la garantía
- * de la que depende RF120: si dos atributos comparten código, la trazabilidad
- * hacia la acreditación deja de poder resolverse.
+ * Dos focos. La unicidad del código **por carrera y marco**, de la que depende
+ * RF120: si dos atributos de una carrera comparten código, la trazabilidad hacia
+ * la acreditación deja de poder resolverse. Y el orden de comprobación: permiso de
+ * lectura, existencia y alcance (404, nunca 403), permiso de gestión acotado a la
+ * carrera, reglas de negocio.
+ *
+ * El Coordinador, el único que gestiona, tiene alcance de lectura `TODAS`
+ * (`sinRestriccion`): lee otras carreras, pero no escribe en ellas. El 404 por
+ * alcance es lo que ve quien lee solo su carrera (`soloCarrera`).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -18,38 +24,43 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AcademicoCrossModuloPort } from '../../../academico/application/ports/academico-cross-modulo.port.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import type {
   DatosAtributoCompleto,
   FiltroAcreditacion,
   RepositorioAtributoPort,
 } from '../ports/atributos.port.js';
+import type {
+  PlanParaAcreditacion,
+  PlanParaAcreditacionPort,
+} from '../ports/plan-para-acreditacion.port.js';
 import { GestionarAtributos } from './gestionar-atributos.use-case.js';
 
-const ACTOR: Actor = { id: 'u-1', nombre: 'Directora de carrera' };
+const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
+const ISI = 'car-isi';
+const IIN = 'car-iin';
 
-function permitirTodo(): AuthorizationPort {
+function sinRestriccion(): AlcanceDeLecturaPort {
   return {
-    puede: async () => ({ permitido: true }),
-    permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
-    rolesDe: async () => [],
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
   };
 }
 
-function denegar(): AuthorizationPort {
+/** Quien lee solo una carrera (o ninguna si es `null`). */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
   return {
-    puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
-    permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
-    rolesDe: async () => [],
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuarioId, carrera) => carreraId !== null && carrera === carreraId,
   };
 }
 
 function atributo(sobre: Partial<DatosAtributoCompleto> = {}): DatosAtributoCompleto {
   return {
     id: 'atr-1',
-    carreraId: 'car-1',
+    carreraId: ISI,
     marco: 'ICACIT',
     codigo: 'AG-I01',
     nombre: 'Conocimientos de ingeniería',
@@ -61,8 +72,24 @@ function atributo(sobre: Partial<DatosAtributoCompleto> = {}): DatosAtributoComp
   };
 }
 
-function repo(sobre: Partial<RepositorioAtributoPort> = {}): RepositorioAtributoPort {
-  return {
+function plan(sobre: Partial<PlanParaAcreditacion> = {}): PlanParaAcreditacion {
+  return { id: 'plan-1', carreraId: ISI, ...sobre };
+}
+
+function montarAtributos(
+  opciones: {
+    repo?: Partial<RepositorioAtributoPort>;
+    plan?: PlanParaAcreditacion | null;
+    carreraExiste?: boolean;
+    /** `false` deniega todo; una función decide por permiso y carrera. */
+    permitido?: boolean | ((permiso: string, carreraId: string | null) => boolean);
+    alcance?: AlcanceDeLecturaPort;
+  } = {},
+) {
+  const publicados: DomainEvent[] = [];
+  const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
+
+  const repo: RepositorioAtributoPort = {
     listar: async () => [atributo()],
     porId: async () => atributo(),
     codigoExiste: async () => false,
@@ -74,80 +101,69 @@ function repo(sobre: Partial<RepositorioAtributoPort> = {}): RepositorioAtributo
     impactoDeInactivar: async () => ({ competenciasVinculadas: 0, planesVinculados: 0 }),
     delPlan: async () => [],
     declararEnPlan: async () => [],
-    inexistentesOInactivos: async () => [],
-    ...sobre,
+    noUtilizablesEnCarrera: async () => [],
+    ...opciones.repo,
   };
+
+  const planes: PlanParaAcreditacionPort = {
+    planPorId: async () => (opciones.plan === undefined ? plan() : opciones.plan),
+  };
+
+  const carreras: AcademicoCrossModuloPort = {
+    carreraPorId: async (id) =>
+      opciones.carreraExiste === false
+        ? null
+        : { id, nombre: 'Sistemas', codigo: 'ISI', activa: true },
+    carrerasActivas: async () => [],
+  };
+
+  const permitido = opciones.permitido ?? true;
+  const autorizacion: AuthorizationPort = {
+    puede: async (_usuarioId, permiso, carreraId) => {
+      autorizaciones.push({ permiso, carreraId: carreraId ?? null });
+      const ok =
+        typeof permitido === 'function' ? permitido(permiso, carreraId ?? null) : permitido;
+      return ok ? { permitido: true } : { permitido: false, motivo: 'Falta el permiso.' };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => ISI,
+    rolesDe: async () => [],
+  };
+
+  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+
+  const caso = new GestionarAtributos(
+    repo,
+    planes,
+    carreras,
+    autorizacion,
+    eventos,
+    opciones.alcance ?? sinRestriccion(),
+  );
+  return { caso, publicados, autorizaciones };
 }
 
-function capturarEventos(): { publicador: PublicadorDeEventos; vistos: DomainEvent[] } {
-  const vistos: DomainEvent[] = [];
-  return {
-    publicador: {
-      publicar: async (e) => {
-        vistos.push(...e);
-      },
-    },
-    vistos,
-  };
-}
+/** Un Coordinador de ISI: lee todo, solo gestiona lo de ISI. */
+const SOLO_GESTIONA_ISI = (permiso: string, carreraId: string | null): boolean =>
+  permiso === 'atributo.gestionar' ? carreraId === ISI : true;
 
 describe('RF120 — registrar atributo del graduado', () => {
-  it('crea el atributo y lo coloca al final del marco', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarAtributos(repo(), permitirTodo(), publicador);
+  it('crea el atributo y lo coloca al final de la carrera', async () => {
+    const { caso, publicados } = montarAtributos();
 
-    const creado = await caso.crear(ACTOR, 'car-1', 'AG-I12', 'Pensamiento sistémico');
+    const creado = await caso.crear(ACTOR, ISI, 'AG-I12', 'Pensamiento sistémico');
 
     expect(creado.codigo).toBe('AG-I12');
     expect(creado.orden).toBe(12);
-    expect(vistos).toHaveLength(1);
-  });
-
-  it('rechaza un código repetido dentro del marco', async () => {
-    const caso = new GestionarAtributos(
-      repo({ codigoExiste: async () => true }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
-
-    await expect(caso.crear(ACTOR, 'car-1', 'AG-I01', 'Duplicado')).rejects.toThrow(
-      ReglaDeNegocioViolada,
-    );
-  });
-
-  it('exige el permiso de gestión', async () => {
-    const caso = new GestionarAtributos(repo(), denegar(), capturarEventos().publicador);
-
-    await expect(caso.crear(ACTOR, 'car-1', 'AG-I12', 'Pensamiento sistémico')).rejects.toThrow(
-      AccesoDenegado,
-    );
-  });
-
-  it('rechaza un nombre en blanco', async () => {
-    const caso = new GestionarAtributos(repo(), permitirTodo(), capturarEventos().publicador);
-
-    await expect(caso.crear(ACTOR, 'car-1', 'AG-I12', '   ')).rejects.toThrow(
-      ReglaDeNegocioViolada,
-    );
-  });
-
-  it('no publica ningún evento si la creación se rechaza', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarAtributos(
-      repo({ codigoExiste: async () => true }),
-      permitirTodo(),
-      publicador,
-    );
-
-    await expect(caso.crear(ACTOR, 'car-1', 'AG-I01', 'Duplicado')).rejects.toThrow();
-
-    expect(vistos).toHaveLength(0);
+    expect(creado.carreraId).toBe(ISI);
+    expect(publicados).toHaveLength(1);
+    expect(publicados[0]?.nombre).toBe('acreditacion.atributo_creado');
   });
 
   it('el código y el orden se calculan dentro de la carrera, no del marco entero', async () => {
     const vistos: { operacion: string; carreraId: string; marco: string }[] = [];
-    const caso = new GestionarAtributos(
-      repo({
+    const { caso } = montarAtributos({
+      repo: {
         codigoExiste: async (carreraId, marco) => {
           vistos.push({ operacion: 'codigoExiste', carreraId, marco });
           return false;
@@ -160,64 +176,114 @@ describe('RF120 — registrar atributo del graduado', () => {
           vistos.push({ operacion: 'crear', carreraId, marco });
           return atributo({ carreraId, marco, codigo, nombre, orden });
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
-    const creado = await caso.crear(ACTOR, 'car-2', 'AG-I12', 'Pensamiento sistémico');
+    const creado = await caso.crear(ACTOR, IIN, 'AG-I12', 'Pensamiento sistémico');
 
     expect(creado.orden).toBe(4);
-    expect(creado.carreraId).toBe('car-2');
     expect(vistos).toEqual([
-      { operacion: 'codigoExiste', carreraId: 'car-2', marco: 'ICACIT' },
-      { operacion: 'ultimoOrden', carreraId: 'car-2', marco: 'ICACIT' },
-      { operacion: 'crear', carreraId: 'car-2', marco: 'ICACIT' },
+      { operacion: 'codigoExiste', carreraId: IIN, marco: 'ICACIT' },
+      { operacion: 'ultimoOrden', carreraId: IIN, marco: 'ICACIT' },
+      { operacion: 'crear', carreraId: IIN, marco: 'ICACIT' },
     ]);
   });
 
-  it('listar pide los atributos de la carrera indicada', async () => {
-    let pedida = '';
-    const caso = new GestionarAtributos(
-      repo({
-        listar: async (carreraId) => {
-          pedida = carreraId;
-          return [];
-        },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
+  it('rechaza un código repetido dentro de la carrera, sin publicar nada', async () => {
+    const { caso, publicados } = montarAtributos({ repo: { codigoExiste: async () => true } });
+
+    await expect(caso.crear(ACTOR, ISI, 'AG-I01', 'Duplicado')).rejects.toThrow(
+      'Ya existe un atributo del graduado con el código AG-I01 en la carrera',
     );
-
-    await caso.listar(ACTOR, 'car-2');
-
-    expect(pedida).toBe('car-2');
+    expect(publicados).toHaveLength(0);
   });
 
-  it('editar revalida el código dentro de la carrera del atributo', async () => {
-    let consultada = '';
-    const caso = new GestionarAtributos(
-      repo({
-        porId: async () => atributo({ carreraId: 'car-9' }),
-        codigoExiste: async (carreraId) => {
-          consultada = carreraId;
-          return false;
+  it('rechaza un nombre en blanco', async () => {
+    const { caso } = montarAtributos();
+
+    await expect(caso.crear(ACTOR, ISI, 'AG-I12', '   ')).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('autoriza la gestión contra la carrera donde se crea', async () => {
+    const { caso, autorizaciones } = montarAtributos();
+
+    await caso.crear(ACTOR, ISI, 'AG-I12', 'Pensamiento sistémico');
+
+    expect(autorizaciones).toContainEqual({ permiso: 'atributo.gestionar', carreraId: ISI });
+  });
+});
+
+describe('Orden de comprobación al crear y al listar (RF-CH-027, RF-CH-028)', () => {
+  it('(1) sin permiso de lectura: AccesoDenegado, antes de mirar la carrera', async () => {
+    const { caso, autorizaciones } = montarAtributos({
+      permitido: false,
+      carreraExiste: false,
+    });
+
+    await expect(caso.listar(ACTOR, ISI)).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(autorizaciones).toEqual([{ permiso: 'atributo.leer', carreraId: null }]);
+  });
+
+  it('(2) una carrera inexistente es NoEncontrado, también para quien no gestiona', async () => {
+    const { caso, autorizaciones } = montarAtributos({
+      carreraExiste: false,
+      permitido: (permiso) => permiso === 'atributo.leer',
+    });
+
+    await expect(caso.listar(ACTOR, ISI)).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.crear(ACTOR, ISI, 'AG-I12', 'Nuevo')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(autorizaciones.some((a) => a.permiso === 'atributo.gestionar')).toBe(false);
+  });
+
+  it('(2) quien lee solo su carrera y pide otra recibe NoEncontrado, nunca AccesoDenegado', async () => {
+    const { caso, autorizaciones } = montarAtributos({
+      alcance: soloCarrera(ISI),
+      // Aunque tampoco pudiera gestionar: el 404 va antes que el 403.
+      permitido: (permiso) => permiso === 'atributo.leer',
+    });
+
+    await expect(caso.listar(ACTOR, IIN)).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.crear(ACTOR, IIN, 'AG-I12', 'Nuevo')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(autorizaciones.some((a) => a.permiso === 'atributo.gestionar')).toBe(false);
+  });
+
+  it('(2) quien lee solo su carrera y no tiene ninguna asignada no ve ninguna', async () => {
+    const { caso } = montarAtributos({ alcance: soloCarrera(null) });
+
+    await expect(caso.listar(ACTOR, ISI)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('(3) el Coordinador lee otra carrera (alcance TODAS) pero no escribe en ella: AccesoDenegado', async () => {
+    const { caso } = montarAtributos({ permitido: SOLO_GESTIONA_ISI });
+
+    // DEJA CONSTANCIA: el alcance de lectura del Coordinador no lo limita a su
+    // carrera (la marca `lectura.solo_su_carrera` es solo del Director).
+    await expect(caso.listar(ACTOR, IIN)).resolves.toHaveLength(1);
+    await expect(caso.crear(ACTOR, IIN, 'AG-I12', 'Nuevo')).rejects.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('(3) antes del 409: sin permiso de gestión no se llega a mirar el código repetido', async () => {
+    let comprobo = false;
+    const { caso } = montarAtributos({
+      permitido: SOLO_GESTIONA_ISI,
+      repo: {
+        codigoExiste: async () => {
+          comprobo = true;
+          return true;
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
+      },
+    });
+
+    await expect(caso.crear(ACTOR, IIN, 'AG-I01', 'Duplicado')).rejects.toBeInstanceOf(
+      AccesoDenegado,
     );
-
-    await caso.editar(ACTOR, 'atr-1', 'AG-I01', 'Nombre nuevo');
-
-    expect(consultada).toBe('car-9');
+    expect(comprobo).toBe(false);
   });
 });
 
 describe('RF121 — editar atributo del graduado', () => {
-  it('actualiza código y nombre', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarAtributos(repo(), permitirTodo(), publicador);
+  it('actualiza código y nombre y lo audita', async () => {
+    const { caso, publicados } = montarAtributos();
 
     const editado = await caso.editar(
       ACTOR,
@@ -227,72 +293,113 @@ describe('RF121 — editar atributo del graduado', () => {
     );
 
     expect(editado.nombre).toBe('Diseño y desarrollo de soluciones');
-    expect(vistos).toHaveLength(1);
+    expect(publicados).toHaveLength(1);
   });
 
   it('falla si el atributo no existe', async () => {
-    const caso = new GestionarAtributos(
-      repo({ porId: async () => null }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+    const { caso } = montarAtributos({ repo: { porId: async () => null } });
 
     await expect(caso.editar(ACTOR, 'atr-9', 'AG-I02', 'Nombre')).rejects.toThrow(NoEncontrado);
   });
 
-  it('el código propio no cuenta como duplicado', async () => {
+  it('el código propio no cuenta como duplicado, y se revalida en la carrera del atributo', async () => {
     // `codigoExiste` recibe `exceptoId`; si el caso de uso no lo pasa, guardar
     // sin cambiar el código fallaría contra el propio registro.
-    let recibido: string | undefined = 'no-invocado';
-    const caso = new GestionarAtributos(
-      repo({
-        codigoExiste: async (_carreraId, _marco, _codigo, exceptoId) => {
-          recibido = exceptoId;
+    let recibido: { carreraId: string; exceptoId: string | undefined } | null = null;
+    const { caso } = montarAtributos({
+      repo: {
+        porId: async () => atributo({ carreraId: IIN }),
+        codigoExiste: async (carreraId, _marco, _codigo, exceptoId) => {
+          recibido = { carreraId, exceptoId };
           return false;
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
     await caso.editar(ACTOR, 'atr-1', 'AG-I01', 'Conocimientos de ingeniería');
 
-    expect(recibido).toBe('atr-1');
+    expect(recibido).toEqual({ carreraId: IIN, exceptoId: 'atr-1' });
+  });
+
+  it('autoriza la gestión contra la carrera del atributo, no contra una que llegue de fuera', async () => {
+    const { caso, autorizaciones } = montarAtributos({
+      repo: { porId: async () => atributo({ carreraId: IIN }) },
+    });
+
+    await caso.editar(ACTOR, 'atr-1', 'AG-I01', 'Nombre');
+
+    expect(autorizaciones).toContainEqual({ permiso: 'atributo.gestionar', carreraId: IIN });
+  });
+
+  it('el atributo de otra carrera, para quien lee solo la suya, es NoEncontrado y no se escribe', async () => {
+    let escribio = false;
+    const { caso } = montarAtributos({
+      alcance: soloCarrera(ISI),
+      repo: {
+        porId: async () => atributo({ carreraId: IIN }),
+        actualizar: async (id, codigo, nombre) => {
+          escribio = true;
+          return atributo({ id, codigo, nombre });
+        },
+      },
+    });
+
+    await expect(caso.editar(ACTOR, 'atr-1', 'AG-I01', 'Nombre')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+    expect(escribio).toBe(false);
+  });
+
+  it('el Coordinador de otra carrera recibe AccesoDenegado al editar', async () => {
+    const { caso } = montarAtributos({
+      permitido: SOLO_GESTIONA_ISI,
+      repo: { porId: async () => atributo({ carreraId: IIN }) },
+    });
+
+    await expect(caso.editar(ACTOR, 'atr-1', 'AG-I01', 'Nombre')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
   });
 });
 
 describe('RF122 y RF128 — listar y buscar', () => {
-  it('propaga el filtro de texto al repositorio', async () => {
-    let filtro: FiltroAcreditacion | undefined;
-    const caso = new GestionarAtributos(
-      repo({
-        listar: async (_carreraId, _marco, f) => {
-          filtro = f;
+  it('pide los atributos de la carrera indicada y propaga el filtro de texto', async () => {
+    let recibido: { carreraId: string; filtro: FiltroAcreditacion | undefined } | null = null;
+    const { caso } = montarAtributos({
+      repo: {
+        listar: async (carreraId, _marco, filtro) => {
+          recibido = { carreraId, filtro };
           return [];
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
-    await caso.listar(ACTOR, 'car-1', { texto: 'ingeniería' });
+    await caso.listar(ACTOR, IIN, { texto: 'ingeniería' });
 
-    expect(filtro?.texto).toBe('ingeniería');
+    expect(recibido).toEqual({ carreraId: IIN, filtro: { texto: 'ingeniería' } });
   });
 
-  it('listar exige permiso de lectura', async () => {
-    const caso = new GestionarAtributos(repo(), denegar(), capturarEventos().publicador);
+  it('una carrera sin atributos devuelve la lista vacía, no un error (flujo alterno de RF-CH-028)', async () => {
+    const { caso } = montarAtributos({ repo: { listar: async () => [] } });
 
-    await expect(caso.listar(ACTOR, 'car-1')).rejects.toThrow(AccesoDenegado);
+    expect(await caso.listar(ACTOR, ISI)).toEqual([]);
+  });
+
+  it('porId: el atributo de otra carrera, para quien lee solo la suya, es NoEncontrado', async () => {
+    const { caso } = montarAtributos({
+      alcance: soloCarrera(ISI),
+      repo: { porId: async () => atributo({ carreraId: IIN }) },
+    });
+
+    await expect(caso.porId(ACTOR, 'atr-1')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });
 
 describe('RF123 — inactivar atributo del graduado', () => {
   it('el impacto se consulta antes de escribir y queda en el evento', async () => {
-    const { publicador, vistos } = capturarEventos();
     const orden: string[] = [];
-    const caso = new GestionarAtributos(
-      repo({
+    const { caso, publicados } = montarAtributos({
+      repo: {
         impactoDeInactivar: async () => {
           orden.push('impacto');
           return { competenciasVinculadas: 3, planesVinculados: 1 };
@@ -301,30 +408,26 @@ describe('RF123 — inactivar atributo del graduado', () => {
           orden.push('escritura');
           return atributo({ id, activo });
         },
-      }),
-      permitirTodo(),
-      publicador,
-    );
+      },
+    });
 
     await caso.cambiarEstado(ACTOR, 'atr-1', false);
 
     expect(orden).toEqual(['impacto', 'escritura']);
-    expect(vistos[0]?.detalle).toContain('3 competencias');
+    expect(publicados[0]?.detalle).toContain('3 competencias');
   });
 
   it('reactivar no consulta impacto', async () => {
     let consultado = false;
-    const caso = new GestionarAtributos(
-      repo({
+    const { caso } = montarAtributos({
+      repo: {
         porId: async () => atributo({ activo: false }),
         impactoDeInactivar: async () => {
           consultado = true;
           return { competenciasVinculadas: 0, planesVinculados: 0 };
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
     await caso.cambiarEstado(ACTOR, 'atr-1', true);
 
@@ -332,99 +435,137 @@ describe('RF123 — inactivar atributo del graduado', () => {
   });
 
   it('no permite inactivar lo que ya está inactivo', async () => {
-    const caso = new GestionarAtributos(
-      repo({ porId: async () => atributo({ activo: false }) }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+    const { caso } = montarAtributos({ repo: { porId: async () => atributo({ activo: false }) } });
 
     await expect(caso.cambiarEstado(ACTOR, 'atr-1', false)).rejects.toThrow(ReglaDeNegocioViolada);
   });
 
-  it('consultar el impacto exige solo permiso de lectura', async () => {
+  it('consultar el impacto exige solo permiso de lectura, nunca el de gestión', async () => {
     // Consultar qué se rompería no rompe nada: pedir aquí el permiso de gestión
     // dejaría sin el aviso a quien puede ver la pantalla.
-    let permisoPedido = '';
-    const autorizacion: AuthorizationPort = {
-      puede: async (_id, permiso) => {
-        permisoPedido = permiso;
-        return { permitido: true };
-      },
-      permisosDe: async () => new Set(),
-      carreraACargoDe: async () => null,
-      rolesDe: async () => [],
-    };
-    const caso = new GestionarAtributos(repo(), autorizacion, capturarEventos().publicador);
+    const { caso, autorizaciones } = montarAtributos();
 
     await caso.impactoDeInactivar(ACTOR, 'atr-1');
 
-    expect(permisoPedido).toBe('atributo.leer');
+    expect(autorizaciones.map((a) => a.permiso)).toEqual(['atributo.leer']);
+  });
+
+  it('el impacto de un atributo de otra carrera, para quien lee solo la suya, es NoEncontrado', async () => {
+    const { caso } = montarAtributos({
+      alcance: soloCarrera(ISI),
+      repo: { porId: async () => atributo({ carreraId: IIN }) },
+    });
+
+    await expect(caso.impactoDeInactivar(ACTOR, 'atr-1')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });
 
 describe('RF122 — atributos declarados por un plan', () => {
+  it('delPlan: un plan inexistente o de otra carrera (para quien lee solo la suya) es NoEncontrado', async () => {
+    const inexistente = montarAtributos({ plan: null });
+    await expect(inexistente.caso.delPlan(ACTOR, 'plan-9')).rejects.toBeInstanceOf(NoEncontrado);
+
+    const ajeno = montarAtributos({ plan: plan({ carreraId: IIN }), alcance: soloCarrera(ISI) });
+    await expect(ajeno.caso.delPlan(ACTOR, 'plan-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
   it('reemplaza el conjunto completo y audita el antes y el después', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarAtributos(
-      repo({
+    const { caso, publicados } = montarAtributos({
+      repo: {
         delPlan: async () => [atributo({ codigo: 'AG-I01' })],
         declararEnPlan: async () => [atributo({ codigo: 'AG-I02' })],
-      }),
-      permitirTodo(),
-      publicador,
-    );
+      },
+    });
 
     await caso.declararEnPlan(ACTOR, 'plan-1', ['atr-2']);
 
-    expect(vistos[0]?.detalle).toContain('AG-I01');
-    expect(vistos[0]?.detalle).toContain('AG-I02');
+    expect(publicados[0]?.detalle).toContain('AG-I01');
+    expect(publicados[0]?.detalle).toContain('AG-I02');
   });
 
-  it('rechaza declarar un atributo inexistente o inactivo', async () => {
-    const caso = new GestionarAtributos(
-      repo({ inexistentesOInactivos: async () => ['atr-9'] }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+  it('valida los atributos contra la carrera del plan: los de otra carrera, inexistentes o inactivos dan 409', async () => {
+    let consultada: { carreraId: string; ids: readonly string[] } | null = null;
+    let escribio = false;
+    const { caso, publicados } = montarAtributos({
+      plan: plan({ carreraId: ISI }),
+      repo: {
+        noUtilizablesEnCarrera: async (carreraId, ids) => {
+          consultada = { carreraId, ids };
+          return ['atr-ajeno'];
+        },
+        declararEnPlan: async () => {
+          escribio = true;
+          return [];
+        },
+      },
+    });
 
-    await expect(caso.declararEnPlan(ACTOR, 'plan-1', ['atr-9'])).rejects.toThrow(
-      ReglaDeNegocioViolada,
+    await expect(caso.declararEnPlan(ACTOR, 'plan-1', ['atr-ajeno', 'atr-1'])).rejects.toThrow(
+      'Estos atributos del graduado no existen, están inactivos o no son de la carrera del plan: atr-ajeno.',
     );
+    expect(consultada).toEqual({ carreraId: ISI, ids: ['atr-ajeno', 'atr-1'] });
+    expect(escribio).toBe(false);
+    expect(publicados).toHaveLength(0);
+  });
+
+  it('autoriza la gestión contra la carrera del plan, y sin permiso no valida ni escribe', async () => {
+    let validó = false;
+    const { caso, autorizaciones } = montarAtributos({
+      plan: plan({ carreraId: IIN }),
+      permitido: SOLO_GESTIONA_ISI,
+      repo: {
+        noUtilizablesEnCarrera: async () => {
+          validó = true;
+          return [];
+        },
+      },
+    });
+
+    await expect(caso.declararEnPlan(ACTOR, 'plan-1', ['atr-1'])).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    expect(autorizaciones).toContainEqual({ permiso: 'atributo.gestionar', carreraId: IIN });
+    expect(validó).toBe(false);
+  });
+
+  it('un plan fuera del alcance de lectura es NoEncontrado antes de pedir el permiso de gestión', async () => {
+    const { caso, autorizaciones } = montarAtributos({
+      plan: plan({ carreraId: IIN }),
+      alcance: soloCarrera(ISI),
+    });
+
+    await expect(caso.declararEnPlan(ACTOR, 'plan-1', [])).rejects.toBeInstanceOf(NoEncontrado);
+    expect(autorizaciones.some((a) => a.permiso === 'atributo.gestionar')).toBe(false);
   });
 
   it('un identificador repetido no llega dos veces al repositorio', async () => {
     let recibidos: readonly string[] = [];
-    const caso = new GestionarAtributos(
-      repo({
+    const { caso } = montarAtributos({
+      repo: {
         declararEnPlan: async (_planId, ids) => {
           recibidos = ids;
           return [];
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
     await caso.declararEnPlan(ACTOR, 'plan-1', ['atr-1', 'atr-1']);
 
     expect(recibidos).toEqual(['atr-1']);
   });
 
-  it('declarar la lista vacía deja el plan sin atributos', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarAtributos(
-      repo({
+  it('declarar la lista vacía deja el plan sin atributos y se audita como «ninguno»', async () => {
+    const { caso, publicados } = montarAtributos({
+      repo: {
         delPlan: async () => [atributo({ codigo: 'AG-I01' })],
         declararEnPlan: async () => [],
-      }),
-      permitirTodo(),
-      publicador,
-    );
+      },
+    });
 
     await caso.declararEnPlan(ACTOR, 'plan-1', []);
 
     // «ninguno» y no un hueco: retirar el último atributo es un cambio que la
     // bitácora tiene que poder contar.
-    expect(vistos[0]?.detalle).toContain('ninguno');
+    expect(publicados[0]?.detalle).toContain('ninguno');
   });
 });

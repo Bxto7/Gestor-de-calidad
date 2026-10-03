@@ -1,9 +1,18 @@
 /**
- * Casos de uso de los atributos del graduado (RF120–RF123, RF128).
+ * Casos de uso de los atributos del graduado (RF120–RF123, RF128 y, desde el
+ * Bloque 5, RF-CH-027/028).
  *
- * Movido de `plan-estudios` (Fase 0d del dashboard por rol). El atributo
- * es catálogo del marco de acreditación, no de un plan — la autorización
- * se pide sin carrera, igual que antes de moverse.
+ * Cada atributo es de una **carrera**. Se lista y se crea por carrera, y
+ * `atributo.gestionar` está acotado a la que el usuario dirige: crear se
+ * autoriza contra la carrera de la ruta; editar, inactivar y eliminar, contra la
+ * de la fila; declarar atributos en un plan, contra la del plan.
+ *
+ * Orden de comprobación: (1) permiso de lectura; (2) existencia y alcance de
+ * lectura de la carrera —de la ruta, de la fila o del plan—: inexistente o fuera
+ * del alcance es NoEncontrado (RF-CH-009, para no revelar si existe), nunca
+ * AccesoDenegado; (3) permiso de gestión acotado a la carrera; (4) reglas de
+ * negocio. El Coordinador, el único que gestiona, tiene alcance de lectura
+ * `TODAS`: lee otras carreras y lo que se le rechaza es escribir.
  */
 
 import type {
@@ -15,6 +24,8 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AcademicoCrossModuloPort } from '../../../academico/application/ports/academico-cross-modulo.port.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
 import {
   AtributoCreado,
@@ -29,6 +40,10 @@ import type {
   ImpactoAtributo,
   RepositorioAtributoPort,
 } from '../ports/atributos.port.js';
+import type {
+  PlanParaAcreditacion,
+  PlanParaAcreditacionPort,
+} from '../ports/plan-para-acreditacion.port.js';
 
 /**
  * Único marco en uso. Cuando haya más, saldrá del actor o de la carrera.
@@ -38,39 +53,46 @@ const MARCO_VIGENTE = 'ICACIT';
 export class GestionarAtributos {
   constructor(
     private readonly atributos: RepositorioAtributoPort,
+    private readonly planes: PlanParaAcreditacionPort,
+    private readonly carreras: AcademicoCrossModuloPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
-  /** RF122 y RF128: listado con búsqueda sobre código y nombre, de una carrera. */
+  /** RF122, RF128 y RF-CH-028: los atributos de una carrera, con búsqueda sobre código y nombre. */
   async listar(
     actor: Actor,
     carreraId: string,
     filtro?: FiltroAcreditacion,
   ): Promise<DatosAtributoCompleto[]> {
-    await this.exigir(actor, 'atributo.leer');
+    await this.exigir(actor, 'atributo.leer', null);
+    await this.carreraLegible(actor, carreraId);
     return this.atributos.listar(carreraId, MARCO_VIGENTE, filtro);
   }
 
   async porId(actor: Actor, id: string): Promise<DatosAtributoCompleto> {
-    await this.exigir(actor, 'atributo.leer');
-    return this.exigirAtributo(id);
+    await this.exigir(actor, 'atributo.leer', null);
+    return this.atributoLegible(actor, id);
   }
 
-  /** RF120: el código es único dentro de la carrera y el marco. */
+  /** RF120 y RF-CH-027: se crea en la carrera de la ruta; el código es único en ella y en el marco. */
   async crear(
     actor: Actor,
     carreraId: string,
     codigo: string,
     nombre: string,
   ): Promise<DatosAtributoCompleto> {
-    await this.exigir(actor, 'atributo.gestionar');
+    await this.exigir(actor, 'atributo.leer', null);
+    await this.carreraLegible(actor, carreraId);
+    await this.exigir(actor, 'atributo.gestionar', carreraId);
+
     const limpio = validarNombre(nombre);
     const codigoLimpio = validarCodigo(codigo);
 
     if (await this.atributos.codigoExiste(carreraId, MARCO_VIGENTE, codigoLimpio)) {
       throw new ReglaDeNegocioViolada(
-        `Ya existe un atributo del graduado con el código ${codigoLimpio} en el marco ${MARCO_VIGENTE}.`,
+        `Ya existe un atributo del graduado con el código ${codigoLimpio} en la carrera y el marco ${MARCO_VIGENTE}.`,
       );
     }
 
@@ -89,21 +111,20 @@ export class GestionarAtributos {
     return creado;
   }
 
-  /** RF121: revalida la unicidad excluyendo el propio registro. */
+  /** RF121: revalida la unicidad en la carrera del atributo, excluyendo el propio registro. */
   async editar(
     actor: Actor,
     id: string,
     codigo: string,
     nombre: string,
   ): Promise<DatosAtributoCompleto> {
-    await this.exigir(actor, 'atributo.gestionar');
-    const previo = await this.exigirAtributo(id);
+    const previo = await this.filaGestionable(actor, id);
     const limpio = validarNombre(nombre);
     const codigoLimpio = validarCodigo(codigo);
 
     if (await this.atributos.codigoExiste(previo.carreraId, MARCO_VIGENTE, codigoLimpio, id)) {
       throw new ReglaDeNegocioViolada(
-        `Ya existe otro atributo del graduado con el código ${codigoLimpio}.`,
+        `Ya existe otro atributo del graduado con el código ${codigoLimpio} en la carrera.`,
       );
     }
 
@@ -117,15 +138,14 @@ export class GestionarAtributos {
 
   /** RF123: el aviso previo. Consultar el impacto no muta, así que basta leer. */
   async impactoDeInactivar(actor: Actor, id: string): Promise<ImpactoAtributo> {
-    await this.exigir(actor, 'atributo.leer');
-    await this.exigirAtributo(id);
+    await this.exigir(actor, 'atributo.leer', null);
+    await this.atributoLegible(actor, id);
     return this.atributos.impactoDeInactivar(id);
   }
 
-  /** RF123 RN1: inactivar conserva el registro. No hay borrado físico. */
+  /** RF123 RN1: inactivar conserva el registro. */
   async cambiarEstado(actor: Actor, id: string, activo: boolean): Promise<DatosAtributoCompleto> {
-    await this.exigir(actor, 'atributo.gestionar');
-    const previo = await this.exigirAtributo(id);
+    const previo = await this.filaGestionable(actor, id);
 
     if (previo.activo === activo) {
       throw new ReglaDeNegocioViolada(
@@ -153,24 +173,31 @@ export class GestionarAtributos {
 
   /** RF122: los atributos que este plan de estudios adopta. */
   async delPlan(actor: Actor, planId: string): Promise<DatosAtributoCompleto[]> {
-    await this.exigir(actor, 'atributo.leer');
+    await this.exigir(actor, 'atributo.leer', null);
+    await this.planLegible(actor, planId);
     return this.atributos.delPlan(planId);
   }
 
-  /** Reemplaza el conjunto completo declarado por el plan, de forma atómica. */
+  /**
+   * Reemplaza el conjunto completo declarado por el plan, de forma atómica. Los
+   * atributos tienen que ser activos y **de la carrera del plan**: uno de otra
+   * carrera nunca se vincula, aunque el identificador se envíe a mano.
+   */
   async declararEnPlan(
     actor: Actor,
     planId: string,
     atributoIds: readonly string[],
   ): Promise<DatosAtributoCompleto[]> {
-    await this.exigir(actor, 'atributo.gestionar');
+    await this.exigir(actor, 'atributo.leer', null);
+    const plan = await this.planLegible(actor, planId);
+    await this.exigir(actor, 'atributo.gestionar', plan.carreraId);
 
     const unicos = [...new Set(atributoIds)];
 
-    const invalidos = await this.atributos.inexistentesOInactivos(unicos);
+    const invalidos = await this.atributos.noUtilizablesEnCarrera(plan.carreraId, unicos);
     if (invalidos.length > 0) {
       throw new ReglaDeNegocioViolada(
-        `Estos atributos del graduado no existen o están inactivos: ${invalidos.join(', ')}.`,
+        `Estos atributos del graduado no existen, están inactivos o no son de la carrera del plan: ${invalidos.join(', ')}.`,
       );
     }
 
@@ -188,14 +215,44 @@ export class GestionarAtributos {
     return despues;
   }
 
-  private async exigirAtributo(id: string): Promise<DatosAtributoCompleto> {
-    const encontrado = await this.atributos.porId(id);
-    if (!encontrado) throw new NoEncontrado('el atributo del graduado', id);
-    return encontrado;
+  /* ── Apoyo ──────────────────────────────────────────────────────────── */
+
+  /** Lectura, existencia, alcance y gestión sobre la carrera de la fila. */
+  private async filaGestionable(actor: Actor, id: string): Promise<DatosAtributoCompleto> {
+    await this.exigir(actor, 'atributo.leer', null);
+    const actual = await this.atributoLegible(actor, id);
+    await this.exigir(actor, 'atributo.gestionar', actual.carreraId);
+    return actual;
   }
 
-  private async exigir(actor: Actor, permiso: string): Promise<void> {
-    const decision = await this.autorizacion.puede(actor.id, permiso, null);
+  /** El atributo existe y su carrera entra en el alcance de lectura; si no, NoEncontrado. */
+  private async atributoLegible(actor: Actor, id: string): Promise<DatosAtributoCompleto> {
+    const atributo = await this.atributos.porId(id);
+    if (!atributo || !(await this.alcance.puedeLeerCarrera(actor.id, atributo.carreraId))) {
+      throw new NoEncontrado('el atributo del graduado', id);
+    }
+    return atributo;
+  }
+
+  /** La carrera existe y entra en el alcance de lectura; si no, NoEncontrado. */
+  private async carreraLegible(actor: Actor, carreraId: string): Promise<void> {
+    const carrera = await this.carreras.carreraPorId(carreraId);
+    if (!carrera || !(await this.alcance.puedeLeerCarrera(actor.id, carreraId))) {
+      throw new NoEncontrado('la carrera', carreraId);
+    }
+  }
+
+  /** El plan existe y su carrera entra en el alcance de lectura; si no, NoEncontrado. */
+  private async planLegible(actor: Actor, planId: string): Promise<PlanParaAcreditacion> {
+    const plan = await this.planes.planPorId(planId);
+    if (!plan || !(await this.alcance.puedeLeerCarrera(actor.id, plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
+    return plan;
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
 }

@@ -170,6 +170,44 @@ describe('RF-CH-015 / RF-CH-017 — el catálogo de la carrera', () => {
   });
 });
 
+describe('RF-CH-027 / RF-CH-030 — atributos y criterios de la carrera', () => {
+  function coordinador(carrera: string | null = ISI): ContextoDeAutorizacion {
+    return {
+      permisos: new Set([
+        'atributo.leer',
+        'atributo.gestionar',
+        'criterio.leer',
+        'criterio.gestionar',
+      ]),
+      carreraACargo: carrera,
+    };
+  }
+
+  it('atributo.gestionar y criterio.gestionar se ejercen solo sobre la carrera que se dirige', () => {
+    for (const permiso of ['atributo.gestionar', 'criterio.gestionar']) {
+      expect(esPermisoAcotadoACarrera(permiso)).toBe(true);
+      expect(puede(coordinador(ISI), permiso, ISI).permitido).toBe(true);
+      expect(puede(coordinador(ISI), permiso, IIN).permitido).toBe(false);
+    }
+  });
+
+  it('sin carrera indicada no se conceden, y sin carrera asignada tampoco', () => {
+    // Un Administrador sin carrera no gestionaría aunque se le diera el permiso:
+    // misma consecuencia que ya tienen las acotadas del 4b.
+    for (const permiso of ['atributo.gestionar', 'criterio.gestionar']) {
+      expect(puede(coordinador(ISI), permiso, null).permitido).toBe(false);
+      expect(puede(coordinador(null), permiso, ISI).permitido).toBe(false);
+    }
+  });
+
+  it('las lecturas no están acotadas: leer otra carrera se decide por el alcance de lectura', () => {
+    for (const permiso of ['atributo.leer', 'criterio.leer']) {
+      expect(esPermisoAcotadoACarrera(permiso)).toBe(false);
+      expect(puede(coordinador(ISI), permiso, IIN).permitido).toBe(true);
+    }
+  });
+});
+
 describe('los permisos de mejora-continua se acotan a la carrera', () => {
   const contexto = (permisos: string[], carreraACargo: string | null) => ({
     permisos: new Set(permisos),

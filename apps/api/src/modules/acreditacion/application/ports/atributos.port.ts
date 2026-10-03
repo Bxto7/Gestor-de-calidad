@@ -60,7 +60,11 @@ export interface RepositorioAtributoPort {
 
   delPlan(planId: string): Promise<DatosAtributoCompleto[]>;
   declararEnPlan(planId: string, atributoIds: readonly string[]): Promise<DatosAtributoCompleto[]>;
-  inexistentesOInactivos(ids: readonly string[]): Promise<string[]>;
+  /**
+   * RF122 y RF-CH-027: de estos ids, los que no existen, están inactivos o son
+   * de **otra carrera**. Un atributo de otra carrera nunca se declara en un plan.
+   */
+  noUtilizablesEnCarrera(carreraId: string, ids: readonly string[]): Promise<string[]>;
 }
 
 export const REPOSITORIO_ATRIBUTO = Symbol('RepositorioAtributoPort');

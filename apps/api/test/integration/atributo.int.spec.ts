@@ -230,15 +230,29 @@ describe('RF122 — declaración por plan', () => {
     expect((await atributos.delPlan(planId)).map((x) => x.codigo)).toEqual(['AG-X01', 'AG-X02']);
   });
 
-  it('`inexistentesOInactivos` delata los que no sirven', async () => {
+  it('`noUtilizablesEnCarrera` delata los inexistentes, los inactivos y los de otra carrera', async () => {
+    const otra = await prisma.carrera.create({
+      data: {
+        facultadId: (await prisma.facultad.findFirstOrThrow()).id,
+        nombre: 'Civil',
+        codigo: 'CIV',
+        duracionAnios: 2,
+      },
+    });
     const activo = await atributos.crear(carreraId, MARCO, 'AG-X01', 'Uno', 1);
     const inactivo = await atributos.crear(carreraId, MARCO, 'AG-X02', 'Dos', 2);
     await atributos.cambiarEstado(inactivo.id, false);
+    const ajeno = await atributos.crear(otra.id, MARCO, 'AG-X03', 'Tres', 1);
     const fantasma = '00000000-0000-4000-8000-000000000000';
 
-    const malos = await atributos.inexistentesOInactivos([activo.id, inactivo.id, fantasma]);
+    const malos = await atributos.noUtilizablesEnCarrera(carreraId, [
+      activo.id,
+      inactivo.id,
+      ajeno.id,
+      fantasma,
+    ]);
 
-    expect(malos.sort()).toEqual([fantasma, inactivo.id].sort());
+    expect(malos.sort()).toEqual([ajeno.id, fantasma, inactivo.id].sort());
   });
 });
 

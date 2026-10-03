@@ -292,7 +292,15 @@ import {
   type RepositorioCarreraPort,
   type RepositorioFacultadPort,
 } from './modules/academico/application/ports/academico.port.js';
-import { ACADEMICO_CROSS_MODULO } from './modules/academico/application/ports/academico-cross-modulo.port.js';
+import {
+  ACADEMICO_CROSS_MODULO,
+  type AcademicoCrossModuloPort,
+} from './modules/academico/application/ports/academico-cross-modulo.port.js';
+import {
+  PLAN_PARA_ACREDITACION,
+  type PlanParaAcreditacionPort,
+} from './modules/acreditacion/application/ports/plan-para-acreditacion.port.js';
+import { PlanParaAcreditacionAdapter } from './modules/plan-estudios/infrastructure/plan-para-acreditacion.adapter.js';
 import { GestionarFacultades } from './modules/academico/application/use-cases/gestionar-facultades.use-case.js';
 import { GestionarCarreras } from './modules/academico/application/use-cases/gestionar-carreras.use-case.js';
 import { ConsultarEstructuraInstitucional } from './modules/academico/application/use-cases/consultar-estructura-institucional.use-case.js';
@@ -494,6 +502,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // La frontera al revés: `objetivos-educacionales` define lo que necesita de
     // un plan y `plan-estudios` lo implementa (Bloque 4b).
     { provide: PLAN_PARA_OBJETIVOS, useClass: PlanParaObjetivosAdapter },
+    // Lo mismo para `acreditacion` (Bloque 5): define lo que necesita de un plan.
+    { provide: PLAN_PARA_ACREDITACION, useClass: PlanParaAcreditacionAdapter },
     { provide: REPOSITORIO_COMPETENCIA, useClass: CompetenciaRepositoryPrisma },
     { provide: REPOSITORIO_ATRIBUTO, useClass: AtributoRepositoryPrisma },
     { provide: REPOSITORIO_CRITERIO, useClass: CriterioRepositoryPrisma },
@@ -520,7 +530,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // Continua responde con el recuento de RF132, sin que se importen entre sí.
     { provide: CRITERIO_EN_USO, useClass: CriterioEnUsoAdapter },
     // La frontera en la otra dirección (RF-PJ-020 a 024): lo expone
-    // `plan-estudios`, lo consume `mejora` — mismo patrón que
+    // `acreditacion`, lo consume `mejora` — mismo patrón que
     // `CONTENIDO_CURRICULAR`.
     { provide: ACREDITACION_PORT, useClass: AcreditacionAdapter },
     { provide: PUBLICADOR_EVENTOS, useExisting: BitacoraListener },
@@ -712,12 +722,22 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarAtributos,
-      inject: [REPOSITORIO_ATRIBUTO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_ATRIBUTO,
+        PLAN_PARA_ACREDITACION,
+        ACADEMICO_CROSS_MODULO,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         atributos: RepositorioAtributoPort,
+        planes: PlanParaAcreditacionPort,
+        carreras: AcademicoCrossModuloPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarAtributos(atributos, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarAtributos(atributos, planes, carreras, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarCriterios,
