@@ -84,6 +84,24 @@ export class AsignaturaEstadoCambiado extends DomainEvent {
   }
 }
 
+/** RF-CH-019: la asignatura se borra de un plan en Borrador o En revisión. */
+export class AsignaturaEliminada extends DomainEvent {
+  readonly nombre = 'asignatura.eliminada';
+  readonly entidad = 'Asignatura' as const;
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    nombreAsignatura: string,
+  ) {
+    super(actor);
+    // Código y nombre porque la fila ya no existe: es lo único que quedará de ella.
+    this.detalle = `${codigo} «${nombreAsignatura}» eliminada definitivamente.`;
+  }
+}
+
 /** Enumera en castellano llano qué campos cambiaron y de qué a qué. */
 function describirCambios(antes: InstantaneaAsignatura, despues: InstantaneaAsignatura): string[] {
   const cambios: string[] = [];

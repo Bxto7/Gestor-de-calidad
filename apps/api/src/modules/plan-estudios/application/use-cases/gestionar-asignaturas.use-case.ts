@@ -26,6 +26,7 @@ import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import {
   AsignaturaCreada,
   AsignaturaEditada,
+  AsignaturaEliminada,
   AsignaturaEstadoCambiado,
   type InstantaneaAsignatura,
 } from '../../domain/events/eventos-asignatura-crud.js';
@@ -41,6 +42,7 @@ import type {
   TipoAsignatura,
 } from '../ports/asignatura.port.js';
 import { CONDICIONES, TIPOS } from '../ports/asignatura.port.js';
+import type { ElementoCurricularEnUsoPort } from '../ports/elemento-curricular-en-uso.port.js';
 import type { RepositorioContenidoPort, RepositorioPlanPort } from '../ports/repositorios.port.js';
 
 export class GestionarAsignaturas {
@@ -50,6 +52,7 @@ export class GestionarAsignaturas {
     private readonly contenido: RepositorioContenidoPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly enUso: ElementoCurricularEnUsoPort,
     private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
@@ -151,7 +154,7 @@ export class GestionarAsignaturas {
     return this.asignaturas.impactoDeInactivar(id);
   }
 
-  /** RF052 RN1: nunca se borra el registro, solo cambia de estado. */
+  /** RF052 RN1: inactivar nunca borra el registro; borrarlo es otra vía (RF-CH-019, `eliminar`). */
   async cambiarEstado(actor: Actor, id: string, activa: boolean): Promise<DatosAsignatura> {
     const actual = await this.asignaturas.porId(id);
     if (!actual) throw new NoEncontrado('la asignatura', id);
@@ -171,6 +174,43 @@ export class GestionarAsignaturas {
       new AsignaturaEstadoCambiado(actor, id, actual.codigo, activa, impacto.dependientes),
     ]);
     return cambiada;
+  }
+
+  /**
+   * RF-CH-019 — eliminar una asignatura del plan.
+   *
+   * Solo con el plan en Borrador o En revisión. Se bloquea si otras
+   * asignaturas la tienen como requisito —`Dependencia` las borraría en
+   * cascada sin avisar— o si Mejora Continua la referencia. El evento se
+   * publica antes de borrar: después, el código y el nombre ya no existirían.
+   */
+  async eliminar(actor: Actor, id: string): Promise<void> {
+    const actual = await this.asignaturas.porId(id);
+    if (!actual) throw new NoEncontrado('la asignatura', id);
+
+    // Lectura y alcance antes de la gestión: fuera de alcance es 404, no 403.
+    const plan = await this.exigirPlan(actual.planId);
+    await this.exigir(actor, 'asignatura.leer', plan.carreraId);
+    await this.exigirAlcance(actor, plan.carreraId, 'la asignatura', id);
+    await this.exigirPlanEditable(actor, actual.planId);
+
+    const { dependientes } = await this.asignaturas.impactoDeInactivar(id);
+    if (dependientes.length > 0) {
+      throw new ReglaDeNegocioViolada(
+        `No se puede eliminar ${actual.codigo}: es requisito de ${dependientes.join(', ')}. ` +
+          'Inactívala si ya no debe dictarse.',
+      );
+    }
+
+    const uso = await this.enUso.asignaturaEnUso(id);
+    if (uso.enUso) {
+      throw new ReglaDeNegocioViolada(
+        `No se puede eliminar ${actual.codigo}: ${uso.motivos.join('; ')}.`,
+      );
+    }
+
+    await this.eventos.publicar([new AsignaturaEliminada(actor, id, actual.codigo, actual.nombre)]);
+    await this.asignaturas.eliminar(id);
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */

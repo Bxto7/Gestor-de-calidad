@@ -440,5 +440,27 @@ describe('RF-CH-021 — competencias del plan', () => {
   });
 });
 
+describe('RF-CH-019 — eliminar', () => {
+  it('borra la asignatura con sus competencias y sus prerrequisitos', async () => {
+    const base = await repo.crear(planId, 'ISI-101', { ...ENTRADA, nombre: 'Base' });
+    const borrada = await repo.crear(planId, 'ISI-201', {
+      ...ENTRADA,
+      nombre: 'Se borra',
+      competenciaIds: [idDe('CPE-01')],
+    });
+    await prisma.dependencia.create({ data: { asignaturaId: borrada.id, requiereId: base.id } });
+
+    await repo.eliminar(borrada.id);
+
+    expect(await repo.porId(borrada.id)).toBeNull();
+    expect(await prisma.asignaturaCompetencia.count({ where: { asignaturaId: borrada.id } })).toBe(
+      0,
+    );
+    expect(await prisma.dependencia.count({ where: { asignaturaId: borrada.id } })).toBe(0);
+    // La que ella requería sigue ahí: solo cae el vínculo.
+    expect(await repo.porId(base.id)).not.toBeNull();
+  });
+});
+
 /** Sufijo por tipo, solo para no repetir códigos en el bucle de la prueba. */
 const TIPOS_INDICE: Record<string, number> = { General: 1, Transversal: 2, Especialidad: 3 };

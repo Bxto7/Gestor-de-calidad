@@ -225,6 +225,10 @@ export class AsignaturaRepositoryPrisma implements RepositorioAsignaturaPort {
       cicloNumero: asignatura?.ciclo?.numero ?? null,
     };
   }
+
+  async eliminar(id: string): Promise<void> {
+    await this.prisma.asignatura.delete({ where: { id } });
+  }
 }
 
 /** Sin ciclo al final; dentro del ciclo, por posición y luego por código. */

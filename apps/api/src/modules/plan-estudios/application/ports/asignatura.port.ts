@@ -100,6 +100,13 @@ export interface RepositorioAsignaturaPort {
   competenciasDelPlan(planId: string): Promise<string[]>;
 
   impactoDeInactivar(id: string): Promise<ImpactoInactivacion>;
+
+  /**
+   * RF-CH-019: borra la asignatura. `asignatura_competencia` y los
+   * prerrequisitos de los dos lados caen en cascada; el caso de uso comprueba
+   * antes que nadie la requiera y que Mejora Continua no la use.
+   */
+  eliminar(id: string): Promise<void>;
 }
 
 export const REPOSITORIO_ASIGNATURA = Symbol('RepositorioAsignaturaPort');

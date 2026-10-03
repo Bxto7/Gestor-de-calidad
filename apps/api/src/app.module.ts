@@ -1051,6 +1051,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         REPOSITORIO_CONTENIDO,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ELEMENTO_CURRICULAR_EN_USO,
         ALCANCE_DE_LECTURA,
       ],
       useFactory: (
@@ -1059,8 +1060,18 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         contenido: RepositorioContenidoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        enUso: ElementoCurricularEnUsoPort,
         alcance: AlcanceDeLecturaPort,
-      ) => new GestionarAsignaturas(asignaturas, planes, contenido, autorizacion, eventos, alcance),
+      ) =>
+        new GestionarAsignaturas(
+          asignaturas,
+          planes,
+          contenido,
+          autorizacion,
+          eventos,
+          enUso,
+          alcance,
+        ),
     },
     {
       provide: UbicarAsignatura,

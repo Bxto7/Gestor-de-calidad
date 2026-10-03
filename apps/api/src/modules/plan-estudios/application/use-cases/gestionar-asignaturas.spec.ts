@@ -29,6 +29,7 @@ import type {
   FiltroAsignaturas,
   RepositorioAsignaturaPort,
 } from '../ports/asignatura.port.js';
+import type { UsoDeElemento } from '../ports/elemento-curricular-en-uso.port.js';
 import type { RepositorioContenidoPort, RepositorioPlanPort } from '../ports/repositorios.port.js';
 import { GestionarAsignaturas } from './gestionar-asignaturas.use-case.js';
 
@@ -104,6 +105,8 @@ function montar(
     dependientes?: string[];
     permitido?: boolean;
     alcance?: AlcanceDeLecturaPort;
+    /** RF-CH-019: lo que responde Mejora Continua. */
+    enUso?: UsoDeElemento;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -112,6 +115,9 @@ function montar(
   const estados: boolean[] = [];
   const filtros: (FiltroAsignaturas | undefined)[] = [];
   const planesDeCompetencias: string[] = [];
+  const eliminadas: string[] = [];
+  const consultasEnUso: string[] = [];
+  const orden: string[] = [];
 
   const repo: RepositorioAsignaturaPort = {
     listar: async (_planId, filtro) => {
@@ -142,6 +148,10 @@ function montar(
       dependientes: opciones.dependientes ?? [],
       cicloNumero: 1,
     }),
+    eliminar: async (id) => {
+      orden.push('borrar');
+      eliminadas.push(id);
+    },
   };
 
   const planes = {
@@ -162,17 +172,42 @@ function montar(
     rolesDe: async () => [],
   };
 
-  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+  const enUso = {
+    competenciaEnUso: async () => ({ enUso: false, motivos: [] }),
+    asignaturaEnUso: async (id: string) => {
+      consultasEnUso.push(id);
+      return opciones.enUso ?? { enUso: false, motivos: [] };
+    },
+  };
+
+  const eventos: PublicadorDeEventos = {
+    publicar: async (e) => {
+      orden.push('eventos');
+      publicados.push(...e);
+    },
+  };
   const caso = new GestionarAsignaturas(
     repo,
     planes,
     contenido,
     autorizacion,
     eventos,
+    enUso,
     opciones.alcance ?? sinRestriccion(),
   );
 
-  return { caso, publicados, creadas, actualizadas, estados, filtros, planesDeCompetencias };
+  return {
+    caso,
+    publicados,
+    creadas,
+    actualizadas,
+    estados,
+    filtros,
+    planesDeCompetencias,
+    eliminadas,
+    consultasEnUso,
+    orden,
+  };
 }
 
 describe('RF047 — registrar asignatura', () => {
@@ -583,5 +618,73 @@ describe('RF-CH-009 — alcance de lectura de asignaturas', () => {
   it('sin restricción se lee cualquier plan', async () => {
     const { caso } = montar();
     await expect(caso.listar(ACTOR, 'plan-1')).resolves.toBeDefined();
+  });
+});
+
+describe('RF-CH-019 — eliminar asignatura', () => {
+  it('en Borrador se elimina y queda en la bitácora con código y nombre', async () => {
+    const { caso, eliminadas, publicados } = montar();
+    await caso.eliminar(ACTOR, 'asig-1');
+    expect(eliminadas).toEqual(['asig-1']);
+    expect(publicados[0]?.nombre).toBe('asignatura.eliminada');
+    expect(publicados[0]?.detalle).toBe('ISI-101 «Álgebra Lineal» eliminada definitivamente.');
+  });
+
+  it('también En revisión', async () => {
+    const { caso, eliminadas } = montar({ plan: plan('En revisión') });
+    await caso.eliminar(ACTOR, 'asig-1');
+    expect(eliminadas).toEqual(['asig-1']);
+  });
+
+  it('en Aprobado, Vigente e Histórico se rechaza sin borrar', async () => {
+    for (const estado of ['Aprobado', 'Vigente', 'Histórico'] as const) {
+      const { caso, eliminadas } = montar({ plan: plan(estado) });
+      await expect(caso.eliminar(ACTOR, 'asig-1'), estado).rejects.toBeInstanceOf(
+        ReglaDeNegocioViolada,
+      );
+      expect(eliminadas, estado).toHaveLength(0);
+    }
+  });
+
+  it('si otras asignaturas la requieren, se bloquea con sus códigos y no pregunta a Mejora Continua', async () => {
+    const { caso, eliminadas, consultasEnUso } = montar({ dependientes: ['ISI-201', 'ISI-305'] });
+    await expect(caso.eliminar(ACTOR, 'asig-1')).rejects.toThrow(
+      'No se puede eliminar ISI-101: es requisito de ISI-201, ISI-305. Inactívala si ya no debe dictarse.',
+    );
+    expect(eliminadas).toHaveLength(0);
+    expect(consultasEnUso).toEqual([]);
+  });
+
+  it('si Mejora Continua la usa, se bloquea con sus motivos', async () => {
+    const { caso, eliminadas } = montar({
+      enUso: { enUso: true, motivos: ['está asignada en 1 evaluación(es)'] },
+    });
+    await expect(caso.eliminar(ACTOR, 'asig-1')).rejects.toThrow(
+      'No se puede eliminar ISI-101: está asignada en 1 evaluación(es).',
+    );
+    expect(eliminadas).toHaveLength(0);
+  });
+
+  it('el evento se publica antes de borrar', async () => {
+    const { caso, orden } = montar();
+    await caso.eliminar(ACTOR, 'asig-1');
+    expect(orden).toEqual(['eventos', 'borrar']);
+  });
+
+  it('una de otra carrera, para quien solo lee la suya, responde NoEncontrado y no borra', async () => {
+    const { caso, eliminadas } = montar({ alcance: soloCarrera('car-iin') });
+    await expect(caso.eliminar(ACTOR, 'asig-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(eliminadas).toHaveLength(0);
+  });
+
+  it('sin permiso responde AccesoDenegado y no borra', async () => {
+    const { caso, eliminadas } = montar({ permitido: false });
+    await expect(caso.eliminar(ACTOR, 'asig-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(eliminadas).toHaveLength(0);
+  });
+
+  it('404 si no existe', async () => {
+    const { caso } = montar({ existente: null });
+    await expect(caso.eliminar(ACTOR, 'x')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

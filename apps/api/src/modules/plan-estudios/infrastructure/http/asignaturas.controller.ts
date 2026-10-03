@@ -7,7 +7,18 @@
  * asignatura concreta van por su identificador, sin repetir el plan en la ruta.
  */
 
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
@@ -127,5 +138,22 @@ export class AsignaturasController {
     @Body() dto: CambiarEstadoAsignaturaDto,
   ) {
     return this.asignaturas.cambiarEstado(actor, id, dto.activa);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Eliminar una asignatura',
+    description:
+      'RF-CH-019. Solo con el plan en Borrador o En revisión, si ninguna otra asignatura la ' +
+      'tiene como requisito y Mejora Continua no la usa. Inactivar (RF052) sigue sin borrar.',
+  })
+  @ApiResponse({ status: 404, description: 'La asignatura no existe o no es de tu carrera.' })
+  @ApiResponse({
+    status: 409,
+    description: 'El plan no admite cambios o la asignatura está en uso.',
+  })
+  async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    await this.asignaturas.eliminar(actor, id);
   }
 }

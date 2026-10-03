@@ -7,7 +7,12 @@ import type {
 import { NoEncontrado } from '../../src/shared-kernel/errors/errores.js';
 import { GestionarCompetencias } from '../../src/modules/plan-estudios/application/use-cases/gestionar-catalogo.use-case.js';
 import { CompetenciaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
-import { PlanRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/plan.repository.js';
+import { GestionarAsignaturas } from '../../src/modules/plan-estudios/application/use-cases/gestionar-asignaturas.use-case.js';
+import { AsignaturaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/asignatura.repository.js';
+import {
+  ContenidoRepositoryPrisma,
+  PlanRepositoryPrisma,
+} from '../../src/modules/plan-estudios/infrastructure/persistence/plan.repository.js';
 import { GestionarObjetivos } from '../../src/modules/objetivos-educacionales/application/use-cases/gestionar-objetivos.use-case.js';
 import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
 import { PlanParaObjetivosAdapter } from '../../src/modules/plan-estudios/infrastructure/plan-para-objetivos.adapter.js';
@@ -313,5 +318,38 @@ describe('RF-CH-015 / RF-CH-009 — objetivos según el alcance de lectura', () 
       gestionarObjetivos().quitarDelPlan(como(director), planCiv, ajeno),
     ).rejects.toBeInstanceOf(NoEncontrado);
     expect(await prisma.planObjetivo.count({ where: { planId: planCiv } })).toBe(1);
+  });
+});
+
+describe('RF-CH-019 / RF-CH-009 — eliminar asignaturas según el alcance', () => {
+  it('el Director no puede eliminar una asignatura de otra carrera: NoEncontrado y nada cambia', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const planCiv = await planDe(civ, 'PE-CIV-2026-v1');
+    const ajena = await prisma.asignatura.create({
+      data: {
+        planId: planCiv,
+        codigo: 'CIV-101',
+        nombre: 'Estática',
+        descripcion: 'Sumilla sintética.',
+        tipo: 'GENERAL',
+        condicion: 'OBLIGATORIA',
+        creditos: 3,
+      },
+    });
+
+    const caso = new GestionarAsignaturas(
+      new AsignaturaRepositoryPrisma(prisma),
+      new PlanRepositoryPrisma(prisma),
+      new ContenidoRepositoryPrisma(prisma),
+      adaptador,
+      sinBitacora,
+      new ElementoCurricularEnUsoAdapter(prisma),
+      adaptador,
+    );
+
+    await expect(caso.eliminar(como(director), ajena.id)).rejects.toBeInstanceOf(NoEncontrado);
+    expect(await prisma.asignatura.count({ where: { id: ajena.id } })).toBe(1);
   });
 });
