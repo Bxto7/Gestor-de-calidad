@@ -1,8 +1,7 @@
 /**
  * Eventos de dominio de Atributo del Graduado. Movidos de
  * `plan-estudios/domain/events/eventos-acreditacion.ts` (Fase 0d), donde
- * compartían archivo con los 3 eventos de Criterio (que se quedan ahí,
- * sin tocar — Criterio no se mueve de módulo).
+ * compartían archivo con los 3 eventos de Criterio (hoy en `eventos-criterio.ts`).
  */
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';

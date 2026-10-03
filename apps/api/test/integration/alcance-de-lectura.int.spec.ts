@@ -18,7 +18,7 @@ import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educaciona
 import { PlanParaObjetivosAdapter } from '../../src/modules/plan-estudios/infrastructure/plan-para-objetivos.adapter.js';
 import { ElementoCurricularEnUsoAdapter } from '../../src/modules/mejora-continua/infrastructure/persistence/elemento-curricular-en-uso.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
-import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+import { sembrarAtributosIcacit } from '../../src/modules/acreditacion/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();

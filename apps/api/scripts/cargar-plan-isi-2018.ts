@@ -31,7 +31,7 @@ import { existsSync } from 'node:fs';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 
-import { crearAtributosIcacitFaltantes } from '../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+import { crearAtributosIcacitFaltantes } from '../src/modules/acreditacion/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaClient } from '../src/platform/database/generated/client.js';
 import {
   ASIGNATURAS,

@@ -3,7 +3,7 @@
  *
  * Movido de `plan-estudios/application/ports/acreditacion.port.ts`
  * (Fase 0d) — ahí compartía archivo con `RepositorioCriterioPort`
- * (Criterio se queda en `plan-estudios`, no se mueve).
+ * (hoy en `criterios.port.ts`).
  */
 
 export interface DatosAtributoCompleto {

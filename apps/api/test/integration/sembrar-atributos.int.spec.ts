@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   crearAtributosIcacitFaltantes,
   sembrarAtributosIcacit,
-} from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+} from '../../src/modules/acreditacion/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();

@@ -1,8 +1,8 @@
 /**
- * Lo que `plan-estudios` expone a Plan de Mejora (RF-PJ-020 a RF-PJ-024).
+ * Lo que `acreditacion` expone a Plan de Mejora (RF-PJ-020 a RF-PJ-024).
  *
- * Nombre distinto de `acreditacion.port.ts` a propósito: ese es el puerto
- * interno de `plan-estudios` (Criterios/Atributos, RF129-RF132); este es el
+ * Nombre distinto de `criterios.port.ts` a propósito: ese es el puerto
+ * interno de `acreditacion` (Criterios, RF129-RF132); este es el
  * que cruza el módulo, mismo patrón que `ContenidoCurricularPort` — datos
  * planos, nunca la entidad ni el repositorio real.
  *

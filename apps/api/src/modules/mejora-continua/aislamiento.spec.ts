@@ -28,9 +28,8 @@ const RAIZ = import.meta.dirname;
 /**
  * Lo único que este módulo puede importar del Plan de Estudios.
  *
- * Cuatro puertos: `contenido-curricular.port.js` (existente, de
- * `medicion`/`evaluacion`), `acreditacion-cross-modulo.port.js` (de `mejora` —
- * RF-PJ-020 a RF-PJ-024, §4 del diseño de 2c-J-B), `plan-vigente.port.js`
+ * Tres puertos: `contenido-curricular.port.js` (existente, de
+ * `medicion`/`evaluacion`), `plan-vigente.port.js`
  * (de `resumen`, la vista de inicio del Director) y
  * `elemento-curricular-en-uso.port.js` (Bloque 4b: `plan-estudios` pregunta si
  * puede borrar una competencia o una asignatura y Mejora Continua lo
@@ -38,7 +37,6 @@ const RAIZ = import.meta.dirname;
  */
 const PUERTO_PERMITIDO = [
   'ports/contenido-curricular.port.js',
-  'ports/acreditacion-cross-modulo.port.js',
   'ports/plan-vigente.port.js',
   'ports/elemento-curricular-en-uso.port.js',
 ];
@@ -256,21 +254,34 @@ describe('aislamiento de mejora-continua hacia academico', () => {
   });
 });
 
-describe('aislamiento de mejora-continua hacia atributos-graduado', () => {
-  const DE_ATRIBUTOS = /(^|\/)atributos-graduado\//;
+describe('aislamiento de mejora-continua hacia acreditacion', () => {
+  // El puerto `acreditacion-cross-modulo.port.js` (RF-PJ-020 a 024) vivía en
+  // `plan-estudios`; desde el Bloque 5 vive en `acreditacion`, que también define
+  // `criterio-en-uso.port.js` (RF-CH-032) y lo implementa `mejora-continua`.
+  const DE_ACREDITACION = /(^|\/)acreditacion\//;
+  const PUERTOS_PERMITIDOS_ACREDITACION = [
+    'ports/acreditacion-cross-modulo.port.js',
+    'ports/criterio-en-uso.port.js',
+  ];
 
-  it('no importa nada de atributos-graduado', () => {
-    const vistos = importsDe().filter(({ importado }) => DE_ATRIBUTOS.test(importado));
-    const infractores = vistos.map(({ archivo, importado }) => `${archivo} → ${importado}`);
+  it('solo importa de acreditacion sus dos puertos', () => {
+    const vistos = importsDe().filter(({ importado }) => DE_ACREDITACION.test(importado));
+    const infractores = vistos
+      .filter(
+        ({ importado }) => !PUERTOS_PERMITIDOS_ACREDITACION.some((p) => importado.endsWith(p)),
+      )
+      .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);
+    // Control positivo: hoy hay dos consumos reales (`gestionar-planes-mejora` y
+    // `CriterioEnUsoAdapter`).
+    expect(vistos).not.toEqual([]);
   });
 
-  it('reconoce un import de atributos-graduado escrito en relativo', () => {
+  it('reconoce un import prohibido de acreditacion escrito en relativo', () => {
     expect(
-      DE_ATRIBUTOS.test(
-        '../../atributos-graduado/infrastructure/persistence/atributos.repository.js',
-      ),
+      DE_ACREDITACION.test('../../acreditacion/infrastructure/persistence/atributos.repository.js'),
     ).toBe(true);
+    expect(DE_ACREDITACION.test('./acreditacion-legacy.js')).toBe(false);
   });
 });

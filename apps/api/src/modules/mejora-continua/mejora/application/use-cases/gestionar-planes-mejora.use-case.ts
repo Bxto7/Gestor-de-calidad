@@ -51,7 +51,7 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
-import type { AcreditacionPort } from '../../../../plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
+import type { AcreditacionPort } from '../../../../acreditacion/application/ports/acreditacion-cross-modulo.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { ObjetivosCrossModuloPort } from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
 import {

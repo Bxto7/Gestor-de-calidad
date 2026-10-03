@@ -105,29 +105,29 @@ import { PlanParaObjetivosAdapter } from './modules/plan-estudios/infrastructure
 import {
   REPOSITORIO_CRITERIO,
   type RepositorioCriterioPort,
-} from './modules/plan-estudios/application/ports/acreditacion.port.js';
+} from './modules/acreditacion/application/ports/criterios.port.js';
 import {
   ACREDITACION_PORT,
   type AcreditacionPort,
-} from './modules/plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
-import { AcreditacionAdapter } from './modules/plan-estudios/infrastructure/acreditacion-cross-modulo.adapter.js';
-import { GestionarCriterios } from './modules/plan-estudios/application/use-cases/gestionar-criterios.use-case.js';
-import { CriterioRepositoryPrisma } from './modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
+} from './modules/acreditacion/application/ports/acreditacion-cross-modulo.port.js';
+import { AcreditacionAdapter } from './modules/acreditacion/infrastructure/acreditacion-cross-modulo.adapter.js';
+import { GestionarCriterios } from './modules/acreditacion/application/use-cases/gestionar-criterios.use-case.js';
+import { CriterioRepositoryPrisma } from './modules/acreditacion/infrastructure/persistence/criterio.repository.js';
 import {
   CriteriosController,
   CriteriosDeCarreraController,
-} from './modules/plan-estudios/infrastructure/http/acreditacion.controller.js';
+} from './modules/acreditacion/infrastructure/http/criterios.controller.js';
 import {
   REPOSITORIO_ATRIBUTO,
   type RepositorioAtributoPort,
-} from './modules/atributos-graduado/application/ports/atributos.port.js';
-import { GestionarAtributos } from './modules/atributos-graduado/application/use-cases/gestionar-atributos.use-case.js';
-import { AtributoRepositoryPrisma } from './modules/atributos-graduado/infrastructure/persistence/atributos.repository.js';
+} from './modules/acreditacion/application/ports/atributos.port.js';
+import { GestionarAtributos } from './modules/acreditacion/application/use-cases/gestionar-atributos.use-case.js';
+import { AtributoRepositoryPrisma } from './modules/acreditacion/infrastructure/persistence/atributos.repository.js';
 import {
   AtributosDeCarreraController,
   AtributosController,
   AtributosDelPlanController,
-} from './modules/atributos-graduado/infrastructure/http/atributos.controller.js';
+} from './modules/acreditacion/infrastructure/http/atributos.controller.js';
 
 /* ── Mejora continua ─────────────────────────────────────────────────────── */
 import {
@@ -235,6 +235,11 @@ import {
   type RepositorioPlanMejoraPort,
 } from './modules/mejora-continua/mejora/application/ports/plan-mejora.port.js';
 import { IMPACTO_PLAN_MEJORA } from './modules/mejora-continua/mejora/application/ports/impacto-plan-mejora.port.js';
+import {
+  CRITERIO_EN_USO,
+  type CriterioEnUsoPort,
+} from './modules/acreditacion/application/ports/criterio-en-uso.port.js';
+import { CriterioEnUsoAdapter } from './modules/mejora-continua/mejora/infrastructure/criterio-en-uso.adapter.js';
 import { GestionarPlanesMejora } from './modules/mejora-continua/mejora/application/use-cases/gestionar-planes-mejora.use-case.js';
 import { VersionarPlanMejora } from './modules/mejora-continua/mejora/application/use-cases/versionar-plan-mejora.use-case.js';
 import { PlanMejoraRepositoryPrisma } from './modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
@@ -511,6 +516,9 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     // ambos puertos; `useExisting` reutiliza la instancia ya registrada
     // arriba, mismo patrón que `SEGURIDAD_PORT`.
     { provide: IMPACTO_PLAN_MEJORA, useExisting: REPOSITORIO_PLAN_MEJORA },
+    // Bloque 5: `acreditacion` pregunta si puede borrar un criterio y Mejora
+    // Continua responde con el recuento de RF132, sin que se importen entre sí.
+    { provide: CRITERIO_EN_USO, useClass: CriterioEnUsoAdapter },
     // La frontera en la otra dirección (RF-PJ-020 a 024): lo expone
     // `plan-estudios`, lo consume `mejora` — mismo patrón que
     // `CONTENIDO_CURRICULAR`.
@@ -713,12 +721,13 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarCriterios,
-      inject: [REPOSITORIO_CRITERIO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [REPOSITORIO_CRITERIO, CRITERIO_EN_USO, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
       useFactory: (
         criterios: RepositorioCriterioPort,
+        enUso: CriterioEnUsoPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarCriterios(criterios, autorizacion, eventos),
+      ) => new GestionarCriterios(criterios, enUso, autorizacion, eventos),
     },
     {
       provide: GestionarPlanesMedicion,

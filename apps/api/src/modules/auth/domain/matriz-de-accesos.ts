@@ -50,14 +50,14 @@ export const PERMISOS = [
   ['objetivo.gestionar', 'Crear, editar e inactivar objetivos', 'plan-estudios'],
   ['competencia.leer', 'Consultar competencias', 'plan-estudios'],
   ['competencia.gestionar', 'Crear, editar e inactivar competencias', 'plan-estudios'],
-  ['atributo.leer', 'Consultar atributos del graduado', 'plan-estudios'],
-  ['atributo.gestionar', 'Crear, editar e inactivar atributos del graduado', 'plan-estudios'],
+  ['atributo.leer', 'Consultar atributos del graduado', 'acreditacion'],
+  ['atributo.gestionar', 'Crear, editar e inactivar atributos del graduado', 'acreditacion'],
   // Como `plan.acceder`: decide solo si se entra a la sección; `criterio.leer`
   // decide si se pueden leer los datos (el Docente los lee desde Planes de
   // Mejora sin tener la sección).
-  ['criterio.acceder', 'Entrar a la sección Criterios de Acreditación', 'plan-estudios'],
-  ['criterio.leer', 'Consultar criterios de acreditación', 'plan-estudios'],
-  ['criterio.gestionar', 'Crear, editar e inactivar criterios de acreditación', 'plan-estudios'],
+  ['criterio.acceder', 'Entrar a la sección Criterios de Acreditación', 'acreditacion'],
+  ['criterio.leer', 'Consultar criterios de acreditación', 'acreditacion'],
+  ['criterio.gestionar', 'Crear, editar e inactivar criterios de acreditación', 'acreditacion'],
   ['asignatura.leer', 'Consultar asignaturas', 'plan-estudios'],
   ['asignatura.gestionar', 'Crear, editar e inactivar asignaturas', 'plan-estudios'],
   ['malla.editar', 'Ubicar asignaturas en los ciclos', 'plan-estudios'],

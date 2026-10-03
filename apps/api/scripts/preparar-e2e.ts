@@ -38,7 +38,7 @@ import { existsSync } from 'node:fs';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 
-import { sembrarAtributosIcacit } from '../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+import { sembrarAtributosIcacit } from '../src/modules/acreditacion/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaClient } from '../src/platform/database/generated/client.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');

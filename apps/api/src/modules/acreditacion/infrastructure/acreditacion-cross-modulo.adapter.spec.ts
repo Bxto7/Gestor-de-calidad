@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   DatosCriterio,
   RepositorioCriterioPort,
-} from '../application/ports/acreditacion.port.js';
+} from '../application/ports/criterios.port.js';
 import { AcreditacionAdapter } from './acreditacion-cross-modulo.adapter.js';
 
 function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
@@ -31,7 +31,6 @@ function repoCriterio(sobre: Partial<RepositorioCriterioPort> = {}): Repositorio
     crear: async () => criterio(),
     actualizar: async () => criterio(),
     cambiarEstado: async () => criterio(),
-    impactoDeInactivar: async () => ({ planesMejoraVinculados: 0 }),
     ...sobre,
   };
 }

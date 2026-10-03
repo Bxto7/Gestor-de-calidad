@@ -14,7 +14,7 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+import { sembrarAtributosIcacit } from '../../src/modules/acreditacion/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { ReportesRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/reportes.repository.js';
 

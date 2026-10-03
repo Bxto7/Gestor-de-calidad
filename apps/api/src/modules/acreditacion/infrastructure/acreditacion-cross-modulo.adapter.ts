@@ -13,7 +13,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   REPOSITORIO_CRITERIO,
   type RepositorioCriterioPort,
-} from '../application/ports/acreditacion.port.js';
+} from '../application/ports/criterios.port.js';
 import type {
   AcreditacionPort,
   DatosCriterioMejora,

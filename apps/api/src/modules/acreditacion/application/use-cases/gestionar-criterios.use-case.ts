@@ -24,18 +24,20 @@ import {
   CriterioCreado,
   CriterioEditado,
   CriterioEstadoCambiado,
-} from '../../domain/events/eventos-acreditacion.js';
+} from '../../domain/events/eventos-criterio.js';
 import { limpiarNombre } from '../../domain/value-objects/codigos.js';
+import type { CriterioEnUsoPort } from '../ports/criterio-en-uso.port.js';
 import type {
   DatosCriterio,
   FiltroAcreditacion,
   ImpactoCriterio,
   RepositorioCriterioPort,
-} from '../ports/acreditacion.port.js';
+} from '../ports/criterios.port.js';
 
 export class GestionarCriterios {
   constructor(
     private readonly criterios: RepositorioCriterioPort,
+    private readonly enUso: CriterioEnUsoPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
   ) {}
@@ -106,7 +108,7 @@ export class GestionarCriterios {
   async impactoDeInactivar(actor: Actor, id: string): Promise<ImpactoCriterio> {
     const criterio = await this.exigirCriterio(id);
     await this.exigir(actor, 'criterio.leer', criterio.carreraId);
-    return this.criterios.impactoDeInactivar(id);
+    return { planesMejoraVinculados: await this.enUso.contarPlanesDeMejora(id) };
   }
 
   /** RF132 RN1: no se elimina físicamente. RN2: lo ya asociado se conserva. */

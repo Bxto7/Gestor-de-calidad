@@ -7,19 +7,14 @@
  * error de restricción de PostgreSQL.
  */
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../platform/database/prisma.service.js';
-import {
-  IMPACTO_PLAN_MEJORA,
-  type ImpactoPlanMejoraPort,
-} from '../../../mejora-continua/mejora/application/ports/impacto-plan-mejora.port.js';
 import type {
   DatosCriterio,
   FiltroAcreditacion,
-  ImpactoCriterio,
   RepositorioCriterioPort,
-} from '../../application/ports/acreditacion.port.js';
+} from '../../application/ports/criterios.port.js';
 
 const SELECCION = {
   id: true,
@@ -52,10 +47,7 @@ function aDatos(fila: Fila): DatosCriterio {
 
 @Injectable()
 export class CriterioRepositoryPrisma implements RepositorioCriterioPort {
-  constructor(
-    private readonly prisma: PrismaService,
-    @Inject(IMPACTO_PLAN_MEJORA) private readonly impactoPlanMejora: ImpactoPlanMejoraPort,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /** RF131 RN1: ordenado por código. */
   async listar(carreraId: string, filtro?: FiltroAcreditacion): Promise<DatosCriterio[]> {
@@ -121,20 +113,5 @@ export class CriterioRepositoryPrisma implements RepositorioCriterioPort {
       select: SELECCION,
     });
     return aDatos(fila);
-  }
-
-  /**
-   * RF132: el recuento real de planes de mejora vinculados, vía
-   * `ImpactoPlanMejoraPort` (2c-J-B, §2f del diseño) — la primera
-   * dependencia circular de primer nivel del proyecto, blindada por las
-   * guardias de `aislamiento.spec.ts` de ambos módulos. Antes de 2c-J-B
-   * devolvía `0` fijo, porque el submódulo Plan de Mejora no existía.
-   */
-  async impactoDeInactivar(id: string): Promise<ImpactoCriterio> {
-    const planesMejoraVinculados = await this.impactoPlanMejora.contarVinculados(
-      'CRITERIO_ACREDITACION',
-      id,
-    );
-    return { planesMejoraVinculados };
   }
 }

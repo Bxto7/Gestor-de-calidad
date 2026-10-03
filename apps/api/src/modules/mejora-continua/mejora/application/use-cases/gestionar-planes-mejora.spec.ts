@@ -28,7 +28,7 @@ import type { AuthorizationPort } from '../../../../auth/application/ports/autho
 import type {
   AcreditacionPort,
   DatosCriterioMejora,
-} from '../../../../plan-estudios/application/ports/acreditacion-cross-modulo.port.js';
+} from '../../../../acreditacion/application/ports/acreditacion-cross-modulo.port.js';
 import type {
   ContenidoCurricularPort,
   PlanBase,

@@ -19,28 +19,11 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
-import type { DatosCriterio, RepositorioCriterioPort } from '../ports/acreditacion.port.js';
+import type { CriterioEnUsoPort } from '../ports/criterio-en-uso.port.js';
+import type { DatosCriterio, RepositorioCriterioPort } from '../ports/criterios.port.js';
 import { GestionarCriterios } from './gestionar-criterios.use-case.js';
 
-const ACTOR: Actor = { id: 'u-1', nombre: 'Directora de carrera' };
-
-function permitirTodo(): AuthorizationPort {
-  return {
-    puede: async () => ({ permitido: true }),
-    permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
-    rolesDe: async () => [],
-  };
-}
-
-function denegar(): AuthorizationPort {
-  return {
-    puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
-    permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
-    rolesDe: async () => [],
-  };
-}
+const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 
 function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
   return {
@@ -54,67 +37,84 @@ function criterio(sobre: Partial<DatosCriterio> = {}): DatosCriterio {
   };
 }
 
-function repo(sobre: Partial<RepositorioCriterioPort> = {}): RepositorioCriterioPort {
-  return {
+function montarCriterios(
+  opciones: {
+    repo?: Partial<RepositorioCriterioPort>;
+    /** `false` deniega todo; una función decide por permiso. */
+    permitido?: boolean | ((permiso: string) => boolean);
+    /** Lo que responde Mejora Continua. */
+    planesDeMejora?: number;
+  } = {},
+) {
+  const publicados: DomainEvent[] = [];
+  const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
+  const consultasEnUso: string[] = [];
+
+  const repo: RepositorioCriterioPort = {
     listar: async () => [criterio()],
     porId: async () => criterio(),
     codigoExiste: async () => false,
     crear: async (carreraId, codigo, nombre) => criterio({ carreraId, codigo, nombre }),
     actualizar: async (id, codigo, nombre) => criterio({ id, codigo, nombre }),
     cambiarEstado: async (id, activo) => criterio({ id, activo }),
-    impactoDeInactivar: async () => ({ planesMejoraVinculados: 0 }),
-    ...sobre,
+    ...opciones.repo,
   };
-}
 
-function capturarEventos(): { publicador: PublicadorDeEventos; vistos: DomainEvent[] } {
-  const vistos: DomainEvent[] = [];
-  return {
-    publicador: {
-      publicar: async (e) => {
-        vistos.push(...e);
-      },
+  const enUso: CriterioEnUsoPort = {
+    contarPlanesDeMejora: async (id) => {
+      consultasEnUso.push(id);
+      return opciones.planesDeMejora ?? 0;
     },
-    vistos,
   };
+
+  const permitido = opciones.permitido ?? true;
+  const autorizacion: AuthorizationPort = {
+    puede: async (_usuarioId, permiso, carreraId) => {
+      autorizaciones.push({ permiso, carreraId: carreraId ?? null });
+      const ok = typeof permitido === 'function' ? permitido(permiso) : permitido;
+      return ok ? { permitido: true } : { permitido: false, motivo: 'Falta el permiso.' };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+
+  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+
+  const caso = new GestionarCriterios(repo, enUso, autorizacion, eventos);
+  return { caso, publicados, autorizaciones, consultasEnUso };
 }
 
 describe('RF129 — registrar criterio de acreditación', () => {
   it('crea el criterio en la carrera indicada', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarCriterios(repo(), permitirTodo(), publicador);
+    const { caso, publicados } = montarCriterios();
 
     const creado = await caso.crear(ACTOR, 'car-1', 'C-02', 'Objetivos educacionales');
 
     expect(creado.codigo).toBe('C-02');
     expect(creado.carreraId).toBe('car-1');
-    expect(vistos).toHaveLength(1);
+    expect(publicados).toHaveLength(1);
   });
 
   it('rechaza un código repetido dentro de la misma carrera', async () => {
-    const caso = new GestionarCriterios(
-      repo({ codigoExiste: async () => true }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+    const { caso, publicados } = montarCriterios({ repo: { codigoExiste: async () => true } });
 
     await expect(caso.crear(ACTOR, 'car-1', 'C-01', 'Duplicado')).rejects.toThrow(
       ReglaDeNegocioViolada,
     );
+    expect(publicados).toHaveLength(0);
   });
 
   it('la unicidad se comprueba contra la carrera del criterio, no globalmente', async () => {
     let carreraConsultada = '';
-    const caso = new GestionarCriterios(
-      repo({
+    const { caso } = montarCriterios({
+      repo: {
         codigoExiste: async (carreraId) => {
           carreraConsultada = carreraId;
           return false;
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
     await caso.crear(ACTOR, 'car-7', 'C-01', 'Estudiantes');
 
@@ -122,51 +122,39 @@ describe('RF129 — registrar criterio de acreditación', () => {
   });
 
   it('exige el permiso de gestión', async () => {
-    const caso = new GestionarCriterios(repo(), denegar(), capturarEventos().publicador);
+    const { caso } = montarCriterios({ permitido: false });
 
     await expect(caso.crear(ACTOR, 'car-1', 'C-02', 'Objetivos')).rejects.toThrow(AccesoDenegado);
   });
 
   it('la autorización se pide con el alcance de la carrera', async () => {
-    // El Director gestiona «su carrera»: ese alcance lo aporta el tercer
+    // El Coordinador gestiona «su carrera»: ese alcance lo aporta el tercer
     // argumento. Pasar null aquí le daría acceso a los criterios de todas.
-    let alcance: string | null | undefined = 'no-invocado';
-    const autorizacion: AuthorizationPort = {
-      puede: async (_id, _permiso, carreraId) => {
-        alcance = carreraId;
-        return { permitido: true };
-      },
-      permisosDe: async () => new Set(),
-      carreraACargoDe: async () => null,
-      rolesDe: async () => [],
-    };
-    const caso = new GestionarCriterios(repo(), autorizacion, capturarEventos().publicador);
+    const { caso, autorizaciones } = montarCriterios();
 
     await caso.crear(ACTOR, 'car-7', 'C-01', 'Estudiantes');
 
-    expect(alcance).toBe('car-7');
+    expect(autorizaciones).toContainEqual({ permiso: 'criterio.gestionar', carreraId: 'car-7' });
   });
 });
 
 describe('RF130 — editar criterio', () => {
   it('RN1: no permite dejar el nombre vacío', async () => {
-    const caso = new GestionarCriterios(repo(), permitirTodo(), capturarEventos().publicador);
+    const { caso } = montarCriterios();
 
     await expect(caso.editar(ACTOR, 'cri-1', 'C-01', '   ')).rejects.toThrow(ReglaDeNegocioViolada);
   });
 
   it('el código propio no cuenta como duplicado', async () => {
     let recibido: string | undefined = 'no-invocado';
-    const caso = new GestionarCriterios(
-      repo({
+    const { caso } = montarCriterios({
+      repo: {
         codigoExiste: async (_carreraId, _codigo, exceptoId) => {
           recibido = exceptoId;
           return false;
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
     await caso.editar(ACTOR, 'cri-1', 'C-01', 'Estudiantes');
 
@@ -174,61 +162,63 @@ describe('RF130 — editar criterio', () => {
   });
 
   it('falla si el criterio no existe', async () => {
-    const caso = new GestionarCriterios(
-      repo({ porId: async () => null }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+    const { caso } = montarCriterios({ repo: { porId: async () => null } });
 
     await expect(caso.editar(ACTOR, 'cri-9', 'C-01', 'Estudiantes')).rejects.toThrow(NoEncontrado);
   });
 
   it('RN2: el cambio queda registrado', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarCriterios(repo(), permitirTodo(), publicador);
+    const { caso, publicados } = montarCriterios();
 
     await caso.editar(ACTOR, 'cri-1', 'C-01', 'Estudiantes y su progreso');
 
-    expect(vistos).toHaveLength(1);
-    expect(vistos[0]?.detalle).toContain('Estudiantes y su progreso');
+    expect(publicados).toHaveLength(1);
+    expect(publicados[0]?.detalle).toContain('Estudiantes y su progreso');
   });
 });
 
 describe('RF132 — inactivar criterio', () => {
   it('RN1: cambia el estado sin borrar', async () => {
-    const { publicador, vistos } = capturarEventos();
-    const caso = new GestionarCriterios(repo(), permitirTodo(), publicador);
+    const { caso, publicados } = montarCriterios();
 
     const cambiado = await caso.cambiarEstado(ACTOR, 'cri-1', false);
 
     expect(cambiado.activo).toBe(false);
-    expect(vistos[0]?.detalle).toContain('inactivado');
+    expect(publicados[0]?.detalle).toContain('inactivado');
   });
 
   it('no permite inactivar lo que ya está inactivo', async () => {
-    const caso = new GestionarCriterios(
-      repo({ porId: async () => criterio({ activo: false }) }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+    const { caso } = montarCriterios({ repo: { porId: async () => criterio({ activo: false }) } });
 
     await expect(caso.cambiarEstado(ACTOR, 'cri-1', false)).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  it('el impacto es el recuento de planes de mejora que da el puerto de uso', async () => {
+    const { caso, consultasEnUso } = montarCriterios({ planesDeMejora: 2 });
+
+    expect(await caso.impactoDeInactivar(ACTOR, 'cri-1')).toEqual({ planesMejoraVinculados: 2 });
+    expect(consultasEnUso).toEqual(['cri-1']);
+  });
+
+  it('el impacto de un criterio inexistente es NoEncontrado y no pregunta a Mejora Continua', async () => {
+    const { caso, consultasEnUso } = montarCriterios({ repo: { porId: async () => null } });
+
+    await expect(caso.impactoDeInactivar(ACTOR, 'cri-9')).rejects.toThrow(NoEncontrado);
+    expect(consultasEnUso).toEqual([]);
   });
 });
 
 describe('RF131 — listar por carrera', () => {
   it('pasa la carrera al repositorio', async () => {
     let recibida = '';
-    const caso = new GestionarCriterios(
-      repo({
+    const { caso } = montarCriterios({
+      repo: {
         listar: async (carreraId) => {
           recibida = carreraId;
           return [];
         },
-      }),
-      permitirTodo(),
-      capturarEventos().publicador,
-    );
+      },
+    });
 
     await caso.listar(ACTOR, 'car-7');
 

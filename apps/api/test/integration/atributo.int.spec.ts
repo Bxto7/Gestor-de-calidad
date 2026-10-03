@@ -15,8 +15,8 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { AtributoRepositoryPrisma } from '../../src/modules/atributos-graduado/infrastructure/persistence/atributos.repository.js';
-import { sembrarAtributosIcacit } from '../../src/modules/atributos-graduado/infrastructure/persistence/sembrar-atributos-icacit.js';
+import { AtributoRepositoryPrisma } from '../../src/modules/acreditacion/infrastructure/persistence/atributos.repository.js';
+import { sembrarAtributosIcacit } from '../../src/modules/acreditacion/infrastructure/persistence/sembrar-atributos-icacit.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();

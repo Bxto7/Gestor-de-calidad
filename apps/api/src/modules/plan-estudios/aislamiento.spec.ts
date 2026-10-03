@@ -1,15 +1,13 @@
 /**
- * El aislamiento en la dirección opuesta (2c-J-B, §4 del diseño).
+ * El aislamiento de `plan-estudios` hacia los demás módulos.
  *
- * `ImpactoPlanMejoraPort` (RF132) abre la primera dependencia circular de
- * primer nivel del proyecto: `mejora-continua → plan-estudios` ya existía
- * (`ContenidoCurricularPort`/`AcreditacionPort`); este puerto es
- * `plan-estudios → mejora-continua`. CLAUDE.md §3.2 sigue cumplido —se habla
- * por puerto, no se comparte tabla— pero necesita su propia guardia: la de
- * `mejora-continua/aislamiento.spec.ts` solo vigila lo que ese módulo
- * importa, no lo que `plan-estudios` importa de él.
+ * Hasta el Bloque 4 `plan-estudios` importaba de `mejora-continua` el puerto de
+ * impacto de planes de mejora (RF132) para sus criterios. Desde el Bloque 5 los
+ * criterios viven en `acreditacion` y este módulo ya no importa **nada** de
+ * `mejora-continua`: la dependencia circular de primer nivel desapareció con
+ * ellos.
  *
- * Mismo mecanismo que la guardia hermana: se escribe sobre el especificador
+ * Mismo mecanismo que las guardias hermanas: se escribe sobre el especificador
  * ya extraído y lleva su propio control positivo, para no repetir el fallo
  * real que dejó una regla comparando `[]` contra `[]` sin vigilar nada.
  */
@@ -20,9 +18,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const RAIZ = import.meta.dirname;
-
-/** Lo único que este módulo puede importar de Mejora Continua. */
-const PUERTO_PERMITIDO = 'ports/impacto-plan-mejora.port.js';
 
 const DE_MEJORA_CONTINUA = /(^|\/)mejora-continua\//;
 
@@ -51,16 +46,12 @@ function importsDe(raiz: string = RAIZ): { archivo: string; importado: string }[
 }
 
 describe('aislamiento de plan-estudios hacia mejora-continua', () => {
-  it('solo importa de mejora-continua el puerto de impacto de plan de mejora', () => {
-    const vistos = importsDe().filter(({ importado }) => DE_MEJORA_CONTINUA.test(importado));
-    const infractores = vistos
-      .filter(({ importado }) => !importado.endsWith(PUERTO_PERMITIDO))
+  it('no importa nada de mejora-continua', () => {
+    const infractores = importsDe()
+      .filter(({ importado }) => DE_MEJORA_CONTINUA.test(importado))
       .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);
-    // Control positivo: sin esto, un patrón que dejara de casar convertiría
-    // la regla en `[]` contra `[]` y seguiría en verde sin vigilar nada.
-    expect(vistos).not.toEqual([]);
   });
 
   it('reconoce un import prohibido escrito en relativo', () => {
@@ -125,22 +116,23 @@ describe('aislamiento de plan-estudios hacia objetivos-educacionales', () => {
   });
 });
 
-describe('aislamiento de plan-estudios hacia atributos-graduado', () => {
-  const DE_ATRIBUTOS = /(^|\/)atributos-graduado\//;
+describe('aislamiento de plan-estudios hacia acreditacion', () => {
+  const DE_ACREDITACION = /(^|\/)acreditacion\//;
 
-  it('no importa nada de atributos-graduado por TypeScript', () => {
+  // Por ahora no importa nada de `acreditacion`; la Tarea 3 añade el único
+  // puerto permitido (`plan-para-acreditacion.port.js`) y su control positivo.
+  it('no importa nada de acreditacion', () => {
     const infractores = importsDe()
-      .filter(({ importado }) => DE_ATRIBUTOS.test(importado))
+      .filter(({ importado }) => DE_ACREDITACION.test(importado))
       .map(({ archivo, importado }) => `${archivo} → ${importado}`);
 
     expect(infractores).toEqual([]);
   });
 
-  it('reconoce un import prohibido de atributos-graduado escrito en relativo', () => {
+  it('reconoce un import prohibido de acreditacion escrito en relativo', () => {
     expect(
-      DE_ATRIBUTOS.test(
-        '../../atributos-graduado/infrastructure/persistence/atributos.repository.js',
-      ),
+      DE_ACREDITACION.test('../../acreditacion/infrastructure/persistence/atributos.repository.js'),
     ).toBe(true);
+    expect(DE_ACREDITACION.test('./acreditacion-legacy.js')).toBe(false);
   });
 });

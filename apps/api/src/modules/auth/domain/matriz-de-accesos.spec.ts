@@ -179,3 +179,35 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
     expect(huerfanos).toEqual([]);
   });
 });
+
+describe('Módulo de los permisos de acreditación (RF-CH-026)', () => {
+  it('atributo.* y criterio.* pertenecen al módulo acreditacion', () => {
+    const modulos = new Map<string, string>(PERMISOS.map(([codigo, , modulo]) => [codigo, modulo]));
+    for (const permiso of [
+      'atributo.leer',
+      'atributo.gestionar',
+      'criterio.acceder',
+      'criterio.leer',
+      'criterio.gestionar',
+    ]) {
+      expect(modulos.get(permiso), permiso).toBe('acreditacion');
+    }
+  });
+
+  it('quién tiene qué no cambió: solo el Coordinador gestiona; el Consultor lee; el Docente solo lee criterios', () => {
+    const conPermiso = (permiso: string) =>
+      ROLES.filter((r) => r.permisos.includes(permiso))
+        .map((r) => r.codigo)
+        .sort();
+
+    expect(conPermiso('atributo.gestionar')).toEqual(['COORDINADOR_ACADEMICO']);
+    expect(conPermiso('criterio.gestionar')).toEqual(['COORDINADOR_ACADEMICO']);
+    expect(conPermiso('atributo.leer')).toEqual(['COORDINADOR_ACADEMICO', 'USUARIO_CONSULTOR']);
+    expect(conPermiso('criterio.leer')).toEqual([
+      'COORDINADOR_ACADEMICO',
+      'DOCENTE',
+      'USUARIO_CONSULTOR',
+    ]);
+    expect(conPermiso('criterio.acceder')).toEqual(['COORDINADOR_ACADEMICO', 'USUARIO_CONSULTOR']);
+  });
+});

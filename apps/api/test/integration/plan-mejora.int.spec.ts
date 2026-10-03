@@ -37,9 +37,9 @@ import { ConfiguracionEvaluacionRepositoryPrisma } from '../../src/modules/mejor
 import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
 import { AcademicoCrossModuloAdapter } from '../../src/modules/academico/infrastructure/academico-cross-modulo.adapter.js';
 import { CarreraRepositoryPrisma } from '../../src/modules/academico/infrastructure/persistence/academico.repository.js';
-import { AcreditacionAdapter } from '../../src/modules/plan-estudios/infrastructure/acreditacion-cross-modulo.adapter.js';
+import { AcreditacionAdapter } from '../../src/modules/acreditacion/infrastructure/acreditacion-cross-modulo.adapter.js';
 import { ContenidoCurricularAdapter } from '../../src/modules/plan-estudios/infrastructure/contenido-curricular.adapter.js';
-import { CriterioRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
+import { CriterioRepositoryPrisma } from '../../src/modules/acreditacion/infrastructure/persistence/criterio.repository.js';
 import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
 import { ObjetivosCrossModuloAdapter } from '../../src/modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
@@ -590,7 +590,7 @@ describe('RF-PJ-032 — los documentos', () => {
  * de puerto solo confirmaría que el doble responde lo que se le programó.
  */
 describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () => {
-  const criterios = new CriterioRepositoryPrisma(prisma, repo);
+  const criterios = new CriterioRepositoryPrisma(prisma);
   const objetivosRepo = new ObjetivoRepositoryPrisma(prisma);
   const acreditacion = new AcreditacionAdapter(criterios);
   const objetivos = new ObjetivosCrossModuloAdapter(objetivosRepo);

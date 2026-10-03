@@ -1,11 +1,9 @@
 /**
- * Puertos de las entidades de acreditación: criterios.
+ * Puertos de los criterios de acreditación.
  *
  * El criterio de acreditación pertenece a una carrera concreta y su código es
- * único dentro de ella (RF129). El atributo del graduado —catálogo del
- * **marco** (ICACIT, SINEACE…), compartido entre planes— se movió a su propio
- * módulo en la Fase 0d: ver
- * `atributos-graduado/application/ports/atributos.port.ts`.
+ * único dentro de ella (RF129). Los atributos del graduado tienen el suyo en
+ * `atributos.port.ts`.
  */
 
 /** Criterio de acreditación de una carrera (RF129–RF132). */
@@ -38,7 +36,6 @@ export interface RepositorioCriterioPort {
   crear(carreraId: string, codigo: string, nombre: string): Promise<DatosCriterio>;
   actualizar(id: string, codigo: string, nombre: string): Promise<DatosCriterio>;
   cambiarEstado(id: string, activo: boolean): Promise<DatosCriterio>;
-  impactoDeInactivar(id: string): Promise<ImpactoCriterio>;
 }
 
 export const REPOSITORIO_CRITERIO = Symbol('RepositorioCriterioPort');

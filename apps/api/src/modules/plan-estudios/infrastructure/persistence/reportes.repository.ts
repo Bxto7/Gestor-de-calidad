@@ -50,7 +50,7 @@ const TIPO: Readonly<Record<string, 'General' | 'Transversal' | 'Especialidad'>>
  * Excepción deliberada de aislamiento (Fases 0b/0c/0d, dashboard por rol):
  * esta clase consulta `Facultad`/`Carrera`/`Ciclo` (academico),
  * `ObjetivoEducacional` (objetivos-educacionales) y `AtributoGraduado`
- * (atributos-graduado) por Prisma directo en varios métodos —
+ * (acreditacion) por Prisma directo en varios métodos —
  * `buscarPlanes()`/`datosDePlan()` (join de carrera/facultad/ciclo) y
  * `panel()` (conteos, `groupBy`, listado de carreras sin plan vigente,
  * más los conteos de objetivo/atributo) — aunque las cuatro entidades
@@ -61,7 +61,7 @@ const TIPO: Readonly<Record<string, 'General' | 'Transversal' | 'Especialidad'>>
  * clase no se justificaba frente al beneficio, dado que la consulta
  * sigue siendo correcta (misma base de datos, mismo cliente Prisma).
  * Los tests de guardia de `academico`/`objetivos-educacionales`/
- * `atributos-graduado` no detectan esto a propósito — vigilan imports
+ * `acreditacion` no detectan esto a propósito — vigilan imports
  * de TypeScript, no consultas de Prisma.
  */
 @Injectable()

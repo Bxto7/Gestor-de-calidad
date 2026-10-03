@@ -49,13 +49,15 @@ function dondeEstado(activo: boolean | undefined) {
  * este repositorio sigue consultando `AtributoGraduado`/`CompetenciaAtributo`
  * por Prisma directo (`listar`, `porId`, `crear`, `actualizar`,
  * `cambiarEstado`, `cobertura`, `atributos`) aunque `AtributoGraduado`
- * vive en su propio módulo (`atributos-graduado`) desde esa fase. Aislar
+ * vive en su propio módulo (`acreditacion`, antes `atributos-graduado`) desde esa fase.
+ * Desde el Bloque 5 cada carrera tiene sus propios atributos: el filtro por
+ * carrera de estos métodos lo añade la Tarea 6. Aislar
  * esto de verdad exigiría refactorizar `GestionarCompetencias` entero
  * para resolver atributos vía un puerto cross-módulo en lote — decisión
  * consciente de no hacerlo: el costo de tocar código de Competencia que
  * funciona hoy no se justificaba frente al beneficio, dado que la
  * consulta sigue siendo correcta (misma base de datos, mismo cliente
- * Prisma). El test de guardia de `atributos-graduado` no detecta esto a
+ * Prisma). El test de guardia de `acreditacion` no detecta esto a
  * propósito — vigila imports de TypeScript, no consultas de Prisma.
  */
 @Injectable()

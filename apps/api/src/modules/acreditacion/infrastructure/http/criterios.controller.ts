@@ -3,8 +3,8 @@
  *
  * Los criterios cuelgan de la carrera al crearlos y listarlos —ahí es donde
  * pertenecen— y de la raíz al operar sobre uno concreto, que ya lleva su
- * carrera dentro. Los atributos del graduado se movieron a su propio módulo
- * en la Fase 0d: ver `atributos-graduado/infrastructure/http/atributos.controller.ts`.
+ * carrera dentro. Los atributos del graduado tienen el suyo en
+ * `atributos.controller.ts`.
  */
 
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
@@ -17,7 +17,7 @@ import {
   CambiarEstadoAcreditacionDto,
   DatosCriterioDto,
   FiltroAcreditacionDto,
-} from './dto/acreditacion.dto.js';
+} from './dto/criterios.dto.js';
 
 @ApiTags('Criterios de acreditación')
 @ApiBearerAuth()

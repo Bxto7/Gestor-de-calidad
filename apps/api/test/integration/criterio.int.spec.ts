@@ -8,13 +8,15 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { CriterioRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/criterio.repository.js';
+import { CriterioRepositoryPrisma } from '../../src/modules/acreditacion/infrastructure/persistence/criterio.repository.js';
 import { PlanMejoraRepositoryPrisma } from '../../src/modules/mejora-continua/mejora/infrastructure/persistence/plan-mejora.repository.js';
+import { CriterioEnUsoAdapter } from '../../src/modules/mejora-continua/mejora/infrastructure/criterio-en-uso.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
 const prisma = new PrismaService();
 const impactoPlanMejora = new PlanMejoraRepositoryPrisma(prisma);
-const criterios = new CriterioRepositoryPrisma(prisma, impactoPlanMejora);
+const criterios = new CriterioRepositoryPrisma(prisma);
+const enUso = new CriterioEnUsoAdapter(impactoPlanMejora);
 
 let carreraA: string;
 let carreraB: string;
@@ -112,7 +114,7 @@ describe('RF132 — inactivar', () => {
   it('el impacto es cero sin planes de mejora vinculados', async () => {
     const creado = await criterios.crear(carreraA, 'C-01', 'Estudiantes');
 
-    expect(await criterios.impactoDeInactivar(creado.id)).toEqual({ planesMejoraVinculados: 0 });
+    expect(await enUso.contarPlanesDeMejora(creado.id)).toBe(0);
   });
 
   it('2c-J-B: el impacto cuenta los planes de mejora reales vinculados (ImpactoPlanMejoraPort)', async () => {
@@ -154,8 +156,8 @@ describe('RF132 — inactivar', () => {
       planEvaluacionId: null,
     });
 
-    expect(await criterios.impactoDeInactivar(creado.id)).toEqual({ planesMejoraVinculados: 2 });
-    expect(await criterios.impactoDeInactivar(otro.id)).toEqual({ planesMejoraVinculados: 1 });
+    expect(await enUso.contarPlanesDeMejora(creado.id)).toBe(2);
+    expect(await enUso.contarPlanesDeMejora(otro.id)).toBe(1);
   });
 
   it('`onDelete: Restrict` impide borrar una carrera con criterios', async () => {
