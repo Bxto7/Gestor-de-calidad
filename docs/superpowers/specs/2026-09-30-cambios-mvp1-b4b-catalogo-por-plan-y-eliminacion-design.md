@@ -165,6 +165,7 @@
 - Tal como está permitiría vincular elementos de otra carrera y quitar vínculos sin las comprobaciones de §3.5. **Se retira**: endpoint, `GestionarPlanes.asociar`, `asociarObjetivos`/`asociarCompetencias` del puerto y del repositorio, y `asociarAlPlan`/`useAsociarAlPlan` de la web.
 - Sus pruebas (`plan.int.spec.ts:162-228`, `gestionar-planes.spec.ts`) se reescriben sobre §3.4, §3.5 y §3.8.
 
+- **Consecuencia aceptada:** sin este endpoint no se puede volver a vincular un elemento existente. Ver la limitación conocida en §5.
 ### 3.10 Web
 
 - **`ObjetivosPage` y `CompetenciasPage`:**
@@ -220,3 +221,4 @@ Son 11 tareas en un solo plan. Si hiciera falta partirlo, el corte natural es 4b
 - **`cargar-plan-isi-2018.ts`** hace upsert de `OE-01`… por código. Si alguien creó antes un `OE-01` desde la interfaz en otra carrera, el script lo sobrescribiría y le pondría la carrera ISI. Ya pasaba antes, pero ahora además cambia la carrera.
 - **Prerrequisitos no copiados en versión nueva** (`copiarContenido`): no se copian hoy y no entra en este bloque, pero conviene registrarlo.
 - **Tests de integración:** hacen `TRUNCATE` y solo se corren contra `sgc_test`. El E2E requiere `npm run e2e:preparar` y apagar el worker al terminar. `plan-mejora.int.spec.ts` ya falla en `main` y no pertenece a este bloque.
+- **Limitación conocida (decisión del 2 de octubre de 2026): no hay forma de volver a vincular a un plan un objetivo o una competencia que ya existe.** Al retirar `PUT /planes/:id/asociaciones` (§3.9), «Quitar del plan» elimina solo el vínculo cuando otro plan (por ejemplo el Vigente) todavía usa el registro. El registro sigue vivo, no hay botón para volver a vincularlo y crearlo de nuevo con el mismo nombre responde 409 por la unicidad por carrera. Si nadie más lo usa, el registro se borra y se puede crear otra vez sin problema, con un código nuevo. **Salida:** generar una nueva versión del plan, que copia los vínculos del Vigente (§3.8). Se descartó un endpoint «Vincular existente» para no ampliar el alcance del bloque; si la universidad lo pide, es un cambio acotado (caso de uso y botón, con las comprobaciones de §3.5). Lo mismo afecta a un Borrador generado antes del arreglo de `copiarContenido` (commit `254de49`), que quedó sin vínculos: solo puede existir en bases de desarrollo, porque ese arreglo no se había publicado.
