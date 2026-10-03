@@ -44,6 +44,9 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
   'plan.justificar',
   'asignatura.gestionar',
   'malla.editar',
+  // Bloque 4b (RF-CH-017): la competencia tiene carrera propia, la del plan en
+  // que se creó. Gestionarla es gestionar el plan de esa carrera.
+  'competencia.gestionar',
 
   // Mejora Continua, por la misma razón que los de arriba: el rol dice
   // «de su carrera». Los dos `.leer` quedan fuera a propósito, como los de

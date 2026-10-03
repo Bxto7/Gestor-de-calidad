@@ -27,9 +27,12 @@ export class ElementoCatalogoCreado extends DomainEvent {
     readonly entidadId: string,
     codigo: string,
     nombreElemento: string,
+    /** RF-CH-017: el plan en el que se creó, si se creó en uno. */
+    codigoPlan?: string,
   ) {
     super(actor);
-    this.detalle = `${ETIQUETA[entidad]} ${codigo} «${nombreElemento}» creado.`;
+    const enPlan = codigoPlan ? ` en el plan ${codigoPlan}` : '';
+    this.detalle = `${ETIQUETA[entidad]} ${codigo} «${nombreElemento}» creado${enPlan}.`;
   }
 }
 

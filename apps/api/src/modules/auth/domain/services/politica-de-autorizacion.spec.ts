@@ -114,12 +114,6 @@ describe('Lectura — no está acotada', () => {
   it('el consultor lee sin tener carrera asignada', () => {
     expect(puede(consultor, 'plan.leer', ISI).permitido).toBe(true);
   });
-
-  it('los permisos de catálogo no dependen de una carrera', () => {
-    // Objetivos y competencias son institucionales, no de una carrera.
-    expect(esPermisoAcotadoACarrera('competencia.gestionar')).toBe(false);
-    expect(puede(director(ISI), 'competencia.gestionar', null).permitido).toBe(true);
-  });
 });
 
 describe('Clasificación de permisos', () => {
@@ -135,6 +129,7 @@ describe('Clasificación de permisos', () => {
       'plan.justificar',
       'asignatura.gestionar',
       'malla.editar',
+      'competencia.gestionar',
     ]) {
       expect(esPermisoAcotadoACarrera(p), p).toBe(true);
     }
@@ -147,12 +142,24 @@ describe('Clasificación de permisos', () => {
       'facultad.leer',
       'carrera.leer',
       'objetivo.gestionar',
-      'competencia.gestionar',
       'reporte.generar',
       'auditoria.leer',
     ]) {
       expect(esPermisoAcotadoACarrera(p), p).toBe(false);
     }
+  });
+});
+
+describe('RF-CH-015 / RF-CH-017 — el catálogo de la carrera', () => {
+  it('competencia.gestionar se ejerce solo sobre la carrera que se dirige', () => {
+    // Desde el Bloque 4b cada competencia tiene carrera propia: gestionar la de
+    // otra carrera es lo mismo que editar el plan de otra carrera.
+    expect(puede(director(ISI), 'competencia.gestionar', ISI).permitido).toBe(true);
+    expect(puede(director(ISI), 'competencia.gestionar', IIN).permitido).toBe(false);
+  });
+
+  it('competencia.gestionar sin carrera no se concede: una fila sin carrera no la gestiona nadie', () => {
+    expect(puede(director(ISI), 'competencia.gestionar', null).permitido).toBe(false);
   });
 });
 

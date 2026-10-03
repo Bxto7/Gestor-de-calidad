@@ -1,5 +1,5 @@
 /**
- * Controller del catálogo institucional: competencias.
+ * Controller de competencias (con carrera propia desde el Bloque 4b).
  *
  * Cuelga de la raíz (`/competencias`) y no de un plan, porque eso es lo que
  * es: catálogo compartido por toda la universidad. Una misma competencia la
@@ -29,6 +29,8 @@ import { ActorActual } from '../../../auth/infrastructure/http/jwt.guard.js';
 import { GestionarCompetencias } from '../../application/use-cases/gestionar-catalogo.use-case.js';
 import {
   CambiarEstadoCatalogoDto,
+  CoberturaDto,
+  CrearCompetenciaDto,
   DatosCompetenciaDto,
   FiltroCatalogoDto,
 } from './dto/catalogo.dto.js';
@@ -43,8 +45,8 @@ export class CompetenciasController {
   @ApiOperation({
     summary: 'Listar competencias',
     description:
-      'RF042 y RF046. Cada fila trae por separado cuántos planes y cuántas ' +
-      'asignaturas la usan.',
+      'RF042, RF046 y RF-CH-017. Con planId, solo las del plan. Cada fila trae ' +
+      'por separado cuántos planes y cuántas asignaturas la usan.',
   })
   async listar(@ActorActual() actor: Actor, @Query() filtro: FiltroCatalogoDto) {
     return this.competencias.listar(actor, filtro);
@@ -71,8 +73,8 @@ export class CompetenciasController {
       'once, también los que no cubre ninguna: un atributo vacío es el hallazgo ' +
       'que una acreditación busca, y no aparecería recorriendo las competencias.',
   })
-  async cobertura(@ActorActual() actor: Actor) {
-    return this.competencias.cobertura(actor);
+  async cobertura(@ActorActual() actor: Actor, @Query() consulta: CoberturaDto) {
+    return this.competencias.cobertura(actor, consulta.planId);
   }
 
   @Get(':id')
@@ -84,12 +86,18 @@ export class CompetenciasController {
 
   @Post()
   @ApiOperation({
-    summary: 'Registrar una competencia',
-    description: 'RF040 y RF041. El código correlativo (CPE-01…) lo genera el sistema.',
+    summary: 'Registrar una competencia dentro de un plan',
+    description:
+      'RF040, RF041 y RF-CH-017. El código correlativo (CPE-01…) lo genera el sistema; ' +
+      'la carrera es la del plan, y la competencia queda vinculada a él.',
   })
-  @ApiResponse({ status: 409, description: 'Ya existe otra competencia con ese nombre.' })
-  async crear(@ActorActual() actor: Actor, @Body() dto: DatosCompetenciaDto) {
-    return this.competencias.crear(actor, dto.nombre, dto.atributoIds ?? []);
+  @ApiResponse({ status: 404, description: 'El plan no existe o no es de tu carrera.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Ya existe otra con ese nombre en la carrera, o el plan no admite cambios.',
+  })
+  async crear(@ActorActual() actor: Actor, @Body() dto: CrearCompetenciaDto) {
+    return this.competencias.crear(actor, dto.planId, dto.nombre, dto.atributoIds ?? []);
   }
 
   @Patch(':id')

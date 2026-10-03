@@ -651,12 +651,20 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
     },
     {
       provide: GestionarCompetencias,
-      inject: [REPOSITORIO_COMPETENCIA, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [
+        REPOSITORIO_COMPETENCIA,
+        REPOSITORIO_PLAN,
+        AUTHORIZATION_PORT,
+        PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         competencias: RepositorioCompetenciaPort,
+        planes: RepositorioPlanPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarCompetencias(competencias, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarCompetencias(competencias, planes, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarAtributos,

@@ -1,20 +1,22 @@
 /**
- * Casos de uso del catálogo institucional (RF033–RF046).
+ * Casos de uso de competencias (RF040–RF046, RF-CH-017).
  *
- * Objetivos educacionales y competencias son catálogos globales: su gestión no
- * está acotada a una carrera, a diferencia de las asignaturas. Por eso la
- * autorización se pide sin carrera.
+ * Desde el Bloque 4b cada competencia tiene **carrera propia**: la del plan en
+ * el que se creó. Se crea siempre dentro de un plan, el listado se acota al
+ * plan o al alcance de lectura del usuario, y `competencia.gestionar` está
+ * acotado a la carrera: crear se autoriza contra la del plan; editar,
+ * inactivar y el borrado raíz, contra la de la fila.
  *
- * Los dos comparten una decisión que conviene entender junta: **inactivar y
- * eliminar no son lo mismo**.
+ * Inactivar y eliminar siguen sin ser lo mismo:
  *
- *  - RF037 y RF044 describen inactivar: el registro se conserva, y con él el
- *    histórico de los planes que ya lo usaban. Es el camino normal.
- *  - RF038 y RF045 permiten eliminar, pero solo lo que no tiene ni un vínculo.
- *    Sirve para deshacer un alta equivocada, no para retirar algo en uso.
+ *  - RF044 describe inactivar: el registro se conserva, y con él el histórico
+ *    de los planes que ya lo usaban. Es el camino normal.
+ *  - RF045 permite eliminar por la raíz solo lo que no tiene ni un vínculo.
  *
- * La combinación protege el histórico sin obligar a arrastrar para siempre una
- * fila creada por error: si nunca se usó, no hay histórico que proteger.
+ * Orden de comprobación de toda operación: permiso de lectura (sin carrera);
+ * existencia y alcance —fuera de él responde NoEncontrado, como si no
+ * existiera (RF-CH-009)—; permiso de gestión acotado a la carrera; y, al
+ * escribir en un plan, que el plan admita cambios.
  */
 
 import type {
@@ -26,7 +28,9 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../auth/application/ports/authorization.port.js';
+import type { PlanDeEstudios } from '../../domain/entities/plan-de-estudios.js';
 import {
   ElementoCatalogoCreado,
   ElementoCatalogoEditado,
@@ -38,9 +42,9 @@ import type {
   CoberturaAtributo,
   DatosAtributo,
   DatosCompetencia,
-  FiltroCatalogo,
   RepositorioCompetenciaPort,
 } from '../ports/catalogo.port.js';
+import type { RepositorioPlanPort } from '../ports/repositorios.port.js';
 
 /**
  * Marco de acreditación vigente (§1).
@@ -50,25 +54,51 @@ import type {
  */
 const MARCO_VIGENTE = 'ICACIT';
 
-/* ── Competencias ─────────────────────────────────────────────────────── */
+/** Lo que se puede pedir al listar. La carrera no: la decide el alcance. */
+export interface ConsultaCompetencias {
+  readonly texto?: string;
+  readonly activo?: boolean;
+  /** RF-CH-017: solo las vinculadas a este plan. */
+  readonly planId?: string;
+}
 
 export class GestionarCompetencias {
   constructor(
     private readonly competencias: RepositorioCompetenciaPort,
+    private readonly planes: RepositorioPlanPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
-  /** RF042 y RF046. */
-  async listar(actor: Actor, filtro?: FiltroCatalogo): Promise<DatosCompetencia[]> {
-    await exigir(this.autorizacion, actor, 'competencia.leer');
-    return this.competencias.listar(filtro);
+  /**
+   * RF042, RF046 y RF-CH-017.
+   *
+   * Con `planId`: solo las del plan, si existe y su carrera entra en el
+   * alcance. Sin `planId`: quien lee solo su carrera recibe las de su carrera
+   * (ninguna si no tiene carrera asignada); los demás, el catálogo entero, que
+   * es lo que leen los selectores de Mejora Continua.
+   */
+  async listar(actor: Actor, consulta: ConsultaCompetencias = {}): Promise<DatosCompetencia[]> {
+    await this.exigir(actor, 'competencia.leer', null);
+    const { texto, activo, planId } = consulta;
+
+    if (planId) {
+      await this.planLegible(actor, planId);
+      return this.competencias.listar({ texto, activo, planId });
+    }
+
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    if (alcance.tipo === 'TODAS') return this.competencias.listar({ texto, activo });
+    if (alcance.carreraId === null) return [];
+    return this.competencias.listar({ texto, activo, carreraId: alcance.carreraId });
   }
 
   async porId(actor: Actor, id: string): Promise<DatosCompetencia> {
-    await exigir(this.autorizacion, actor, 'competencia.leer');
+    await this.exigir(actor, 'competencia.leer', null);
     const competencia = await this.competencias.porId(id);
     if (!competencia) throw new NoEncontrado('la competencia', id);
+    await this.exigirAlcanceDeFila(actor, competencia.carreraId, id);
     return competencia;
   }
 
@@ -79,36 +109,57 @@ export class GestionarCompetencias {
    * lista no habría forma de mapear nada sin escribir el código a mano.
    */
   async atributos(actor: Actor): Promise<DatosAtributo[]> {
-    await exigir(this.autorizacion, actor, 'competencia.leer');
+    await this.exigir(actor, 'competencia.leer', null);
     return this.competencias.atributos(MARCO_VIGENTE);
   }
 
   /**
    * Cobertura del marco: qué atributo desarrolla cada competencia y cuál no
-   * desarrolla ninguna (§6.2).
+   * desarrolla ninguna (§6.2). Con `planId`, la del plan (RF-CH-017).
    *
-   * Es la vista que pide una acreditación. Se devuelven todos los atributos,
-   * también los vacíos, porque el hallazgo que importa es el que falta.
+   * Se devuelven todos los atributos, también los vacíos, porque el hallazgo
+   * que importa es el que falta.
    */
-  async cobertura(actor: Actor): Promise<CoberturaAtributo[]> {
-    await exigir(this.autorizacion, actor, 'competencia.leer');
-    return this.competencias.cobertura(MARCO_VIGENTE);
+  async cobertura(actor: Actor, planId?: string): Promise<CoberturaAtributo[]> {
+    await this.exigir(actor, 'competencia.leer', null);
+    if (planId) await this.planLegible(actor, planId);
+    return this.competencias.cobertura(MARCO_VIGENTE, planId);
   }
 
-  /** RF040 y RF041. La competencia solo lleva nombre; no tiene descripción. */
+  /**
+   * RF040, RF041 y RF-CH-017 RN1: se crea dentro del plan, con su carrera, y
+   * queda vinculada a él. La competencia solo lleva nombre; no tiene descripción.
+   */
   async crear(
     actor: Actor,
+    planId: string,
     nombre: string,
     atributoIds: readonly string[] = [],
   ): Promise<DatosCompetencia> {
-    await exigir(this.autorizacion, actor, 'competencia.gestionar');
-    const limpio = await this.validar(nombre);
+    await this.exigir(actor, 'competencia.leer', null);
+    const plan = await this.planLegible(actor, planId);
+    await this.exigir(actor, 'competencia.gestionar', plan.carreraId);
+    exigirEditable(plan);
 
+    const limpio = await this.validar(nombre, plan.carreraId);
     const codigo = siguienteCodigoCompetencia(await this.competencias.codigos());
-    const creada = await this.competencias.crear(codigo, limpio, sinRepetir(atributoIds));
+    const creada = await this.competencias.crearEnPlan(
+      plan.id,
+      plan.carreraId,
+      codigo,
+      limpio,
+      sinRepetir(atributoIds),
+    );
 
     await this.eventos.publicar([
-      new ElementoCatalogoCreado(actor, 'Competencia', creada.id, creada.codigo, creada.nombre),
+      new ElementoCatalogoCreado(
+        actor,
+        'Competencia',
+        creada.id,
+        creada.codigo,
+        creada.nombre,
+        plan.codigo,
+      ),
     ]);
     return creada;
   }
@@ -120,12 +171,9 @@ export class GestionarCompetencias {
     nombre: string,
     atributoIds: readonly string[] = [],
   ): Promise<DatosCompetencia> {
-    await exigir(this.autorizacion, actor, 'competencia.gestionar');
+    const actual = await this.filaGestionable(actor, id);
 
-    const actual = await this.competencias.porId(id);
-    if (!actual) throw new NoEncontrado('la competencia', id);
-
-    const limpio = await this.validar(nombre, id);
+    const limpio = await this.validar(nombre, actual.carreraId, id);
     const editada = await this.competencias.actualizar(id, limpio, sinRepetir(atributoIds));
 
     await this.eventos.publicar([
@@ -153,10 +201,7 @@ export class GestionarCompetencias {
    * reescribiría planes ya cerrados.
    */
   async cambiarEstado(actor: Actor, id: string, activa: boolean): Promise<DatosCompetencia> {
-    await exigir(this.autorizacion, actor, 'competencia.gestionar');
-
-    const actual = await this.competencias.porId(id);
-    if (!actual) throw new NoEncontrado('la competencia', id);
+    const actual = await this.filaGestionable(actor, id);
 
     const cambiada = await this.competencias.cambiarEstado(id, activa);
 
@@ -173,12 +218,9 @@ export class GestionarCompetencias {
     return cambiada;
   }
 
-  /** RF045: solo si no la usa ninguna asignatura ni ningún plan. */
+  /** RF045: borrado raíz, solo si no la usa ninguna asignatura ni ningún plan. */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    await exigir(this.autorizacion, actor, 'competencia.gestionar');
-
-    const actual = await this.competencias.porId(id);
-    if (!actual) throw new NoEncontrado('la competencia', id);
+    const actual = await this.filaGestionable(actor, id);
 
     const total = actual.planesVinculados + actual.asignaturasVinculadas;
     if (total > 0) {
@@ -201,30 +243,76 @@ export class GestionarCompetencias {
     await this.competencias.eliminar(id);
   }
 
-  private async validar(nombre: string, idIgnorado?: string): Promise<string> {
+  /* ── Apoyo ──────────────────────────────────────────────────────────── */
+
+  /** Lectura, existencia, alcance y gestión sobre la carrera de la fila. */
+  private async filaGestionable(actor: Actor, id: string): Promise<DatosCompetencia> {
+    await this.exigir(actor, 'competencia.leer', null);
+    const actual = await this.competencias.porId(id);
+    if (!actual) throw new NoEncontrado('la competencia', id);
+    await this.exigirAlcanceDeFila(actor, actual.carreraId, id);
+    // Una fila sin carrera (heredada) llega aquí con `null`, y la política
+    // deniega un permiso acotado sin carrera: nadie la gestiona.
+    await this.exigir(actor, 'competencia.gestionar', actual.carreraId);
+    return actual;
+  }
+
+  /** El plan existe y su carrera entra en el alcance; si no, NoEncontrado. */
+  private async planLegible(actor: Actor, planId: string): Promise<PlanDeEstudios> {
+    const plan = await this.planes.porId(planId);
+    if (!plan || !(await this.alcance.puedeLeerCarrera(actor.id, plan.carreraId))) {
+      throw new NoEncontrado('el plan de estudios', planId);
+    }
+    return plan;
+  }
+
+  /**
+   * RF-CH-009: una fila de otra carrera responde NoEncontrado. Una fila sin
+   * carrera solo la ve quien no tiene restricción de lectura.
+   */
+  private async exigirAlcanceDeFila(
+    actor: Actor,
+    carreraId: string | null,
+    id: string,
+  ): Promise<void> {
+    const visible =
+      carreraId === null
+        ? (await this.alcance.alcanceDeLectura(actor.id)).tipo === 'TODAS'
+        : await this.alcance.puedeLeerCarrera(actor.id, carreraId);
+    if (!visible) throw new NoEncontrado('la competencia', id);
+  }
+
+  private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
+    const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
+    if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+  }
+
+  private async validar(
+    nombre: string,
+    carreraId: string | null,
+    idIgnorado?: string,
+  ): Promise<string> {
     const limpio = limpiarNombre(nombre);
 
     // RF040 RN1: el nombre es obligatorio.
     if (!limpio) throw new ReglaDeNegocioViolada('El nombre de la competencia es obligatorio.');
 
-    if (await this.competencias.existeNombre(limpio, idIgnorado)) {
-      throw new ReglaDeNegocioViolada('Ya existe otra competencia con ese nombre.');
+    // RF-CH-017: único dentro de la carrera, no en toda la universidad.
+    if (await this.competencias.existeNombre(limpio, carreraId, idIgnorado)) {
+      throw new ReglaDeNegocioViolada('Ya existe otra competencia con ese nombre en la carrera.');
     }
     return limpio;
   }
 }
 
-/**
- * El catálogo es institucional: se pide sin carrera, igual que la estructura
- * académica. Un objetivo o una competencia sirven a toda la universidad.
- */
-async function exigir(
-  autorizacion: AuthorizationPort,
-  actor: Actor,
-  permiso: string,
-): Promise<void> {
-  const decision = await autorizacion.puede(actor.id, permiso, null);
-  if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+/** RF027: lo que cuelga del plan solo cambia con el plan en Borrador o En revisión. */
+function exigirEditable(plan: PlanDeEstudios): void {
+  if (!plan.esEditable) {
+    throw new ReglaDeNegocioViolada(
+      `El plan está en estado ${plan.estado} y no admite cambios. ` +
+        'Genera una nueva versión para modificarlo.',
+    );
+  }
 }
 
 /**

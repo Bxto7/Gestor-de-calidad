@@ -286,11 +286,15 @@ export async function listarCompetencias(): Promise<Competencia[]> {
   return (await cliente.get<CompetenciaApi[]>('/competencias')).map(aCompetencia);
 }
 
+/** RF-CH-017: se crea dentro del plan, que le da su carrera y la vincula. */
 export async function crearCompetencia(
+  planId: string,
   nombre: string,
   atributoIds: readonly string[] = [],
 ): Promise<Competencia> {
-  return aCompetencia(await cliente.post<CompetenciaApi>('/competencias', { nombre, atributoIds }));
+  return aCompetencia(
+    await cliente.post<CompetenciaApi>('/competencias', { planId, nombre, atributoIds }),
+  );
 }
 
 export async function editarCompetencia(

@@ -194,7 +194,7 @@ const CASOS: readonly Caso[] = [
     nombre: 'crear una competencia',
     preparar: () => vi.spyOn(api, 'crearCompetencia').mockResolvedValue(COMPETENCIA),
     useEjecutar: () => {
-      const m = useCrearCompetencia();
+      const m = useCrearCompetencia('p1');
       return () => m.mutateAsync({ nombre: 'Competencia', atributoIds: [] });
     },
   },

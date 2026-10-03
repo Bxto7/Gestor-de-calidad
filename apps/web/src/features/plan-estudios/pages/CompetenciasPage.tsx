@@ -264,6 +264,7 @@ export function CompetenciasPage() {
       {(creando || editando !== null) && (
         <ModalCompetencia
           competencia={editando}
+          planId={planId}
           onCerrar={() => {
             setCreando(false);
             setEditando(null);
@@ -275,9 +276,11 @@ export function CompetenciasPage() {
 }
 
 function ModalCompetencia({
+  planId,
   competencia,
   onCerrar,
 }: {
+  planId: string;
   competencia: Competencia | null;
   onCerrar: () => void;
 }) {
@@ -290,7 +293,7 @@ function ModalCompetencia({
   const [error, setError] = useState<string | null>(null);
 
   const { data: atributos } = useAtributos();
-  const crear = useCrearCompetencia();
+  const crear = useCrearCompetencia(planId);
   const editar = useEditarCompetencia();
   const guardando = crear.isPending || editar.isPending;
 

@@ -1,5 +1,13 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
+import type {
+  Actor,
+  PublicadorDeEventos,
+} from '../../src/shared-kernel/domain-events/domain-event.js';
+import { NoEncontrado } from '../../src/shared-kernel/errors/errores.js';
+import { GestionarCompetencias } from '../../src/modules/plan-estudios/application/use-cases/gestionar-catalogo.use-case.js';
+import { CompetenciaRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/catalogo.repository.js';
+import { PlanRepositoryPrisma } from '../../src/modules/plan-estudios/infrastructure/persistence/plan.repository.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 
@@ -107,5 +115,95 @@ describe('AuthorizationAdapter.puedeLeerCarrera', () => {
     const consultor = await crearUsuario('con@x.pe', 'USUARIO_CONSULTOR', null);
 
     expect(await adaptador.puedeLeerCarrera(consultor.id, sis)).toBe(true);
+  });
+});
+
+/* ── Bloque 4b: el catálogo según el alcance (RF-CH-015 a 018) ─────────── */
+
+const sinBitacora: PublicadorDeEventos = { publicar: async () => undefined };
+
+function como(usuario: { id: string }): Actor {
+  return { id: usuario.id, nombre: 'Usuario de prueba' };
+}
+
+async function planDe(carreraId: string, codigo: string): Promise<string> {
+  const p = await prisma.planEstudios.create({
+    data: { carreraId, codigo, version: 1, estado: 'BORRADOR', duracionAnios: 5 },
+  });
+  return p.id;
+}
+
+async function competenciaEn(
+  codigo: string,
+  carreraId: string | null,
+  planId?: string,
+): Promise<string> {
+  const c = await prisma.competencia.create({
+    data: {
+      codigo,
+      nombre: `Competencia ${codigo}`,
+      carreraId,
+      ...(planId ? { planes: { create: { planId } } } : {}),
+    },
+  });
+  return c.id;
+}
+
+function gestionarCompetencias(): GestionarCompetencias {
+  return new GestionarCompetencias(
+    new CompetenciaRepositoryPrisma(prisma),
+    new PlanRepositoryPrisma(prisma),
+    adaptador,
+    sinBitacora,
+    adaptador,
+  );
+}
+
+describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', () => {
+  it('el Director lista sin planId solo las de su carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    await competenciaEn('CPE-01', sis);
+    await competenciaEn('CPE-02', civ);
+    await competenciaEn('CPE-03', null);
+
+    const r = await gestionarCompetencias().listar(como(director));
+    expect(r.map((c) => c.codigo)).toEqual(['CPE-01']);
+  });
+
+  it('el Director recibe NoEncontrado al pedir las de un plan de otra carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const planCiv = await planDe(civ, 'PE-CIV-2026-v1');
+    await competenciaEn('CPE-02', civ, planCiv);
+
+    await expect(
+      gestionarCompetencias().listar(como(director), { planId: planCiv }),
+    ).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('el Director recibe NoEncontrado al leer por id una competencia de otra carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const ajena = await competenciaEn('CPE-02', civ);
+
+    await expect(gestionarCompetencias().porId(como(director), ajena)).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('el Coordinador sin planId recibe el catálogo entero, también las filas sin carrera', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
+    await competenciaEn('CPE-01', sis);
+    await competenciaEn('CPE-02', civ);
+    await competenciaEn('CPE-03', null);
+
+    const r = await gestionarCompetencias().listar(como(coordinador));
+    expect(r.map((c) => c.codigo)).toEqual(['CPE-01', 'CPE-02', 'CPE-03']);
   });
 });

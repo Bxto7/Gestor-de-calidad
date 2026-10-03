@@ -23,6 +23,7 @@ const competencias = new CompetenciaRepositoryPrisma(prisma);
 
 let planId: string;
 let otroPlanId: string;
+let carreraId: string;
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
@@ -43,6 +44,7 @@ beforeEach(async () => {
   const carrera = await prisma.carrera.create({
     data: { facultadId: facultad.id, nombre: 'Sistemas', codigo: 'ISI', duracionAnios: 2 },
   });
+  carreraId = carrera.id;
 
   const plan = await prisma.planEstudios.create({
     data: {
@@ -88,6 +90,46 @@ async function asignatura(codigo: string, competenciaIds: string[] = []): Promis
   return a.id;
 }
 
+/**
+ * Una competencia creada directamente, sin plan ni carrera. El repositorio ya
+ * no tiene alta suelta (RF-CH-017 crea siempre dentro de un plan), y estas
+ * pruebas miden recuentos y búsquedas que no dependen de dónde se creó.
+ */
+async function competenciaSuelta(
+  codigo: string,
+  nombre: string,
+  atributoIds: readonly string[] = [],
+) {
+  const fila = await prisma.competencia.create({
+    data: {
+      codigo,
+      nombre,
+      atributos: { create: atributoIds.map((atributoId) => ({ atributoId })) },
+    },
+  });
+  const datos = await competencias.porId(fila.id);
+  if (!datos) throw new Error(`No se pudo releer la competencia ${codigo}.`);
+  return datos;
+}
+
+/** Una carrera más, con un plan en Borrador. */
+async function otraCarreraConPlan(): Promise<{ carrera: string; plan: string }> {
+  const facultad = await prisma.facultad.create({ data: { nombre: 'Ingeniería Civil' } });
+  const carrera = await prisma.carrera.create({
+    data: { facultadId: facultad.id, nombre: 'Civil', codigo: 'CIV', duracionAnios: 2 },
+  });
+  const plan = await prisma.planEstudios.create({
+    data: {
+      carreraId: carrera.id,
+      codigo: 'PE-CIV-2026-v1',
+      version: 1,
+      estado: 'BORRADOR',
+      duracionAnios: 2,
+    },
+  });
+  return { carrera: carrera.id, plan: plan.id };
+}
+
 describe('Unicidad de código', () => {
   it('el código del objetivo es único en todo el sistema', async () => {
     await objetivos.crear('OE-01', 'Primero', 'Descripción.');
@@ -95,14 +137,14 @@ describe('Unicidad de código', () => {
   });
 
   it('el de la competencia también', async () => {
-    await competencias.crear('CPE-01', 'Primera', []);
-    await expect(competencias.crear('CPE-01', 'Segunda', [])).rejects.toThrow();
+    await competenciaSuelta('CPE-01', 'Primera', []);
+    await expect(competenciaSuelta('CPE-01', 'Segunda', [])).rejects.toThrow();
   });
 
   it('objetivo y competencia no comparten espacio de códigos', async () => {
     // Prefijos distintos, tablas distintas: no hay colisión posible.
     await objetivos.crear('OE-01', 'Objetivo', 'Descripción.');
-    await expect(competencias.crear('CPE-01', 'Competencia', [])).resolves.toBeTruthy();
+    await expect(competenciaSuelta('CPE-01', 'Competencia', [])).resolves.toBeTruthy();
   });
 });
 
@@ -162,7 +204,7 @@ describe('RF038 — recuento de vínculos del objetivo', () => {
 
 describe('RF045 — recuento de vínculos de la competencia', () => {
   it('separa planes de asignaturas', async () => {
-    const creada = await competencias.crear('CPE-01', 'Competencia', []);
+    const creada = await competenciaSuelta('CPE-01', 'Competencia', []);
     await prisma.planCompetencia.create({ data: { planId, competenciaId: creada.id } });
     await asignatura('ISI-101', [creada.id]);
     await asignatura('ISI-102', [creada.id]);
@@ -173,21 +215,21 @@ describe('RF045 — recuento de vínculos de la competencia', () => {
   });
 
   it('la base impide borrar una usada por una asignatura', async () => {
-    const creada = await competencias.crear('CPE-01', 'Competencia', []);
+    const creada = await competenciaSuelta('CPE-01', 'Competencia', []);
     await asignatura('ISI-101', [creada.id]);
 
     await expect(competencias.eliminar(creada.id)).rejects.toThrow();
   });
 
   it('la base impide borrar una usada por un plan', async () => {
-    const creada = await competencias.crear('CPE-01', 'Competencia', []);
+    const creada = await competenciaSuelta('CPE-01', 'Competencia', []);
     await prisma.planCompetencia.create({ data: { planId, competenciaId: creada.id } });
 
     await expect(competencias.eliminar(creada.id)).rejects.toThrow();
   });
 
   it('borrar una sin usar funciona', async () => {
-    const creada = await competencias.crear('CPE-01', 'Competencia', []);
+    const creada = await competenciaSuelta('CPE-01', 'Competencia', []);
     await competencias.eliminar(creada.id);
     expect(await competencias.porId(creada.id)).toBeNull();
   });
@@ -196,7 +238,7 @@ describe('RF045 — recuento de vínculos de la competencia', () => {
     // Retirar el vínculo reescribiría planes ya cerrados. Lo que impide
     // inactivarla es vincularla a asignaturas NUEVAS, y eso lo filtra
     // `competenciasValidas` del repositorio de asignaturas.
-    const creada = await competencias.crear('CPE-01', 'Competencia', []);
+    const creada = await competenciaSuelta('CPE-01', 'Competencia', []);
     const asigId = await asignatura('ISI-101', [creada.id]);
 
     await competencias.cambiarEstado(creada.id, false);
@@ -211,9 +253,9 @@ describe('RF045 — recuento de vínculos de la competencia', () => {
 
 describe('RF039 / RF046 — búsqueda', () => {
   beforeEach(async () => {
-    await competencias.crear('CPE-01', 'Resolver problemas de ingeniería', []);
-    await competencias.crear('CPE-02', 'Diseñar sistemas de software', []);
-    await competencias.crear('CPE-03', 'Comunicarse con eficacia', []);
+    await competenciaSuelta('CPE-01', 'Resolver problemas de ingeniería', []);
+    await competenciaSuelta('CPE-02', 'Diseñar sistemas de software', []);
+    await competenciaSuelta('CPE-03', 'Comunicarse con eficacia', []);
   });
 
   it('RN1: busca por nombre', async () => {
@@ -234,7 +276,7 @@ describe('RF039 / RF046 — búsqueda', () => {
     // Misma limitación que en asignaturas: `mode: 'insensitive'` de Prisma no
     // ignora diacríticos. Resolverlo pide `unaccent` en la base, que es una
     // migración, no un cambio de consulta.
-    await competencias.crear('CPE-04', 'Aplicar métodos numéricos', []);
+    await competenciaSuelta('CPE-04', 'Aplicar métodos numéricos', []);
     expect(await competencias.listar({ texto: 'métodos' })).toHaveLength(1);
     expect(await competencias.listar({ texto: 'metodos' })).toHaveLength(0);
   });
@@ -272,7 +314,7 @@ describe('Unicidad de nombre', () => {
     // Son catálogos distintos: que un objetivo y una competencia se llamen
     // parecido es normal y no debe bloquearse.
     await objetivos.crear('OE-01', 'Resolver problemas', 'Descripción.');
-    await expect(competencias.crear('CPE-01', 'Resolver problemas', [])).resolves.toBeTruthy();
+    await expect(competenciaSuelta('CPE-01', 'Resolver problemas', [])).resolves.toBeTruthy();
   });
 });
 
@@ -296,7 +338,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
   });
 
   it('una competencia mapeada devuelve su atributo', async () => {
-    const creada = await competencias.crear('CPE-01', 'Resolver problemas', [
+    const creada = await competenciaSuelta('CPE-01', 'Resolver problemas', [
       await atributo('AG-I08'),
     ]);
     expect((await competencias.porId(creada.id))?.atributos).toMatchObject([
@@ -307,7 +349,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
   it('una competencia puede desarrollar varios atributos a la vez', async () => {
     // No es un caso hipotético: en la matriz del plan 2018, «Aprendizaje
     // autónomo» responde a AG-I06 y AG-I08 juntos.
-    const creada = await competencias.crear('CPE-01', 'Aprendizaje autónomo', [
+    const creada = await competenciaSuelta('CPE-01', 'Aprendizaje autónomo', [
       await atributo('AG-I06'),
       await atributo('AG-I08'),
     ]);
@@ -316,12 +358,12 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
   });
 
   it('una competencia sin mapear devuelve lista vacía, no un error', async () => {
-    const creada = await competencias.crear('CPE-01', 'Sin mapear', []);
+    const creada = await competenciaSuelta('CPE-01', 'Sin mapear', []);
     expect((await competencias.porId(creada.id))?.atributos).toEqual([]);
   });
 
   it('editar puede retirar el mapeo', async () => {
-    const creada = await competencias.crear('CPE-01', 'Con mapeo', [await atributo('AG-I08')]);
+    const creada = await competenciaSuelta('CPE-01', 'Con mapeo', [await atributo('AG-I08')]);
     const editada = await competencias.actualizar(creada.id, 'Con mapeo', []);
     expect(editada.atributos).toEqual([]);
   });
@@ -329,7 +371,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
   it('editar reemplaza el conjunto entero, no lo acumula', async () => {
     // Si `actualizar` añadiera en vez de reemplazar, quitar un atributo sería
     // imposible desde la interfaz y el mapeo solo podría crecer.
-    const creada = await competencias.crear('CPE-01', 'Cambia de atributo', [
+    const creada = await competenciaSuelta('CPE-01', 'Cambia de atributo', [
       await atributo('AG-I06'),
       await atributo('AG-I08'),
     ]);
@@ -352,15 +394,15 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
       // En el plan 2018 pasa tres veces: AG-I01, AG-I05 y AG-I06 los cubren dos
       // competencias cada uno.
       const ag = await atributo('AG-I06');
-      await competencias.crear('CPE-01', 'Aprendizaje autónomo', [ag]);
-      await competencias.crear('CPE-05', 'Gestión de TIC', [ag]);
+      await competenciaSuelta('CPE-01', 'Aprendizaje autónomo', [ag]);
+      await competenciaSuelta('CPE-05', 'Gestión de TIC', [ag]);
 
       const fila = (await competencias.cobertura('ICACIT')).find((a) => a.codigo === 'AG-I06');
       expect(fila?.competencias.map((c) => c.codigo)).toEqual(['CPE-01', 'CPE-05']);
     });
 
     it('deja vacíos los atributos que nadie cubre', async () => {
-      await competencias.crear('CPE-01', 'Solo uno', [await atributo('AG-I08')]);
+      await competenciaSuelta('CPE-01', 'Solo uno', [await atributo('AG-I08')]);
 
       const sinCubrir = (await competencias.cobertura('ICACIT'))
         .filter((a) => a.competencias.length === 0)
@@ -373,9 +415,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
     it('una competencia inactiva deja de cubrir su atributo', async () => {
       // Cubrir un atributo con una competencia retirada sería declarar una
       // cobertura que el plan ya no ofrece.
-      const creada = await competencias.crear('CPE-01', 'Se inactivará', [
-        await atributo('AG-I08'),
-      ]);
+      const creada = await competenciaSuelta('CPE-01', 'Se inactivará', [await atributo('AG-I08')]);
       await competencias.cambiarEstado(creada.id, false);
 
       const fila = (await competencias.cobertura('ICACIT')).find((a) => a.codigo === 'AG-I08');
@@ -393,7 +433,7 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
       const efimero = await prisma.atributoGraduado.create({
         data: { marco: 'PRUEBA', codigo: 'X-01', nombre: 'Atributo desechable', orden: 1 },
       });
-      const creada = await competencias.crear('CPE-01', 'Competencia', [efimero.id]);
+      const creada = await competenciaSuelta('CPE-01', 'Competencia', [efimero.id]);
 
       await prisma.atributoGraduado.delete({ where: { id: efimero.id } });
 
@@ -408,5 +448,71 @@ describe('Trazabilidad con el marco de acreditación (§6.2)', () => {
       });
       expect(await competencias.cobertura('ICACIT')).toHaveLength(11);
     });
+  });
+});
+
+describe('RF-CH-017 — competencias del plan y de la carrera', () => {
+  it('crearEnPlan fija la carrera y vincula al plan en la misma escritura', async () => {
+    const creada = await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Resolver', []);
+    expect(creada.carreraId).toBe(carreraId);
+    expect(creada.planesVinculados).toBe(1);
+    expect(
+      await prisma.planCompetencia.count({ where: { planId, competenciaId: creada.id } }),
+    ).toBe(1);
+  });
+
+  it('listar con planId devuelve solo las vinculadas a ese plan', async () => {
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Del plan', []);
+    await competencias.crearEnPlan(otroPlanId, carreraId, 'CPE-02', 'De otro plan', []);
+    expect((await competencias.listar({ planId })).map((c) => c.codigo)).toEqual(['CPE-01']);
+  });
+
+  it('listar con carreraId devuelve solo las de esa carrera', async () => {
+    const civ = await otraCarreraConPlan();
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'De Sistemas', []);
+    await competenciaSuelta('CPE-02', 'Sin carrera');
+    await competencias.crearEnPlan(civ.plan, civ.carrera, 'CPE-03', 'De Civil', []);
+    expect((await competencias.listar({ carreraId })).map((c) => c.codigo)).toEqual(['CPE-01']);
+  });
+
+  it('la cobertura con planId solo cuenta las del plan', async () => {
+    const ag = (
+      await prisma.atributoGraduado.findFirstOrThrow({
+        where: { marco: 'ICACIT', codigo: 'AG-I08' },
+      })
+    ).id;
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Del plan', [ag]);
+    await competencias.crearEnPlan(otroPlanId, carreraId, 'CPE-02', 'De otro plan', [ag]);
+
+    const delPlan = (await competencias.cobertura('ICACIT', planId)).find(
+      (a) => a.codigo === 'AG-I08',
+    );
+    const todas = (await competencias.cobertura('ICACIT')).find((a) => a.codigo === 'AG-I08');
+    expect(delPlan?.competencias.map((c) => c.codigo)).toEqual(['CPE-01']);
+    expect(todas?.competencias.map((c) => c.codigo)).toEqual(['CPE-01', 'CPE-02']);
+  });
+});
+
+describe('RF-CH-017 — nombre único por carrera', () => {
+  it('existeNombre busca solo dentro de la carrera, sin distinguir mayúsculas', async () => {
+    const civ = await otraCarreraConPlan();
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Resolver problemas', []);
+    expect(await competencias.existeNombre('RESOLVER PROBLEMAS', carreraId)).toBe(true);
+    expect(await competencias.existeNombre('Resolver problemas', civ.carrera)).toBe(false);
+  });
+
+  it('la base rechaza el mismo nombre dos veces en la misma carrera', async () => {
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Resolver problemas', []);
+    await expect(
+      competencias.crearEnPlan(otroPlanId, carreraId, 'CPE-02', 'resolver problemas', []),
+    ).rejects.toThrow();
+  });
+
+  it('el mismo nombre en dos carreras distintas sí se permite', async () => {
+    const civ = await otraCarreraConPlan();
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Resolver problemas', []);
+    await expect(
+      competencias.crearEnPlan(civ.plan, civ.carrera, 'CPE-02', 'Resolver problemas', []),
+    ).resolves.toBeTruthy();
   });
 });

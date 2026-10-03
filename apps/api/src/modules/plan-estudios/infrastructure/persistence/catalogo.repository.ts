@@ -1,5 +1,5 @@
 /**
- * Repositorio Prisma de competencias, catálogo institucional.
+ * Repositorio Prisma de competencias (con carrera propia desde el Bloque 4b).
  *
  * Los recuentos de vínculos (`planesVinculados`, `asignaturasVinculadas`) se
  * traen siempre, no solo cuando alguien va a borrar. Son lo que permite a la UI
@@ -67,6 +67,8 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       where: {
         ...dondeEstado(filtro?.activo),
         ...(filtro?.texto ? dondeTexto(filtro.texto) : {}),
+        ...(filtro?.planId ? { planes: { some: { planId: filtro.planId } } } : {}),
+        ...(filtro?.carreraId ? { carreraId: filtro.carreraId } : {}),
       },
       orderBy: { codigo: 'asc' },
       include: {
@@ -103,13 +105,20 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
    * las competencias solo enseñaría los atributos ya mapeados, y lo que hay que
    * ver son los que se quedaron sin ninguna.
    */
-  async cobertura(marco: string): Promise<CoberturaAtributo[]> {
+  async cobertura(marco: string, planId?: string): Promise<CoberturaAtributo[]> {
     const filas = await this.prisma.atributoGraduado.findMany({
       where: { marco },
       orderBy: { orden: 'asc' },
       include: {
         competencias: {
-          where: { competencia: { estado: 'ACTIVO' } },
+          // RF-CH-017: con plan, la cobertura es la de ese plan, no la de todo
+          // el catálogo.
+          where: {
+            competencia: {
+              estado: 'ACTIVO',
+              ...(planId ? { planes: { some: { planId } } } : {}),
+            },
+          },
           select: { competencia: { select: { id: true, codigo: true, nombre: true } } },
         },
       },
@@ -140,7 +149,13 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     return filas.map((f) => f.codigo);
   }
 
-  async crear(
+  /**
+   * RF-CH-017 RN1: la fila y su vínculo con el plan en una sola escritura
+   * anidada, que Prisma ejecuta en una transacción.
+   */
+  async crearEnPlan(
+    planId: string,
+    carreraId: string,
     codigo: string,
     nombre: string,
     atributoIds: readonly string[],
@@ -149,7 +164,9 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
       data: {
         codigo,
         nombre,
+        carreraId,
         atributos: { create: atributoIds.map((atributoId) => ({ atributoId })) },
+        planes: { create: { planId } },
       },
       include: {
         _count: { select: { planes: true, asignaturas: true } },
@@ -212,10 +229,16 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     await this.prisma.competencia.delete({ where: { id } });
   }
 
-  async existeNombre(nombre: string, idIgnorado?: string): Promise<boolean> {
+  async existeNombre(
+    nombre: string,
+    carreraId: string | null,
+    idIgnorado?: string,
+  ): Promise<boolean> {
     const fila = await this.prisma.competencia.findFirst({
       where: {
         nombre: { equals: nombre, mode: 'insensitive' },
+        // `null` busca entre las filas sin carrera: Prisma lo traduce a IS NULL.
+        carreraId,
         ...(idIgnorado ? { id: { not: idIgnorado } } : {}),
       },
       select: { id: true },
@@ -229,6 +252,7 @@ function aCompetencia(fila: {
   codigo: string;
   nombre: string;
   estado: string;
+  carreraId: string | null;
   creadoEn: Date;
   _count: { planes: number; asignaturas: number };
   atributos: { atributo: { id: string; marco: string; codigo: string; nombre: string } }[];
@@ -239,6 +263,7 @@ function aCompetencia(fila: {
     nombre: fila.nombre,
     activa: fila.estado === 'ACTIVO',
     atributos: fila.atributos.map((a) => a.atributo),
+    carreraId: fila.carreraId,
     planesVinculados: fila._count.planes,
     asignaturasVinculadas: fila._count.asignaturas,
     creadoEn: fila.creadoEn,

@@ -24,6 +24,19 @@ export class DatosCompetenciaDto {
   atributoIds?: string[];
 }
 
+/** RF-CH-017 RN1: el alta va siempre dentro de un plan, que fija la carrera. */
+export class CrearCompetenciaDto extends DatosCompetenciaDto {
+  @IsUUID('4', { message: 'La competencia se crea dentro de un plan: falta su identificador.' })
+  planId!: string;
+}
+
+/** RF-CH-017: la cobertura de un plan concreto, o la del catálogo entero. */
+export class CoberturaDto {
+  @IsOptional()
+  @IsUUID('4')
+  planId?: string;
+}
+
 /** RF039 y RF046: búsqueda por texto, más filtro de estado. */
 export class FiltroCatalogoDto {
   @IsOptional()
@@ -35,6 +48,11 @@ export class FiltroCatalogoDto {
   @Transform(({ value }: { value: unknown }) => value === 'true' || value === true)
   @IsBoolean()
   activo?: boolean;
+
+  /** RF-CH-017: solo las vinculadas a este plan. */
+  @IsOptional()
+  @IsUUID('4')
+  planId?: string;
 }
 
 export class CambiarEstadoCatalogoDto {

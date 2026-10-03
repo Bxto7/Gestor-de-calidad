@@ -295,13 +295,14 @@ export function useCompetencias() {
   return useQuery({ queryKey: claves.competencias, queryFn: api.listarCompetencias });
 }
 
-export function useCrearCompetencia() {
+export function useCrearCompetencia(planId: string) {
   return useMutacionConInvalidacion(
     (v: { nombre: string; atributoIds: readonly string[] }) =>
-      api.crearCompetencia(v.nombre, v.atributoIds),
+      api.crearCompetencia(planId, v.nombre, v.atributoIds),
     // `claves.competencias` es prefijo de `atributos` y `cobertura`, así que
-    // invalidar aquí refresca también el panel de cobertura.
-    [claves.competencias, ['plan']],
+    // invalidar aquí refresca también el panel de cobertura. La competencia
+    // nueva queda vinculada al plan: su detalle cambia.
+    [claves.competencias, claves.plan(planId)],
   );
 }
 
