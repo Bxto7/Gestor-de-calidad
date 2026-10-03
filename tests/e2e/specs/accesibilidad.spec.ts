@@ -9,9 +9,12 @@
 
 import type { Page } from '@playwright/test';
 
+import { tokenDe } from '../fixtures/api';
 import { analizar } from '../fixtures/axe';
+import { borradorNuevo, borrarPlan, cabeceras } from '../fixtures/plan-borrador';
 import { completarDefinicion } from '../fixtures/plan-mejora';
 import { expect, paginaComo, test } from '../fixtures/sesion';
+import { API } from '../global-setup';
 
 /**
  * Crea un plan de evaluación fresco sobre la base Indirecta de la semilla y
@@ -542,5 +545,58 @@ test.describe('con la cuenta de docente', () => {
     await expect(page.getByRole('status', { name: 'Cargando tus evaluaciones' })).toBeHidden();
 
     await analizar(page, 'la página Mis evidencias del docente');
+  });
+});
+
+test.describe('Objetivos y Competencias del plan, con el modal de eliminar abierto', () => {
+  test.use({ rol: 'director' });
+
+  test('la sección Competencias de un Borrador', async ({ page, request }) => {
+    const planId = await borradorNuevo(request);
+    try {
+      await page.goto(`/plan-estudios/planes/${planId}/competencias`);
+      // Con contenido real: el Borrador trae las competencias del Vigente.
+      const fila = page.getByRole('row').filter({ hasText: 'CPE-E2E02' });
+      await fila.getByRole('button', { name: 'Eliminar' }).click();
+      await expect(
+        page.getByRole('dialog', { name: 'Eliminar competencia del plan' }),
+      ).toBeVisible();
+
+      await analizar(page, 'Competencias del plan con el modal de eliminar');
+    } finally {
+      await borrarPlan(request, planId);
+    }
+  });
+
+  test('la sección Objetivos de un Borrador', async ({ page, request }) => {
+    const planId = await borradorNuevo(request);
+    try {
+      const h = cabeceras(await tokenDe('director'));
+      const creado = await request.post(`${API}/objetivos`, {
+        headers: h,
+        data: {
+          planId,
+          nombre: `Objetivo para axe ${Date.now().toString().slice(-7)}`,
+          descripcion: 'Objetivo creado por la suite E2E para analizar la pantalla.',
+        },
+      });
+      expect(creado.ok()).toBe(true);
+      const { id, codigo } = (await creado.json()) as { id: string; codigo: string };
+
+      await page.goto(`/plan-estudios/planes/${planId}/objetivos`);
+      await page
+        .getByRole('row')
+        .filter({ hasText: codigo })
+        .getByRole('button', { name: 'Eliminar' })
+        .click();
+      await expect(page.getByRole('dialog', { name: 'Eliminar objetivo del plan' })).toBeVisible();
+
+      await analizar(page, 'Objetivos del plan con el modal de eliminar');
+
+      // Solo estaba en este Borrador: quitarlo borra el registro y no deja restos.
+      await request.delete(`${API}/planes/${planId}/objetivos/${id}`, { headers: h });
+    } finally {
+      await borrarPlan(request, planId);
+    }
   });
 });

@@ -106,6 +106,41 @@ test.describe('el Director solo lee su carrera (API)', () => {
     expect(ids).toContain(ajena);
     expect(ids.length).toBeGreaterThan(1);
   });
+
+  test('GET /objetivos y /competencias sin plan solo traen los de su carrera (RF-CH-015, RF-CH-017)', async ({
+    request,
+  }) => {
+    const h = cabeceras(await tokenDe('director'));
+    const [carrera] = (await (await request.get(`${API}/carreras`, { headers: h })).json()) as {
+      id: string;
+    }[];
+
+    const competencias = (await (
+      await request.get(`${API}/competencias`, { headers: h })
+    ).json()) as {
+      codigo: string;
+      carreraId: string | null;
+    }[];
+    expect(competencias.map((c) => c.codigo)).toContain('CPE-E2E01');
+    expect(competencias.every((c) => c.carreraId === carrera!.id)).toBe(true);
+
+    const objetivos = (await (await request.get(`${API}/objetivos`, { headers: h })).json()) as {
+      codigo: string;
+      carreraId: string | null;
+    }[];
+    expect(objetivos.map((o) => o.codigo)).toContain('OE-E2E-01');
+    expect(objetivos.every((o) => o.carreraId === carrera!.id)).toBe(true);
+  });
+
+  test('el Coordinador sin plan sigue viendo el catálogo que usan sus selectores de Mejora Continua', async ({
+    request,
+  }) => {
+    const h = cabeceras(await tokenDe('editor'));
+    const objetivos = (await (await request.get(`${API}/objetivos`, { headers: h })).json()) as {
+      codigo: string;
+    }[];
+    expect(objetivos.map((o) => o.codigo)).toContain('OE-E2E-01');
+  });
 });
 
 test.describe('con la cuenta de administrador', () => {
