@@ -17,8 +17,10 @@ import type {
 } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import {
   AccesoDenegado,
+  NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   ContenidoCurricularPort,
@@ -105,10 +107,25 @@ function contenido(): CopiaDelPlan {
 
 type DatosCopiar = Parameters<RepositorioPlanMedicionPort['copiar']>[0];
 
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
 function montar(
   opciones: {
     estado?: DatosPlanMedicion['estado'];
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
     codigosUsados?: string[];
     curricular?: Partial<ContenidoCurricularPort>;
   } = {},
@@ -142,6 +159,7 @@ function montar(
     curricular,
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    opciones.alcance ?? sinRestriccion(),
   );
   return { caso, vistos, copiados };
 }
@@ -284,5 +302,15 @@ describe('el alcance por carrera (2c-C)', () => {
     await ejecutar(caso).catch(() => undefined);
 
     expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
+  });
+});
+
+describe('RF-CH-034 — la URL directa a un plan de otra carrera', () => {
+  it('versionar o duplicar es NoEncontrado y no copia nada', async () => {
+    const { caso, copiados } = montar({ alcance: soloCarrera('otra-carrera') });
+
+    await expect(caso.generarNuevaVersion(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.duplicarPlan(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(copiados).toHaveLength(0);
   });
 });

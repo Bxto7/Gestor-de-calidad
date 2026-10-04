@@ -20,8 +20,10 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import {
   PlanMedicionDuplicado,
   PlanMedicionVersionado,
@@ -39,6 +41,7 @@ export class VersionarPlanesMedicion {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF-PM-030: copia con vínculo al origen, conservando las marcas de medición. */
@@ -106,8 +109,14 @@ export class VersionarPlanesMedicion {
   }
 
   private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.planes.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de medición', id);
+    // RF-CH-034: un plan de otra carrera no existe para quien no la lee.
+    const plan = await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(id),
+      'el plan de medición',
+      id,
+    );
 
     // RF-PM-042: las dos operaciones crean un plan, así que exigen crearlos.
     // La carrera sale del plan de medición base, no de uno que todavía no

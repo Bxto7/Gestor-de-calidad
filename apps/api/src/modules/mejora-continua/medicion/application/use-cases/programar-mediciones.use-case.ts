@@ -24,8 +24,10 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import { MatrizProgramada, MedicionMarcada } from '../../domain/events/eventos-medicion.js';
 import { permiteEdicion } from '../../../domain/value-objects/estado-plan.js';
 import type {
@@ -62,6 +64,7 @@ export class ProgramarMediciones {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /**
@@ -74,7 +77,7 @@ export class ProgramarMediciones {
    */
   async matriz(actor: Actor, id: string, ahora: Date = new Date()): Promise<VistaMatriz> {
     await this.exigir(actor, 'medicion.leer', null);
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
     const celdas = await this.planes.matriz(id);
 
     // Índice por «competencia|periodo» en vez de recorrer el arreglo por cada
@@ -117,7 +120,7 @@ export class ProgramarMediciones {
     id: string,
     celdas: readonly { competenciaId: string; periodoId: string }[],
   ): Promise<CeldaMatriz[]> {
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
     this.verificarEditable(plan);
 
@@ -167,7 +170,7 @@ export class ProgramarMediciones {
     periodoId: string,
     realizada: boolean,
   ): Promise<CeldaMatriz> {
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
 
     // RN1: solo una celda programada puede marcarse.
@@ -203,10 +206,15 @@ export class ProgramarMediciones {
     return marcada;
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.planes.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de medición', id);
-    return plan;
+  /** Existe y su carrera entra en el alcance de lectura (RF-CH-034); si no, NoEncontrado. */
+  private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanMedicion> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(id),
+      'el plan de medición',
+      id,
+    );
   }
 
   /** RF-PM-007 RN1. */

@@ -23,7 +23,8 @@ import type {
   DomainEvent,
   PublicadorDeEventos,
 } from '../../../../../shared-kernel/domain-events/domain-event.js';
-import { AccesoDenegado } from '../../../../../shared-kernel/errors/errores.js';
+import { AccesoDenegado, NoEncontrado } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   ContenidoCurricularPort,
@@ -64,6 +65,20 @@ function denegarRegistrando(pedidos: string[]): AuthorizationPort {
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
     rolesDe: async () => [],
+  };
+}
+
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
   };
 }
 
@@ -278,6 +293,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       configuracionPort,
       permitirTodo(),
       publicador,
+      sinRestriccion(),
     );
   });
 
@@ -373,6 +389,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       configuracionPort,
       denegarRegistrando(pedidos),
       { publicar: async () => undefined },
+      sinRestriccion(),
     );
 
     await expect(casos.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
@@ -402,9 +419,26 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
         rolesDe: async () => [],
       },
       { publicar: async () => undefined },
+      sinRestriccion(),
     );
 
     await expect(casos.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
     expect(puede).toHaveBeenCalledWith(ACTOR.id, 'evaluacion.crear', 'carrera-ajena');
+  });
+
+  it('RF-CH-038: versionar o consultar las versiones de un plan de otra carrera es NoEncontrado', async () => {
+    casos = new VersionarPlanesEvaluacion(
+      planes,
+      mediciones,
+      curricular,
+      configuracionPort,
+      permitirTodo(),
+      { publicar: async () => undefined },
+      soloCarrera('otra-carrera'),
+    );
+
+    await expect(casos.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(casos.versionesDe(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(configuraciones.copiado).toBeUndefined();
   });
 });

@@ -28,6 +28,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { DirectorioDeUsuariosPort } from '../../../../auth/application/ports/directorio-usuarios.port.js';
 import type {
@@ -230,6 +231,20 @@ function repoConfiguracion(
   };
 }
 
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
 function montar(
   opciones: {
     evaluacion?: DatosPlanEvaluacion;
@@ -241,6 +256,7 @@ function montar(
     planDeIndicacion?: string | null;
     contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
     registrarRolPedido?: (rol: string) => void;
   } = {},
 ) {
@@ -347,6 +363,7 @@ function montar(
     directorio,
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    opciones.alcance ?? sinRestriccion(),
   );
 
   return { caso, publicados, guardado };
@@ -836,5 +853,15 @@ describe('NoEncontrado', () => {
         responsableId: null,
       }),
     ).rejects.toThrow(NoEncontrado);
+  });
+});
+
+describe('RF-CH-038 — la URL directa a un plan de otra carrera', () => {
+  it('la configuración y las asignaturas elegibles son NoEncontrado', async () => {
+    const { caso, publicados } = montar({ alcance: soloCarrera('otra-carrera') });
+
+    await expect(caso.configuracion(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.asignaturasElegibles(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(publicados).toHaveLength(0);
   });
 });

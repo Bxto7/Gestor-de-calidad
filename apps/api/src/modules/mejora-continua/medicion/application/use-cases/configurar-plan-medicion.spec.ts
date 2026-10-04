@@ -19,6 +19,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   ContenidoCurricularPort,
@@ -139,11 +140,26 @@ function repo(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlan
   };
 }
 
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
 function montar(
   opciones: {
     repo?: Partial<RepositorioPlanMedicionPort>;
     contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const vistos: DomainEvent[] = [];
@@ -157,6 +173,7 @@ function montar(
     contenido(opciones.contenido),
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    opciones.alcance ?? sinRestriccion(),
   );
   return { caso, vistos };
 }
@@ -607,5 +624,17 @@ describe('el alcance por carrera (2c-C)', () => {
     await ejecutar(caso).catch(() => undefined);
 
     expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
+  });
+});
+
+describe('RF-CH-034 — la URL directa a un plan de otra carrera', () => {
+  it('leer las competencias o los periodos propuestos, o declararlos, es NoEncontrado', async () => {
+    const { caso, vistos } = montar({ alcance: soloCarrera('otra-carrera') });
+
+    await expect(caso.competenciasDisponibles(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.periodosPropuestos(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', [])).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(caso.declararPeriodos(ACTOR, 'pm-1', [])).rejects.toBeInstanceOf(NoEncontrado);
+    expect(vistos).toHaveLength(0);
   });
 });

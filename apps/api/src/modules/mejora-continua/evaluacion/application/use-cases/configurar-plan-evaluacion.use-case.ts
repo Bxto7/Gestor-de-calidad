@@ -45,12 +45,14 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { DirectorioDeUsuariosPort } from '../../../../auth/application/ports/directorio-usuarios.port.js';
 import type {
   AsignaturaBase,
   ContenidoCurricularPort,
 } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import { permiteEdicion } from '../../../domain/value-objects/estado-plan.js';
 import type {
   DatosPlanMedicion,
@@ -76,12 +78,13 @@ export class ConfigurarPlanEvaluacion {
     private readonly directorio: DirectorioDeUsuariosPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF-PE-016: las asignaturas del plan de estudios base, para el desplegable. */
   async asignaturasElegibles(actor: Actor, planEvaluacionId: string): Promise<AsignaturaBase[]> {
     await this.exigir(actor, 'evaluacion.leer', null);
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     return this.curricular.asignaturasDelPlan(base.planEstudiosId);
   }
@@ -95,7 +98,7 @@ export class ConfigurarPlanEvaluacion {
   /** Todo lo configurado del plan, en una sola lectura. */
   async configuracion(actor: Actor, planEvaluacionId: string): Promise<ConfiguracionDelPlan> {
     await this.exigir(actor, 'evaluacion.leer', null);
-    await this.exigirPlan(planEvaluacionId);
+    await this.exigirPlan(actor, planEvaluacionId);
     return this.configuraciones.del(planEvaluacionId);
   }
 
@@ -118,7 +121,7 @@ export class ConfigurarPlanEvaluacion {
     competenciaId: string,
     datos: { instrumento: string | null; frecuencia: string | null; responsableId: string | null },
   ): Promise<void> {
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirDefinicionEditable(plan);
@@ -148,7 +151,7 @@ export class ConfigurarPlanEvaluacion {
     periodoId: string,
     asignaturas: readonly { asignaturaId: string; entregable: string; docenteId: string | null }[],
   ): Promise<void> {
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirDefinicionEditable(plan);
@@ -186,7 +189,7 @@ export class ConfigurarPlanEvaluacion {
     periodoId: string,
     porcentaje: number | null,
   ): Promise<void> {
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     // La misma comprobación que `guardarAsignaturas`, y por el mismo motivo:
     // el repositorio hace `upsert`, así que sin ella un cruce inventado no da
     // error, **crea la fila**. Un porcentaje alcanzado colgado de una
@@ -234,7 +237,7 @@ export class ConfigurarPlanEvaluacion {
       throw new NoEncontrado('la asignatura evaluada', asignaturaEvaluadaId);
     }
 
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirSeguimientoEditable(plan);
@@ -260,7 +263,7 @@ export class ConfigurarPlanEvaluacion {
       enlaceInstrumento: string;
     }[],
   ): Promise<void> {
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirDefinicionEditable(plan);
@@ -294,7 +297,7 @@ export class ConfigurarPlanEvaluacion {
       throw new NoEncontrado('la indicación', indicacionId);
     }
 
-    const plan = await this.exigirPlan(planEvaluacionId);
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
     this.exigirSeguimientoEditable(plan);
@@ -314,10 +317,15 @@ export class ConfigurarPlanEvaluacion {
     ]);
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanEvaluacion> {
-    const plan = await this.evaluaciones.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de evaluación', id);
-    return plan;
+  /** Existe y su carrera entra en el alcance de lectura (RF-CH-038); si no, NoEncontrado. */
+  private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanEvaluacion> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(id),
+      'el plan de evaluación',
+      id,
+    );
   }
 
   private async exigirBase(planMedicionId: string): Promise<DatosPlanMedicion> {

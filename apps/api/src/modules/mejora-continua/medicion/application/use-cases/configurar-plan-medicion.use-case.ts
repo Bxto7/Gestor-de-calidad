@@ -15,8 +15,10 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import {
   CompetenciasDelPlanDeclaradas,
   PeriodosDeclarados,
@@ -58,12 +60,13 @@ export class ConfigurarPlanMedicion {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF-PM-013 y RF-PM-014: las competencias del plan base, agrupadas. */
   async competenciasDisponibles(actor: Actor, id: string): Promise<GrupoDeCompetencias[]> {
     await this.exigir(actor, 'medicion.leer', null);
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
     const competencias = await this.curricular.competenciasDelPlan(plan.planEstudiosId);
 
     return agruparPorAtributo(competencias);
@@ -84,7 +87,7 @@ export class ConfigurarPlanMedicion {
     id: string,
     competenciaIds: readonly string[],
   ): Promise<DatosPlanMedicion> {
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
     this.verificarEditable(plan);
 
@@ -123,7 +126,7 @@ export class ConfigurarPlanMedicion {
   /** RF-PM-016: la propuesta inicial. Solo para la Directa. */
   async periodosPropuestos(actor: Actor, id: string): Promise<PeriodoPropuesto[]> {
     await this.exigir(actor, 'medicion.leer', null);
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
 
     // La Indirecta cubre años calendario que elige el usuario (RF-PM-020): el
     // plan de estudios no dice nada sobre el horizonte de una encuesta a
@@ -142,7 +145,7 @@ export class ConfigurarPlanMedicion {
     id: string,
     periodos: readonly PeriodoADeclarar[],
   ): Promise<DatosPlanMedicion> {
-    const plan = await this.exigirPlan(id);
+    const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
     this.verificarEditable(plan);
 
@@ -181,10 +184,15 @@ export class ConfigurarPlanMedicion {
     return actualizado;
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.planes.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de medición', id);
-    return plan;
+  /** Existe y su carrera entra en el alcance de lectura (RF-CH-034); si no, NoEncontrado. */
+  private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanMedicion> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(id),
+      'el plan de medición',
+      id,
+    );
   }
 
   /** RF-PM-007 RN1. */

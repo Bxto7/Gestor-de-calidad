@@ -47,8 +47,10 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import { permiteVersionado } from '../../../domain/value-objects/estado-plan.js';
 import type {
   DatosPlanMedicion,
@@ -71,11 +73,12 @@ export class VersionarPlanesEvaluacion {
     private readonly configuraciones: RepositorioConfiguracionEvaluacionPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF-PE-034: la nueva versión, en Borrador, vinculada a la que la origina. */
   async generarNuevaVersion(actor: Actor, id: string): Promise<DatosPlanEvaluacion> {
-    const origen = await this.exigirPlan(id);
+    const origen = await this.exigirPlan(actor, id);
     const base = await this.exigirBase(origen.planMedicionId);
 
     // RF-PE-042: las dos operaciones que escriben —crear y versionar— exigen
@@ -125,6 +128,7 @@ export class VersionarPlanesEvaluacion {
   /** RF-PE-034 RN1: el linaje completo, de la más reciente a la más antigua. */
   async versionesDe(actor: Actor, id: string): Promise<DatosPlanEvaluacion[]> {
     await this.exigir(actor, 'evaluacion.leer', null);
+    await this.exigirPlan(actor, id);
     return this.evaluaciones.linajeDe(id);
   }
 
@@ -181,10 +185,15 @@ export class VersionarPlanesEvaluacion {
     };
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanEvaluacion> {
-    const plan = await this.evaluaciones.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de evaluación', id);
-    return plan;
+  /** Existe y su carrera entra en el alcance de lectura (RF-CH-038); si no, NoEncontrado. */
+  private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanEvaluacion> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(id),
+      'el plan de evaluación',
+      id,
+    );
   }
 
   private async exigirBase(planMedicionId: string): Promise<DatosPlanMedicion> {

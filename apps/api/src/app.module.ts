@@ -818,6 +818,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         REPOSITORIO_CONFIGURACION_EVALUACION,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         evaluaciones: RepositorioPlanEvaluacionPort,
@@ -826,6 +827,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         configuraciones: RepositorioConfiguracionEvaluacionPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new VersionarPlanesEvaluacion(
           evaluaciones,
@@ -834,6 +836,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           configuraciones,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {
@@ -846,6 +849,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         DIRECTORIO_USUARIOS,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         evaluaciones: RepositorioPlanEvaluacionPort,
@@ -855,6 +859,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         directorio: DirectorioDeUsuariosPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new ConfigurarPlanEvaluacion(
           evaluaciones,
@@ -864,6 +869,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           directorio,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {
@@ -1047,13 +1053,15 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanMedicionPort,
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new VersionarPlanesMedicion(planes, curricular, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new VersionarPlanesMedicion(planes, curricular, autorizacion, eventos, alcance),
     },
     {
       provide: ConfigurarPlanMedicion,
@@ -1062,13 +1070,15 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanMedicionPort,
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new ConfigurarPlanMedicion(planes, curricular, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConfigurarPlanMedicion(planes, curricular, autorizacion, eventos, alcance),
     },
     {
       // El puerto curricular entra solo por el alcance por carrera (2c-C): lo
@@ -1080,13 +1090,15 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanMedicionPort,
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new ProgramarMediciones(planes, curricular, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new ProgramarMediciones(planes, curricular, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarAsignaturas,
