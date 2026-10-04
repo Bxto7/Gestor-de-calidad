@@ -46,7 +46,9 @@ function evaluacion(sobre: Partial<PlanEvaluacion>): PlanEvaluacion {
   };
 }
 
-function montar(opciones: { carreraACargo?: string | null; planes?: PlanEvaluacion[] } = {}) {
+function montar(
+  opciones: { carreraACargo?: string | null; planes?: PlanEvaluacion[]; permisos?: string[] } = {},
+) {
   const listar = vi
     .spyOn(api, 'listarEvaluaciones')
     .mockResolvedValue(opciones.planes ?? [evaluacion({})]);
@@ -55,7 +57,7 @@ function montar(opciones: { carreraACargo?: string | null; planes?: PlanEvaluaci
     base({ id: 'pm-2', carreraId: 'c2', codigo: 'PM-CIV' }),
   ]);
   montarPagina(<PlanesEvaluacionPage />, {
-    permisos: ['evaluacion.leer', 'evaluacion.crear', 'evaluacion.eliminar'],
+    permisos: opciones.permisos ?? ['evaluacion.leer', 'evaluacion.crear', 'evaluacion.eliminar'],
     carreraACargo: opciones.carreraACargo === undefined ? 'c1' : opciones.carreraACargo,
   });
   return { listar };
@@ -104,5 +106,17 @@ describe('PlanesEvaluacionPage — eliminar (RF-CH-039)', () => {
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Eliminar' }));
 
     await waitFor(() => expect(eliminar).toHaveBeenCalledWith('ev-1'));
+  });
+});
+
+describe('PlanesEvaluacionPage — el listado (RF-CH-038)', () => {
+  it('quien lee solo su carrera y no tiene ninguna ve el aviso, no un listado vacío sin explicación', async () => {
+    montar({
+      permisos: ['evaluacion.leer', 'lectura.solo_su_carrera'],
+      carreraACargo: null,
+      planes: [],
+    });
+
+    expect(await screen.findByText('No tienes una carrera asignada')).toBeInTheDocument();
   });
 });

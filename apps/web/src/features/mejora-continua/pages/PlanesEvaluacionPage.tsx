@@ -173,12 +173,11 @@ function ModalNuevaEvaluacion({ onCerrar }: { onCerrar: () => void }) {
 
   // RF-PE-001 RN3: el backend ya filtra a Aprobado o Vigente — no hay que
   // repetir el filtro aquí, a diferencia del alta de un plan de medición.
-  const { data: bases } = useBasesElegibles();
-
   // RF-CH-037: solo bases de la carrera de la sesión. El backend ya las acota por
   // el alcance de lectura; esto cubre a quien lee todas pero crea en la suya.
   const { identidad } = useSesion();
   const carreraId = identidad?.carreraACargo ?? null;
+  const { data: bases } = useBasesElegibles({ enabled: carreraId !== null });
   const propias = (bases ?? []).filter((b) => b.carreraId === carreraId);
 
   const [planMedicionId, setPlanMedicionId] = useState('');

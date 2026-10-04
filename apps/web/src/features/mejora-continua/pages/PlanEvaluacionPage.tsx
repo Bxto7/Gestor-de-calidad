@@ -36,7 +36,6 @@ import {
   CabeceraSeccion,
   Campo,
   Cargando,
-  EstadoVacio,
   Modal,
   Selector,
   Tarjeta,
@@ -66,6 +65,7 @@ import { ConfiguracionDelAnio } from '../components/ConfiguracionDelAnio';
 import { ConfiguracionDelPeriodo } from '../components/ConfiguracionDelPeriodo';
 import { DocumentosDelPlanEvaluacion } from '../components/DocumentosDelPlanEvaluacion';
 import { EliminarPlan } from '../components/EliminarPlan';
+import { FalloAlCargarPlan } from '../components/FalloAlCargarPlan';
 import { HeredadoDelPlanBase } from '../components/HeredadoDelPlanBase';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
 import { VersionesDelPlan } from '../components/VersionesDelPlan';
@@ -93,7 +93,7 @@ export function PlanEvaluacionPage() {
   const { puede } = useSesion();
   const navegar = useNavigate();
 
-  const { data: vista, isLoading, isError } = usePlanEvaluacion(id);
+  const { data: vista, isLoading, isError, error: falloAlCargar, refetch } = usePlanEvaluacion(id);
   const transicionar = useTransicionarEvaluacion(id);
   const eliminar = useEliminarPlanEvaluacion();
 
@@ -159,9 +159,10 @@ export function PlanEvaluacionPage() {
   // existe. Sin esto la pantalla se quedaría «cargando» para siempre.
   if (isError) {
     return (
-      <EstadoVacio
-        titulo="Plan de evaluación no encontrado"
-        detalle="No existe, o no es de la carrera con la que trabajas."
+      <FalloAlCargarPlan
+        error={falloAlCargar}
+        tituloNoEncontrado="Plan de evaluación no encontrado"
+        onReintentar={() => void refetch()}
       />
     );
   }

@@ -56,7 +56,7 @@ describe('EliminarPlan — cuándo se ofrece', () => {
     expect(screen.queryByRole('button', BOTON)).not.toBeInTheDocument();
   });
 
-  it('sin el permiso, o en otra carrera, no se ofrece', () => {
+  it('sin el permiso no se ofrece', () => {
     montar({ permisos: ['medicion.leer'] });
     expect(screen.queryByRole('button', BOTON)).not.toBeInTheDocument();
   });

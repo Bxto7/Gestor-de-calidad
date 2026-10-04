@@ -51,6 +51,7 @@ import { descargarDocumento } from '../api/medicion.api';
 import { DocumentosDelPlan } from '../components/DocumentosDelPlan';
 import { EditorDePeriodos } from '../components/EditorDePeriodos';
 import { EliminarPlan } from '../components/EliminarPlan';
+import { FalloAlCargarPlan } from '../components/FalloAlCargarPlan';
 import { GrupoDeCompetencias } from '../components/GrupoDeCompetencias';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
 import { LineaDeVersiones } from '../components/LineaDeVersiones';
@@ -78,7 +79,7 @@ export function PlanMedicionPage() {
   const { puede } = useSesion();
   const navegar = useNavigate();
 
-  const { data: plan, isLoading, isError } = usePlanMedicion(id);
+  const { data: plan, isLoading, isError, error: falloAlCargar, refetch } = usePlanMedicion(id);
   const { data: grupos } = useCompetenciasDisponibles(id);
   const { data: vista } = useMatriz(id);
   const { data: consistencia } = useConsistencia(id);
@@ -123,9 +124,10 @@ export function PlanMedicionPage() {
   // existe. Sin esto la pantalla se quedaría «cargando» para siempre.
   if (isError) {
     return (
-      <EstadoVacio
-        titulo="Plan de medición no encontrado"
-        detalle="No existe, o no es de la carrera con la que trabajas."
+      <FalloAlCargarPlan
+        error={falloAlCargar}
+        tituloNoEncontrado="Plan de medición no encontrado"
+        onReintentar={() => void refetch()}
       />
     );
   }

@@ -320,10 +320,11 @@ function useMutacionDeEvaluacion<TVars, TDatos>(id: string, fn: (v: TVars) => Pr
   });
 }
 
-export function useBasesElegibles() {
+export function useBasesElegibles(opciones?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['evaluacion', 'bases-elegibles'] as const,
     queryFn: () => evaluacionApi.basesElegibles(),
+    enabled: opciones?.enabled ?? true,
   });
 }
 
