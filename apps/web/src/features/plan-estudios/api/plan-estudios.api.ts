@@ -313,9 +313,13 @@ export async function editarCompetencia(
   );
 }
 
-/** §6.2: los atributos del graduado del marco vigente, para poder mapear. */
-export async function listarAtributos(): Promise<AtributoGraduado[]> {
-  return cliente.get<AtributoGraduado[]>('/competencias/atributos');
+/**
+ * §6.2: los atributos del graduado para poder mapear. Con `planId`, los de la
+ * carrera del plan (Bloque 5: cada carrera tiene los suyos); sin él, los de la
+ * carrera de quien lee o los de todas.
+ */
+export async function listarAtributos(planId?: string): Promise<AtributoGraduado[]> {
+  return cliente.get<AtributoGraduado[]>('/competencias/atributos', { planId });
 }
 
 /**

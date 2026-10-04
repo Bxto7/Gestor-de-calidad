@@ -27,23 +27,26 @@ export function montarPagina(
      * Con ella, `puedeEn` se comporta como el de `ProveedorSesion`: sin carrera
      * en juego concede, con carrera solo la propia. Sin ella, ignora la carrera.
      */
-    carreraACargo?: string;
+    /** `null`: una sesión sin carrera, como la del Consultor. */
+    carreraACargo?: string | null;
   },
 ): { cliente: QueryClient } {
   const tiene = (p: string) => opciones.permisos.includes(p);
   const { carreraACargo } = opciones;
+  // Con una carrera (cadena), `puedeEn` imita el alcance por carrera de
+  // `ProveedorSesion`. Sin ella (`undefined` o `null`), ignora la carrera.
   const puedeEn =
-    carreraACargo === undefined
-      ? tiene
-      : (p: string, carreraId: string | null | undefined) =>
-          tiene(p) && (carreraId == null || carreraId === carreraACargo);
+    typeof carreraACargo === 'string'
+      ? (p: string, carreraId: string | null | undefined) =>
+          tiene(p) && (carreraId == null || carreraId === carreraACargo)
+      : tiene;
   const sesion = {
     identidad: {
       id: 'u1',
       nombre: 'Usuario de prueba',
       permisos: [...opciones.permisos],
       roles: [],
-      carreraACargo: carreraACargo ?? 'c1',
+      carreraACargo: carreraACargo === undefined ? 'c1' : carreraACargo,
     },
     cargando: false,
     puede: tiene,

@@ -15,12 +15,24 @@ import type {
 
 /* ── Atributos del graduado (RF120–RF128) ─────────────────────────────── */
 
-export async function listarAtributos(texto?: string): Promise<AtributoGraduado[]> {
-  return cliente.get<AtributoGraduado[]>('/atributos', { texto });
+export async function listarAtributos(
+  carreraId: string,
+  texto?: string,
+): Promise<AtributoGraduado[]> {
+  return cliente.get<AtributoGraduado[]>(`/carreras/${carreraId}/atributos`, { texto });
 }
 
-export async function crearAtributo(codigo: string, nombre: string): Promise<AtributoGraduado> {
-  return cliente.post<AtributoGraduado>('/atributos', { codigo, nombre });
+export async function crearAtributo(
+  carreraId: string,
+  codigo: string,
+  nombre: string,
+): Promise<AtributoGraduado> {
+  return cliente.post<AtributoGraduado>(`/carreras/${carreraId}/atributos`, { codigo, nombre });
+}
+
+/** RF-CH-029: solo si nada lo usa; si no, el servidor responde 409 con el motivo. */
+export async function eliminarAtributo(id: string): Promise<void> {
+  await cliente.delete(`/atributos/${id}`);
 }
 
 export async function editarAtributo(
@@ -77,4 +89,9 @@ export async function cambiarEstadoCriterio(
   activo: boolean,
 ): Promise<CriterioAcreditacion> {
   return cliente.patch<CriterioAcreditacion>(`/criterios/${id}/estado`, { activo });
+}
+
+/** RF-CH-032: solo si ningún plan de mejora lo referencia; si no, 409 con el motivo. */
+export async function eliminarCriterio(id: string): Promise<void> {
+  await cliente.delete(`/criterios/${id}`);
 }

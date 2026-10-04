@@ -326,7 +326,7 @@ function ModalCompetencia({
   );
   const [error, setError] = useState<string | null>(null);
 
-  const { data: atributos } = useAtributos();
+  const { data: atributos } = useAtributos(planId);
   const crear = useCrearCompetencia(planId);
   const editar = useEditarCompetencia();
   const guardando = crear.isPending || editar.isPending;

@@ -38,7 +38,7 @@ export const claves = {
   /** Prefijo de competencias, atributos y cobertura. */
   competencias: ['competencias'] as const,
   competenciasDe: (planId?: string) => ['competencias', planId ?? 'todas'] as const,
-  atributos: ['competencias', 'atributos'] as const,
+  atributos: (planId?: string) => ['competencias', 'atributos', planId ?? 'todos'] as const,
   coberturaDe: (planId?: string) => ['competencias', 'cobertura', planId ?? 'todas'] as const,
   asignaturas: (planId: string) => ['asignaturas', planId] as const,
   auditoria: (entidad: string, id: string) => ['auditoria', entidad, id] as const,
@@ -287,9 +287,12 @@ export function useQuitarObjetivoDelPlan(planId: string) {
   );
 }
 
-/** §6.2: los atributos del marco, para el selector del formulario. */
-export function useAtributos() {
-  return useQuery({ queryKey: claves.atributos, queryFn: api.listarAtributos });
+/** §6.2: los atributos de la carrera del plan, para el selector del formulario. */
+export function useAtributos(planId?: string) {
+  return useQuery({
+    queryKey: claves.atributos(planId),
+    queryFn: () => api.listarAtributos(planId),
+  });
 }
 
 /**

@@ -176,3 +176,14 @@ describe('CompetenciasPage — eliminar del plan (RF-CH-018)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('CompetenciasPage — atributos de la carrera del plan (Bloque 5)', () => {
+  it('el formulario pide los atributos del plan en curso, no los de todas las carreras', async () => {
+    montar();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva competencia' }));
+    await screen.findByRole('dialog', { name: 'Nueva competencia' });
+
+    await waitFor(() => expect(api.listarAtributos).toHaveBeenCalledWith('p1'));
+  });
+});

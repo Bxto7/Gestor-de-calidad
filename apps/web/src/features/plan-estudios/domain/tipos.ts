@@ -86,6 +86,8 @@ export interface AtributoGraduado {
   /** AG-I01…AG-I11 en ICACIT. */
   codigo: string;
   nombre: string;
+  /** Bloque 5: la carrera a la que pertenece. */
+  carreraId?: string;
 }
 
 /**

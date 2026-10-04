@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { useCarreras } from '@/features/plan-estudios/api/queries';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
@@ -33,28 +34,32 @@ import {
   useCrearCriterio,
   useCriterios,
   useEditarCriterio,
+  useEliminarCriterio,
 } from '../api/queries';
+import { ConfirmarEliminacion } from '../components/ConfirmarEliminacion';
+import { carreraDeTrabajo } from '../domain/carrera-de-trabajo';
 import type { CriterioAcreditacion } from '../domain/tipos';
 
 export function CriteriosPage() {
   const { publicar } = useEncabezado();
 
+  const { identidad } = useSesion();
   const { data: carreras } = useCarreras();
   const [elegida, setElegida] = useState('');
   const [enEdicion, setEnEdicion] = useState<CriterioAcreditacion | null>(null);
   const [creando, setCreando] = useState(false);
+  const [aEliminar, setAEliminar] = useState<CriterioAcreditacion | null>(null);
 
-  /**
-   * La elección del usuario, o la primera carrera disponible.
-   *
-   * Se deriva en vez de fijarse con un efecto: escribir estado en respuesta a
-   * datos que acaban de llegar provoca un render de más y deja la pantalla un
-   * instante en un estado que no corresponde a nada.
-   */
-  const carreraId = elegida || (carreras?.[0]?.id ?? '');
+  // RF-CH-030: quien tiene carrera trabaja con la suya, sin selector.
+  const { carreraId, conSelector } = carreraDeTrabajo(
+    identidad?.carreraACargo,
+    elegida,
+    carreras?.[0]?.id ?? '',
+  );
 
   const { data: criterios, isLoading } = useCriterios(carreraId);
   const cambiarEstado = useCambiarEstadoCriterio();
+  const eliminar = useEliminarCriterio();
 
   useEffect(() => {
     publicar({ migas: [{ etiqueta: 'Criterios de Acreditación' }], acciones: null });
@@ -75,19 +80,21 @@ export function CriteriosPage() {
         }
       />
 
-      <Selector
-        aria-label="Carrera"
-        value={carreraId}
-        onChange={(e) => setElegida(e.target.value)}
-        className="max-w-sm"
-      >
-        <option value="">Selecciona una carrera…</option>
-        {(carreras ?? []).map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.codigo} — {c.nombre}
-          </option>
-        ))}
-      </Selector>
+      {conSelector && (
+        <Selector
+          aria-label="Carrera"
+          value={carreraId}
+          onChange={(e) => setElegida(e.target.value)}
+          className="max-w-sm"
+        >
+          <option value="">Selecciona una carrera…</option>
+          {(carreras ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.codigo} — {c.nombre}
+            </option>
+          ))}
+        </Selector>
+      )}
 
       {!carreraId ? (
         <EstadoVacio
@@ -144,6 +151,9 @@ export function CriteriosPage() {
                         >
                           {c.activo ? 'Inactivar' : 'Reactivar'}
                         </Boton>
+                        <Boton variante="fantasma" tamano="sm" onClick={() => setAEliminar(c)}>
+                          Eliminar
+                        </Boton>
                       </div>
                     </SiPuede>
                   </td>
@@ -160,6 +170,19 @@ export function CriteriosPage() {
           carreraId={carreraId}
           criterio={enEdicion}
           onCerrar={() => setEnEdicion(null)}
+        />
+      )}
+      {aEliminar && (
+        <ConfirmarEliminacion
+          titulo="Eliminar criterio"
+          descripcion={
+            <>
+              Se eliminará <strong>{aEliminar.codigo}</strong> de la carrera y no se podrá
+              recuperar. Si ya no debe usarse, inactívalo en su lugar.
+            </>
+          }
+          onConfirmar={() => eliminar.mutateAsync(aEliminar.id)}
+          onCerrar={() => setAEliminar(null)}
         />
       )}
     </div>

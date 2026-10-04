@@ -1,9 +1,9 @@
 /**
  * Atributos del Graduado — RF120 a RF123 y RF128.
  *
- * El atributo pertenece al marco de acreditación, no a un plan: es el estándar
- * contra el que se acredita, y varios planes adoptan el mismo registro. Por eso
- * la pantalla cuelga de la raíz y no de un plan de estudios.
+ * El atributo pertenece a una carrera y a un marco de acreditación, no a un plan:
+ * varios planes de la carrera adoptan el mismo registro. La pantalla usa la
+ * carrera de la sesión; solo quien lee con alcance global elige.
  *
  * Inactivar avisa antes de confirmar (RF123): retirar un atributo que once
  * competencias desarrollan no es lo mismo que retirar uno sin usar, y el
@@ -14,6 +14,8 @@ import { useEffect, useState } from 'react';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+import { useCarreras } from '@/features/plan-estudios/api/queries';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
   Badge,
@@ -24,6 +26,7 @@ import {
   Entrada,
   EstadoVacio,
   Modal,
+  Selector,
 } from '@/shared/components/ui';
 
 import * as api from '../api/acreditacion.api';
@@ -32,18 +35,33 @@ import {
   useCambiarEstadoAtributo,
   useCrearAtributo,
   useEditarAtributo,
+  useEliminarAtributo,
 } from '../api/queries';
+import { ConfirmarEliminacion } from '../components/ConfirmarEliminacion';
+import { carreraDeTrabajo } from '../domain/carrera-de-trabajo';
 import type { AtributoGraduado, ImpactoAtributo } from '../domain/tipos';
 
 export function AtributosPage() {
   const { publicar } = useEncabezado();
+  const { identidad } = useSesion();
+  const { data: carreras } = useCarreras();
 
+  const [elegida, setElegida] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [enEdicion, setEnEdicion] = useState<AtributoGraduado | null>(null);
   const [creando, setCreando] = useState(false);
   const [aInactivar, setAInactivar] = useState<AtributoGraduado | null>(null);
+  const [aEliminar, setAEliminar] = useState<AtributoGraduado | null>(null);
 
-  const { data: atributos, isLoading } = useAtributos(busqueda.trim() || undefined);
+  // RF-CH-027: quien tiene carrera trabaja con la suya, sin selector.
+  const { carreraId, conSelector } = carreraDeTrabajo(
+    identidad?.carreraACargo,
+    elegida,
+    carreras?.[0]?.id ?? '',
+  );
+
+  const { data: atributos, isLoading } = useAtributos(carreraId, busqueda.trim() || undefined);
+  const eliminar = useEliminarAtributo();
 
   useEffect(() => {
     publicar({ migas: [{ etiqueta: 'Atributos del Graduado' }], acciones: null });
@@ -56,13 +74,29 @@ export function AtributosPage() {
         titulo="Atributos del Graduado"
         descripcion="El perfil contra el que se acredita el programa. Las competencias del plan se mapean a estos atributos."
         acciones={
-          <SiPuede permiso="atributo.gestionar">
-            <Boton variante="primario" onClick={() => setCreando(true)}>
+          <SiPuede permiso="atributo.gestionar" carreraId={carreraId}>
+            <Boton variante="primario" disabled={!carreraId} onClick={() => setCreando(true)}>
               Nuevo atributo
             </Boton>
           </SiPuede>
         }
       />
+
+      {conSelector && (
+        <Selector
+          aria-label="Carrera"
+          value={carreraId}
+          onChange={(e) => setElegida(e.target.value)}
+          className="max-w-sm"
+        >
+          <option value="">Selecciona una carrera…</option>
+          {(carreras ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.codigo} — {c.nombre}
+            </option>
+          ))}
+        </Selector>
+      )}
 
       {/* RF128 RN1: la búsqueda aplica sobre código y nombre. */}
       <Entrada
@@ -74,21 +108,28 @@ export function AtributosPage() {
         className="max-w-sm"
       />
 
-      {isLoading ? (
+      {!carreraId ? (
+        <EstadoVacio
+          titulo="Elige una carrera"
+          detalle="Los atributos del graduado se definen por carrera profesional."
+        />
+      ) : isLoading ? (
         <Cargando etiqueta="Cargando atributos…" />
       ) : (atributos ?? []).length === 0 ? (
         <EstadoVacio
-          titulo={busqueda ? 'Sin resultados' : 'Todavía no hay atributos del graduado'}
+          titulo={
+            busqueda ? 'Sin resultados' : 'Esta carrera todavía no tiene atributos del graduado'
+          }
           detalle={
             busqueda
               ? 'Ningún atributo coincide con la búsqueda.'
-              : 'Los once atributos de ICACIT se siembran con el sistema.'
+              : 'Quien gestiona la carrera crea los que necesite con «Nuevo atributo».'
           }
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-sm">
-            <caption className="sr-only">Atributos del graduado del marco de acreditación</caption>
+            <caption className="sr-only">Atributos del graduado de la carrera</caption>
             <thead className="bg-slate-50 text-left">
               <tr>
                 <th scope="col" className="px-4 py-3 font-semibold">
@@ -129,7 +170,7 @@ export function AtributosPage() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <SiPuede permiso="atributo.gestionar">
+                    <SiPuede permiso="atributo.gestionar" carreraId={carreraId}>
                       <div className="flex justify-end gap-2">
                         <Boton variante="fantasma" tamano="sm" onClick={() => setEnEdicion(a)}>
                           Editar
@@ -141,6 +182,9 @@ export function AtributosPage() {
                         >
                           {a.activo ? 'Inactivar' : 'Reactivar'}
                         </Boton>
+                        <Boton variante="fantasma" tamano="sm" onClick={() => setAEliminar(a)}>
+                          Eliminar
+                        </Boton>
                       </div>
                     </SiPuede>
                   </td>
@@ -151,22 +195,43 @@ export function AtributosPage() {
         </div>
       )}
 
-      {creando && <ModalAtributo onCerrar={() => setCreando(false)} />}
-      {enEdicion && <ModalAtributo atributo={enEdicion} onCerrar={() => setEnEdicion(null)} />}
+      {creando && <ModalAtributo carreraId={carreraId} onCerrar={() => setCreando(false)} />}
+      {enEdicion && (
+        <ModalAtributo
+          carreraId={carreraId}
+          atributo={enEdicion}
+          onCerrar={() => setEnEdicion(null)}
+        />
+      )}
       {aInactivar && <ModalEstado atributo={aInactivar} onCerrar={() => setAInactivar(null)} />}
+      {aEliminar && (
+        <ConfirmarEliminacion
+          titulo="Eliminar atributo"
+          descripcion={
+            <>
+              Se eliminará <strong>{aEliminar.codigo}</strong> de la carrera y no se podrá
+              recuperar. Si ya no debe usarse, inactívalo en su lugar.
+            </>
+          }
+          onConfirmar={() => eliminar.mutateAsync(aEliminar.id)}
+          onCerrar={() => setAEliminar(null)}
+        />
+      )}
     </div>
   );
 }
 
 /** RF120 y RF121. */
 function ModalAtributo({
+  carreraId,
   atributo,
   onCerrar,
 }: {
+  carreraId: string;
   atributo?: AtributoGraduado;
   onCerrar: () => void;
 }) {
-  const crear = useCrearAtributo();
+  const crear = useCrearAtributo(carreraId);
   const editar = useEditarAtributo();
 
   const [codigo, setCodigo] = useState(atributo?.codigo ?? '');
@@ -191,7 +256,7 @@ function ModalAtributo({
     <Modal
       abierto
       titulo={atributo ? 'Editar atributo del graduado' : 'Nuevo atributo del graduado'}
-      descripcion="El código es único dentro del marco de acreditación."
+      descripcion="El código es único dentro de la carrera y del marco de acreditación."
       onCerrar={onCerrar}
       pie={
         <>

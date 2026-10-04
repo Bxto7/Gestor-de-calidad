@@ -1,13 +1,15 @@
 /**
  * Tipos de las entidades de acreditación: atributos del graduado y criterios.
  *
- * El atributo pertenece al marco (ICACIT, SINEACE…) y no a un plan: su código
- * es único dentro del marco y varios planes adoptan el mismo registro. El
- * criterio, en cambio, pertenece a una carrera concreta.
+ * El atributo pertenece a una carrera (cada una tiene los suyos dentro del marco
+ * ICACIT, SINEACE…) y su código es único dentro de ella y del marco. El criterio
+ * también pertenece a una carrera.
  */
 
 export interface AtributoGraduado {
   readonly id: string;
+  /** RF-CH-027: la carrera a la que pertenece. */
+  readonly carreraId: string;
   readonly marco: string;
   readonly codigo: string;
   readonly nombre: string;

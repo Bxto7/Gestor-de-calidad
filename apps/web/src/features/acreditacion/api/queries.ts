@@ -11,17 +11,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './acreditacion.api';
 
 export const claves = {
-  atributos: (texto?: string) => ['acreditacion', 'atributos', texto ?? ''] as const,
+  atributos: (carreraId: string, texto?: string) =>
+    ['acreditacion', 'atributos', carreraId, texto ?? ''] as const,
   criterios: (carreraId: string, texto?: string) =>
     ['acreditacion', 'criterios', carreraId, texto ?? ''] as const,
 };
 
 /* ── Atributos ────────────────────────────────────────────────────────── */
 
-export function useAtributos(texto?: string) {
+export function useAtributos(carreraId: string, texto?: string) {
   return useQuery({
-    queryKey: claves.atributos(texto),
-    queryFn: () => api.listarAtributos(texto),
+    queryKey: claves.atributos(carreraId, texto),
+    queryFn: () => api.listarAtributos(carreraId, texto),
+    enabled: !!carreraId,
   });
 }
 
@@ -37,10 +39,14 @@ function useMutacionDeAtributos<TVars, TDatos>(fn: (v: TVars) => Promise<TDatos>
   });
 }
 
-export function useCrearAtributo() {
+export function useCrearAtributo(carreraId: string) {
   return useMutacionDeAtributos((v: { codigo: string; nombre: string }) =>
-    api.crearAtributo(v.codigo, v.nombre),
+    api.crearAtributo(carreraId, v.codigo, v.nombre),
   );
+}
+
+export function useEliminarAtributo() {
+  return useMutacionDeAtributos((id: string) => api.eliminarAtributo(id));
 }
 
 export function useEditarAtributo() {
@@ -89,4 +95,8 @@ export function useCambiarEstadoCriterio() {
   return useMutacionDeCriterios((v: { id: string; activo: boolean }) =>
     api.cambiarEstadoCriterio(v.id, v.activo),
   );
+}
+
+export function useEliminarCriterio() {
+  return useMutacionDeCriterios((id: string) => api.eliminarCriterio(id));
 }
