@@ -37,7 +37,7 @@ export interface RepositorioCriterioPort {
   actualizar(id: string, codigo: string, nombre: string): Promise<DatosCriterio>;
   cambiarEstado(id: string, activo: boolean): Promise<DatosCriterio>;
   /** RF-CH-032: borrado físico; quien llama ya comprobó que ningún plan de mejora lo usa. */
-  eliminar(id: string): Promise<void>;
+  eliminar(id: string): Promise<boolean>;
 }
 
 export const REPOSITORIO_CRITERIO = Symbol('RepositorioCriterioPort');

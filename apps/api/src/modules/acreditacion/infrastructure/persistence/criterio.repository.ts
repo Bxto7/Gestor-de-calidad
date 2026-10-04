@@ -115,8 +115,13 @@ export class CriterioRepositoryPrisma implements RepositorioCriterioPort {
     return aDatos(fila);
   }
 
-  /** RF-CH-032: borrado físico. Quien llama ya comprobó que ningún plan de mejora lo referencia. */
-  async eliminar(id: string): Promise<void> {
-    await this.prisma.criterioAcreditacion.delete({ where: { id } });
+  /**
+   * RF-CH-032: borrado físico. Quien llama ya comprobó que ningún plan de mejora lo
+   * referencia. `false` si otra persona ya lo había eliminado (`deleteMany` no lanza
+   * si no hay fila, a diferencia de `delete`).
+   */
+  async eliminar(id: string): Promise<boolean> {
+    const { count } = await this.prisma.criterioAcreditacion.deleteMany({ where: { id } });
+    return count > 0;
   }
 }

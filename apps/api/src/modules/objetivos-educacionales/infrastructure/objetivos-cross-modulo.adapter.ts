@@ -1,9 +1,7 @@
 /**
  * Implementa `ObjetivosCrossModuloPort` — mismo patrón que `AcreditacionAdapter`
- * real (inyecta por token de puerto, no por clase concreta de Prisma), no el
- * patrón que tenía el propio `AcreditacionAdapter` antes de que el módulo
- * `objetivos-educacionales` existiera (que sí envolvía la clase concreta
- * directamente porque compartía archivo).
+ * (módulo `acreditacion`): inyecta por token de puerto, no por clase concreta
+ * de Prisma.
  */
 
 import { Inject, Injectable } from '@nestjs/common';

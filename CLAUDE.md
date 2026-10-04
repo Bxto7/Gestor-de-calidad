@@ -129,7 +129,7 @@ Se están construyendo **en paralelo**:
 >   sistema), D-6 (sin RF que defina los prerrequisitos), D-9 (`RF047`, plan
 >   ISI 2018 con sumillas «pendiente»; la parte de horas teóricas en 0 la retiró RF-CH-020), D-11 (`RF127`, se muestran deshabilitadas en vez de excluirse), D-12
 >   (`RF-PE-020`, evidencia solo como enlace), D-13 (`RF-PE-006` RN2, remite a
->   números equivocados) D-14 (`RF-PE-032`/`033`, sin la plantilla institucional) y D-15 (`RF-CH-029`/`032`, eliminar atributos y criterios bloquea ante cualquier uso y no solo ante el de Mejora Continua activa).
+>   números equivocados), D-14 (`RF-PE-032`/`033`, sin la plantilla institucional) y D-15 (`RF-CH-029`/`032`, eliminar atributos y criterios bloquea ante cualquier uso y no solo ante el de Mejora Continua activa).
 >   D-7 y D-8 están ratificadas y D-10 aprobada.
 > - **`RF127` cumple el resultado pero no la forma que pide.** Desde el 25 de
 >   septiembre de 2026 ningún plan de medición puede incluir una competencia sin

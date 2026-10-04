@@ -88,6 +88,7 @@ function montarCriterios(
     eliminar: async (id) => {
       orden.push('eliminar');
       eliminados.push(id);
+      return true;
     },
     ...opciones.repo,
   };
@@ -410,7 +411,7 @@ describe('Operaciones por id: alcance de la fila y gestión contra su carrera', 
 });
 
 describe('RF-CH-032 — eliminar criterio de acreditación', () => {
-  it('elimina el criterio sin planes de mejora y publica el evento antes de borrar', async () => {
+  it('elimina el criterio sin planes de mejora y publica el evento después de borrar', async () => {
     const { caso, publicados, orden, eliminados, consultasEnUso } = montarCriterios({
       repo: { porId: async () => criterio({ id: 'cri-9', codigo: 'C-09', nombre: 'Gestión' }) },
     });
@@ -419,7 +420,7 @@ describe('RF-CH-032 — eliminar criterio de acreditación', () => {
 
     expect(consultasEnUso).toEqual(['cri-9']);
     expect(eliminados).toEqual(['cri-9']);
-    expect(orden).toEqual(['eventos', 'eliminar']);
+    expect(orden).toEqual(['eliminar', 'eventos']);
     expect(publicados[0]?.nombre).toBe('acreditacion.criterio_eliminado');
     expect(publicados[0]?.detalle).toBe('Criterio de acreditación C-09 «Gestión» eliminado.');
   });
@@ -462,6 +463,13 @@ describe('RF-CH-032 — eliminar criterio de acreditación', () => {
       expect(r.consultasEnUso).toEqual([]);
       expect(r.eliminados).toEqual([]);
     }
+  });
+
+  it('carrera crítica: si otro lo eliminó antes, NoEncontrado y sin evento', async () => {
+    const { caso, publicados } = montarCriterios({ repo: { eliminar: async () => false } });
+
+    await expect(caso.eliminar(ACTOR, 'cri-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(publicados).toHaveLength(0);
   });
 
   it('un criterio inexistente es NoEncontrado', async () => {

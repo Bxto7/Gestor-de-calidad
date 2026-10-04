@@ -1,16 +1,12 @@
 /**
- * Lo que `mejora` expone a `plan-estudios` (RF132): cuántos planes de mejora
- * referencian un elemento suyo.
+ * Lo que `mejora` expone sobre sus planes (RF132): cuántos planes de mejora
+ * referencian un elemento suyo. Hoy lo consume solo `CriterioEnUsoAdapter`,
+ * dentro de `mejora`, que a su vez implementa el puerto `CriterioEnUsoPort` de
+ * `acreditacion` (D-15): el dueño del dato declara e implementa, y quien lo
+ * necesita solo habla por puerto.
  *
- * Primera dependencia circular de primer nivel del proyecto (§2f/§4 del
- * diseño de 2c-J-B): `mejora-continua → plan-estudios` ya existía vía
- * `ContenidoCurricularPort`/`AcreditacionPort`; este puerto abre la
- * dirección opuesta. El dueño del dato (`mejora`) declara e implementa el
- * puerto; `plan-estudios` solo lo consume — sigue siendo "hablar por
- * puerto", igual que en todos los demás casos, con el dueño invertido.
- *
- * Blindado por dos guardias simétricas de aislamiento — ver
- * `mejora-continua/aislamiento.spec.ts` y `plan-estudios/aislamiento.spec.ts`.
+ * Blindado por las guardias de aislamiento — ver `mejora-continua/aislamiento.spec.ts`
+ * y `acreditacion/aislamiento.spec.ts`.
  */
 
 import type { AspectoPlanMejora } from './plan-mejora.port.js';

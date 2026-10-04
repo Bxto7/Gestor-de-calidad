@@ -145,7 +145,7 @@ export class GestionarCriterios {
    * foránea que lo respalde, así que esta pregunta a Mejora Continua es la única
    * defensa; es previa y no transaccional, y la carrera con «crear un plan de
    * mejora con este criterio» se acepta (§3.4 del diseño). El evento se publica
-   * justo antes de escribir, ya superada la comprobación de uso.
+   * después de borrar, para no registrar un borrado que no ocurrió.
    */
   async eliminar(actor: Actor, id: string): Promise<void> {
     const actual = await this.filaGestionable(actor, id);
@@ -159,8 +159,11 @@ export class GestionarCriterios {
       );
     }
 
+    // `false`: otra persona lo eliminó entre la lectura y el borrado.
+    if (!(await this.criterios.eliminar(id))) {
+      throw new NoEncontrado('el criterio de acreditación', id);
+    }
     await this.eventos.publicar([new CriterioEliminado(actor, id, actual.codigo, actual.nombre)]);
-    await this.criterios.eliminar(id);
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */

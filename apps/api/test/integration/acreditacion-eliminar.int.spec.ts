@@ -251,6 +251,13 @@ describe('RF-CH-029 — eliminar un atributo', () => {
 });
 
 describe('RF-CH-032 — eliminar un criterio', () => {
+  it('el repositorio borra el criterio y dice false si ya no existe, sin lanzar', async () => {
+    const criterio = await criterios().crear(coordinador, isi, 'C-07', 'Libre');
+
+    expect(await criteriosRepo.eliminar(criterio.id)).toBe(true);
+    expect(await criteriosRepo.eliminar(criterio.id)).toBe(false);
+  });
+
   it('un criterio sin planes de mejora se borra, y el homónimo de otra carrera no se entera', async () => {
     const otro = await crearCoordinador('coo2@x.pe', civ);
     const mio = await criterios().crear(coordinador, isi, 'C-01', 'Estudiantes');

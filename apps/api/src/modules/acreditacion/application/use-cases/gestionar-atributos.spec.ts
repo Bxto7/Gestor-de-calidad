@@ -583,7 +583,7 @@ describe('RF122 — atributos declarados por un plan', () => {
 });
 
 describe('RF-CH-029 — eliminar atributo del graduado', () => {
-  it('elimina el atributo libre y publica el evento antes de borrar', async () => {
+  it('elimina el atributo libre y publica el evento después de borrar', async () => {
     const { caso, publicados, orden, eliminados } = montarAtributos({
       repo: { porId: async () => atributo({ id: 'atr-9', codigo: 'AG-I09', nombre: 'Diseño' }) },
     });
@@ -591,8 +591,8 @@ describe('RF-CH-029 — eliminar atributo del graduado', () => {
     await caso.eliminar(ACTOR, 'atr-9');
 
     expect(eliminados).toEqual(['atr-9']);
-    // Antes de escribir: después, el código y el nombre ya no existirían en ninguna parte.
-    expect(orden).toEqual(['eventos', 'eliminar']);
+    // Después de borrar: la bitácora es append-only y no puede contar un borrado que no ocurrió.
+    expect(orden).toEqual(['eliminar', 'eventos']);
     expect(publicados[0]?.nombre).toBe('acreditacion.atributo_eliminado');
     expect(publicados[0]?.detalle).toBe('Atributo del graduado AG-I09 «Diseño» eliminado.');
   });
@@ -663,10 +663,12 @@ describe('RF-CH-029 — eliminar atributo del graduado', () => {
   });
 
   it('carrera crítica: si en la transacción el atributo ya está en uso, 409 y nada se borra', async () => {
-    const { caso } = montarAtributos({ repo: { eliminar: async () => false } });
+    const { caso, publicados } = montarAtributos({ repo: { eliminar: async () => false } });
 
     await expect(caso.eliminar(ACTOR, 'atr-1')).rejects.toThrow(
       'El atributo AG-I01 cambió mientras se eliminaba: ahora está en uso o ya no existe. No se borró nada.',
     );
+    // Un borrado que no ocurrió no deja evento.
+    expect(publicados).toHaveLength(0);
   });
 });

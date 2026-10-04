@@ -1,6 +1,6 @@
 /**
  * Implementa `AcademicoCrossModuloPort` reutilizando `RepositorioCarreraPort`
- * — mismo patrón que `AcreditacionAdapter` en `plan-estudios`: se inyecta por
+ * — mismo patrón que `AcreditacionAdapter` en `acreditacion`: se inyecta por
  * el token del puerto, no por la clase concreta `CarreraRepositoryPrisma`,
  * para no acoplar este adaptador a Prisma y para que la Task 6 (wiring) solo
  * tenga que registrar un provider por token, no una clase específica.

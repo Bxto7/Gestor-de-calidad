@@ -178,8 +178,8 @@ export class GestionarAtributos {
    * documento, que solo bloquea si el uso es de Mejora Continua activa; ver §5 del
    * diseño). Mejora Continua solo llega a los atributos por las competencias, así
    * que ese recuento ya la cubre. El rechazo explica el motivo y sugiere inactivar
-   * (RF123). El evento se publica justo antes de escribir, ya superadas las
-   * comprobaciones de uso.
+   * (RF123). El evento se publica después de borrar: la bitácora es append-only y
+   * no puede registrar un borrado que no ocurrió (la transacción puede rechazarlo).
    */
   async eliminar(actor: Actor, id: string): Promise<void> {
     const actual = await this.filaGestionable(actor, id);
@@ -189,8 +189,6 @@ export class GestionarAtributos {
       throw new ReglaDeNegocioViolada(mensajeEnUso(actual.codigo, uso));
     }
 
-    await this.eventos.publicar([new AtributoEliminado(actor, id, actual.codigo, actual.nombre)]);
-
     // La comprobación de arriba es solo para dar el motivo; la que protege los
     // vínculos es la de la transacción de borrado.
     if (!(await this.atributos.eliminar(id))) {
@@ -198,6 +196,8 @@ export class GestionarAtributos {
         `El atributo ${actual.codigo} cambió mientras se eliminaba: ahora está en uso o ya no existe. No se borró nada.`,
       );
     }
+
+    await this.eventos.publicar([new AtributoEliminado(actor, id, actual.codigo, actual.nombre)]);
   }
 
   /** RF122: los atributos que este plan de estudios adopta. */

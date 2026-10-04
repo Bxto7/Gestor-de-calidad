@@ -31,7 +31,7 @@ function repoCriterio(sobre: Partial<RepositorioCriterioPort> = {}): Repositorio
     crear: async () => criterio(),
     actualizar: async () => criterio(),
     cambiarEstado: async () => criterio(),
-    eliminar: async () => undefined,
+    eliminar: async () => true,
     ...sobre,
   };
 }
