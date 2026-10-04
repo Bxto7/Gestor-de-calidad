@@ -28,6 +28,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   CompetenciaConAtributos,
@@ -45,6 +46,7 @@ import type {
 } from '../ports/configuracion-evaluacion.port.js';
 import type {
   DatosPlanEvaluacion,
+  FiltroPlanesEvaluacion,
   RepositorioPlanEvaluacionPort,
 } from '../ports/plan-evaluacion.port.js';
 import { GestionarPlanesEvaluacion } from './gestionar-planes-evaluacion.use-case.js';
@@ -55,7 +57,7 @@ function permitirTodo(): AuthorizationPort {
   return {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
+    carreraACargoDe: async () => 'car-1',
     rolesDe: async () => [],
   };
 }
@@ -76,7 +78,56 @@ function denegarRegistrando(pedidos: string[]): AuthorizationPort {
       return { permitido: false, motivo: 'Falta el permiso.' };
     },
     permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
+    carreraACargoDe: async () => 'car-1',
+    rolesDe: async () => [],
+  };
+}
+
+/** Sin restricción de lectura, como el Consultor. */
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Quien lee solo una carrera (o ninguna si es `null`): el Coordinador desde el Bloque 6a. */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
+/**
+ * Como la política real: concede toda lectura y la escritura solo sobre
+ * `carreraPropia`. Anota cada permiso pedido; `sinPermisos` los niega aunque la
+ * carrera sea la suya.
+ */
+function autorizarEn(
+  carreraPropia: string | null,
+  pedidos: string[] = [],
+  sinPermisos: readonly string[] = [],
+): AuthorizationPort {
+  return {
+    puede: async (_id, permiso, carreraId) => {
+      pedidos.push(permiso);
+      if (sinPermisos.includes(permiso)) {
+        return { permitido: false, motivo: `Falta el permiso ${permiso}.` };
+      }
+      if (permiso.endsWith('.leer')) return { permitido: true };
+      if (carreraPropia === null) {
+        return { permitido: false, motivo: 'El usuario no tiene ninguna carrera asignada.' };
+      }
+      return carreraId === carreraPropia
+        ? { permitido: true }
+        : {
+            permitido: false,
+            motivo: 'El usuario no dirige la carrera a la que pertenece este plan.',
+          };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => carreraPropia,
     rolesDe: async () => [],
   };
 }
@@ -256,6 +307,8 @@ function montar(
     contenido?: Partial<ContenidoCurricularPort>;
     configuraciones?: Partial<RepositorioConfiguracionEvaluacionPort>;
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
+    planes?: Partial<RepositorioPlanEvaluacionPort>;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -295,6 +348,7 @@ function montar(
       };
       return evaluacionActual;
     },
+    ...opciones.planes,
   });
 
   const curricular = contenido({
@@ -311,6 +365,7 @@ function montar(
     configuraciones,
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    opciones.alcance ?? sinRestriccion(),
   );
 
   return { caso, publicados, pedidos };
@@ -324,20 +379,6 @@ describe('RF-PE-001 y RF-PE-002 — el alta', () => {
 
     expect(creado.estado).toBe('Borrador');
     expect(creado.codigo).toBe('EV-PE-ISI-2026-v2-D-v1');
-  });
-
-  it('el plan de evaluación se guarda con la carrera de su base (RF-CH-037)', async () => {
-    let recibida = '';
-    const { caso } = montar({ base: planMedicion({ carreraId: 'car-1' }) });
-    const original = caso['evaluaciones'].crear.bind(caso['evaluaciones']);
-    caso['evaluaciones'].crear = async (d) => {
-      recibida = d.carreraId;
-      return original(d);
-    };
-
-    await caso.crear(ACTOR, 'pm-1');
-
-    expect(recibida).toBe('car-1');
   });
 
   it('RN3: una base que no está Aprobado ni Vigente se rechaza', async () => {
@@ -362,12 +403,12 @@ describe('RF-PE-001 y RF-PE-002 — el alta', () => {
     await expect(caso.crear(ACTOR, 'pm-desconocido')).rejects.toThrow(NoEncontrado);
   });
 
-  it('exige `evaluacion.crear`', async () => {
+  it('exige `evaluacion.leer` y luego `evaluacion.crear`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: autorizarEn('car-1', pedidos, ['evaluacion.crear']) });
 
     await expect(caso.crear(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['evaluacion.crear']);
+    expect(pedidos).toEqual(['evaluacion.leer', 'evaluacion.crear']);
   });
 
   it('deja constancia en la bitácora, nombrando la base', async () => {
@@ -471,12 +512,14 @@ describe('RF-PE-008 — el borrado', () => {
     await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(ReglaDeNegocioViolada);
   });
 
-  it('exige `evaluacion.eliminar`', async () => {
+  it('exige `evaluacion.leer` y luego `evaluacion.eliminar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({
+      autorizacion: autorizarEn('car-1', pedidos, ['evaluacion.eliminar']),
+    });
 
     await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['evaluacion.eliminar']);
+    expect(pedidos).toEqual(['evaluacion.leer', 'evaluacion.eliminar']);
   });
 
   it('deja constancia en la bitácora, nombrando el plan', async () => {
@@ -692,60 +735,157 @@ describe('RF-PE-044 — el vigente', () => {
   });
 });
 
-/**
- * El alcance por carrera (2c-C): `mejora-continua` no comprobaba la carrera en
- * ninguno de sus casos de uso. `crear` la saca del plan de medición base que
- * llega en la petición; `eliminar` y `transicionar` la sacan del propio plan
- * de evaluación, saltando por su base.
- */
-describe('el alcance por carrera (2c-C)', () => {
-  it('crear un plan de evaluación en la carrera de otro se deniega', async () => {
-    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
-      carreraId === 'carrera-propia'
-        ? ({ permitido: true } as const)
-        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
-    );
+describe('RF-CH-037 — el alta en la carrera de la sesión', () => {
+  it('el plan se guarda con la carrera de la sesión, que el cliente no envía', async () => {
+    let recibida = '';
     const { caso } = montar({
-      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
-      autorizacion: {
-        puede,
-        permisosDe: async () => new Set(),
-        carreraACargoDe: async () => null,
-        rolesDe: async () => [],
+      autorizacion: autorizarEn('car-1'),
+      planes: {
+        crear: async (d) => {
+          recibida = d.carreraId;
+          return evaluacion({ carreraId: d.carreraId, codigo: d.codigo });
+        },
       },
     });
 
-    await expect(caso.crear(ACTOR, 'pm-1')).rejects.toThrow(AccesoDenegado);
-    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'evaluacion.crear', 'carrera-ajena');
+    await caso.crear(ACTOR, 'pm-1');
+
+    expect(recibida).toBe('car-1');
   });
 
-  /**
-   * Las tres operaciones que escriben, una por una: la propiedad que se
-   * comprueba es la misma en las tres —que la carrera que llega a `puede()`
-   * es la del plan, y no `null`—.
-   */
-  it.each([
-    ['crear', (caso: GestionarPlanesEvaluacion) => caso.crear(ACTOR, 'pm-1')],
-    ['eliminar', (caso: GestionarPlanesEvaluacion) => caso.eliminar(ACTOR, 'ev-1')],
-    [
-      'transicionar',
-      (caso: GestionarPlanesEvaluacion) =>
-        caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {}),
-    ],
-  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
-    const puede = vi.fn(async () => ({ permitido: true }) as const);
+  it('un plan de medición base de otra carrera es 409 y no se crea nada', async () => {
+    let creados = 0;
+    const { caso, publicados } = montar({
+      autorizacion: autorizarEn('car-1'),
+      base: planMedicion({ carreraId: 'car-2' }),
+      planes: {
+        crear: async (d) => {
+          creados++;
+          return evaluacion({ codigo: d.codigo });
+        },
+      },
+    });
+
+    await expect(caso.crear(ACTOR, 'pm-1')).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'El plan de medición base no es de tu carrera: un plan de evaluación se construye sobre un plan de medición de la carrera con la que trabajas.',
+      ),
+    );
+    expect(creados).toBe(0);
+    expect(publicados).toHaveLength(0);
+  });
+
+  it('sin carrera asignada: AccesoDenegado con el motivo, antes de mirar la base', async () => {
+    let consultada = false;
+    const { caso } = montar({ autorizacion: autorizarEn(null) });
+    const mediciones = caso['mediciones'];
+    const porIdOriginal = mediciones.porId.bind(mediciones);
+    mediciones.porId = async (id) => {
+      consultada = true;
+      return porIdOriginal(id);
+    };
+
+    await expect(caso.crear(ACTOR, 'pm-1')).rejects.toThrow('No tienes una carrera asignada');
+    expect(consultada).toBe(false);
+  });
+});
+
+describe('RF-CH-038 — listados según el alcance de lectura', () => {
+  it('el listado de quien lee solo su carrera se acota a la suya aunque pida otra', async () => {
+    const filtros: (FiltroPlanesEvaluacion | undefined)[] = [];
     const { caso } = montar({
-      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      alcance: soloCarrera('car-1'),
+      planes: {
+        listar: async (f) => {
+          filtros.push(f);
+          return [];
+        },
+      },
+    });
+
+    await caso.listar(ACTOR, { carreraId: 'car-2', estado: 'Borrador' });
+
+    expect(filtros).toEqual([{ carreraId: 'car-1', estado: 'Borrador' }]);
+  });
+
+  it('las bases elegibles también se acotan a su carrera', async () => {
+    const { caso, pedidos } = montar({ alcance: soloCarrera('car-1') });
+
+    await caso.basesElegibles(ACTOR);
+
+    expect(pedidos.filtros).toEqual([
+      { estado: 'Vigente', carreraId: 'car-1' },
+      { estado: 'Aprobado', carreraId: 'car-1' },
+    ]);
+  });
+
+  it('sin carrera legible: listado y bases vacíos, sin consultar', async () => {
+    const { caso, pedidos } = montar({ alcance: soloCarrera(null) });
+
+    expect(await caso.listar(ACTOR)).toEqual([]);
+    expect(await caso.basesElegibles(ACTOR)).toEqual([]);
+    expect(pedidos.filtros).toEqual([]);
+  });
+});
+
+type OperacionEv = (caso: GestionarPlanesEvaluacion) => Promise<unknown>;
+
+const SOBRE_UNA_EVALUACION: readonly (readonly [string, OperacionEv])[] = [
+  ['porId', (caso) => caso.porId(ACTOR, 'ev-1')],
+  ['eliminar', (caso) => caso.eliminar(ACTOR, 'ev-1')],
+  ['transicionar', (caso) => caso.transicionar(ACTOR, 'ev-1', 'enviar-a-revision', {})],
+];
+
+describe('Orden de comprobación sobre un plan existente (RF-CH-038)', () => {
+  it('(1) sin evaluacion.leer: AccesoDenegado, aunque el plan sea de otra carrera', async () => {
+    const pedidos: string[] = [];
+    const { caso } = montar({
+      autorizacion: autorizarEn('car-1', pedidos, ['evaluacion.leer']),
+      alcance: soloCarrera('car-2'),
+    });
+
+    await expect(caso.porId(ACTOR, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(pedidos).toEqual(['evaluacion.leer']);
+  });
+
+  it.each(SOBRE_UNA_EVALUACION)(
+    '(2) %s sobre un plan de otra carrera es NoEncontrado y no pide escritura',
+    async (_nombre, ejecutar) => {
+      const pedidos: string[] = [];
+      const { caso, publicados } = montar({
+        autorizacion: autorizarEn('car-2', pedidos),
+        alcance: soloCarrera('car-2'),
+      });
+
+      await expect(ejecutar(caso)).rejects.toBeInstanceOf(NoEncontrado);
+      expect(pedidos.every((p) => p === 'evaluacion.leer')).toBe(true);
+      expect(publicados).toHaveLength(0);
+    },
+  );
+
+  it('(2) la evaluación vigente de un plan de medición de otra carrera es NoEncontrado', async () => {
+    const { caso } = montar({ alcance: soloCarrera('car-2') });
+
+    await expect(caso.vigenteDe(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('(3) el permiso de escritura se pide con la carrera del propio plan de evaluación', async () => {
+    const carreras: (string | null)[] = [];
+    const { caso } = montar({
+      evaluacion: evaluacion({ carreraId: 'car-1' }),
       autorizacion: {
-        puede,
+        puede: async (_id, permiso, carreraId) => {
+          if (permiso === 'evaluacion.eliminar') carreras.push(carreraId ?? null);
+          return { permitido: true };
+        },
         permisosDe: async () => new Set(),
-        carreraACargoDe: async () => null,
+        carreraACargoDe: async () => 'car-1',
         rolesDe: async () => [],
       },
     });
 
-    await ejecutar(caso).catch(() => undefined);
+    await caso.eliminar(ACTOR, 'ev-1');
 
-    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
+    expect(carreras).toEqual(['car-1']);
   });
 });

@@ -784,6 +784,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         REPOSITORIO_CONFIGURACION_EVALUACION,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         evaluaciones: RepositorioPlanEvaluacionPort,
@@ -792,6 +793,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         configuraciones: RepositorioConfiguracionEvaluacionPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GestionarPlanesEvaluacion(
           evaluaciones,
@@ -800,6 +802,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           configuraciones,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {

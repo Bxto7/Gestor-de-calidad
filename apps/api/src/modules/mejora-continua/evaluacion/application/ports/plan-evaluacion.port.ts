@@ -74,6 +74,8 @@ export interface ContenidoEvaluacionACopiar {
 
 export interface FiltroPlanesEvaluacion {
   readonly planMedicionId?: string;
+  /** RF-CH-038: la impone el caso de uso según el alcance de lectura, nunca el cliente. */
+  readonly carreraId?: string;
   /** Filtra atravesando la relación: el tipo vive en el plan de medición. */
   readonly tipo?: TipoMedicion;
   readonly estado?: EstadoMedicion;

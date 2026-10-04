@@ -8,6 +8,11 @@
  * cada vez, para que un plan de medición Aprobado o Vigente (que ya no cambia)
  * sea la única fuente de verdad y no haya una segunda copia que pueda
  * desincronizarse.
+ *
+ * Bloque 6a (RF-CH-037, RF-CH-038): el plan es de la carrera de la sesión y se
+ * lee según el alcance de lectura, con el mismo orden de comprobación que
+ * `GestionarPlanesMedicion`: lectura 403 → existencia y alcance 404 → permiso
+ * acotado a la carrera del plan 403 → reglas 409.
  */
 
 import type {
@@ -19,8 +24,14 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import {
+  carreraDeLaSesion,
+  carreraImpuesta,
+  exigirPlanLegible,
+} from '../../../application/alcance-de-planes.js';
 import {
   agruparPorAtributo,
   type GrupoDeCompetencias,
@@ -73,34 +84,38 @@ export class GestionarPlanesEvaluacion {
     private readonly configuraciones: RepositorioConfiguracionEvaluacionPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /**
-   * RF-PE-001 RN3: los planes de medición sobre los que se puede levantar un
-   * plan de evaluación.
+   * RF-PE-001 RN3 y RF-CH-037: los planes de medición sobre los que se puede
+   * levantar un plan de evaluación, dentro de la carrera que impone el alcance.
    *
-   * Dos llamadas a `mediciones.listar`, una por estado, y no una lista de
-   * estados en el filtro: `FiltroPlanesMedicion.estado` admite un único valor y
-   * ya lo consumen otros tres casos de uso, así que ampliarlo por esto no
-   * compensa. Y no se trae todo para filtrar en memoria: dos consultas por
-   * clave indexada cuestan menos que arrastrar planes que se van a descartar.
+   * Dos llamadas a `mediciones.listar`, una por estado: `FiltroPlanesMedicion.estado`
+   * admite un único valor, y dos consultas por clave indexada cuestan menos que
+   * arrastrar planes que se van a descartar.
    */
   async basesElegibles(actor: Actor): Promise<DatosPlanMedicion[]> {
     await this.exigir(actor, 'evaluacion.leer', null);
-    const vigentes = await this.mediciones.listar({ estado: 'Vigente' });
-    const aprobados = await this.mediciones.listar({ estado: 'Aprobado' });
+    const carrera = await carreraImpuesta(this.alcance, actor);
+    if (carrera === null) return [];
+    const vigentes = await this.mediciones.listar({ estado: 'Vigente', carreraId: carrera });
+    const aprobados = await this.mediciones.listar({ estado: 'Aprobado', carreraId: carrera });
     return [...vigentes, ...aprobados];
   }
 
+  /** RF-PE-009 y RF-CH-038: la carrera la impone el alcance; la del filtro se pisa. */
   async listar(actor: Actor, filtro?: FiltroPlanesEvaluacion): Promise<DatosPlanEvaluacion[]> {
     await this.exigir(actor, 'evaluacion.leer', null);
-    return this.evaluaciones.listar(filtro);
+    const carrera = await carreraImpuesta(this.alcance, actor);
+    if (carrera === null) return [];
+    return this.evaluaciones.listar({ ...filtro, carreraId: carrera });
   }
 
   /** RF-PE-010 a RF-PE-012: arma la vista leyendo la base, nada se copia. */
   async porId(actor: Actor, id: string): Promise<VistaPlanEvaluacion> {
     await this.exigir(actor, 'evaluacion.leer', null);
-    const plan = await this.exigirPlan(id);
+    const plan = await this.planLegible(actor, id);
     const base = await this.exigirBase(plan.planMedicionId);
 
     const [catalogo, matriz] = await Promise.all([
@@ -134,24 +149,37 @@ export class GestionarPlanesEvaluacion {
     };
   }
 
-  /** RF-PE-044: cero o uno vigente por plan de medición. */
+  /** RF-PE-044: cero o uno vigente por plan de medición —legible—. */
   async vigenteDe(actor: Actor, planMedicionId: string): Promise<DatosPlanEvaluacion | null> {
     await this.exigir(actor, 'evaluacion.leer', null);
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.mediciones.porId(planMedicionId),
+      'el plan de medición',
+      planMedicionId,
+    );
     return this.evaluaciones.vigenteDe(planMedicionId);
   }
 
   /**
-   * RF-PE-001 y RF-PE-002: el alta.
-   *
-   * La carrera sale del plan de medición base que llega en la petición, no de
-   * uno que todavía no existe: un plan de evaluación no puede resolver su
-   * propia carrera antes de nacer.
+   * RF-PE-001, RF-PE-002 y RF-CH-037: el alta, en la carrera de la sesión, sobre
+   * un plan de medición de esa misma carrera.
    */
   async crear(actor: Actor, planMedicionId: string): Promise<DatosPlanEvaluacion> {
+    await this.exigir(actor, 'evaluacion.leer', null);
+    const carreraId = await carreraDeLaSesion(this.autorizacion, actor, 'planes de evaluación');
+    await this.exigir(actor, 'evaluacion.crear', carreraId);
+
     const base = await this.mediciones.porId(planMedicionId);
     if (!base) throw new NoEncontrado('el plan de medición', planMedicionId);
 
-    await this.exigir(actor, 'evaluacion.crear', await this.carreraDe(base.planEstudiosId));
+    // RF-CH-037 RN1: la asociación es automática y no editable.
+    if (base.carreraId !== carreraId) {
+      throw new ReglaDeNegocioViolada(
+        'El plan de medición base no es de tu carrera: un plan de evaluación se construye sobre un plan de medición de la carrera con la que trabajas.',
+      );
+    }
 
     // RN3: un plan de medición que todavía se edita puede cambiar sus
     // competencias y sus periodos bajo los pies del plan de evaluación que se
@@ -172,11 +200,7 @@ export class GestionarPlanesEvaluacion {
       await this.evaluaciones.codigosDe(base.planEstudiosId, base.tipo),
     );
 
-    const creado = await this.evaluaciones.crear({
-      planMedicionId: base.id,
-      carreraId: base.carreraId,
-      codigo,
-    });
+    const creado = await this.evaluaciones.crear({ planMedicionId: base.id, carreraId, codigo });
 
     await this.eventos.publicar([
       new PlanEvaluacionCreado(actor, creado.id, creado.codigo, base.codigo),
@@ -186,9 +210,7 @@ export class GestionarPlanesEvaluacion {
 
   /** RF-PE-008: solo un Borrador se elimina. */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    const plan = await this.exigirPlan(id);
-    const base = await this.exigirBase(plan.planMedicionId);
-    await this.exigir(actor, 'evaluacion.eliminar', await this.carreraDe(base.planEstudiosId));
+    const plan = await this.planGestionable(actor, id, 'evaluacion.eliminar');
 
     if (!permiteEliminacion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
@@ -207,14 +229,9 @@ export class GestionarPlanesEvaluacion {
     accion: AccionMedicion,
     contexto: { comentario?: string },
   ): Promise<DatosPlanEvaluacion> {
-    const plan = await this.exigirPlan(id);
-    const base = await this.exigirBase(plan.planMedicionId);
     const transicion = describirTransicion(accion);
-    await this.exigir(
-      actor,
-      `evaluacion.${transicion.permiso}`,
-      await this.carreraDe(base.planEstudiosId),
-    );
+    const plan = await this.planGestionable(actor, id, `evaluacion.${transicion.permiso}`);
+    const base = await this.exigirBase(plan.planMedicionId);
 
     // RF-PE-041 RN1: la validación integral es requisito previo, pero solo
     // para las transiciones que la exigen (enviar a revisión y aprobar). Se
@@ -330,9 +347,26 @@ export class GestionarPlanesEvaluacion {
     return `Hay inconsistencias bloqueantes sin resolver: ${detalle}.`;
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanEvaluacion> {
-    const plan = await this.evaluaciones.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de evaluación', id);
+  /** (2) Existe y su carrera entra en el alcance de lectura; si no, NoEncontrado. */
+  private async planLegible(actor: Actor, id: string): Promise<DatosPlanEvaluacion> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(id),
+      'el plan de evaluación',
+      id,
+    );
+  }
+
+  /** (1) a (3): lectura, existencia y alcance, y el permiso sobre la carrera del plan. */
+  private async planGestionable(
+    actor: Actor,
+    id: string,
+    permiso: string,
+  ): Promise<DatosPlanEvaluacion> {
+    await this.exigir(actor, 'evaluacion.leer', null);
+    const plan = await this.planLegible(actor, id);
+    await this.exigir(actor, permiso, plan.carreraId);
     return plan;
   }
 
@@ -340,21 +374,6 @@ export class GestionarPlanesEvaluacion {
     const base = await this.mediciones.porId(planMedicionId);
     if (!base) throw new NoEncontrado('el plan de medición', planMedicionId);
     return base;
-  }
-
-  /**
-   * La carrera del plan, para acotar el permiso.
-   *
-   * Sale de la cadena que ya existe —evaluación → medición → plan de estudios—
-   * y no de una columna propia: desnormalizarla es una migración que se añade
-   * el día que el número lo justifique, y hoy no hay número.
-   */
-  private async carreraDe(planEstudiosId: string): Promise<string> {
-    const plan = await this.curricular.planPorId(planEstudiosId);
-    if (!plan) {
-      throw new NoEncontrado('el plan de estudios', planEstudiosId);
-    }
-    return plan.carreraId;
   }
 
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {

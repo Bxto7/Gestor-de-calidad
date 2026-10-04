@@ -115,6 +115,7 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
     const filas = await this.prisma.planEvaluacion.findMany({
       where: {
         ...(filtro.planMedicionId ? { planMedicionId: filtro.planMedicionId } : {}),
+        ...(filtro.carreraId ? { carreraId: filtro.carreraId } : {}),
         ...(filtro.estado ? { estado: A_BD[filtro.estado] } : {}),
         ...(filtro.texto
           ? { codigo: { contains: filtro.texto, mode: 'insensitive' as const } }
