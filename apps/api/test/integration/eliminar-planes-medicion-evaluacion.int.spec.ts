@@ -136,7 +136,7 @@ describe('RF-CH-035 — eliminar un plan de medición', () => {
     ['EN_REVISION', 'En revisión', ''],
   ] as const)(
     'en %s se borra con sus periodos, y queda en la bitácora%s',
-    async (estado, texto) => {
+    async (estado, texto, _rotulo) => {
       const pm = await medicion('PM-1', estado);
       await prisma.periodoMedicion.create({
         data: { planMedicionId: pm.id, etiqueta: '2026-I', orden: 1 },
