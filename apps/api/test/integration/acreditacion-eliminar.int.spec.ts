@@ -15,11 +15,7 @@ import type {
   Actor,
   PublicadorDeEventos,
 } from '../../src/shared-kernel/domain-events/domain-event.js';
-import {
-  AccesoDenegado,
-  NoEncontrado,
-  ReglaDeNegocioViolada,
-} from '../../src/shared-kernel/errors/errores.js';
+import { NoEncontrado, ReglaDeNegocioViolada } from '../../src/shared-kernel/errors/errores.js';
 import { AcademicoCrossModuloAdapter } from '../../src/modules/academico/infrastructure/academico-cross-modulo.adapter.js';
 import { CarreraRepositoryPrisma } from '../../src/modules/academico/infrastructure/persistence/academico.repository.js';
 import { GestionarAtributos } from '../../src/modules/acreditacion/application/use-cases/gestionar-atributos.use-case.js';
@@ -215,12 +211,10 @@ describe('RF-CH-029 — eliminar un atributo', () => {
     );
   });
 
-  it('el atributo de otra carrera: el Coordinador recibe AccesoDenegado y nada se borra', async () => {
+  it('el atributo de otra carrera: el Coordinador recibe NoEncontrado y nada se borra', async () => {
     const deCiv = await atributoDe(civ, 'AG-I09');
 
-    await expect(atributos().eliminar(coordinador, deCiv.id)).rejects.toBeInstanceOf(
-      AccesoDenegado,
-    );
+    await expect(atributos().eliminar(coordinador, deCiv.id)).rejects.toBeInstanceOf(NoEncontrado);
     expect(await prisma.atributoGraduado.count({ where: { carreraId: civ } })).toBe(11);
   });
 
@@ -301,13 +295,11 @@ describe('RF-CH-032 — eliminar un criterio', () => {
     expect(await criteriosRepo.porId(criterio.id)).toBeNull();
   });
 
-  it('el criterio de otra carrera: el Coordinador recibe AccesoDenegado y nada se borra', async () => {
+  it('el criterio de otra carrera: el Coordinador recibe NoEncontrado y nada se borra', async () => {
     const otro = await crearCoordinador('coo2@x.pe', civ);
     const ajeno = await criterios().crear(otro, civ, 'C-01', 'De Civil');
 
-    await expect(criterios().eliminar(coordinador, ajeno.id)).rejects.toBeInstanceOf(
-      AccesoDenegado,
-    );
+    await expect(criterios().eliminar(coordinador, ajeno.id)).rejects.toBeInstanceOf(NoEncontrado);
     expect(await criteriosRepo.porId(ajeno.id)).not.toBeNull();
   });
 });

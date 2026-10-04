@@ -88,11 +88,23 @@ describe('AuthorizationAdapter.alcanceDeLectura', () => {
     expect(await adaptador.alcanceDeLectura(consultor.id)).toEqual({ tipo: 'TODAS' });
   });
 
-  it('un Coordinador con carrera a cargo tampoco: la marca es solo del Director', async () => {
+  it('un Coordinador con carrera a cargo queda restringido a ella (Bloque 6a)', async () => {
     const sis = await crearCarrera('SIS');
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
 
-    expect(await adaptador.alcanceDeLectura(coordinador.id)).toEqual({ tipo: 'TODAS' });
+    expect(await adaptador.alcanceDeLectura(coordinador.id)).toEqual({
+      tipo: 'CARRERA',
+      carreraId: sis,
+    });
+  });
+
+  it('un Coordinador sin carrera queda restringido y sin carrera: no lee ninguna', async () => {
+    const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', null);
+
+    expect(await adaptador.alcanceDeLectura(coordinador.id)).toEqual({
+      tipo: 'CARRERA',
+      carreraId: null,
+    });
   });
 
   it('una cuenta inactiva se queda sin permisos, y sin la marca: TODAS (su permiso de lectura ya falla)', async () => {
@@ -209,7 +221,7 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     expect(r.flatMap((a) => a.competencias.map((c) => c.codigo))).toEqual(['CPE-01']);
   });
 
-  it('la cobertura sin planId del Coordinador cuenta los atributos y las competencias de todas las carreras', async () => {
+  it('la cobertura sin planId del Coordinador cuenta solo los de su carrera (Bloque 6a)', async () => {
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
@@ -230,9 +242,9 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
 
     const r = await gestionarCompetencias().cobertura(como(coordinador));
 
-    expect(r).toHaveLength(22);
-    // La cobertura ordena por carrera (CIV antes que SIS) y no por código de competencia.
-    expect(r.flatMap((a) => a.competencias.map((c) => c.codigo))).toEqual(['CPE-02', 'CPE-01']);
+    expect(r).toHaveLength(11);
+    expect(new Set(r.map((a) => a.carreraId))).toEqual(new Set([sis]));
+    expect(r.flatMap((a) => a.competencias.map((c) => c.codigo))).toEqual(['CPE-01']);
   });
 
   it('los atributos sin planId del Director son los de su carrera; sin carrera asignada, ninguno', async () => {
@@ -272,7 +284,7 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     );
   });
 
-  it('el Coordinador sin planId recibe el catálogo entero, también las filas sin carrera', async () => {
+  it('el Coordinador sin planId recibe solo las de su carrera (Bloque 6a)', async () => {
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
@@ -281,7 +293,7 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     await competenciaEn('CPE-03', null);
 
     const r = await gestionarCompetencias().listar(como(coordinador));
-    expect(r.map((c) => c.codigo)).toEqual(['CPE-01', 'CPE-02', 'CPE-03']);
+    expect(r.map((c) => c.codigo)).toEqual(['CPE-01']);
   });
 
   it('el Director no puede quitar una competencia de un plan de otra carrera: NoEncontrado y nada cambia', async () => {
@@ -362,7 +374,7 @@ describe('RF-CH-015 / RF-CH-009 — objetivos según el alcance de lectura', () 
     );
   });
 
-  it('el Coordinador sin planId recibe el catálogo entero, también las filas sin carrera', async () => {
+  it('el Coordinador sin planId recibe solo las de su carrera (Bloque 6a)', async () => {
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
@@ -371,7 +383,7 @@ describe('RF-CH-015 / RF-CH-009 — objetivos según el alcance de lectura', () 
     await objetivoEn('OE-03', null);
 
     const r = await gestionarObjetivos().listar(como(coordinador));
-    expect(r.map((o) => o.codigo)).toEqual(['OE-01', 'OE-02', 'OE-03']);
+    expect(r.map((o) => o.codigo)).toEqual(['OE-01']);
   });
 
   it('el Director no puede quitar un objetivo de un plan de otra carrera: NoEncontrado y nada cambia', async () => {

@@ -14,8 +14,12 @@ cuál carrera*. Son una conjunción: no basta con tener el permiso.
   continua, listados en la política): se ejercen **solo** sobre la carrera que el
   usuario tiene asignada. Un Director puede *consultar* planes de cualquier
   carrera, pero *editar/aprobar* solo los de la suya.
-- **Permisos de solo lectura** (los `.leer`): **no** están acotados — se puede
-  consultar cualquier carrera.
+- **Permisos de solo lectura** (los `.leer`): no están acotados por la política;
+  lo que los acota es la marca **`lectura.solo_su_carrera`**. Quien la tiene
+  —Director y, desde el Bloque 6a (RF-CH-034, RF-CH-038), Coordinador— lee solo
+  la carrera que tiene a cargo: lo de otra responde 404, como si no existiera, y
+  sin carrera asignada no lee ninguna. Sin la marca (Administrador, Consultor)
+  se lee cualquier carrera.
 - Un usuario tiene **una sola** carrera a cargo (lo impone un `UNIQUE` sobre
   `usuario_id` en `usuario_carrera`).
 - El rol y la carrera llegan juntos a la decisión: un Director sin carrera
@@ -86,6 +90,9 @@ carrera** — sobre la de otro director solo puede consultar.
 ## 4. COORDINADOR_ACADEMICO — Coordinador académico
 
 **Requiere carrera:** Sí (una).
+**Alcance de lectura:** solo su carrera (`lectura.solo_su_carrera`, Bloque 6a).
+Planes de medición, de evaluación, catálogo, cobertura y Acreditación de otra
+carrera le responden 404; el panel general de Reportes, 403.
 **Filosofía:** apoyo operativo: **arma** el plan y lo envía a revisión, pero
 **no aprueba ni observa**. La separación es deliberada: *quien construye no
 puede ser quien da el visto bueno* — eso es lo que hace que la aprobación

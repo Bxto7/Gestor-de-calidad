@@ -7,9 +7,9 @@
  * lectura, existencia y alcance (404, nunca 403), permiso de gestión acotado a la
  * carrera, reglas de negocio.
  *
- * El Coordinador, el único que gestiona, tiene alcance de lectura `TODAS`
- * (`sinRestriccion`): lee otras carreras, pero no escribe en ellas. El 404 por
- * alcance es lo que ve quien lee solo su carrera (`soloCarrera`).
+ * Con alcance de lectura `TODAS` (`sinRestriccion`) se leen otras carreras, pero no
+ * se escribe en ellas. El 404 por alcance es lo que ve quien lee solo su carrera
+ * (`soloCarrera`): desde el Bloque 6a, el Coordinador y el Director.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -265,11 +265,11 @@ describe('Orden de comprobación al crear y al listar (RF-CH-027, RF-CH-028)', (
     await expect(caso.listar(ACTOR, ISI)).rejects.toBeInstanceOf(NoEncontrado);
   });
 
-  it('(3) el Coordinador lee otra carrera (alcance TODAS) pero no escribe en ella: AccesoDenegado', async () => {
+  it('(3) quien lee con alcance TODAS lee otra carrera pero no escribe en ella: AccesoDenegado', async () => {
     const { caso } = montarAtributos({ permitido: SOLO_GESTIONA_ISI });
 
-    // DEJA CONSTANCIA: el alcance de lectura del Coordinador no lo limita a su
-    // carrera (la marca `lectura.solo_su_carrera` es solo del Director).
+    // Un rol con alcance de lectura global y una carrera a cargo (hoy ninguno del
+    // seed: desde el Bloque 6a el Coordinador lee solo la suya).
     await expect(caso.listar(ACTOR, IIN)).resolves.toHaveLength(1);
     await expect(caso.crear(ACTOR, IIN, 'AG-I12', 'Nuevo')).rejects.toBeInstanceOf(AccesoDenegado);
   });

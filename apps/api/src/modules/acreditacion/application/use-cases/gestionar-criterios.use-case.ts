@@ -10,8 +10,8 @@
  * comprobación: (1) permiso de lectura; (2) existencia y alcance de lectura de la
  * carrera —de la ruta o de la fila—: inexistente o fuera del alcance es
  * NoEncontrado (RF-CH-009), nunca AccesoDenegado; (3) permiso de gestión acotado;
- * (4) reglas de negocio. El Coordinador, el único que gestiona, tiene alcance de
- * lectura `TODAS`: lee otras carreras y lo que se le rechaza es escribir.
+ * (4) reglas de negocio. Desde el Bloque 6a el Coordinador —el único que
+ * gestiona— lee solo su carrera: otra es NoEncontrado.
  */
 
 import type {

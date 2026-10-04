@@ -1,7 +1,7 @@
 /**
  * Criterios por carrera (RF-CH-030, RF-CH-031) con la autorización real. Mismo
- * reparto que `acreditacion-atributos.int.spec.ts`: el Coordinador lee todas las
- * carreras (alcance `TODAS`) y gestiona solo la suya.
+ * reparto que `acreditacion-atributos.int.spec.ts`: desde el Bloque 6a el
+ * Coordinador lee y gestiona solo su carrera; otra es NoEncontrado.
  */
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -97,29 +97,32 @@ describe('el Coordinador y los criterios de su carrera', () => {
     ).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
   });
 
-  it('DEJA CONSTANCIA: lee los criterios de otra carrera (alcance TODAS) pero no escribe en ella', async () => {
+  it('otra carrera no existe para él: leer, crear, editar, inactivar y consultar son NoEncontrado', async () => {
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', isi);
     const otro = await crearUsuario('coo2@x.pe', 'COORDINADOR_ACADEMICO', civ);
     const deCiv = await gestionar().crear(como(otro), civ, 'C-01', 'De Civil');
 
-    expect(await gestionar().listar(como(coordinador), civ)).toHaveLength(1);
+    await expect(gestionar().listar(como(coordinador), civ)).rejects.toBeInstanceOf(NoEncontrado);
     await expect(
       gestionar().crear(como(coordinador), civ, 'C-02', 'Intruso'),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
+    ).rejects.toBeInstanceOf(NoEncontrado);
     await expect(
       gestionar().editar(como(coordinador), deCiv.id, 'C-01', 'Renombrado'),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
+    ).rejects.toBeInstanceOf(NoEncontrado);
     await expect(
       gestionar().cambiarEstado(como(coordinador), deCiv.id, false),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
-    expect((await gestionar().porId(como(coordinador), deCiv.id)).nombre).toBe('De Civil');
+    ).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(gestionar().porId(como(coordinador), deCiv.id)).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+    expect((await gestionar().porId(como(otro), deCiv.id)).nombre).toBe('De Civil');
   });
 
   it('un Coordinador sin carrera asignada no gestiona ninguna', async () => {
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', null);
 
     await expect(gestionar().crear(como(coordinador), isi, 'C-01', 'Nuevo')).rejects.toBeInstanceOf(
-      AccesoDenegado,
+      NoEncontrado,
     );
   });
 
@@ -129,7 +132,7 @@ describe('el Coordinador y los criterios de su carrera', () => {
     await expect(
       gestionar().listar(como(coordinador), '00000000-0000-4000-8000-000000000000'),
     ).rejects.toBeInstanceOf(NoEncontrado);
-    expect(await gestionar().listar(como(coordinador), civ)).toEqual([]);
+    expect(await gestionar().listar(como(coordinador), isi)).toEqual([]);
   });
 });
 

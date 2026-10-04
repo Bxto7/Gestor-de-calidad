@@ -56,8 +56,9 @@ const PERMISOS_ACOTADOS_A_CARRERA: ReadonlySet<string> = new Set([
   'criterio.gestionar',
 
   // Mejora Continua, por la misma razón que los de arriba: el rol dice
-  // «de su carrera». Los dos `.leer` quedan fuera a propósito, como los de
-  // Plan de Estudios — consultar un plan ajeno se permite, modificarlo no.
+  // «de su carrera». Los `.leer` quedan fuera a propósito: qué carreras lee cada
+  // rol no lo decide esta lista sino la marca `lectura.solo_su_carrera`, que
+  // desde el Bloque 6a tienen el Director y el Coordinador.
   'medicion.crear',
   'medicion.editar',
   'medicion.eliminar',

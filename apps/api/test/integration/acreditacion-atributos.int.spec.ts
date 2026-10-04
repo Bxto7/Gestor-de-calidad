@@ -2,10 +2,9 @@
  * Atributos por carrera (RF-CH-027, RF-CH-028) con la autorización real: el rol
  * COORDINADOR_ACADEMICO del seed, su carrera a cargo y `AlcanceDeLecturaPort`.
  *
- * Deja constancia de una asimetría que los dobles no revelan: el Coordinador
- * tiene alcance de lectura `TODAS` (la marca `lectura.solo_su_carrera` es solo
- * del Director), así que **lee** los atributos de otra carrera y lo que se le
- * rechaza es escribir (403). Una carrera inexistente da 404 a cualquiera.
+ * Desde el Bloque 6a el Coordinador lleva `lectura.solo_su_carrera`: otra carrera
+ * no existe para él, ni para leer ni para escribir (404). Quien lee todas —el
+ * Consultor— la lee, pero no la gestiona (403).
  */
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -130,40 +129,41 @@ describe('el Coordinador y los atributos de su carrera', () => {
     ).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
   });
 
-  it('DEJA CONSTANCIA: lee los atributos de otra carrera (alcance TODAS) pero no escribe en ella', async () => {
+  it('otra carrera no existe para él: leer, crear, editar e inactivar son NoEncontrado, y nada cambia', async () => {
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', isi);
 
-    expect(await gestionar().listar(como(coordinador), civ)).toHaveLength(11);
+    await expect(gestionar().listar(como(coordinador), civ)).rejects.toBeInstanceOf(NoEncontrado);
     await expect(
       gestionar().crear(como(coordinador), civ, 'AG-X01', 'Intruso'),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
-    expect(await prisma.atributoGraduado.count({ where: { carreraId: civ } })).toBe(11);
+    ).rejects.toBeInstanceOf(NoEncontrado);
 
     const deCiv = await prisma.atributoGraduado.findFirstOrThrow({ where: { carreraId: civ } });
     await expect(
       gestionar().editar(como(coordinador), deCiv.id, 'AG-I01', 'Renombrado'),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
+    ).rejects.toBeInstanceOf(NoEncontrado);
     await expect(
       gestionar().cambiarEstado(como(coordinador), deCiv.id, false),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
+    ).rejects.toBeInstanceOf(NoEncontrado);
+    expect(await prisma.atributoGraduado.count({ where: { carreraId: civ } })).toBe(11);
   });
 
-  it('un Coordinador sin carrera asignada no gestiona ninguna', async () => {
+  it('un Coordinador sin carrera asignada no ve ninguna: NoEncontrado', async () => {
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', null);
 
     await expect(
       gestionar().crear(como(coordinador), isi, 'AG-X01', 'Nuevo'),
-    ).rejects.toBeInstanceOf(AccesoDenegado);
+    ).rejects.toBeInstanceOf(NoEncontrado);
   });
 
   it('una carrera inexistente es NoEncontrado, y una carrera nueva empieza sin atributos', async () => {
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', isi);
+    const consultor = await crearUsuario('con@x.pe', 'USUARIO_CONSULTOR', null);
     const nueva = await crearCarrera('NUE');
 
     await expect(
       gestionar().listar(como(coordinador), '00000000-0000-4000-8000-000000000000'),
     ).rejects.toBeInstanceOf(NoEncontrado);
-    expect(await gestionar().listar(como(coordinador), nueva)).toEqual([]);
+    expect(await gestionar().listar(como(consultor), nueva)).toEqual([]);
   });
 });
 
@@ -222,11 +222,11 @@ describe('RF122 — declarar los atributos de un plan, solo de su carrera', () =
     ).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
   });
 
-  it('en el plan de otra carrera el Coordinador recibe AccesoDenegado', async () => {
+  it('el plan de otra carrera no existe para el Coordinador: NoEncontrado', async () => {
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', isi);
 
     await expect(gestionar().declararEnPlan(como(coordinador), planCiv, [])).rejects.toBeInstanceOf(
-      AccesoDenegado,
+      NoEncontrado,
     );
   });
 });

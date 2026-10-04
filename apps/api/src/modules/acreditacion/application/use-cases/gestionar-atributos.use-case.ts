@@ -11,8 +11,8 @@
  * lectura de la carrera —de la ruta, de la fila o del plan—: inexistente o fuera
  * del alcance es NoEncontrado (RF-CH-009, para no revelar si existe), nunca
  * AccesoDenegado; (3) permiso de gestión acotado a la carrera; (4) reglas de
- * negocio. El Coordinador, el único que gestiona, tiene alcance de lectura
- * `TODAS`: lee otras carreras y lo que se le rechaza es escribir.
+ * negocio. Desde el Bloque 6a el Coordinador —el único que gestiona— lee solo su
+ * carrera: otra es NoEncontrado. Quien lee todas (el Consultor) no gestiona.
  */
 
 import type {

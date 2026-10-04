@@ -245,6 +245,11 @@ export const ROLES: {
       // eso no exige darle acceso a los accesos de todos ni a los demás módulos.
       'auditoria.leer_entidad',
       'reporte.generar',
+      // Bloque 6a (RF-CH-034, RF-CH-038): ve solo los planes de su carrera, y la
+      // URL directa a los de otra se deniega. La marca acota TODAS sus lecturas,
+      // no solo las de Mejora Continua: carreras, planes de estudio, catálogo,
+      // cobertura, panel de reportes y Acreditación.
+      'lectura.solo_su_carrera',
     ],
   },
   {
