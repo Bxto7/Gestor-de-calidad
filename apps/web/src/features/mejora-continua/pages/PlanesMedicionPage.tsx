@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { usePlanes } from '@/features/plan-estudios/api/queries';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
@@ -26,12 +27,18 @@ import {
   Selector,
 } from '@/shared/components/ui';
 
-import { useCrearPlan, usePlanesMedicion } from '../api/queries';
+import { useCrearPlan, useEliminarPlanMedicion, usePlanesMedicion } from '../api/queries';
+import { EliminarPlan } from '../components/EliminarPlan';
 import { TONO_ESTADO } from '../domain/estado-medicion';
 import { porcentajeDeMeta, type TipoMedicion } from '../domain/tipos';
 
 export function PlanesMedicionPage() {
   const { publicar } = useEncabezado();
+  const { identidad, puede } = useSesion();
+  const eliminar = useEliminarPlanMedicion();
+  // RF-CH-034: quien lee solo su carrera y no tiene ninguna no ve nada; se le
+  // dice por qué en vez de enseñarle un listado vacío.
+  const sinCarrera = puede('lectura.solo_su_carrera') && !identidad?.carreraACargo;
 
   const [tipo, setTipo] = useState<'' | TipoMedicion>('');
   const [estado, setEstado] = useState('');
@@ -86,7 +93,12 @@ export function PlanesMedicionPage() {
         </Selector>
       </div>
 
-      {isLoading ? (
+      {sinCarrera ? (
+        <EstadoVacio
+          titulo="No tienes una carrera asignada"
+          detalle="Los planes de medición se ven y se crean por carrera. Pide al administrador que te asigne la tuya."
+        />
+      ) : isLoading ? (
         <Cargando etiqueta="Cargando planes de medición…" />
       ) : (planes ?? []).length === 0 ? (
         <EstadoVacio
@@ -117,6 +129,9 @@ export function PlanesMedicionPage() {
                 <th scope="col" className="px-4 py-3 font-semibold">
                   Estado
                 </th>
+                <th scope="col" className="px-4 py-3">
+                  <span className="sr-only">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -137,6 +152,14 @@ export function PlanesMedicionPage() {
                   <td className="px-4 py-3">
                     <Badge tono={TONO_ESTADO[p.estado]}>{p.estado}</Badge>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <EliminarPlan
+                      permiso="medicion.eliminar"
+                      plan={p}
+                      titulo="Eliminar plan de medición"
+                      eliminar={(id) => eliminar.mutateAsync(id)}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -153,11 +176,18 @@ export function PlanesMedicionPage() {
 function ModalNuevoPlan({ onCerrar }: { onCerrar: () => void }) {
   const crear = useCrearPlan();
 
-  // RF-PM-001 RN2: solo Aprobado o Vigente. El backend lo vuelve a comprobar;
-  // filtrar aquí evita ofrecer lo que va a rechazar.
-  const { data: planesEstudio } = usePlanes();
+  // RF-CH-033: la carrera es la de la sesión, sin selector. Sin carrera no hay
+  // alta: el modal lo explica en lugar del formulario.
+  const { identidad } = useSesion();
+  const carreraId = identidad?.carreraACargo ?? null;
+
+  // RF-PM-001 RN2: solo Aprobado o Vigente, y solo de su carrera. El backend lo
+  // vuelve a comprobar; filtrar aquí evita ofrecer lo que va a rechazar.
+  const { data: planesEstudio } = usePlanes(carreraId ? { carreraId } : undefined, {
+    enabled: carreraId !== null,
+  });
   const elegibles = (planesEstudio ?? []).filter(
-    (p) => p.estado === 'Aprobado' || p.estado === 'Vigente',
+    (p) => p.carreraId === carreraId && (p.estado === 'Aprobado' || p.estado === 'Vigente'),
   );
 
   const [planEstudiosId, setPlanEstudiosId] = useState('');
@@ -192,109 +222,122 @@ function ModalNuevoPlan({ onCerrar }: { onCerrar: () => void }) {
       descripcion="Se crea en Borrador. Las competencias y los periodos se configuran después."
       onCerrar={onCerrar}
       pie={
-        <>
+        carreraId === null ? (
           <Boton variante="secundario" onClick={onCerrar}>
-            Cancelar
+            Cerrar
           </Boton>
-          <Boton
-            variante="primario"
-            disabled={!planEstudiosId || crear.isPending}
-            onClick={() => void enviar()}
-          >
-            {crear.isPending ? 'Creando…' : 'Crear'}
-          </Boton>
-        </>
+        ) : (
+          <>
+            <Boton variante="secundario" onClick={onCerrar}>
+              Cancelar
+            </Boton>
+            <Boton
+              variante="primario"
+              disabled={!planEstudiosId || crear.isPending}
+              onClick={() => void enviar()}
+            >
+              {crear.isPending ? 'Creando…' : 'Crear'}
+            </Boton>
+          </>
+        )
       }
     >
-      <div className="space-y-4">
-        <Campo etiqueta="Plan de estudios" requerido>
-          {(props) => (
-            <Selector
-              {...props}
-              value={planEstudiosId}
-              onChange={(e) => setPlanEstudiosId(e.target.value)}
-            >
-              <option value="">Selecciona un plan…</option>
-              {elegibles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.codigo} — {p.estado}
-                </option>
-              ))}
-            </Selector>
-          )}
-        </Campo>
+      {carreraId === null ? (
+        <p role="status" className="text-sm text-tinta-suave">
+          No tienes una carrera asignada: un plan de medición se crea en la carrera con la que
+          trabajas. Pide al administrador que te asigne la tuya.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <Campo etiqueta="Plan de estudios" requerido>
+            {(props) => (
+              <Selector
+                {...props}
+                value={planEstudiosId}
+                onChange={(e) => setPlanEstudiosId(e.target.value)}
+              >
+                <option value="">Selecciona un plan…</option>
+                {elegibles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo} — {p.estado}
+                  </option>
+                ))}
+              </Selector>
+            )}
+          </Campo>
 
-        <Campo
-          etiqueta="Tipo de medición"
-          requerido
-          ayuda="La Directa se organiza por periodos académicos; la Indirecta, por años calendario."
-        >
-          {(props) => (
-            <Selector
-              {...props}
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value as TipoMedicion)}
-            >
-              <option value="DIRECTA">Directa</option>
-              <option value="INDIRECTA">Indirecta</option>
-            </Selector>
-          )}
-        </Campo>
-
-        <Campo etiqueta="Meta (%)" requerido ayuda="Entre 0 y 100. Es única para todo el plan.">
-          {(props) => (
-            <Entrada
-              {...props}
-              type="number"
-              min={0}
-              max={100}
-              value={meta}
-              onChange={(e) => setMeta(e.target.value)}
-            />
-          )}
-        </Campo>
-
-        {tipo === 'DIRECTA' && (
-          <div className="grid grid-cols-2 gap-3">
-            <Campo
-              etiqueta="Año de inicio"
-              ayuda="Desde aquí se proponen los periodos, dos por año."
-            >
-              {(props) => (
-                <Entrada
-                  {...props}
-                  type="number"
-                  min={2000}
-                  max={2100}
-                  value={anio}
-                  onChange={(e) => setAnio(e.target.value)}
-                />
-              )}
-            </Campo>
-            <Campo etiqueta="Periodo">
-              {(props) => (
-                <Selector
-                  {...props}
-                  value={mitad}
-                  onChange={(e) => setMitad(e.target.value as '1' | '2')}
-                >
-                  <option value="1">I</option>
-                  <option value="2">II</option>
-                </Selector>
-              )}
-            </Campo>
-          </div>
-        )}
-
-        {error && (
-          <p
-            role="alert"
-            className="rounded-lg bg-estado-inactivo-bg px-3 py-2 text-sm text-estado-inactivo-fg"
+          <Campo
+            etiqueta="Tipo de medición"
+            requerido
+            ayuda="La Directa se organiza por periodos académicos; la Indirecta, por años calendario."
           >
-            {error}
-          </p>
-        )}
-      </div>
+            {(props) => (
+              <Selector
+                {...props}
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as TipoMedicion)}
+              >
+                <option value="DIRECTA">Directa</option>
+                <option value="INDIRECTA">Indirecta</option>
+              </Selector>
+            )}
+          </Campo>
+
+          <Campo etiqueta="Meta (%)" requerido ayuda="Entre 0 y 100. Es única para todo el plan.">
+            {(props) => (
+              <Entrada
+                {...props}
+                type="number"
+                min={0}
+                max={100}
+                value={meta}
+                onChange={(e) => setMeta(e.target.value)}
+              />
+            )}
+          </Campo>
+
+          {tipo === 'DIRECTA' && (
+            <div className="grid grid-cols-2 gap-3">
+              <Campo
+                etiqueta="Año de inicio"
+                ayuda="Desde aquí se proponen los periodos, dos por año."
+              >
+                {(props) => (
+                  <Entrada
+                    {...props}
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={anio}
+                    onChange={(e) => setAnio(e.target.value)}
+                  />
+                )}
+              </Campo>
+              <Campo etiqueta="Periodo">
+                {(props) => (
+                  <Selector
+                    {...props}
+                    value={mitad}
+                    onChange={(e) => setMitad(e.target.value as '1' | '2')}
+                  >
+                    <option value="1">I</option>
+                    <option value="2">II</option>
+                  </Selector>
+                )}
+              </Campo>
+            </div>
+          )}
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg bg-estado-inactivo-bg px-3 py-2 text-sm text-estado-inactivo-fg"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }

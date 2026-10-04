@@ -20,6 +20,7 @@ function version(sobre: Partial<PlanMedicion>): PlanMedicion {
   return {
     id: 'p1',
     planEstudiosId: 'pe-1',
+    carreraId: 'c1',
     tipo: 'DIRECTA',
     codigo: 'PM-X-D-v1',
     version: 1,

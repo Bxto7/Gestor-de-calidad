@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
   Badge,
@@ -24,12 +25,23 @@ import {
   Selector,
 } from '@/shared/components/ui';
 
-import { useBasesElegibles, useCrearEvaluacion, usePlanesEvaluacion } from '../api/queries';
+import {
+  useBasesElegibles,
+  useCrearEvaluacion,
+  useEliminarPlanEvaluacion,
+  usePlanesEvaluacion,
+} from '../api/queries';
+import { EliminarPlan } from '../components/EliminarPlan';
 import { TONO_ESTADO } from '../domain/estado-medicion';
 import { porcentajeDeMeta, type TipoMedicion } from '../domain/tipos';
 
 export function PlanesEvaluacionPage() {
   const { publicar } = useEncabezado();
+  const { identidad, puede } = useSesion();
+  const eliminar = useEliminarPlanEvaluacion();
+  // RF-CH-038: quien lee solo su carrera y no tiene ninguna no ve nada; se le
+  // dice por qué en vez de enseñarle un listado vacío.
+  const sinCarrera = puede('lectura.solo_su_carrera') && !identidad?.carreraACargo;
 
   const [tipo, setTipo] = useState<'' | TipoMedicion>('');
   const [estado, setEstado] = useState('');
@@ -84,7 +96,12 @@ export function PlanesEvaluacionPage() {
         </Selector>
       </div>
 
-      {isLoading ? (
+      {sinCarrera ? (
+        <EstadoVacio
+          titulo="No tienes una carrera asignada"
+          detalle="Los planes de evaluación se ven y se crean por carrera. Pide al administrador que te asigne la tuya."
+        />
+      ) : isLoading ? (
         <Cargando etiqueta="Cargando planes de evaluación…" />
       ) : (planes ?? []).length === 0 ? (
         <EstadoVacio
@@ -109,6 +126,9 @@ export function PlanesEvaluacionPage() {
                 <th scope="col" className="px-4 py-3 font-semibold">
                   Creado
                 </th>
+                <th scope="col" className="px-4 py-3">
+                  <span className="sr-only">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -127,6 +147,14 @@ export function PlanesEvaluacionPage() {
                     <Badge tono={TONO_ESTADO[p.estado]}>{p.estado}</Badge>
                   </td>
                   <td className="px-4 py-3">{new Date(p.creadoEn).toLocaleDateString('es-PE')}</td>
+                  <td className="px-4 py-3 text-right">
+                    <EliminarPlan
+                      permiso="evaluacion.eliminar"
+                      plan={p}
+                      titulo="Eliminar plan de evaluación"
+                      eliminar={(id) => eliminar.mutateAsync(id)}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -147,10 +175,16 @@ function ModalNuevaEvaluacion({ onCerrar }: { onCerrar: () => void }) {
   // repetir el filtro aquí, a diferencia del alta de un plan de medición.
   const { data: bases } = useBasesElegibles();
 
+  // RF-CH-037: solo bases de la carrera de la sesión. El backend ya las acota por
+  // el alcance de lectura; esto cubre a quien lee todas pero crea en la suya.
+  const { identidad } = useSesion();
+  const carreraId = identidad?.carreraACargo ?? null;
+  const propias = (bases ?? []).filter((b) => b.carreraId === carreraId);
+
   const [planMedicionId, setPlanMedicionId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const baseElegida = (bases ?? []).find((b) => b.id === planMedicionId);
+  const baseElegida = propias.find((b) => b.id === planMedicionId);
 
   async function enviar() {
     setError(null);
@@ -170,63 +204,76 @@ function ModalNuevaEvaluacion({ onCerrar }: { onCerrar: () => void }) {
       descripcion="Se crea en Borrador. El tipo y la meta los hereda del plan de medición base."
       onCerrar={onCerrar}
       pie={
-        <>
+        carreraId === null ? (
           <Boton variante="secundario" onClick={onCerrar}>
-            Cancelar
+            Cerrar
           </Boton>
-          <Boton
-            variante="primario"
-            disabled={!planMedicionId || crear.isPending}
-            onClick={() => void enviar()}
-          >
-            {crear.isPending ? 'Creando…' : 'Crear'}
-          </Boton>
-        </>
+        ) : (
+          <>
+            <Boton variante="secundario" onClick={onCerrar}>
+              Cancelar
+            </Boton>
+            <Boton
+              variante="primario"
+              disabled={!planMedicionId || crear.isPending}
+              onClick={() => void enviar()}
+            >
+              {crear.isPending ? 'Creando…' : 'Crear'}
+            </Boton>
+          </>
+        )
       }
     >
-      <div className="space-y-4">
-        <Campo
-          etiqueta="Plan de medición base"
-          requerido
-          ayuda="Determina el tipo y la meta de la evaluación (RF-PE-001 RN2). Solo se ofrecen planes Aprobado o Vigente."
-        >
-          {(props) => (
-            <Selector
-              {...props}
-              value={planMedicionId}
-              onChange={(e) => setPlanMedicionId(e.target.value)}
-            >
-              <option value="">Selecciona un plan de medición…</option>
-              {(bases ?? []).map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.codigo} — {b.estado}
-                </option>
-              ))}
-            </Selector>
-          )}
-        </Campo>
-
-        {baseElegida && (
-          <p className="text-sm text-tinta-suave">
-            Se creará una evaluación{' '}
-            <span className="font-semibold">
-              {baseElegida.tipo === 'DIRECTA' ? 'directa' : 'indirecta'}
-            </span>{' '}
-            con meta del{' '}
-            <span className="font-semibold">{porcentajeDeMeta(baseElegida.meta)} %</span>, heredada
-            de {baseElegida.codigo}.
-          </p>
-        )}
-
-        {error && (
-          <p
-            role="alert"
-            className="rounded-lg bg-estado-inactivo-bg px-3 py-2 text-sm text-estado-inactivo-fg"
+      {carreraId === null ? (
+        <p role="status" className="text-sm text-tinta-suave">
+          No tienes una carrera asignada: un plan de evaluación se crea en la carrera con la que
+          trabajas. Pide al administrador que te asigne la tuya.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <Campo
+            etiqueta="Plan de medición base"
+            requerido
+            ayuda="Determina el tipo y la meta de la evaluación (RF-PE-001 RN2). Solo se ofrecen planes Aprobado o Vigente."
           >
-            {error}
-          </p>
-        )}
-      </div>
+            {(props) => (
+              <Selector
+                {...props}
+                value={planMedicionId}
+                onChange={(e) => setPlanMedicionId(e.target.value)}
+              >
+                <option value="">Selecciona un plan de medición…</option>
+                {propias.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.codigo} — {b.estado}
+                  </option>
+                ))}
+              </Selector>
+            )}
+          </Campo>
+
+          {baseElegida && (
+            <p className="text-sm text-tinta-suave">
+              Se creará una evaluación{' '}
+              <span className="font-semibold">
+                {baseElegida.tipo === 'DIRECTA' ? 'directa' : 'indirecta'}
+              </span>{' '}
+              con meta del{' '}
+              <span className="font-semibold">{porcentajeDeMeta(baseElegida.meta)} %</span>,
+              heredada de {baseElegida.codigo}.
+            </p>
+          )}
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg bg-estado-inactivo-bg px-3 py-2 text-sm text-estado-inactivo-fg"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }

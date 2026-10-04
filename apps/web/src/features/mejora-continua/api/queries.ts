@@ -161,8 +161,17 @@ export function useEditarPlan(id: string) {
   ]);
 }
 
-export function useEliminarPlan(id: string) {
-  return useMutacionDelPlan(id, () => api.eliminarPlan(id), [LISTA]);
+/**
+ * RF-CH-035. Sin id fijo: el listado elimina cualquiera de sus filas. Solo
+ * invalida el listado; la caché del plan eliminado se queda hasta que alguien la
+ * vuelva a pedir, y entonces el 404 dice «no encontrado».
+ */
+export function useEliminarPlanMedicion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.eliminarPlan(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: LISTA }),
+  });
 }
 
 export function useTransicionar(id: string) {
@@ -341,14 +350,13 @@ export function useCrearEvaluacion() {
   });
 }
 
-/**
- * RF-PE-008. No la consume ninguna pantalla de esta tarea, igual que
- * `useEliminarPlan` de medición: el hook existe porque el puerto lo pide,
- * pero borrar un plan de evaluación no forma parte de las dos pantallas de
- * 2c-A (RF-PE-009).
- */
-export function useEliminarEvaluacion(id: string) {
-  return useMutacionDeEvaluacion(id, () => evaluacionApi.eliminarEvaluacion(id));
+/** RF-CH-039. Sin id fijo, como `useEliminarPlanMedicion`. */
+export function useEliminarPlanEvaluacion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => evaluacionApi.eliminarEvaluacion(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['evaluacion', 'lista'] }),
+  });
 }
 
 export function useTransicionarEvaluacion(id: string) {

@@ -36,6 +36,7 @@ import {
   CabeceraSeccion,
   Campo,
   Cargando,
+  EstadoVacio,
   Modal,
   Selector,
   Tarjeta,
@@ -46,6 +47,7 @@ import {
   useConfiguracionDelPlan,
   useDocentes,
   useDocumentosEvaluacion,
+  useEliminarPlanEvaluacion,
   useGenerarDocumentoEvaluacion,
   useGuardarAsignaturas,
   useGuardarCompetencia,
@@ -63,6 +65,7 @@ import { descargarDocumentoEvaluacion } from '../api/evaluacion.api';
 import { ConfiguracionDelAnio } from '../components/ConfiguracionDelAnio';
 import { ConfiguracionDelPeriodo } from '../components/ConfiguracionDelPeriodo';
 import { DocumentosDelPlanEvaluacion } from '../components/DocumentosDelPlanEvaluacion';
+import { EliminarPlan } from '../components/EliminarPlan';
 import { HeredadoDelPlanBase } from '../components/HeredadoDelPlanBase';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
 import { VersionesDelPlan } from '../components/VersionesDelPlan';
@@ -90,8 +93,9 @@ export function PlanEvaluacionPage() {
   const { puede } = useSesion();
   const navegar = useNavigate();
 
-  const { data: vista, isLoading } = usePlanEvaluacion(id);
+  const { data: vista, isLoading, isError } = usePlanEvaluacion(id);
   const transicionar = useTransicionarEvaluacion(id);
+  const eliminar = useEliminarPlanEvaluacion();
 
   // ── Documentos, versiones e historial (Task 7) ─────────────────────────
   const { data: documentos } = useDocumentosEvaluacion(id);
@@ -151,6 +155,17 @@ export function PlanEvaluacionPage() {
     return [...mapa.values()];
   }, [vista]);
 
+  // RF-CH-034 RN1: un plan de otra carrera responde 404, igual que uno que no
+  // existe. Sin esto la pantalla se quedaría «cargando» para siempre.
+  if (isError) {
+    return (
+      <EstadoVacio
+        titulo="Plan de evaluación no encontrado"
+        detalle="No existe, o no es de la carrera con la que trabajas."
+      />
+    );
+  }
+
   if (isLoading || !vista) return <Cargando etiqueta="Cargando el plan de evaluación…" />;
 
   const { plan, base } = vista;
@@ -183,7 +198,18 @@ export function PlanEvaluacionPage() {
       <CabeceraSeccion
         titulo={plan.codigo}
         descripcion={`Evaluación ${base.tipo === 'DIRECTA' ? 'directa' : 'indirecta'} · meta del ${base.metaPorcentaje} %`}
-        acciones={<Badge tono={TONO_ESTADO[plan.estado]}>{plan.estado}</Badge>}
+        acciones={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tono={TONO_ESTADO[plan.estado]}>{plan.estado}</Badge>
+            <EliminarPlan
+              permiso="evaluacion.eliminar"
+              plan={plan}
+              titulo="Eliminar plan de evaluación"
+              eliminar={(planId) => eliminar.mutateAsync(planId)}
+              onEliminado={() => void navegar('/mejora-continua/evaluacion')}
+            />
+          </div>
+        }
       />
 
       {error && (

@@ -20,6 +20,7 @@ import { VersionesDelPlan, type VersionesDelPlanProps } from './VersionesDelPlan
 function version(sobre: Partial<PlanEvaluacion> & { id: string }): PlanEvaluacion {
   return {
     planMedicionId: 'pm-1',
+    carreraId: 'c1',
     codigo: 'EV-X-D',
     version: 1,
     estado: 'Borrador',

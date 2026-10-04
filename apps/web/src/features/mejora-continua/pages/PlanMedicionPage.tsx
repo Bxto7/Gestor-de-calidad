@@ -34,6 +34,7 @@ import {
   useDeclararPeriodos,
   useDuplicarPlan,
   useEditarPlan,
+  useEliminarPlanMedicion,
   useHistorial,
   useDocumentos,
   useGenerarDocumento,
@@ -49,6 +50,7 @@ import {
 import { descargarDocumento } from '../api/medicion.api';
 import { DocumentosDelPlan } from '../components/DocumentosDelPlan';
 import { EditorDePeriodos } from '../components/EditorDePeriodos';
+import { EliminarPlan } from '../components/EliminarPlan';
 import { GrupoDeCompetencias } from '../components/GrupoDeCompetencias';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
 import { LineaDeVersiones } from '../components/LineaDeVersiones';
@@ -76,7 +78,7 @@ export function PlanMedicionPage() {
   const { puede } = useSesion();
   const navegar = useNavigate();
 
-  const { data: plan, isLoading } = usePlanMedicion(id);
+  const { data: plan, isLoading, isError } = usePlanMedicion(id);
   const { data: grupos } = useCompetenciasDisponibles(id);
   const { data: vista } = useMatriz(id);
   const { data: consistencia } = useConsistencia(id);
@@ -94,6 +96,7 @@ export function PlanMedicionPage() {
   const programar = useProgramarMatriz(id);
   const marcar = useMarcarMedicion(id);
   const transicionar = useTransicionar(id);
+  const eliminar = useEliminarPlanMedicion();
 
   const [enTransicion, setEnTransicion] = useState<AccionMedicion | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +118,17 @@ export function PlanMedicionPage() {
     for (const g of grupos ?? []) for (const c of g.competencias) mapa.set(c.id, c);
     return [...mapa.values()];
   }, [grupos]);
+
+  // RF-CH-034 RN1: un plan de otra carrera responde 404, igual que uno que no
+  // existe. Sin esto la pantalla se quedaría «cargando» para siempre.
+  if (isError) {
+    return (
+      <EstadoVacio
+        titulo="Plan de medición no encontrado"
+        detalle="No existe, o no es de la carrera con la que trabajas."
+      />
+    );
+  }
 
   if (isLoading || !plan) return <Cargando etiqueta="Cargando el plan de medición…" />;
 
@@ -139,6 +153,13 @@ export function PlanMedicionPage() {
         acciones={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tono={TONO[plan.estado]}>{plan.estado}</Badge>
+            <EliminarPlan
+              permiso="medicion.eliminar"
+              plan={plan}
+              titulo="Eliminar plan de medición"
+              eliminar={(planId) => eliminar.mutateAsync(planId)}
+              onEliminado={() => void navegar('/mejora-continua/medicion')}
+            />
             <SiPuede permiso="medicion.crear">
               {/* RF-PM-030: solo desde un plan ya cerrado. Un Borrador se edita. */}
               {permiteVersionado(plan.estado) && (

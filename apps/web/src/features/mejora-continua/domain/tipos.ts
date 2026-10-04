@@ -24,6 +24,8 @@ export interface Periodo {
 export interface PlanMedicion {
   readonly id: string;
   readonly planEstudiosId: string;
+  /** RF-CH-033 / RF-CH-037: la carrera del plan, la de quien lo creó. */
+  readonly carreraId: string;
   readonly tipo: TipoMedicion;
   readonly codigo: string;
   readonly version: number;
@@ -51,6 +53,8 @@ export interface PlanMedicion {
 export interface PlanEvaluacion {
   readonly id: string;
   readonly planMedicionId: string;
+  /** RF-CH-033 / RF-CH-037: la carrera del plan, la de quien lo creó. */
+  readonly carreraId: string;
   readonly codigo: string;
   readonly version: number;
   readonly estado: EstadoMedicion;

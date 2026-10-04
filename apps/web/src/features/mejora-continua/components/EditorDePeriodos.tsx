@@ -109,6 +109,8 @@ export function EditorDePeriodos({
                 <span className="sr-only">Etiqueta del periodo {i + 1}</span>
                 <Entrada
                   aria-label={`Etiqueta del periodo ${i + 1}`}
+                  // RF-CH-036: el formato esperado, mientras el campo está vacío.
+                  placeholder="Ej.: 2026-I o 2027"
                   value={f.etiqueta}
                   onChange={(e) => cambiar(i, { etiqueta: e.target.value })}
                   className="w-32"

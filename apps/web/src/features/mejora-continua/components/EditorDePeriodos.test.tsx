@@ -129,3 +129,25 @@ describe('añadir y quitar', () => {
     expect(screen.getByRole('button', { name: /guardar periodos/i })).toBeDisabled();
   });
 });
+
+describe('RF-CH-036 — el placeholder de «Periodos»', () => {
+  it('cada etiqueta vacía muestra un ejemplo del formato', async () => {
+    render(<EditorDePeriodos periodos={[]} propuesta={[]} editable onGuardar={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /añadir periodo/i }));
+
+    expect(screen.getByLabelText('Etiqueta del periodo 1')).toHaveAttribute(
+      'placeholder',
+      'Ej.: 2026-I o 2027',
+    );
+  });
+
+  it('al escribir, el valor ocupa el campo (RN1: el navegador oculta el placeholder)', async () => {
+    render(<EditorDePeriodos periodos={[]} propuesta={[]} editable onGuardar={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /añadir periodo/i }));
+    await userEvent.type(screen.getByLabelText('Etiqueta del periodo 1'), '2027');
+
+    expect(screen.getByLabelText('Etiqueta del periodo 1')).toHaveValue('2027');
+  });
+});

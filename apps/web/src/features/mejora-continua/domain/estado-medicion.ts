@@ -82,9 +82,9 @@ export function permiteEdicion(estado: EstadoMedicion): boolean {
   return estado === 'Borrador';
 }
 
-/** RF-PM-009. */
+/** RF-CH-035 y RF-CH-039: Borrador o En revisión. La misma regla que el backend. */
 export function permiteEliminacion(estado: EstadoMedicion): boolean {
-  return estado === 'Borrador';
+  return estado === 'Borrador' || estado === 'En revisión';
 }
 
 /**

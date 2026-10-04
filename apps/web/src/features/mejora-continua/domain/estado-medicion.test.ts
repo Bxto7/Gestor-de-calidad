@@ -62,10 +62,11 @@ describe('RF-PM-007 RN1 — la edición libre solo existe en Borrador', () => {
   });
 });
 
-describe('RF-PM-009 — solo un Borrador puede eliminarse', () => {
-  it('cualquier otro estado lo impide', () => {
+describe('RF-CH-035 y RF-CH-039 — se eliminan en Borrador o En revisión', () => {
+  it('Borrador y En revisión sí; desde Aprobado, no', () => {
     expect(permiteEliminacion('Borrador')).toBe(true);
-    for (const e of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+    expect(permiteEliminacion('En revisión')).toBe(true);
+    for (const e of ['Aprobado', 'Vigente', 'Histórico'] as const) {
       expect(permiteEliminacion(e)).toBe(false);
     }
   });
