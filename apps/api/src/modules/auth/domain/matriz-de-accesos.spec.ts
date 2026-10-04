@@ -181,6 +181,16 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
 });
 
 describe('Módulo de los permisos de acreditación (RF-CH-026)', () => {
+  it('la descripción de .gestionar dice que incluye eliminar (RF-CH-029, RF-CH-032)', () => {
+    const descripciones = new Map(PERMISOS.map(([codigo, descripcion]) => [codigo, descripcion]));
+    expect(descripciones.get('atributo.gestionar')).toBe(
+      'Crear, editar, inactivar y eliminar atributos del graduado',
+    );
+    expect(descripciones.get('criterio.gestionar')).toBe(
+      'Crear, editar, inactivar y eliminar criterios de acreditación',
+    );
+  });
+
   it('atributo.* y criterio.* pertenecen al módulo acreditacion', () => {
     const modulos = new Map<string, string>(PERMISOS.map(([codigo, , modulo]) => [codigo, modulo]));
     for (const permiso of [

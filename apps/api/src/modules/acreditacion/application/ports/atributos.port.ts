@@ -57,6 +57,13 @@ export interface RepositorioAtributoPort {
   actualizar(id: string, codigo: string, nombre: string): Promise<DatosAtributoCompleto>;
   cambiarEstado(id: string, activo: boolean): Promise<DatosAtributoCompleto>;
   impactoDeInactivar(id: string): Promise<ImpactoAtributo>;
+  /**
+   * RF-CH-029: borra el atributo **si en la misma transacción** ninguna
+   * competencia ni plan lo usa. Devuelve `false` (y no borra nada) si ya estaba en
+   * uso o había desaparecido. `competencia_atributo` cae en cascada con el
+   * atributo: esta comprobación es lo que impide perder un vínculo en silencio.
+   */
+  eliminar(id: string): Promise<boolean>;
 
   delPlan(planId: string): Promise<DatosAtributoCompleto[]>;
   declararEnPlan(planId: string, atributoIds: readonly string[]): Promise<DatosAtributoCompleto[]>;

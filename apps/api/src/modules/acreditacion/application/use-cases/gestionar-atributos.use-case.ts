@@ -30,6 +30,7 @@ import type { AuthorizationPort } from '../../../auth/application/ports/authoriz
 import {
   AtributoCreado,
   AtributoEditado,
+  AtributoEliminado,
   AtributoEstadoCambiado,
   AtributosDePlanDeclarados,
 } from '../../domain/events/eventos-atributo.js';
@@ -171,6 +172,34 @@ export class GestionarAtributos {
     return cambiado;
   }
 
+  /**
+   * RF-CH-029 y D-15 — borrado físico, solo de lo que **nada** usa: ninguna
+   * competencia vinculada ni plan de estudios que lo adopte (más estricto que el
+   * documento, que solo bloquea si el uso es de Mejora Continua activa; ver §5 del
+   * diseño). Mejora Continua solo llega a los atributos por las competencias, así
+   * que ese recuento ya la cubre. El rechazo explica el motivo y sugiere inactivar
+   * (RF123). El evento se publica justo antes de escribir, ya superadas las
+   * comprobaciones de uso.
+   */
+  async eliminar(actor: Actor, id: string): Promise<void> {
+    const actual = await this.filaGestionable(actor, id);
+
+    const uso = await this.atributos.impactoDeInactivar(id);
+    if (uso.competenciasVinculadas > 0 || uso.planesVinculados > 0) {
+      throw new ReglaDeNegocioViolada(mensajeEnUso(actual.codigo, uso));
+    }
+
+    await this.eventos.publicar([new AtributoEliminado(actor, id, actual.codigo, actual.nombre)]);
+
+    // La comprobación de arriba es solo para dar el motivo; la que protege los
+    // vínculos es la de la transacción de borrado.
+    if (!(await this.atributos.eliminar(id))) {
+      throw new ReglaDeNegocioViolada(
+        `El atributo ${actual.codigo} cambió mientras se eliminaba: ahora está en uso o ya no existe. No se borró nada.`,
+      );
+    }
+  }
+
   /** RF122: los atributos que este plan de estudios adopta. */
   async delPlan(actor: Actor, planId: string): Promise<DatosAtributoCompleto[]> {
     await this.exigir(actor, 'atributo.leer', null);
@@ -255,6 +284,22 @@ export class GestionarAtributos {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
+}
+
+function contar(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
+function mensajeEnUso(codigo: string, uso: ImpactoAtributo): string {
+  const partes = [
+    uso.competenciasVinculadas > 0
+      ? contar(uso.competenciasVinculadas, 'competencia', 'competencias')
+      : null,
+    uso.planesVinculados > 0
+      ? contar(uso.planesVinculados, 'plan de estudio', 'planes de estudio')
+      : null,
+  ].filter((p): p is string => p !== null);
+  return `No se puede eliminar el atributo ${codigo}: está en uso (${partes.join(', ')}). Inactívalo si ya no debe usarse.`;
 }
 
 function validarNombre(nombre: string): string {

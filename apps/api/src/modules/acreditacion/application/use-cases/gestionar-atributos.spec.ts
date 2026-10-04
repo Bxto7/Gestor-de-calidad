@@ -86,6 +86,8 @@ function montarAtributos(
     alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
+  const orden: string[] = [];
+  const eliminados: string[] = [];
   const publicados: DomainEvent[] = [];
   const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
 
@@ -102,6 +104,11 @@ function montarAtributos(
     delPlan: async () => [],
     declararEnPlan: async () => [],
     noUtilizablesEnCarrera: async () => [],
+    eliminar: async (id) => {
+      orden.push('eliminar');
+      eliminados.push(id);
+      return true;
+    },
     ...opciones.repo,
   };
 
@@ -130,7 +137,12 @@ function montarAtributos(
     rolesDe: async () => [],
   };
 
-  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+  const eventos: PublicadorDeEventos = {
+    publicar: async (e) => {
+      orden.push('eventos');
+      publicados.push(...e);
+    },
+  };
 
   const caso = new GestionarAtributos(
     repo,
@@ -140,7 +152,7 @@ function montarAtributos(
     eventos,
     opciones.alcance ?? sinRestriccion(),
   );
-  return { caso, publicados, autorizaciones };
+  return { caso, publicados, autorizaciones, orden, eliminados };
 }
 
 /** Un Coordinador de ISI: lee todo, solo gestiona lo de ISI. */
@@ -567,5 +579,94 @@ describe('RF122 — atributos declarados por un plan', () => {
     // «ninguno» y no un hueco: retirar el último atributo es un cambio que la
     // bitácora tiene que poder contar.
     expect(publicados[0]?.detalle).toContain('ninguno');
+  });
+});
+
+describe('RF-CH-029 — eliminar atributo del graduado', () => {
+  it('elimina el atributo libre y publica el evento antes de borrar', async () => {
+    const { caso, publicados, orden, eliminados } = montarAtributos({
+      repo: { porId: async () => atributo({ id: 'atr-9', codigo: 'AG-I09', nombre: 'Diseño' }) },
+    });
+
+    await caso.eliminar(ACTOR, 'atr-9');
+
+    expect(eliminados).toEqual(['atr-9']);
+    // Antes de escribir: después, el código y el nombre ya no existirían en ninguna parte.
+    expect(orden).toEqual(['eventos', 'eliminar']);
+    expect(publicados[0]?.nombre).toBe('acreditacion.atributo_eliminado');
+    expect(publicados[0]?.detalle).toBe('Atributo del graduado AG-I09 «Diseño» eliminado.');
+  });
+
+  it.each([
+    [{ competenciasVinculadas: 3, planesVinculados: 0 }, '3 competencias'],
+    [{ competenciasVinculadas: 1, planesVinculados: 0 }, '1 competencia'],
+    [{ competenciasVinculadas: 0, planesVinculados: 2 }, '2 planes de estudio'],
+    [{ competenciasVinculadas: 0, planesVinculados: 1 }, '1 plan de estudio'],
+    [{ competenciasVinculadas: 4, planesVinculados: 2 }, '4 competencias, 2 planes de estudio'],
+  ])(
+    'en uso (%j): 409 con el motivo y la sugerencia de inactivar, sin tocar nada',
+    async (uso, motivo) => {
+      const { caso, publicados, eliminados } = montarAtributos({
+        repo: { impactoDeInactivar: async () => uso },
+      });
+
+      await expect(caso.eliminar(ACTOR, 'atr-1')).rejects.toThrow(
+        `No se puede eliminar el atributo AG-I01: está en uso (${motivo}). Inactívalo si ya no debe usarse.`,
+      );
+      expect(eliminados).toEqual([]);
+      expect(publicados).toHaveLength(0);
+    },
+  );
+
+  it('un atributo inactivo en uso tampoco se elimina: inactivar no libera', async () => {
+    const { caso, eliminados } = montarAtributos({
+      repo: {
+        porId: async () => atributo({ activo: false }),
+        impactoDeInactivar: async () => ({ competenciasVinculadas: 1, planesVinculados: 0 }),
+      },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'atr-1')).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
+    expect(eliminados).toEqual([]);
+  });
+
+  it('(1)(2)(3) el orden de comprobación: sin lectura, 403; fuera de alcance, 404; sin gestión, 403; y nunca se cuenta el uso antes', async () => {
+    let contó = 0;
+    const contar = {
+      impactoDeInactivar: async () => {
+        contó += 1;
+        return { competenciasVinculadas: 0, planesVinculados: 0 };
+      },
+    };
+
+    const sinLectura = montarAtributos({ permitido: false, repo: contar });
+    await expect(sinLectura.caso.eliminar(ACTOR, 'atr-1')).rejects.toBeInstanceOf(AccesoDenegado);
+
+    const fuera = montarAtributos({
+      alcance: soloCarrera(ISI),
+      repo: { ...contar, porId: async () => atributo({ carreraId: IIN }) },
+      permitido: (permiso) => permiso === 'atributo.leer',
+    });
+    await expect(fuera.caso.eliminar(ACTOR, 'atr-1')).rejects.toBeInstanceOf(NoEncontrado);
+
+    const ajeno = montarAtributos({
+      permitido: SOLO_GESTIONA_ISI,
+      repo: { ...contar, porId: async () => atributo({ carreraId: IIN }) },
+    });
+    await expect(ajeno.caso.eliminar(ACTOR, 'atr-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(ajeno.autorizaciones).toContainEqual({ permiso: 'atributo.gestionar', carreraId: IIN });
+
+    expect(contó).toBe(0);
+    expect(sinLectura.eliminados.length + fuera.eliminados.length + ajeno.eliminados.length).toBe(
+      0,
+    );
+  });
+
+  it('carrera crítica: si en la transacción el atributo ya está en uso, 409 y nada se borra', async () => {
+    const { caso } = montarAtributos({ repo: { eliminar: async () => false } });
+
+    await expect(caso.eliminar(ACTOR, 'atr-1')).rejects.toThrow(
+      'El atributo AG-I01 cambió mientras se eliminaba: ahora está en uso o ya no existe. No se borró nada.',
+    );
   });
 });

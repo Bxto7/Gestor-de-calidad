@@ -29,6 +29,7 @@ import type { AuthorizationPort } from '../../../auth/application/ports/authoriz
 import {
   CriterioCreado,
   CriterioEditado,
+  CriterioEliminado,
   CriterioEstadoCambiado,
 } from '../../domain/events/eventos-criterio.js';
 import { limpiarNombre } from '../../domain/value-objects/codigos.js';
@@ -135,6 +136,31 @@ export class GestionarCriterios {
 
     await this.eventos.publicar([new CriterioEstadoCambiado(actor, id, cambiado.codigo, activo)]);
     return cambiado;
+  }
+
+  /**
+   * RF-CH-032 — borrado físico, solo si **ningún plan de mejora**, de cualquier
+   * estado, lo referencia (D-15: más estricto que el documento, que solo bloquea
+   * ante un plan activo; un plan histórico lo dejaría colgando). No hay clave
+   * foránea que lo respalde, así que esta pregunta a Mejora Continua es la única
+   * defensa; es previa y no transaccional, y la carrera con «crear un plan de
+   * mejora con este criterio» se acepta (§3.4 del diseño). El evento se publica
+   * justo antes de escribir, ya superada la comprobación de uso.
+   */
+  async eliminar(actor: Actor, id: string): Promise<void> {
+    const actual = await this.filaGestionable(actor, id);
+
+    const planes = await this.enUso.contarPlanesDeMejora(id);
+    if (planes > 0) {
+      throw new ReglaDeNegocioViolada(
+        `No se puede eliminar el criterio ${actual.codigo}: está en uso ` +
+          `(${planes} ${planes === 1 ? 'plan de mejora' : 'planes de mejora'}). ` +
+          'Inactívalo si ya no debe usarse.',
+      );
+    }
+
+    await this.eventos.publicar([new CriterioEliminado(actor, id, actual.codigo, actual.nombre)]);
+    await this.criterios.eliminar(id);
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */

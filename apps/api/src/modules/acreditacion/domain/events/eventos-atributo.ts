@@ -88,3 +88,24 @@ export class AtributosDePlanDeclarados extends DomainEvent {
     this.detalle = `Atributos del graduado del plan: ${antes} → ${despues}.`;
   }
 }
+
+/**
+ * RF-CH-029: el atributo se elimina del todo (solo si nada lo usa). El evento se
+ * publica antes de borrar, y por eso lleva el código y el nombre en el detalle:
+ * después, esos datos no existirían en ninguna parte.
+ */
+export class AtributoEliminado extends DomainEvent {
+  readonly nombre = 'acreditacion.atributo_eliminado';
+  readonly entidad = 'AtributoGraduado';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    nombreAtributo: string,
+  ) {
+    super(actor);
+    this.detalle = `Atributo del graduado ${codigo} «${nombreAtributo}» eliminado.`;
+  }
+}

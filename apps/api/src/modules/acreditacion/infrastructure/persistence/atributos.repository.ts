@@ -157,6 +157,25 @@ export class AtributoRepositoryPrisma implements RepositorioAtributoPort {
     return { competenciasVinculadas, planesVinculados };
   }
 
+  async eliminar(id: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // Se bloquea la fila: un vínculo nuevo (su clave foránea toma un bloqueo
+      // compartido sobre ella) espera a que esta transacción termine, y las
+      // cuentas de abajo ven todo lo ya confirmado.
+      const bloqueada = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "atributos_graduado"."atributos_graduado"
+         WHERE "id" = ${id}::uuid FOR UPDATE`;
+      if (bloqueada.length === 0) return false;
+
+      const competencias = await tx.competenciaAtributo.count({ where: { atributoId: id } });
+      const planes = await tx.planAtributo.count({ where: { atributoId: id } });
+      if (competencias > 0 || planes > 0) return false;
+
+      await tx.atributoGraduado.delete({ where: { id } });
+      return true;
+    });
+  }
+
   async delPlan(planId: string): Promise<DatosAtributoCompleto[]> {
     const filas = await this.prisma.planAtributo.findMany({
       where: { planId },

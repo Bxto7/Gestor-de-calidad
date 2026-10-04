@@ -72,6 +72,8 @@ function montarCriterios(
     alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
+  const orden: string[] = [];
+  const eliminados: string[] = [];
   const publicados: DomainEvent[] = [];
   const autorizaciones: { permiso: string; carreraId: string | null }[] = [];
   const consultasEnUso: string[] = [];
@@ -83,6 +85,10 @@ function montarCriterios(
     crear: async (carreraId, codigo, nombre) => criterio({ carreraId, codigo, nombre }),
     actualizar: async (id, codigo, nombre) => criterio({ id, codigo, nombre }),
     cambiarEstado: async (id, activo) => criterio({ id, activo }),
+    eliminar: async (id) => {
+      orden.push('eliminar');
+      eliminados.push(id);
+    },
     ...opciones.repo,
   };
 
@@ -114,7 +120,12 @@ function montarCriterios(
     rolesDe: async () => [],
   };
 
-  const eventos: PublicadorDeEventos = { publicar: async (e) => void publicados.push(...e) };
+  const eventos: PublicadorDeEventos = {
+    publicar: async (e) => {
+      orden.push('eventos');
+      publicados.push(...e);
+    },
+  };
 
   const caso = new GestionarCriterios(
     repo,
@@ -124,7 +135,7 @@ function montarCriterios(
     eventos,
     opciones.alcance ?? sinRestriccion(),
   );
-  return { caso, publicados, autorizaciones, consultasEnUso };
+  return { caso, publicados, autorizaciones, consultasEnUso, orden, eliminados };
 }
 
 describe('RF129 — registrar criterio de acreditación', () => {
@@ -395,5 +406,67 @@ describe('Operaciones por id: alcance de la fila y gestión contra su carrera', 
     await caso.impactoDeInactivar(ACTOR, 'cri-1');
 
     expect(autorizaciones.map((a) => a.permiso)).toEqual(['criterio.leer']);
+  });
+});
+
+describe('RF-CH-032 — eliminar criterio de acreditación', () => {
+  it('elimina el criterio sin planes de mejora y publica el evento antes de borrar', async () => {
+    const { caso, publicados, orden, eliminados, consultasEnUso } = montarCriterios({
+      repo: { porId: async () => criterio({ id: 'cri-9', codigo: 'C-09', nombre: 'Gestión' }) },
+    });
+
+    await caso.eliminar(ACTOR, 'cri-9');
+
+    expect(consultasEnUso).toEqual(['cri-9']);
+    expect(eliminados).toEqual(['cri-9']);
+    expect(orden).toEqual(['eventos', 'eliminar']);
+    expect(publicados[0]?.nombre).toBe('acreditacion.criterio_eliminado');
+    expect(publicados[0]?.detalle).toBe('Criterio de acreditación C-09 «Gestión» eliminado.');
+  });
+
+  it.each([
+    [1, '1 plan de mejora'],
+    [2, '2 planes de mejora'],
+  ])(
+    'con %i plan(es) de mejora: 409 con el motivo y la sugerencia de inactivar, sin tocar nada',
+    async (n, motivo) => {
+      const { caso, publicados, eliminados } = montarCriterios({ planesDeMejora: n });
+
+      await expect(caso.eliminar(ACTOR, 'cri-1')).rejects.toThrow(
+        `No se puede eliminar el criterio C-01: está en uso (${motivo}). Inactívalo si ya no debe usarse.`,
+      );
+      expect(eliminados).toEqual([]);
+      expect(publicados).toHaveLength(0);
+    },
+  );
+
+  it('(1)(2)(3) el orden de comprobación, y Mejora Continua solo se consulta al final', async () => {
+    const sinLectura = montarCriterios({ permitido: false });
+    await expect(sinLectura.caso.eliminar(ACTOR, 'cri-1')).rejects.toBeInstanceOf(AccesoDenegado);
+
+    const fuera = montarCriterios({
+      alcance: soloCarrera(ISI),
+      repo: { porId: async () => criterio({ carreraId: IIN }) },
+      permitido: (permiso) => permiso === 'criterio.leer',
+    });
+    await expect(fuera.caso.eliminar(ACTOR, 'cri-1')).rejects.toBeInstanceOf(NoEncontrado);
+
+    const ajeno = montarCriterios({
+      permitido: SOLO_GESTIONA_ISI,
+      repo: { porId: async () => criterio({ carreraId: IIN }) },
+    });
+    await expect(ajeno.caso.eliminar(ACTOR, 'cri-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(ajeno.autorizaciones).toContainEqual({ permiso: 'criterio.gestionar', carreraId: IIN });
+
+    for (const r of [sinLectura, fuera, ajeno]) {
+      expect(r.consultasEnUso).toEqual([]);
+      expect(r.eliminados).toEqual([]);
+    }
+  });
+
+  it('un criterio inexistente es NoEncontrado', async () => {
+    const { caso } = montarCriterios({ repo: { porId: async () => null } });
+
+    await expect(caso.eliminar(ACTOR, 'cri-9')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

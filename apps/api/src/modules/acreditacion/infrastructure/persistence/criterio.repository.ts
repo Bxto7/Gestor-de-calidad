@@ -114,4 +114,9 @@ export class CriterioRepositoryPrisma implements RepositorioCriterioPort {
     });
     return aDatos(fila);
   }
+
+  /** RF-CH-032: borrado físico. Quien llama ya comprobó que ningún plan de mejora lo referencia. */
+  async eliminar(id: string): Promise<void> {
+    await this.prisma.criterioAcreditacion.delete({ where: { id } });
+  }
 }

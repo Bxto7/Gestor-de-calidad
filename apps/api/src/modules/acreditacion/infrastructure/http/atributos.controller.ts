@@ -8,7 +8,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -103,7 +105,8 @@ export class AtributosController {
   @Patch(':id/estado')
   @ApiOperation({
     summary: 'Inactivar o reactivar un atributo del graduado',
-    description: 'RF123. RN1: nunca se elimina físicamente.',
+    description:
+      'RF123. Inactivar conserva el registro; eliminarlo es DELETE /atributos/:id (RF-CH-029).',
   })
   async cambiarEstado(
     @Param('id', ParseUUIDPipe) id: string,
@@ -111,6 +114,20 @@ export class AtributosController {
     @Body() dto: CambiarEstadoAtributoDto,
   ) {
     return this.atributos.cambiarEstado(actor, id, dto.activo);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Eliminar un atributo del graduado',
+    description:
+      'RF-CH-029. Borrado físico, solo si ninguna competencia ni plan de estudios lo usa; ' +
+      'si está en uso, 409 con el motivo y la sugerencia de inactivarlo.',
+  })
+  @ApiResponse({ status: 404, description: 'El atributo no existe o su carrera no es visible.' })
+  @ApiResponse({ status: 409, description: 'El atributo está en uso.' })
+  async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    await this.atributos.eliminar(actor, id);
   }
 }
 

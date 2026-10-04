@@ -7,7 +7,18 @@
  * `atributos.controller.ts`.
  */
 
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import type { Actor } from '../../../../shared-kernel/domain-events/domain-event.js';
@@ -88,7 +99,8 @@ export class CriteriosController {
   @Patch(':id/estado')
   @ApiOperation({
     summary: 'Inactivar o reactivar un criterio de acreditación',
-    description: 'RF132. RN1: nunca se elimina físicamente.',
+    description:
+      'RF132. Inactivar conserva el registro; eliminarlo es DELETE /criterios/:id (RF-CH-032).',
   })
   async cambiarEstado(
     @Param('id', ParseUUIDPipe) id: string,
@@ -96,5 +108,19 @@ export class CriteriosController {
     @Body() dto: CambiarEstadoAcreditacionDto,
   ) {
     return this.criterios.cambiarEstado(actor, id, dto.activo);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Eliminar un criterio de acreditación',
+    description:
+      'RF-CH-032. Borrado físico, solo si ningún plan de mejora lo referencia; ' +
+      'si está en uso, 409 con el motivo y la sugerencia de inactivarlo.',
+  })
+  @ApiResponse({ status: 404, description: 'El criterio no existe o su carrera no es visible.' })
+  @ApiResponse({ status: 409, description: 'El criterio está en uso.' })
+  async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    await this.criterios.eliminar(actor, id);
   }
 }

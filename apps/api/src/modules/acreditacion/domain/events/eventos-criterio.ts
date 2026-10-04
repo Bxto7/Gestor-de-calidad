@@ -64,3 +64,20 @@ export class CriterioEstadoCambiado extends DomainEvent {
     this.detalle = `Criterio de acreditación ${codigo} ${activo ? 'reactivado' : 'inactivado'}.`;
   }
 }
+
+/** RF-CH-032: el criterio se elimina del todo (solo si ningún plan de mejora lo referencia). */
+export class CriterioEliminado extends DomainEvent {
+  readonly nombre = 'acreditacion.criterio_eliminado';
+  readonly entidad = 'CriterioAcreditacion';
+  readonly detalle: string;
+
+  constructor(
+    actor: Actor,
+    readonly entidadId: string,
+    codigo: string,
+    nombreCriterio: string,
+  ) {
+    super(actor);
+    this.detalle = `Criterio de acreditación ${codigo} «${nombreCriterio}» eliminado.`;
+  }
+}
