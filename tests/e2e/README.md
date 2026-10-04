@@ -62,6 +62,13 @@ npm run build && THROTTLE_LIMIT=10000 npm start
 npm run start:worker
 ```
 
+Si `npx prisma migrate deploy` aborta con «Hay planes sin carrera…» (migración del Bloque 6a),
+es que la base tiene planes de medición cuyo plan de estudios ya no existe —las pruebas de
+integración vacían `plan_estudios` y esos planes, sin clave foránea, se quedan—. En la base de
+pruebas: `npx prisma migrate resolve --rolled-back 20261004120000_carrera_de_planes_medicion_y_evaluacion`,
+borrar los huérfanos (primero sus planes de evaluación) y volver a aplicar. En una base con datos
+reales, leer los códigos del mensaje y decidir con quien los creó.
+
 El worker no es opcional: los PDF y Excel se generan en una cola de BullMQ y solo él la
 consume. Sin él, la API responde bien pero los documentos se quedan en «Pendiente» y fallan
 las pruebas que esperan verlos «Listo» (`exportacion`, `documentos-evaluacion`,
@@ -88,7 +95,10 @@ npx playwright show-report     # el informe de la última ejecución
 ```
 
 Playwright arranca `vite preview` por su cuenta; la API hay que levantarla antes, porque
-necesita su base preparada primero.
+necesita su base preparada primero. Sirve el bundle que haya en `apps/web/dist`, no el código
+fuente: tras cambiar la web, `cd apps/web && npm run build` antes de ejecutar, o la suite
+probará la versión anterior (el 4 de octubre de 2026 eso hizo fallar 26 pruebas con un
+mensaje que ya no existía en el código).
 
 Si la API no está viva, `global-setup.ts` lo dice con un mensaje y el comando para arrancarla,
 en vez de dejar que fallen quince pruebas por razones distintas.
@@ -135,9 +145,9 @@ está registrada como **D-10** en la sección 8 de
 `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, **aprobada el 4 de septiembre de
 2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
 
-**Cobertura actual (3 de octubre de 2026).** Además de las cuatro pantallas de
-aquella primera medición, el spec tiene hoy 28 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
-sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, Criterios de Acreditación y los modales de eliminar de Atributos y Criterios, el
+**Cobertura actual (4 de octubre de 2026).** Además de las cuatro pantallas de
+aquella primera medición, el spec tiene hoy 30 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
+sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, Criterios de Acreditación y los modales de eliminar de Atributos, Criterios, Planes de Medición y Planes de Evaluación, el
 resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias,
 desde RF127 el selector de competencias con una competencia sin atributo —la casilla
 deshabilitada y su motivo enlazado por `aria-describedby`— y las Actas de Aprobación: el

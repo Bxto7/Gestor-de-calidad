@@ -206,24 +206,23 @@ test('un criterio libre se elimina; con un plan de mejora, no (RF-CH-030, RF-CH-
 });
 
 test.describe('el alcance del Coordinador (API)', () => {
-  test('lee otra carrera pero no escribe en ella; una carrera inexistente es 404', async ({
+  test('otra carrera no existe para él: leer y escribir responden 404, como una inexistente', async ({
     request,
   }) => {
     const ajena = await crearCarreraAjena(request);
     const h = cabeceras(await tokenDe('editor'));
 
-    // DEJA CONSTANCIA: el Coordinador lee con alcance global (la marca de «solo su
-    // carrera» es del Director). Una carrera nueva empieza sin atributos ni criterios.
+    // Desde el Bloque 6a el Coordinador lleva `lectura.solo_su_carrera`: lo de
+    // otra carrera no existe para él, ni para leer ni para escribir.
     for (const recurso of ['atributos', 'criterios'] as const) {
       const lectura = await request.get(`${API}/carreras/${ajena}/${recurso}`, { headers: h });
-      expect(lectura.status()).toBe(200);
-      expect(await lectura.json()).toEqual([]);
+      expect(lectura.status()).toBe(404);
 
       const escritura = await request.post(`${API}/carreras/${ajena}/${recurso}`, {
         headers: h,
         data: { codigo: 'X-99', nombre: 'Intruso de la suite E2E' },
       });
-      expect(escritura.status()).toBe(403);
+      expect(escritura.status()).toBe(404);
     }
 
     const fantasma = await request.get(

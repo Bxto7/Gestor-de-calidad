@@ -204,6 +204,57 @@ test('los criterios de acreditación y el modal de eliminar uno', async ({ page 
   await analizar(page, 'el modal de eliminar un criterio');
 });
 
+test('el modal de eliminar un plan de medición (RF-CH-035)', async ({ page, request }) => {
+  // Un plan propio en Borrador: «Eliminar» solo se ofrece en Borrador o En revisión.
+  // Indirecto, para no desplazar el «Directo más reciente» de otras suites.
+  const h = cabeceras(await tokenDe('editor'));
+  const estudios = (await (await request.get(`${API}/planes`, { headers: h })).json()) as {
+    id: string;
+    codigo: string;
+  }[];
+  const pe = estudios.find((p) => p.codigo === 'PE-E2E-v1');
+  expect(pe, 'Falta el plan PE-E2E-v1: `npm run e2e:preparar`.').toBeDefined();
+  const alta = await request.post(`${API}/planes-medicion`, {
+    headers: h,
+    data: { planEstudiosId: pe!.id, tipo: 'INDIRECTA', metaPorcentaje: 70 },
+  });
+  expect(alta.ok()).toBe(true);
+  const plan = (await alta.json()) as { id: string; codigo: string };
+  try {
+    await page.goto('/mejora-continua/medicion');
+    await page.getByRole('button', { name: `Eliminar ${plan.codigo}` }).click();
+    await expect(page.getByRole('dialog', { name: 'Eliminar plan de medición' })).toBeVisible();
+
+    await analizar(page, 'el modal de eliminar un plan de medición');
+  } finally {
+    await request.delete(`${API}/planes-medicion/${plan.id}`, { headers: h });
+  }
+});
+
+test('el modal de eliminar un plan de evaluación (RF-CH-039)', async ({ page, request }) => {
+  const h = cabeceras(await tokenDe('editor'));
+  const bases = (await (
+    await request.get(`${API}/planes-evaluacion/bases-elegibles`, { headers: h })
+  ).json()) as { id: string; codigo: string }[];
+  const base = bases.find((b) => b.codigo === 'PM-PE-E2E-v1-I-v1');
+  expect(base, 'Falta la base Indirecta: `npm run e2e:preparar`.').toBeDefined();
+  const alta = await request.post(`${API}/planes-evaluacion`, {
+    headers: h,
+    data: { planMedicionId: base!.id },
+  });
+  expect(alta.ok()).toBe(true);
+  const plan = (await alta.json()) as { id: string; codigo: string };
+  try {
+    await page.goto('/mejora-continua/evaluacion');
+    await page.getByRole('button', { name: `Eliminar ${plan.codigo}` }).click();
+    await expect(page.getByRole('dialog', { name: 'Eliminar plan de evaluación' })).toBeVisible();
+
+    await analizar(page, 'el modal de eliminar un plan de evaluación');
+  } finally {
+    await request.delete(`${API}/planes-evaluacion/${plan.id}`, { headers: h });
+  }
+});
+
 test('el resumen', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Bienvenido/ })).toBeVisible();
