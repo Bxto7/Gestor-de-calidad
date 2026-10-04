@@ -109,6 +109,10 @@ export class VersionarPlanesMedicion {
   }
 
   private async exigirPlan(actor: Actor, id: string): Promise<DatosPlanMedicion> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    const lectura = await this.autorizacion.puede(actor.id, 'medicion.leer', null);
+    if (!lectura.permitido) throw new AccesoDenegado(lectura.motivo);
+
     // RF-CH-034: un plan de otra carrera no existe para quien no la lee.
     const plan = await exigirPlanLegible(
       this.alcance,

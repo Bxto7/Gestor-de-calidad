@@ -56,11 +56,13 @@ function permitirTodo(): AuthorizationPort {
   };
 }
 
-function denegarRegistrando(pedidos: string[]): AuthorizationPort {
+function denegarRegistrando(pedidos: string[], concedidos: string[] = []): AuthorizationPort {
   return {
     puede: async (_id, permiso) => {
       pedidos.push(permiso);
-      return { permitido: false, motivo: 'Falta el permiso.' };
+      return concedidos.includes(permiso)
+        ? { permitido: true }
+        : { permitido: false, motivo: 'Falta el permiso.' };
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
@@ -387,13 +389,13 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       mediciones,
       curricular,
       configuracionPort,
-      denegarRegistrando(pedidos),
+      denegarRegistrando(pedidos, ['evaluacion.leer']),
       { publicar: async () => undefined },
       sinRestriccion(),
     );
 
     await expect(casos.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['evaluacion.crear']);
+    expect(pedidos).toEqual(['evaluacion.leer', 'evaluacion.crear']);
   });
 
   /**
@@ -402,8 +404,8 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
    */
   it('versionar el plan de otra carrera se deniega', async () => {
     curricular = { ...curricular, planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) };
-    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
-      carreraId === 'carrera-propia'
+    const puede = vi.fn(async (_id: string, permiso: string, carreraId: string | null) =>
+      permiso.endsWith('.leer') || carreraId === 'carrera-propia'
         ? ({ permitido: true } as const)
         : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
     );
@@ -440,5 +442,58 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
     await expect(casos.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
     await expect(casos.versionesDe(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
     expect(configuraciones.copiado).toBeUndefined();
+  });
+});
+
+/** Todo permitido salvo un permiso: el de lectura que el caso de uso debe pedir primero. */
+function sinPermiso(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: false, motivo: 'Falta el permiso.' } : { permitido: true },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+/** Solo lee: toda escritura acotada a una carrera se niega (prueba que el 404 va antes). */
+function soloLee(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: true } : { permitido: false, motivo: 'No dirige esa carrera.' },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+describe('orden de comprobación de la escritura: la lectura va primero', () => {
+  function con(autorizacion: AuthorizationPort, alcance: AlcanceDeLecturaPort) {
+    return new VersionarPlanesEvaluacion(
+      {
+        porId: async (id: string) => (id === 'ev-1' ? evaluacion() : null),
+      } as unknown as RepositorioPlanEvaluacionPort,
+      { porId: async () => planMedicion() } as unknown as RepositorioPlanMedicionPort,
+      { planPorId: async () => planBase() } as unknown as ContenidoCurricularPort,
+      {} as unknown as RepositorioConfiguracionEvaluacionPort,
+      autorizacion,
+      { publicar: async () => undefined },
+      alcance,
+    );
+  }
+
+  it('generarNuevaVersion sin `evaluacion.leer` es 403, exista o no el plan (no revela existencia)', async () => {
+    const c = con(sinPermiso('evaluacion.leer'), sinRestriccion());
+
+    await expect(c.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    await expect(c.generarNuevaVersion(ACTOR, 'ev-inventado')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+  });
+
+  it('el 404 va antes del 403: sin permiso de escritura y fuera del alcance, es NoEncontrado', async () => {
+    const c = con(soloLee('evaluacion.leer'), soloCarrera('otra-carrera'));
+
+    await expect(c.generarNuevaVersion(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

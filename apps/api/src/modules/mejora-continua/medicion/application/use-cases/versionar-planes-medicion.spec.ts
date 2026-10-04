@@ -124,6 +124,7 @@ function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
 function montar(
   opciones: {
     estado?: DatosPlanMedicion['estado'];
+    existe?: boolean;
     autorizacion?: AuthorizationPort;
     alcance?: AlcanceDeLecturaPort;
     codigosUsados?: string[];
@@ -134,7 +135,8 @@ function montar(
   const copiados: DatosCopiar[] = [];
 
   const repo = {
-    porId: async () => plan({ estado: opciones.estado ?? 'Vigente' }),
+    porId: async () =>
+      opciones.existe === false ? null : plan({ estado: opciones.estado ?? 'Vigente' }),
     contenidoDe: async () => contenido(),
     codigosDe: async () => opciones.codigosUsados ?? ['PM-PE-ISI-2026-v1-D-v1'],
     copiar: async (datos: DatosCopiar) => {
@@ -262,8 +264,8 @@ describe('permisos', () => {
  */
 describe('el alcance por carrera (2c-C)', () => {
   it('versionar el plan de otra carrera se deniega', async () => {
-    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
-      carreraId === 'carrera-propia'
+    const puede = vi.fn(async (_id: string, permiso: string, carreraId: string | null) =>
+      permiso.endsWith('.leer') || carreraId === 'carrera-propia'
         ? ({ permitido: true } as const)
         : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
     );
@@ -312,5 +314,52 @@ describe('RF-CH-034 — la URL directa a un plan de otra carrera', () => {
     await expect(caso.generarNuevaVersion(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
     await expect(caso.duplicarPlan(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
     expect(copiados).toHaveLength(0);
+  });
+});
+
+/** Todo permitido salvo un permiso: el de lectura que el caso de uso debe pedir primero. */
+function sinPermiso(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: false, motivo: 'Falta el permiso.' } : { permitido: true },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+/** Solo lee: toda escritura acotada a una carrera se niega (prueba que el 404 va antes). */
+function soloLee(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: true } : { permitido: false, motivo: 'No dirige esa carrera.' },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+describe('orden de comprobación de las escrituras: la lectura va primero', () => {
+  it.each([
+    ['generarNuevaVersion', (c: VersionarPlanesMedicion) => c.generarNuevaVersion(ACTOR, 'pm-1')],
+    ['duplicarPlan', (c: VersionarPlanesMedicion) => c.duplicarPlan(ACTOR, 'pm-1')],
+  ] as const)(
+    '%s sin `medicion.leer` es 403, exista o no el plan (no revela existencia)',
+    async (_n, ejecutar) => {
+      const existe = montar({ autorizacion: sinPermiso('medicion.leer') });
+      await expect(ejecutar(existe.caso)).rejects.toBeInstanceOf(AccesoDenegado);
+
+      const noExiste = montar({ autorizacion: sinPermiso('medicion.leer'), existe: false });
+      await expect(ejecutar(noExiste.caso)).rejects.toBeInstanceOf(AccesoDenegado);
+    },
+  );
+
+  it('el 404 va antes del 403: sin permiso de escritura y fuera del alcance, es NoEncontrado', async () => {
+    const { caso } = montar({
+      autorizacion: soloLee('medicion.leer'),
+      alcance: soloCarrera('otra-carrera'),
+    });
+
+    await expect(caso.generarNuevaVersion(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

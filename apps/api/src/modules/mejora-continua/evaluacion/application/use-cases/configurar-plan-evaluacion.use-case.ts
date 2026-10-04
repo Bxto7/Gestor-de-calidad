@@ -121,6 +121,8 @@ export class ConfigurarPlanEvaluacion {
     competenciaId: string,
     datos: { instrumento: string | null; frecuencia: string | null; responsableId: string | null },
   ): Promise<void> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
@@ -151,6 +153,8 @@ export class ConfigurarPlanEvaluacion {
     periodoId: string,
     asignaturas: readonly { asignaturaId: string; entregable: string; docenteId: string | null }[],
   ): Promise<void> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
@@ -189,6 +193,8 @@ export class ConfigurarPlanEvaluacion {
     periodoId: string,
     porcentaje: number | null,
   ): Promise<void> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(actor, planEvaluacionId);
     // La misma comprobación que `guardarAsignaturas`, y por el mismo motivo:
     // el repositorio hace `upsert`, así que sin ella un cruce inventado no da
@@ -237,6 +243,8 @@ export class ConfigurarPlanEvaluacion {
       throw new NoEncontrado('la asignatura evaluada', asignaturaEvaluadaId);
     }
 
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
@@ -263,6 +271,8 @@ export class ConfigurarPlanEvaluacion {
       enlaceInstrumento: string;
     }[],
   ): Promise<void> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
@@ -297,6 +307,8 @@ export class ConfigurarPlanEvaluacion {
       throw new NoEncontrado('la indicación', indicacionId);
     }
 
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const plan = await this.exigirPlan(actor, planEvaluacionId);
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));

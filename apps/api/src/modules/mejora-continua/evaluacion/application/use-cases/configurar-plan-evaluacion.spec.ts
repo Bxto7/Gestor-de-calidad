@@ -68,11 +68,13 @@ function permitirTodo(): AuthorizationPort {
  * «exige `evaluacion.editar`» quedaría en verde aunque el caso de uso pidiera
  * por error otro permiso.
  */
-function denegarRegistrando(pedidos: string[]): AuthorizationPort {
+function denegarRegistrando(pedidos: string[], concedidos: string[] = []): AuthorizationPort {
   return {
     puede: async (_id, permiso) => {
       pedidos.push(permiso);
-      return { permitido: false, motivo: 'Falta el permiso.' };
+      return concedidos.includes(permiso)
+        ? { permitido: true }
+        : { permitido: false, motivo: 'Falta el permiso.' };
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
@@ -648,7 +650,7 @@ describe('el plan de unas evidencias sale de la asignatura evaluada', () => {
 describe('permisos y bitácora', () => {
   it('escribir exige `evaluacion.editar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos, ['evaluacion.leer']) });
 
     await expect(
       caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
@@ -657,7 +659,7 @@ describe('permisos y bitácora', () => {
         responsableId: null,
       }),
     ).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['evaluacion.editar']);
+    expect(pedidos).toEqual(['evaluacion.leer', 'evaluacion.editar']);
   });
 
   it('leer exige `evaluacion.leer`', async () => {
@@ -755,8 +757,8 @@ describe('los catálogos', () => {
  */
 describe('el alcance por carrera (2c-C)', () => {
   it('un editor de otra carrera no puede tocar la configuración', async () => {
-    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
-      carreraId === 'carrera-propia'
+    const puede = vi.fn(async (_id: string, permiso: string, carreraId: string | null) =>
+      permiso.endsWith('.leer') || carreraId === 'carrera-propia'
         ? ({ permitido: true } as const)
         : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
     );
@@ -863,5 +865,62 @@ describe('RF-CH-038 — la URL directa a un plan de otra carrera', () => {
     await expect(caso.configuracion(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
     await expect(caso.asignaturasElegibles(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
     expect(publicados).toHaveLength(0);
+  });
+});
+
+/** Todo permitido salvo un permiso: el de lectura que el caso de uso debe pedir primero. */
+function sinPermiso(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: false, motivo: 'Falta el permiso.' } : { permitido: true },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+/** Solo lee: toda escritura acotada a una carrera se niega (prueba que el 404 va antes). */
+function soloLee(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: true } : { permitido: false, motivo: 'No dirige esa carrera.' },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+describe('orden de comprobación de las escrituras: la lectura va primero', () => {
+  const COMPETENCIA = { instrumento: null, frecuencia: null, responsableId: null };
+
+  it.each([
+    [
+      'guardarCompetencia',
+      (c: ConfigurarPlanEvaluacion, id: string) =>
+        c.guardarCompetencia(ACTOR, id, 'c-1', COMPETENCIA),
+    ],
+    [
+      'guardarPorcentaje',
+      (c: ConfigurarPlanEvaluacion, id: string) => c.guardarPorcentaje(ACTOR, id, 'c-1', 'p-1', 50),
+    ],
+  ] as const)(
+    '%s sin `evaluacion.leer` es 403, exista o no el plan (no revela existencia)',
+    async (_n, ejecutar) => {
+      const { caso } = montar({ autorizacion: sinPermiso('evaluacion.leer') });
+
+      await expect(ejecutar(caso, 'ev-1')).rejects.toBeInstanceOf(AccesoDenegado);
+      await expect(ejecutar(caso, 'ev-inventado')).rejects.toBeInstanceOf(AccesoDenegado);
+    },
+  );
+
+  it('el 404 va antes del 403: sin permiso de escritura y fuera del alcance, es NoEncontrado', async () => {
+    const { caso } = montar({
+      autorizacion: soloLee('evaluacion.leer'),
+      alcance: soloCarrera('otra-carrera'),
+    });
+
+    await expect(caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', COMPETENCIA)).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
   });
 });

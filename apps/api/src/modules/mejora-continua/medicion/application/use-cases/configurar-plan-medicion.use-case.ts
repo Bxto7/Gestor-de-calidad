@@ -87,6 +87,8 @@ export class ConfigurarPlanMedicion {
     id: string,
     competenciaIds: readonly string[],
   ): Promise<DatosPlanMedicion> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
     this.verificarEditable(plan);
@@ -145,6 +147,8 @@ export class ConfigurarPlanMedicion {
     id: string,
     periodos: readonly PeriodoADeclarar[],
   ): Promise<DatosPlanMedicion> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
     this.verificarEditable(plan);

@@ -578,8 +578,8 @@ describe('RF-PM-018 a RF-PM-021 — declarar periodos', () => {
  */
 describe('el alcance por carrera (2c-C)', () => {
   it('declarar competencias en la carrera de otro se deniega', async () => {
-    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
-      carreraId === 'carrera-propia'
+    const puede = vi.fn(async (_id: string, permiso: string, carreraId: string | null) =>
+      permiso.endsWith('.leer') || carreraId === 'carrera-propia'
         ? ({ permitido: true } as const)
         : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
     );
@@ -636,5 +636,61 @@ describe('RF-CH-034 — la URL directa a un plan de otra carrera', () => {
     await expect(caso.declararCompetencias(ACTOR, 'pm-1', [])).rejects.toBeInstanceOf(NoEncontrado);
     await expect(caso.declararPeriodos(ACTOR, 'pm-1', [])).rejects.toBeInstanceOf(NoEncontrado);
     expect(vistos).toHaveLength(0);
+  });
+});
+
+/** Todo permitido salvo un permiso: el de lectura que el caso de uso debe pedir primero. */
+function sinPermiso(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: false, motivo: 'Falta el permiso.' } : { permitido: true },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+/** Solo lee: toda escritura acotada a una carrera se niega (prueba que el 404 va antes). */
+function soloLee(permiso: string): AuthorizationPort {
+  return {
+    puede: async (_u, p) =>
+      p === permiso ? { permitido: true } : { permitido: false, motivo: 'No dirige esa carrera.' },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => null,
+    rolesDe: async () => [],
+  };
+}
+
+describe('orden de comprobación de las escrituras: la lectura va primero', () => {
+  it.each([
+    [
+      'declararCompetencias',
+      (c: ConfigurarPlanMedicion, id: string) => c.declararCompetencias(ACTOR, id, []),
+    ],
+    [
+      'declararPeriodos',
+      (c: ConfigurarPlanMedicion, id: string) => c.declararPeriodos(ACTOR, id, []),
+    ],
+  ] as const)(
+    '%s sin `medicion.leer` es 403, exista o no el plan (no revela existencia)',
+    async (_n, ejecutar) => {
+      const existe = montar({ autorizacion: sinPermiso('medicion.leer') });
+      await expect(ejecutar(existe.caso, 'pm-1')).rejects.toBeInstanceOf(AccesoDenegado);
+
+      const noExiste = montar({
+        autorizacion: sinPermiso('medicion.leer'),
+        repo: { porId: async () => null },
+      });
+      await expect(ejecutar(noExiste.caso, 'pm-9')).rejects.toBeInstanceOf(AccesoDenegado);
+    },
+  );
+
+  it('el 404 va antes del 403: sin permiso de escritura y fuera del alcance, es NoEncontrado', async () => {
+    const { caso } = montar({
+      autorizacion: soloLee('medicion.leer'),
+      alcance: soloCarrera('otra-carrera'),
+    });
+
+    await expect(caso.declararCompetencias(ACTOR, 'pm-1', [])).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

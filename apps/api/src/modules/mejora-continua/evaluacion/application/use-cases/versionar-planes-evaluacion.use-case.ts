@@ -78,6 +78,8 @@ export class VersionarPlanesEvaluacion {
 
   /** RF-PE-034: la nueva versión, en Borrador, vinculada a la que la origina. */
   async generarNuevaVersion(actor: Actor, id: string): Promise<DatosPlanEvaluacion> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'evaluacion.leer', null);
     const origen = await this.exigirPlan(actor, id);
     const base = await this.exigirBase(origen.planMedicionId);
 

@@ -120,6 +120,8 @@ export class ProgramarMediciones {
     id: string,
     celdas: readonly { competenciaId: string; periodoId: string }[],
   ): Promise<CeldaMatriz[]> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
     this.verificarEditable(plan);
@@ -170,6 +172,8 @@ export class ProgramarMediciones {
     periodoId: string,
     realizada: boolean,
   ): Promise<CeldaMatriz> {
+    // (1) lectura, antes de saber si el plan existe: sin ella el 404 revelaría existencia.
+    await this.exigir(actor, 'medicion.leer', null);
     const plan = await this.exigirPlan(actor, id);
     await this.exigir(actor, 'medicion.editar', await this.carreraDe(plan.planEstudiosId));
 
