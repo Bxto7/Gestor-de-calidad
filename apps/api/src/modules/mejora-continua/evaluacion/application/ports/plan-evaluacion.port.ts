@@ -10,6 +10,7 @@
  */
 
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { ResultadoEliminacion } from '../../../medicion/application/ports/plan-medicion.port.js';
 import type { TipoMedicion } from '../../../medicion/domain/value-objects/tipo-medicion.js';
 import type { GrupoObjetivo } from './configuracion-evaluacion.port.js';
 
@@ -100,7 +101,7 @@ export interface RepositorioPlanEvaluacionPort {
     /** RF-PE-042. Solo al aprobar; una transición posterior no debe pisarlos. */
     aprobacion?: { actorId: string; fecha: Date },
   ): Promise<DatosPlanEvaluacion>;
-  eliminar(id: string): Promise<void>;
+  eliminar(id: string): Promise<ResultadoEliminacion>;
 
   /** RF-PE-034: crea la versión nueva con su contenido copiado, en una transacción. */
   copiar(datos: {

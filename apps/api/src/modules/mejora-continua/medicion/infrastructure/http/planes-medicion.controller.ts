@@ -151,7 +151,12 @@ export class PlanesMedicionController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar un plan de medición',
-    description: 'RF-PM-009. Solo en Borrador.',
+    description: 'RF-CH-035. En Borrador o En revisión, y sin planes de evaluación asociados.',
+  })
+  @ApiResponse({ status: 404, description: 'No existe, o es de otra carrera.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Su estado no lo permite, o tiene planes de evaluación asociados.',
   })
   async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     await this.planes.eliminar(actor, id);

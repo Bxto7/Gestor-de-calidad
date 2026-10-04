@@ -220,7 +220,7 @@ function repoMedicion(
     crear: async (d) => planMedicion({ codigo: d.codigo, tipo: d.tipo, meta: d.meta }),
     actualizar: async (_id, d) => planMedicion({ meta: d.meta ?? 0.7 }),
     cambiarEstado: async (_id, estado) => planMedicion({ estado }),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     declararCompetencias: async () => planMedicion(),
     declararPeriodos: async () => planMedicion(),
     matriz: async () => [
@@ -264,7 +264,7 @@ function repoEvaluacion(
         estado,
         ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
       }),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     copiar: async (d) =>
       evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
     linajeDe: async () => [evaluacion()],
@@ -506,10 +506,69 @@ describe('RF-PE-010 a RF-PE-012 — lo que se hereda', () => {
 });
 
 describe('RF-PE-008 — el borrado', () => {
-  it('solo en Borrador', async () => {
-    const { caso } = montar({ evaluacion: evaluacion({ estado: 'Vigente' }) });
+  it.each(['Borrador', 'En revisión'] as const)(
+    'RF-CH-039: elimina un plan en %s y deja constancia después de borrar',
+    async (estado) => {
+      let eventosAlBorrar = -1;
+      const montado = montar({
+        evaluacion: evaluacion({ estado }),
+        planes: {
+          eliminar: async () => {
+            eventosAlBorrar = montado.publicados.length;
+            return { tipo: 'eliminado' };
+          },
+        },
+      });
 
-    await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(ReglaDeNegocioViolada);
+      await montado.caso.eliminar(ACTOR, 'ev-1');
+
+      expect(eventosAlBorrar).toBe(0);
+      expect(montado.publicados[0]?.nombre).toBe('evaluacion.eliminado');
+      expect(montado.publicados[0]?.detalle).toBe(
+        `Plan de evaluación EV-PE-ISI-2026-v2-D-v1 eliminado en ${estado}.`,
+      );
+    },
+  );
+
+  it.each(['Aprobado', 'Vigente', 'Histórico'] as const)(
+    'un plan %s no se elimina: 409 que nombra su estado',
+    async (estado) => {
+      const { caso } = montar({ evaluacion: evaluacion({ estado }) });
+
+      await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          `No se puede eliminar el plan de evaluación EV-PE-ISI-2026-v2-D-v1: está en ${estado}. Solo se eliminan planes en Borrador o En revisión.`,
+        ),
+      );
+    },
+  );
+
+  it.each([
+    [1, '1 plan de mejora asociado'],
+    [3, '3 planes de mejora asociados'],
+  ] as const)(
+    'con %i planes de mejora asociados: 409 con el motivo y sin evento',
+    async (n, texto) => {
+      const { caso, publicados } = montar({
+        planes: { eliminar: async () => ({ tipo: 'en-uso', asociados: n }) },
+      });
+
+      await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          `No se puede eliminar el plan de evaluación EV-PE-ISI-2026-v2-D-v1: tiene ${texto}.`,
+        ),
+      );
+      expect(publicados).toHaveLength(0);
+    },
+  );
+
+  it('si otro lo eliminó antes: NoEncontrado y sin evento', async () => {
+    const { caso, publicados } = montar({
+      planes: { eliminar: async () => ({ tipo: 'no-existe' }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(publicados).toHaveLength(0);
   });
 
   it('exige `evaluacion.leer` y luego `evaluacion.eliminar`', async () => {
@@ -520,16 +579,6 @@ describe('RF-PE-008 — el borrado', () => {
 
     await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toEqual(['evaluacion.leer', 'evaluacion.eliminar']);
-  });
-
-  it('deja constancia en la bitácora, nombrando el plan', async () => {
-    const { caso, publicados } = montar();
-
-    await caso.eliminar(ACTOR, 'ev-1');
-
-    expect(publicados).toHaveLength(1);
-    expect(publicados[0]?.nombre).toBe('evaluacion.eliminado');
-    expect(publicados[0]?.detalle).toContain('EV-PE-ISI-2026-v2-D-v1');
   });
 });
 

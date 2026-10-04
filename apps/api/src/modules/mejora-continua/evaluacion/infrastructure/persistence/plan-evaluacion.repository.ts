@@ -11,6 +11,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
 import { ReglaDeNegocioViolada } from '../../../../../shared-kernel/errors/errores.js';
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { ResultadoEliminacion } from '../../../medicion/application/ports/plan-medicion.port.js';
 import type { TipoMedicion } from '../../../medicion/domain/value-objects/tipo-medicion.js';
 import type {
   ContenidoEvaluacionACopiar,
@@ -191,8 +192,29 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
     }
   }
 
-  async eliminar(id: string): Promise<void> {
-    await this.prisma.planEvaluacion.delete({ where: { id } });
+  /**
+   * RF-CH-039: borra solo si ningún plan de mejora lo usa, en la misma
+   * transacción. `PlanMejora.planEvaluacionId` no tiene clave foránea: esta
+   * cuenta es la única defensa, y se lee la tabla de planes de mejora porque es
+   * del mismo módulo (`mejora_continua`). El bloqueo de la fila no detiene un alta
+   * concurrente de plan de mejora —no hay clave foránea que lo tome—; esa ventana
+   * se acepta, como la del criterio en el Bloque 5.
+   *
+   * La configuración, las mediciones, las indicaciones y los documentos caen por
+   * cascada del esquema.
+   */
+  async eliminar(id: string): Promise<ResultadoEliminacion> {
+    return this.prisma.$transaction(async (tx) => {
+      const bloqueada = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "mejora_continua"."planes_evaluacion" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      if (bloqueada.length === 0) return { tipo: 'no-existe' } as const;
+
+      const asociados = await tx.planMejora.count({ where: { planEvaluacionId: id } });
+      if (asociados > 0) return { tipo: 'en-uso', asociados } as const;
+
+      await tx.planEvaluacion.delete({ where: { id } });
+      return { tipo: 'eliminado' } as const;
+    });
   }
 
   /**

@@ -52,10 +52,10 @@ describe('creación y baja', () => {
     expect(e.detalle).toContain('70 %');
   });
 
-  it('la baja consta como ocurrida en Borrador', () => {
-    const e = new PlanMedicionEliminado(ACTOR, 'pm-1', 'PM-1');
+  it('la baja dice el estado en que estaba el plan', () => {
+    const e = new PlanMedicionEliminado(ACTOR, 'pm-1', 'PM-1', 'En revisión');
 
-    expect(e.detalle).toContain('Borrador');
+    expect(e.detalle).toBe('Plan de medición PM-1 eliminado en En revisión.');
   });
 });
 

@@ -178,18 +178,31 @@ export class GestionarPlanesMedicion {
     return editado;
   }
 
-  /** RF-PM-009: solo un Borrador se elimina (la Tarea 6 lo amplía a En revisión). */
+  /**
+   * RF-CH-035 (reemplaza RF-PM-009): se elimina en Borrador o En revisión, y no
+   * si algún plan de evaluación —de cualquier estado— lo usa. La comprobación
+   * de uso y el borrado van en la misma transacción del repositorio; el evento se
+   * publica después de borrar, porque la bitácora no puede registrar un borrado
+   * que no ocurrió.
+   */
   async eliminar(actor: Actor, id: string): Promise<void> {
     const plan = await this.planGestionable(actor, id, 'medicion.eliminar');
 
     if (!permiteEliminacion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
-        `Solo se puede eliminar un plan de medición en Borrador; ${plan.codigo} está en ${plan.estado}.`,
+        `No se puede eliminar el plan de medición ${plan.codigo}: está en ${plan.estado}. Solo se eliminan planes en Borrador o En revisión.`,
       );
     }
 
-    await this.planes.eliminar(id);
-    await this.eventos.publicar([new PlanMedicionEliminado(actor, id, plan.codigo)]);
+    const r = await this.planes.eliminar(id);
+    if (r.tipo === 'no-existe') throw new NoEncontrado('el plan de medición', id);
+    if (r.tipo === 'en-uso') {
+      throw new ReglaDeNegocioViolada(
+        `No se puede eliminar el plan de medición ${plan.codigo}: tiene ${contar(r.asociados, 'plan de evaluación asociado', 'planes de evaluación asociados')}.`,
+      );
+    }
+
+    await this.eventos.publicar([new PlanMedicionEliminado(actor, id, plan.codigo, plan.estado)]);
   }
 
   /** RF-PM-038: la validación integral, consultable sin transicionar. */
@@ -353,4 +366,8 @@ export class GestionarPlanesMedicion {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
+}
+
+function contar(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
 }

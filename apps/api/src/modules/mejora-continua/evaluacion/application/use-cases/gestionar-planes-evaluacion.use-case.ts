@@ -208,18 +208,29 @@ export class GestionarPlanesEvaluacion {
     return creado;
   }
 
-  /** RF-PE-008: solo un Borrador se elimina. */
+  /**
+   * RF-CH-039 (reemplaza RF-PE-008): se elimina en Borrador o En revisión, y no
+   * si algún plan de mejora —de cualquier estado— lo usa. Comprobación y borrado
+   * en la misma transacción; el evento, después de borrar.
+   */
   async eliminar(actor: Actor, id: string): Promise<void> {
     const plan = await this.planGestionable(actor, id, 'evaluacion.eliminar');
 
     if (!permiteEliminacion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
-        `Solo se puede eliminar un plan de evaluación en Borrador; ${plan.codigo} está en ${plan.estado}.`,
+        `No se puede eliminar el plan de evaluación ${plan.codigo}: está en ${plan.estado}. Solo se eliminan planes en Borrador o En revisión.`,
       );
     }
 
-    await this.evaluaciones.eliminar(id);
-    await this.eventos.publicar([new PlanEvaluacionEliminado(actor, id, plan.codigo)]);
+    const r = await this.evaluaciones.eliminar(id);
+    if (r.tipo === 'no-existe') throw new NoEncontrado('el plan de evaluación', id);
+    if (r.tipo === 'en-uso') {
+      throw new ReglaDeNegocioViolada(
+        `No se puede eliminar el plan de evaluación ${plan.codigo}: tiene ${contar(r.asociados, 'plan de mejora asociado', 'planes de mejora asociados')}.`,
+      );
+    }
+
+    await this.eventos.publicar([new PlanEvaluacionEliminado(actor, id, plan.codigo, plan.estado)]);
   }
 
   /** RF-PE-005: transición con su propio permiso —`evaluacion.*`, no `medicion.*`—. */
@@ -380,4 +391,8 @@ export class GestionarPlanesEvaluacion {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
+}
+
+function contar(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
 }

@@ -158,7 +158,7 @@ function repo(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlan
     crear: async (d) => plan({ codigo: d.codigo, tipo: d.tipo, meta: d.meta }),
     actualizar: async (_id, d) => plan({ meta: d.meta ?? 0.7 }),
     cambiarEstado: async (_id, estado) => plan({ estado }),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     declararCompetencias: async () => plan(),
     declararPeriodos: async () => plan(),
     matriz: async () => [
@@ -366,19 +366,80 @@ describe('RF-PM-007 y RF-PM-008 — editar solo en Borrador', () => {
   });
 });
 
-describe('RF-PM-009 — eliminar solo en Borrador', () => {
-  it('elimina un Borrador y lo audita', async () => {
-    const { caso, vistos } = montar();
+describe('RF-CH-035 — eliminar en Borrador o En revisión', () => {
+  it.each(['Borrador', 'En revisión'] as const)(
+    'elimina un plan en %s y publica el evento después de borrar, con el estado',
+    async (estado) => {
+      let eventosAlBorrar = -1;
+      const montado = montar({
+        repo: {
+          porId: async () => plan({ estado }),
+          eliminar: async () => {
+            eventosAlBorrar = montado.vistos.length;
+            return { tipo: 'eliminado' };
+          },
+        },
+      });
 
-    await caso.eliminar(ACTOR, 'pm-1');
+      await montado.caso.eliminar(ACTOR, 'pm-1');
 
-    expect(vistos).toHaveLength(1);
-  });
+      expect(eventosAlBorrar).toBe(0);
+      expect(montado.vistos).toHaveLength(1);
+      expect(montado.vistos[0]?.nombre).toBe('medicion.eliminado');
+      expect(montado.vistos[0]?.detalle).toBe(
+        `Plan de medición PM-PE-ISI-2026-v1-D-v1 eliminado en ${estado}.`,
+      );
+    },
+  );
 
-  it('un plan Vigente no se elimina', async () => {
-    const { caso } = montar({ repo: { porId: async () => plan({ estado: 'Vigente' }) } });
+  it.each(['Aprobado', 'Vigente', 'Histórico'] as const)(
+    'un plan %s no se elimina: 409 que nombra su estado, y no se llega al repositorio',
+    async (estado) => {
+      let borrados = 0;
+      const { caso, vistos } = montar({
+        repo: {
+          porId: async () => plan({ estado }),
+          eliminar: async () => {
+            borrados++;
+            return { tipo: 'eliminado' };
+          },
+        },
+      });
 
-    await expect(caso.eliminar(ACTOR, 'pm-1')).rejects.toThrow(ReglaDeNegocioViolada);
+      await expect(caso.eliminar(ACTOR, 'pm-1')).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          `No se puede eliminar el plan de medición PM-PE-ISI-2026-v1-D-v1: está en ${estado}. Solo se eliminan planes en Borrador o En revisión.`,
+        ),
+      );
+      expect(borrados).toBe(0);
+      expect(vistos).toHaveLength(0);
+    },
+  );
+
+  it.each([
+    [1, '1 plan de evaluación asociado'],
+    [2, '2 planes de evaluación asociados'],
+  ] as const)(
+    'con %i planes de evaluación asociados: 409 con el motivo y sin evento',
+    async (n, texto) => {
+      const { caso, vistos } = montar({
+        repo: { eliminar: async () => ({ tipo: 'en-uso', asociados: n }) },
+      });
+
+      await expect(caso.eliminar(ACTOR, 'pm-1')).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          `No se puede eliminar el plan de medición PM-PE-ISI-2026-v1-D-v1: tiene ${texto}.`,
+        ),
+      );
+      expect(vistos).toHaveLength(0);
+    },
+  );
+
+  it('si otro lo eliminó entre la lectura y el borrado: NoEncontrado y sin evento', async () => {
+    const { caso, vistos } = montar({ repo: { eliminar: async () => ({ tipo: 'no-existe' }) } });
+
+    await expect(caso.eliminar(ACTOR, 'pm-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(vistos).toHaveLength(0);
   });
 });
 

@@ -68,6 +68,16 @@ export interface FiltroPlanesMedicion {
   readonly texto?: string;
 }
 
+/**
+ * RF-CH-035 y RF-CH-039: el resultado de un borrado que comprueba el uso en la
+ * misma transacción en que borra. `en-uso` lleva cuántos planes lo referencian,
+ * para que el motivo diga cuántos; `no-existe`, que otro lo borró antes.
+ */
+export type ResultadoEliminacion =
+  | { readonly tipo: 'eliminado' }
+  | { readonly tipo: 'no-existe' }
+  | { readonly tipo: 'en-uso'; readonly asociados: number };
+
 export interface RepositorioPlanMedicionPort {
   listar(filtro?: FiltroPlanesMedicion): Promise<DatosPlanMedicion[]>;
   porId(id: string): Promise<DatosPlanMedicion | null>;
@@ -113,7 +123,7 @@ export interface RepositorioPlanMedicionPort {
   marcarVigenteRelevando(
     id: string,
   ): Promise<{ plan: DatosPlanMedicion; relevado: DatosPlanMedicion | null }>;
-  eliminar(id: string): Promise<void>;
+  eliminar(id: string): Promise<ResultadoEliminacion>;
 
   /** Reemplaza el conjunto completo, de forma atómica (RNF12). */
   declararCompetencias(id: string, competenciaIds: readonly string[]): Promise<DatosPlanMedicion>;

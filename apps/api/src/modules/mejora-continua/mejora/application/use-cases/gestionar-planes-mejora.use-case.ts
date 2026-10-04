@@ -60,7 +60,7 @@ import {
   describirTransicion,
   intentarTransicion,
   permiteEdicion,
-  permiteEliminacion,
+  permiteEliminacionDeMejora,
 } from '../../../domain/value-objects/estado-plan.js';
 import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
 import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
@@ -284,7 +284,7 @@ export class GestionarPlanesMejora {
     // RF-PJ-043: eliminar queda restringido a roles autorizados.
     await this.exigir(actor, 'mejora.eliminar', plan.carreraId);
 
-    if (!permiteEliminacion(plan.estado)) {
+    if (!permiteEliminacionDeMejora(plan.estado)) {
       throw new ReglaDeNegocioViolada(
         `Solo se puede eliminar un plan de mejora en Borrador; ${plan.codigo} está en ${plan.estado}.`,
       );

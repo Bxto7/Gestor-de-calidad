@@ -7,6 +7,7 @@
 
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { DomainEvent } from '../../../../../shared-kernel/domain-events/domain-event.js';
+import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
 
 abstract class EventoEvaluacion extends DomainEvent {
   readonly entidad = 'PlanEvaluacion';
@@ -35,9 +36,11 @@ export class PlanEvaluacionEliminado extends EventoEvaluacion {
     actor: Actor,
     readonly entidadId: string,
     codigo: string,
+    /** RF-CH-039: desde el Bloque 6a puede ser Borrador o En revisión. */
+    estado: EstadoMedicion,
   ) {
     super(actor);
-    this.detalle = `Plan de evaluación ${codigo} eliminado.`;
+    this.detalle = `Plan de evaluación ${codigo} eliminado en ${estado}.`;
   }
 }
 

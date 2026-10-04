@@ -265,7 +265,7 @@ function evaluacionesDouble(
     codigosDe: async () => [],
     crear: async () => planEvaluacion(),
     cambiarEstado: async () => planEvaluacion(),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     copiar: async () => planEvaluacion(),
     linajeDe: async () => [planEvaluacion()],
     ...sobre,
@@ -290,7 +290,7 @@ function medicionesDouble(
     copiar: noUsado('copiar'),
     linajeDe: async () => [],
     marcarVigenteRelevando: noUsado('marcarVigenteRelevando'),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     declararCompetencias: noUsado('declararCompetencias'),
     declararPeriodos: noUsado('declararPeriodos'),
     matriz: async () => [],
@@ -851,6 +851,13 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
 describe('RF-PJ-008 — el borrado', () => {
   it('solo en Borrador', async () => {
     const { caso } = montar({ plan: plan({ estado: 'Vigente' }) });
+
+    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(ReglaDeNegocioViolada);
+  });
+
+  // Guardia de regresión: pasa antes y después de la Tarea 6, que solo protege la regla.
+  it('el Bloque 6a no lo amplía: un plan de mejora En revisión sigue sin eliminarse', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'En revisión' }) });
 
     await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(ReglaDeNegocioViolada);
   });

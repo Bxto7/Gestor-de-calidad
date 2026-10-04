@@ -15,6 +15,7 @@ import type {
   DatosPlanMedicion,
   FiltroPlanesMedicion,
   RepositorioPlanMedicionPort,
+  ResultadoEliminacion,
   TipoMedicion,
 } from '../../application/ports/plan-medicion.port.js';
 import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
@@ -395,9 +396,26 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
     };
   }
 
-  async eliminar(id: string): Promise<void> {
-    // Periodos, competencias y matriz caen por cascada del esquema.
-    await this.prisma.planMedicion.delete({ where: { id } });
+  /**
+   * RF-CH-035: borra solo si ningún plan de evaluación lo usa, en la misma
+   * transacción. La fila se bloquea primero: un plan de evaluación nuevo toma un
+   * bloqueo compartido sobre ella por su clave foránea, así que espera a que esta
+   * transacción termine, y la cuenta ve todo lo ya confirmado.
+   *
+   * Periodos, competencias, matriz y documentos caen por cascada del esquema.
+   */
+  async eliminar(id: string): Promise<ResultadoEliminacion> {
+    return this.prisma.$transaction(async (tx) => {
+      const bloqueada = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "mejora_continua"."planes_medicion" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      if (bloqueada.length === 0) return { tipo: 'no-existe' } as const;
+
+      const asociados = await tx.planEvaluacion.count({ where: { planMedicionId: id } });
+      if (asociados > 0) return { tipo: 'en-uso', asociados } as const;
+
+      await tx.planMedicion.delete({ where: { id } });
+      return { tipo: 'eliminado' } as const;
+    });
   }
 
   /** RNF12: atómico. */

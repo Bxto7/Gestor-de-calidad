@@ -210,7 +210,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       codigosDe: async () => [plan.codigo],
       crear: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo }),
       cambiarEstado: async (_id, estado) => evaluacion({ estado }),
-      eliminar: async () => undefined,
+      eliminar: async () => ({ tipo: 'eliminado' }) as const,
       copiar: async (d) => {
         configuraciones.copiado = d.contenido;
         return evaluacion({
@@ -239,7 +239,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
       crear: async () => planMedicion(),
       actualizar: async () => planMedicion(),
       cambiarEstado: async () => planMedicion(),
-      eliminar: async () => undefined,
+      eliminar: async () => ({ tipo: 'eliminado' }) as const,
       declararCompetencias: async () => planMedicion(),
       declararPeriodos: async () => planMedicion(),
       // RF-PE-012: la rejilla que se copia sale de aquí, no de lo que el

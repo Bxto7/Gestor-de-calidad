@@ -160,8 +160,21 @@ export function permiteEdicion(estado: EstadoMedicion): boolean {
   return estado === 'Borrador';
 }
 
-/** RF-PM-009: solo un Borrador puede eliminarse. */
+/**
+ * RF-CH-035 y RF-CH-039 (reemplazan RF-PM-009 y RF-PE-008): un plan de medición
+ * o de evaluación se elimina en Borrador o En revisión. Desde Aprobado ya es un
+ * documento con historia: se versiona, no se borra.
+ */
 export function permiteEliminacion(estado: EstadoMedicion): boolean {
+  return estado === 'Borrador' || estado === 'En revisión';
+}
+
+/**
+ * RF-PJ-008: un plan de mejora, solo en Borrador. Vive aparte para que ampliar
+ * la regla de medición y evaluación (Bloque 6a) no la arrastre; si el Bloque 6b
+ * la cambia, cambia aquí.
+ */
+export function permiteEliminacionDeMejora(estado: EstadoMedicion): boolean {
   return estado === 'Borrador';
 }
 

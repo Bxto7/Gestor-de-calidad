@@ -15,6 +15,7 @@ import {
   intentarTransicion,
   permiteEdicion,
   permiteEliminacion,
+  permiteEliminacionDeMejora,
   transicionesDisponibles,
 } from './estado-plan.js';
 
@@ -153,11 +154,24 @@ describe('RF-PM-007 RN1 — la edición libre solo existe en Borrador', () => {
   });
 });
 
-describe('RF-PM-009 — solo un Borrador puede eliminarse', () => {
-  it('cualquier otro estado lo impide', () => {
+describe('RF-CH-035 y RF-CH-039 — medición y evaluación se eliminan en Borrador o En revisión', () => {
+  it('reemplaza RF-PM-009 y RF-PE-008: también En revisión', () => {
     expect(permiteEliminacion('Borrador')).toBe(true);
-    for (const e of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+    expect(permiteEliminacion('En revisión')).toBe(true);
+  });
+
+  it('un plan ya aprobado no se elimina', () => {
+    for (const e of ['Aprobado', 'Vigente', 'Histórico'] as const) {
       expect(permiteEliminacion(e)).toBe(false);
+    }
+  });
+});
+
+describe('RF-PJ-008 — el plan de mejora sigue eliminándose solo en Borrador', () => {
+  it('el Bloque 6a no lo amplía (eso es del 6b)', () => {
+    expect(permiteEliminacionDeMejora('Borrador')).toBe(true);
+    for (const e of ['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const) {
+      expect(permiteEliminacionDeMejora(e)).toBe(false);
     }
   });
 });

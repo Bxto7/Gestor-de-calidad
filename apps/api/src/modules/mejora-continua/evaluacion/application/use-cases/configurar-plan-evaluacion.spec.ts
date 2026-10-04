@@ -171,7 +171,7 @@ function repoMedicion(
     crear: async (d) => planMedicion({ codigo: d.codigo, tipo: d.tipo, meta: d.meta }),
     actualizar: async (_id, d) => planMedicion({ meta: d.meta ?? 0.7 }),
     cambiarEstado: async (_id, estado) => planMedicion({ estado }),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     declararCompetencias: async () => planMedicion(),
     declararPeriodos: async () => planMedicion(),
     matriz: async () => [
@@ -206,7 +206,7 @@ function repoEvaluacion(
     codigosDe: async () => [],
     crear: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo }),
     cambiarEstado: async (_id, estado) => evaluacion({ estado }),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     copiar: async (d) =>
       evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
     linajeDe: async () => [evaluacion()],
