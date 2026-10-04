@@ -12,14 +12,22 @@ cuál carrera*. Son una conjunción: no basta con tener el permiso.
 
 - **Permisos acotados a carrera** (toda la escritura académica y de mejora
   continua, listados en la política): se ejercen **solo** sobre la carrera que el
-  usuario tiene asignada. Un Director puede *consultar* planes de cualquier
-  carrera, pero *editar/aprobar* solo los de la suya.
+  usuario tiene asignada. Además, el Director y el Coordinador *leen* solo su
+  carrera (siguiente punto); el Consultor y el Administrador leen todas.
 - **Permisos de solo lectura** (los `.leer`): no están acotados por la política;
   lo que los acota es la marca **`lectura.solo_su_carrera`**. Quien la tiene
   —Director y, desde el Bloque 6a (RF-CH-034, RF-CH-038), Coordinador— lee solo
-  la carrera que tiene a cargo: lo de otra responde 404, como si no existiera, y
-  sin carrera asignada no lee ninguna. Sin la marca (Administrador, Consultor)
-  se lee cualquier carrera.
+  la carrera que tiene a cargo, y sin carrera asignada no lee ninguna. Sin la
+  marca (Administrador, Consultor) se lee cualquier carrera. Hoy la marca hace que
+  lo de otra carrera responda 404, como si no existiera, en Acreditación
+  (atributos del graduado y criterios), en los planes de Medición y de Evaluación
+  y en sus documentos (exportación, estado y descarga). **Todavía no** en los
+  planes de Mejora ni en las Actas de Aprobación: los bloques siguientes los
+  acotan.
+- La marca llega a una base de datos **solo** al ejecutar el seed
+  (`npx tsx prisma/seed.ts`, después de `prisma migrate deploy`): el seed
+  reemplaza el conjunto de permisos de cada rol, así que una base migrada pero sin
+  re-sembrar no la tiene.
 - Un usuario tiene **una sola** carrera a cargo (lo impone un `UNIQUE` sobre
   `usuario_id` en `usuario_carrera`).
 - El rol y la carrera llegan juntos a la decisión: un Director sin carrera
@@ -83,7 +91,8 @@ carrera**. Es el rol más poderoso en lo académico.
 
 **Nota:** es el **único** con `plan.aprobar`, `medicion.aprobar`,
 `evaluacion.aprobar` y `mejora.aprobar`. Todo lo académico lo hace **sobre su
-carrera** — sobre la de otro director solo puede consultar.
+carrera**. Lleva `lectura.solo_su_carrera`: en los módulos que ya la aplican
+(§1) lo de otra carrera le responde 404, no solo le niega editarlo.
 
 ---
 
@@ -91,8 +100,9 @@ carrera** — sobre la de otro director solo puede consultar.
 
 **Requiere carrera:** Sí (una).
 **Alcance de lectura:** solo su carrera (`lectura.solo_su_carrera`, Bloque 6a).
-Planes de medición, de evaluación, catálogo, cobertura y Acreditación de otra
-carrera le responden 404; el panel general de Reportes, 403.
+Los planes de Medición y de Evaluación (con sus documentos) y Acreditación de
+otra carrera le responden 404; el panel general de Reportes, 403. Los planes de
+Mejora y las Actas todavía no se acotan por carrera en la lectura (§1).
 **Filosofía:** apoyo operativo: **arma** el plan y lo envía a revisión, pero
 **no aprueba ni observa**. La separación es deliberada: *quien construye no
 puede ser quien da el visto bueno* — eso es lo que hace que la aprobación
