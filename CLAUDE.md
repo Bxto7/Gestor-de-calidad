@@ -120,7 +120,7 @@ Se están construyendo **en paralelo**:
 >
 > **Qué no dice este 100 %.**
 >
-> - **Divergencias abiertas: 11.** El registro vive en
+> - **Divergencias abiertas: 12.** El registro vive en
 >   `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md` §8 y es la fuente; aquí
 >   solo se resumen. Están **pendientes** —nadie de la universidad las ha aprobado—
 >   D-1 (`RF092`, evidencia de aprobación también desde Vigente e Histórico), D-2
@@ -129,7 +129,7 @@ Se están construyendo **en paralelo**:
 >   sistema), D-6 (sin RF que defina los prerrequisitos), D-9 (`RF047`, plan
 >   ISI 2018 con sumillas «pendiente»; la parte de horas teóricas en 0 la retiró RF-CH-020), D-11 (`RF127`, se muestran deshabilitadas en vez de excluirse), D-12
 >   (`RF-PE-020`, evidencia solo como enlace), D-13 (`RF-PE-006` RN2, remite a
->   números equivocados) y D-14 (`RF-PE-032`/`033`, sin la plantilla institucional).
+>   números equivocados) D-14 (`RF-PE-032`/`033`, sin la plantilla institucional) y D-15 (`RF-CH-029`/`032`, eliminar atributos y criterios bloquea ante cualquier uso y no solo ante el de Mejora Continua activa).
 >   D-7 y D-8 están ratificadas y D-10 aprobada.
 > - **`RF127` cumple el resultado pero no la forma que pide.** Desde el 25 de
 >   septiembre de 2026 ningún plan de medición puede incluir una competencia sin
@@ -183,7 +183,7 @@ componente, no axe.
 
 Desde el 26 de septiembre de 2026 la misma suite cubre también las **Actas de
 Aprobación**: el listado, el detalle en Borrador, En revisión, Aprobada y Emitida, y el
-modal de rechazo. Son 24 pruebas de `axe` en total, sin violaciones y sin reglas
+modal de rechazo. Son 28 pruebas de `axe` en total, sin violaciones y sin reglas
 desactivadas. Solo queda sin `axe` el estado Histórica, que ningún flujo del sistema
 alcanza todavía. Las cuatro pruebas que parten de un acta nueva la llevan por la interfaz
 hasta enviarla a revisión, y la de Emitida necesita el worker de documentos. Los pasos
@@ -529,7 +529,7 @@ Si a futuro la universidad requiere una certificación formal (por ejemplo ISO/I
 | Adecuación funcional | 131 RF + 24 RNF documentados y trazables por módulo (sección 1) | ✅ ya definido |
 | Eficiencia de desempeño | Generación de documentos en cola BullMQ con worker propio (3.4). Scripts de k6 en `tests/carga/`, con el RNF escrito como umbral que hace fallar la prueba. Última medición local: extremo a extremo p(95) = 942 ms frente a los 5 s del RNF; consultas p(95) = 104 ms con 15 usuarios concurrentes | ✅ implementado y medido en desarrollo / 🔲 falta ejecutarlo en Staging, que aún no existe (§5 pendiente): el número que cuenta es el del VPS |
 | Compatibilidad | API REST + OpenAPI autogenerado (4.2), evita acoplar frontend/backend a un formato propietario | ✅ ya definido |
-| Capacidad de interacción (antes "usabilidad") | Tailwind (4.1); objetivo WCAG 2.1 AA verificado con `axe-core` sobre las pantallas de Mejora Continua en cada PR (`tests/e2e/`; 24 pruebas al 26 de septiembre de 2026, con las Actas de Aprobación en todos sus estados salvo Histórica). Primera medición el 4 de septiembre de 2026: las cuatro pantallas del flujo pasan sin violaciones, tras oscurecer cinco colores de texto que iban de 2.56:1 a 3.80:1 donde AA exige 4.5:1 (divergencia D-10 del documento de UI, aprobada el 4 de septiembre de 2026) | ✅ automatizado en el flujo de Mejora Continua / 🔲 el resto de pantallas, y la revisión manual que §6.4 pide en Staging, siguen pendientes |
+| Capacidad de interacción (antes "usabilidad") | Tailwind (4.1); objetivo WCAG 2.1 AA verificado con `axe-core` sobre las pantallas de Mejora Continua en cada PR (`tests/e2e/`; 28 pruebas al 3 de octubre de 2026, con las Actas de Aprobación en todos sus estados salvo Histórica). Primera medición el 4 de septiembre de 2026: las cuatro pantallas del flujo pasan sin violaciones, tras oscurecer cinco colores de texto que iban de 2.56:1 a 3.80:1 donde AA exige 4.5:1 (divergencia D-10 del documento de UI, aprobada el 4 de septiembre de 2026) | ✅ automatizado en el flujo de Mejora Continua / 🔲 el resto de pantallas, y la revisión manual que §6.4 pide en Staging, siguen pendientes |
 | Fiabilidad | Máquina de estados explícita (3.4), auditoría append-only (3.4/5.3), backups diarios + RTO ≤4h (5.6) | ✅ ya definido |
 | Seguridad | JWT + refresh, `argon2id`, rate limiting (4.4), RBAC vía `AuthorizationPort` (3.5), TLS + firewall (5.7); SAST + dependency scanning (4.7); objetivo ASVS L2 (6.2) | ✅ controles base definidos / 🔲 gap analysis contra ASVS L2 pendiente |
 | Mantenibilidad | Arquitectura hexagonal + aislamiento de módulos (3.1-3.2), dominio sin dependencias de framework, cobertura ≥80% (2) | ✅ ya definido |

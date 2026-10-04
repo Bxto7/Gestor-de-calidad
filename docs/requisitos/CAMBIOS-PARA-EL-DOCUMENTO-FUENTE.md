@@ -2,11 +2,11 @@
 
 Dirigido a quien mantiene *«Módulo de Plan de Estudios — Especificación de Requerimientos»* (Huancayo, 15 de agosto de 2026) y *«Módulo de Mejora Continua — Requerimientos»*.
 
-Al construir los módulos aparecieron trece puntos en los que el sistema y el documento no coinciden. **Once necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
+Al construir los módulos aparecieron catorce puntos en los que el sistema y el documento no coinciden. **Doce necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
 
-Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-14** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
+Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-15** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
 
-Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto); D-11 se actualizó el 25 de septiembre de 2026.
+Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto); D-11 se actualizó el 25 de septiembre de 2026; D-15 se añadió el 3 de octubre de 2026.
 
 ---
 
@@ -161,6 +161,18 @@ Las dos reglas exigen que el Excel y el PDF del plan de evaluación salgan «igu
 
 **Qué hay que decidir.** Si la plantilla institucional real existe y se puede compartir, para reemplazar la actual por ella. Afecta a la vez a RF-PE-032/RF-PE-033 y, por la misma razón, a RF-PM-028/RF-PM-029 si tampoco se resolvió allí. Mientras tanto, el documento y el sistema no coinciden en la letra de RN2, aunque sí coinciden en que el resultado es un documento de tabla completo y descargable.
 
+### D-15 · RF-CH-029 y RF-CH-032 · Eliminar bloquea más de lo que pide el documento
+
+*Este punto es del documento de Cambios y Observaciones MVP1.*
+
+Las dos reglas bloquean la eliminación de un atributo o de un criterio solo si lo usa Mejora Continua **activa**. El sistema bloquea ante **cualquier** uso: una competencia mapeada, un plan de estudios que adopta el atributo, o un plan de mejora de cualquier estado.
+
+**Por qué se hizo así.** Con la regla literal se podría borrar un atributo con competencias mapeadas pero sin uso en Mejora Continua, y esas competencias quedarían sin atributo sin ningún aviso (RF127 las deja fuera de los planes de medición). Y un criterio referenciado por un plan de mejora histórico quedaría colgando: no hay clave foránea que lo impida.
+
+**Qué hay que decidir.** Aceptar el criterio estricto y corregir RN1 de RF-CH-029 y RF-CH-032, o pedir la lectura literal. En los dos casos el rechazo explica el motivo y sugiere inactivar.
+
+**Recomendación:** aceptarlo.
+
 ---
 
 ## Parte 2 — Solo para constancia
@@ -241,6 +253,7 @@ De más urgente a menos:
 | **D-5** · Carga de planes históricos | Discrepancia sobre el papel; la práctica es la correcta |
 | **D-13** · RF-PE-006 RN2 · Cita cruzada equivocada | Discrepancia sobre el papel; el sistema ya sigue la lectura correcta |
 | **D-11** · RF127 · Competencias sin atributo | Discrepancia de forma: se muestran deshabilitadas en vez de ocultarse; el resultado ya se cumple |
+| **D-15** · RF-CH-029/032 · Eliminar bloquea de más | Ninguno hoy: el sistema es más estricto que el documento; falta que la universidad acepte el criterio |
 | **D-3** · RF084 en Excel | Ninguno, salvo que alguien lo pida |
 
 Los dos puntos de constancia (**D-7** y **D-8**) no aparecen aquí porque no hay nada que resolver.

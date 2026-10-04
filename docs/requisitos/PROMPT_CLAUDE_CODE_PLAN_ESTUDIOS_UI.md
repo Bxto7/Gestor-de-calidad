@@ -1280,6 +1280,7 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-12 | RF-PE-020 (Mejora Continua) | La evidencia del entregable se registra como enlace; el requisito admite «archivos o enlaces» y no hay subida de archivos | **PENDIENTE** |
 | D-13 | RF-PE-006 RN2 (Mejora Continua) | La excepción del registro progresivo remite a RF-PE-022 y RF-PE-028 (medición Indirecta, ninguno registra un porcentaje); los que sí lo describen son RF-PE-019 y RF-PE-026 | **PENDIENTE** |
 | D-14 | RF-PE-032 RN2 · RF-PE-033 RN2 (Mejora Continua) | El Excel y el PDF calcan la plantilla del plan de medición, no «el formato institucional»: esa plantilla no está en el repositorio | **PENDIENTE** |
+| D-15 | RF-CH-029 RN1 · RF-CH-032 RN1 (Cambios y Observaciones MVP1) | Eliminar un atributo o un criterio se bloquea ante **cualquier** uso (competencia mapeada, plan de estudios que lo adopta, plan de mejora de cualquier estado); el documento solo bloquea ante uso en Mejora Continua activa | **PENDIENTE** |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1544,6 +1545,19 @@ RF-PE-033, y por la misma razón a RF-PM-028 y RF-PM-029, que citan la misma
 exigencia y no la resuelven tampoco. Mientras tanto, el documento y el sistema
 no coinciden en la letra de RN2, aunque el resultado sí sea un documento de
 tabla completo y descargable.
+
+
+### D-15 · RF-CH-029 RN1 · RF-CH-032 RN1 — eliminar bloquea más de lo que pide el documento
+
+*Este punto es del documento de Cambios y Observaciones MVP1, no del de Plan de Estudios.*
+
+**Pide:** RN1 de RF-CH-029 bloquea la eliminación de un atributo solo si lo usa una competencia que está en planes de medición, evaluación o mejora **activos**; RN1 de RF-CH-032, solo si un plan de mejora **activo** referencia el criterio.
+
+**Hace:** bloquea ante **cualquier** vínculo —competencia mapeada, plan de estudios que adopta el atributo, plan de mejora de cualquier estado— y responde 409 con el motivo y la sugerencia de inactivarlo (`gestionar-atributos.use-case.ts`, `gestionar-criterios.use-case.ts`).
+
+**Por qué:** el documento permitiría borrar un atributo con competencias mapeadas pero sin uso en Mejora Continua, lo que dejaría esas competencias sin atributo y violaría RF127 sin aviso; y un criterio referenciado por un plan de mejora histórico quedaría colgando, porque no hay clave foránea que lo impida.
+
+**Qué hay que decidir:** si la universidad acepta el criterio estricto, corregir RN1 de los dos requisitos. Si prefiere la lectura literal, el cambio es acotado: un caso de uso con dos condiciones menos y sus pruebas.
 
 ---
 

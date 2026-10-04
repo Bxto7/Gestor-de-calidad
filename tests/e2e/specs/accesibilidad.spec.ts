@@ -169,6 +169,41 @@ test('los atributos del graduado', async ({ page }) => {
   await analizar(page, 'la pantalla de atributos');
 });
 
+test('el modal de eliminar un atributo, con el motivo del servidor a la vista', async ({
+  page,
+}) => {
+  // AG-I08 está en uso: el rechazo es el estado con más contenido del modal, y
+  // analizarlo vacío no distingue «sin problemas» de «axe nunca vio el aviso».
+  await page.goto('/acreditacion/atributos');
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'AG-I08' })
+    .getByRole('button', { name: 'Eliminar' })
+    .click();
+  const modal = page.getByRole('dialog', { name: 'Eliminar atributo' });
+  await modal.getByRole('button', { name: 'Eliminar' }).click();
+  await expect(modal.getByRole('alert')).toContainText('está en uso');
+
+  await analizar(page, 'el modal de eliminar un atributo con el motivo del servidor');
+});
+
+test('los criterios de acreditación y el modal de eliminar uno', async ({ page }) => {
+  await page.goto('/acreditacion/criterios');
+  await expect(page.getByRole('heading', { name: 'Criterios de Acreditación' })).toBeVisible();
+  await analizar(page, 'la pantalla de criterios');
+
+  // Solo se abre, no se confirma: `C-E2E-01` lo siembra `e2e:preparar` y otras
+  // pruebas dependen de él.
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'C-E2E-01' })
+    .getByRole('button', { name: 'Eliminar' })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'Eliminar criterio' })).toBeVisible();
+
+  await analizar(page, 'el modal de eliminar un criterio');
+});
+
 test('el resumen', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Bienvenido/ })).toBeVisible();

@@ -135,9 +135,9 @@ está registrada como **D-10** en la sección 8 de
 `docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, **aprobada el 4 de septiembre de
 2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
 
-**Cobertura actual (26 de septiembre de 2026).** Además de las cuatro pantallas de
-aquella primera medición, el spec tiene hoy 24 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
-sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, el
+**Cobertura actual (3 de octubre de 2026).** Además de las cuatro pantallas de
+aquella primera medición, el spec tiene hoy 28 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
+sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, Criterios de Acreditación y los modales de eliminar de Atributos y Criterios, el
 resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias,
 desde RF127 el selector de competencias con una competencia sin atributo —la casilla
 deshabilitada y su motivo enlazado por `aria-describedby`— y las Actas de Aprobación: el
