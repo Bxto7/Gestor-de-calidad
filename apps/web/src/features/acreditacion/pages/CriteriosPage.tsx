@@ -36,7 +36,7 @@ import {
   useEditarCriterio,
   useEliminarCriterio,
 } from '../api/queries';
-import { ConfirmarEliminacion } from '../components/ConfirmarEliminacion';
+import { ConfirmarEliminacion } from '@/shared/components/ConfirmarEliminacion';
 import { carreraDeTrabajo } from '../domain/carrera-de-trabajo';
 import type { CriterioAcreditacion } from '../domain/tipos';
 

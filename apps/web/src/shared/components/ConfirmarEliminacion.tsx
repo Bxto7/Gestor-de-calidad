@@ -1,10 +1,10 @@
 /**
- * Confirmación de un borrado definitivo (RF-CH-029, RF-CH-032).
+ * Confirmación de un borrado definitivo, compartida por Acreditación (RF-CH-029, RF-CH-032) y Mejora Continua (RF-CH-035, RF-CH-039).
  *
- * Si el servidor rechaza —el registro está en uso—, el motivo y la sugerencia de
- * inactivar llegan en el propio mensaje del 409 (RNF08: el motivo concreto, no
+ * Si el servidor rechaza —el registro está en uso—, el motivo
+ * llega en el propio mensaje del 409 (RNF08: el motivo concreto, no
  * «ocurrió un error») y se muestran aquí sin cerrar el diálogo, para que el
- * usuario lea por qué y decida inactivar en su lugar.
+ * usuario lea por qué.
  */
 
 import { useState, type ReactNode } from 'react';

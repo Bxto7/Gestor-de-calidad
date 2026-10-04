@@ -37,7 +37,7 @@ import {
   useEditarAtributo,
   useEliminarAtributo,
 } from '../api/queries';
-import { ConfirmarEliminacion } from '../components/ConfirmarEliminacion';
+import { ConfirmarEliminacion } from '@/shared/components/ConfirmarEliminacion';
 import { carreraDeTrabajo } from '../domain/carrera-de-trabajo';
 import type { AtributoGraduado, ImpactoAtributo } from '../domain/tipos';
 
