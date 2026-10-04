@@ -132,25 +132,32 @@ afterAll(async () => {
 
 describe('RF-CH-035 — eliminar un plan de medición', () => {
   it.each([
-    ['BORRADOR', 'Borrador'],
-    ['EN_REVISION', 'En revisión'],
-  ] as const)('en %s se borra con sus periodos, y queda en la bitácora', async (estado, texto) => {
-    const pm = await medicion('PM-1', estado);
-    await prisma.periodoMedicion.create({
-      data: { planMedicionId: pm.id, etiqueta: '2026-I', orden: 1 },
-    });
+    ['BORRADOR', 'Borrador', ' (guardia de regresión: el código anterior ya borraba en Borrador)'],
+    ['EN_REVISION', 'En revisión', ''],
+  ] as const)(
+    'en %s se borra con sus periodos, y queda en la bitácora%s',
+    async (estado, texto) => {
+      const pm = await medicion('PM-1', estado);
+      await prisma.periodoMedicion.create({
+        data: { planMedicionId: pm.id, etiqueta: '2026-I', orden: 1 },
+      });
 
-    await mediciones().eliminar(coordinador, pm.id);
+      await mediciones().eliminar(coordinador, pm.id);
 
-    expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(0);
-    expect(await prisma.periodoMedicion.count({ where: { planMedicionId: pm.id } })).toBe(0);
-    expect(bitacora).toEqual([`Plan de medición PM-1 eliminado en ${texto}.`]);
-  });
+      expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(0);
+      expect(await prisma.periodoMedicion.count({ where: { planMedicionId: pm.id } })).toBe(0);
+      expect(bitacora).toEqual([`Plan de medición PM-1 eliminado en ${texto}.`]);
+    },
+  );
 
-  it('Vigente: 409 que nombra el estado, y el plan queda', async () => {
+  it('Vigente: 409 con el texto completo, y el plan queda', async () => {
     const pm = await medicion('PM-1', 'VIGENTE');
 
-    await expect(mediciones().eliminar(coordinador, pm.id)).rejects.toThrow('está en Vigente');
+    await expect(mediciones().eliminar(coordinador, pm.id)).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'No se puede eliminar el plan de medición PM-1: está en Vigente. Solo se eliminan planes en Borrador o En revisión.',
+      ),
+    );
     expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(1);
   });
 
@@ -158,6 +165,9 @@ describe('RF-CH-035 — eliminar un plan de medición', () => {
     const pm = await medicion('PM-1', 'APROBADO');
     await evaluacionSobre(pm.id, 'EV-1', 'VIGENTE');
     await prisma.planMedicion.update({ where: { id: pm.id }, data: { estado: 'BORRADOR' } });
+    await prisma.periodoMedicion.create({
+      data: { planMedicionId: pm.id, etiqueta: '2026-I', orden: 1 },
+    });
 
     await expect(mediciones().eliminar(coordinador, pm.id)).rejects.toThrow(
       new ReglaDeNegocioViolada(
@@ -165,6 +175,7 @@ describe('RF-CH-035 — eliminar un plan de medición', () => {
       ),
     );
     expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(1);
+    expect(await prisma.periodoMedicion.count({ where: { planMedicionId: pm.id } })).toBe(1);
     expect(await prisma.planEvaluacion.count({ where: { planMedicionId: pm.id } })).toBe(1);
     expect(bitacora).toEqual([]);
   });
@@ -176,16 +187,59 @@ describe('RF-CH-035 — eliminar un plan de medición', () => {
     expect(await repoMedicion.eliminar(pm.id)).toEqual({ tipo: 'no-existe' });
   });
 
-  it('carrera crítica: un plan de evaluación que aparece antes del borrado lo detiene', async () => {
+  it('secuencial: un plan de evaluación ya existente lo detiene (no prueba el bloqueo de la fila)', async () => {
     const pm = await medicion('PM-1');
-    // Simula el vínculo confirmado entre la lectura del caso de uso y el borrado.
     await evaluacionSobre(pm.id, 'EV-1');
 
     expect(await repoMedicion.eliminar(pm.id)).toEqual({ tipo: 'en-uso', asociados: 1 });
     expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(1);
   });
 
-  it('un plan que ya no existe es NoEncontrado y no deja evento', async () => {
+  it('concurrencia: un plan de evaluación insertado en una transacción abierta, y confirmado durante el borrado, lo detiene', async () => {
+    const pm = await medicion('PM-1');
+    let confirmar!: () => void;
+    const puedeConfirmar = new Promise<void>((r) => (confirmar = r));
+    let insertada!: () => void;
+    const yaInsertada = new Promise<void>((r) => (insertada = r));
+
+    // La transacción inserta (sin confirmar) y toma el bloqueo compartido de la
+    // fila del plan por su clave foránea.
+    const abierta = prisma.$transaction(async (tx) => {
+      await tx.planEvaluacion.create({
+        data: { planMedicionId: pm.id, carreraId: isi, codigo: 'EV-1', estado: 'BORRADOR' },
+      });
+      insertada();
+      await puedeConfirmar;
+    });
+    await yaInsertada;
+
+    let terminado = false;
+    const borrado = repoMedicion.eliminar(pm.id).finally(() => (terminado = true));
+    await new Promise((r) => setTimeout(r, 400));
+    // Con FOR UPDATE el borrado espera a la transacción; sin él ya habría terminado.
+    expect(terminado).toBe(false);
+
+    confirmar();
+    await abierta;
+
+    expect(await borrado).toEqual({ tipo: 'en-uso', asociados: 1 });
+    expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(1);
+    expect(await prisma.planEvaluacion.count({ where: { planMedicionId: pm.id } })).toBe(1);
+  });
+
+  it('concurrencia: dos borrados a la vez del mismo plan: uno elimina y el otro no-existe', async () => {
+    const pm = await medicion('PM-1');
+
+    const resultados = await Promise.all([
+      repoMedicion.eliminar(pm.id),
+      repoMedicion.eliminar(pm.id),
+    ]);
+
+    expect(resultados.map((r) => r.tipo).sort()).toEqual(['eliminado', 'no-existe']);
+    expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(0);
+  });
+
+  it('guardia de regresión: un plan que ya no existe es NoEncontrado y no deja evento (planGestionable ya lo daba)', async () => {
     await expect(mediciones().eliminar(coordinador, randomUUID())).rejects.toBeInstanceOf(
       NoEncontrado,
     );
@@ -236,11 +290,32 @@ describe('RF-CH-039 — eliminar un plan de evaluación', () => {
     },
   );
 
-  it('Aprobado: 409 que nombra el estado', async () => {
+  it('Aprobado: 409 con el texto completo', async () => {
     const base = await medicion('PM-1', 'APROBADO');
     const ev = await evaluacionSobre(base.id, 'EV-1', 'APROBADO');
 
-    await expect(evaluaciones().eliminar(coordinador, ev.id)).rejects.toThrow('está en Aprobado');
+    await expect(evaluaciones().eliminar(coordinador, ev.id)).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'No se puede eliminar el plan de evaluación EV-1: está en Aprobado. Solo se eliminan planes en Borrador o En revisión.',
+      ),
+    );
+    expect(await prisma.planEvaluacion.count({ where: { id: ev.id } })).toBe(1);
+  });
+
+  // Sin prueba de concurrencia contra un plan de mejora que se inserta durante el
+  // borrado: PlanMejora.planEvaluacionId no tiene clave foránea, así que la fila
+  // del plan de evaluación no recibe ningún bloqueo compartido y esa ventana es
+  // inevitable (el comentario del repositorio la declara). Un test sería aleatorio.
+  it('concurrencia: dos borrados a la vez del mismo plan: uno elimina y el otro no-existe', async () => {
+    const base = await medicion('PM-1', 'APROBADO');
+    const ev = await evaluacionSobre(base.id, 'EV-1');
+
+    const resultados = await Promise.all([
+      repoEvaluacion.eliminar(ev.id),
+      repoEvaluacion.eliminar(ev.id),
+    ]);
+
+    expect(resultados.map((r) => r.tipo).sort()).toEqual(['eliminado', 'no-existe']);
   });
 
   it('el repositorio: eliminado, y la segunda vez no-existe', async () => {

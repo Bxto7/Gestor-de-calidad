@@ -531,15 +531,26 @@ describe('RF-PE-008 — el borrado', () => {
   );
 
   it.each(['Aprobado', 'Vigente', 'Histórico'] as const)(
-    'un plan %s no se elimina: 409 que nombra su estado',
+    'un plan %s no se elimina: 409 que nombra su estado, sin llegar al repositorio ni publicar',
     async (estado) => {
-      const { caso } = montar({ evaluacion: evaluacion({ estado }) });
+      let borrados = 0;
+      const { caso, publicados } = montar({
+        evaluacion: evaluacion({ estado }),
+        planes: {
+          eliminar: async () => {
+            borrados++;
+            return { tipo: 'eliminado' };
+          },
+        },
+      });
 
       await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(
         new ReglaDeNegocioViolada(
           `No se puede eliminar el plan de evaluación EV-PE-ISI-2026-v2-D-v1: está en ${estado}. Solo se eliminan planes en Borrador o En revisión.`,
         ),
       );
+      expect(borrados).toBe(0);
+      expect(publicados).toHaveLength(0);
     },
   );
 

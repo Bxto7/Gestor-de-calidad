@@ -84,6 +84,7 @@ export class PlanesEvaluacionController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar un plan de evaluación en Borrador o En revisión (RF-CH-039)' })
+  @ApiResponse({ status: 404, description: 'No existe, o es de otra carrera.' })
   @ApiResponse({
     status: 409,
     description: 'Su estado no lo permite, o tiene planes de mejora asociados.',
