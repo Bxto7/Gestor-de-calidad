@@ -113,21 +113,32 @@ export class GestionarCompetencias {
   }
 
   /**
-   * Los atributos del graduado del marco vigente.
+   * Los atributos del graduado del marco vigente que se ofrecen al mapear una
+   * competencia (Bloque 5: cada carrera tiene los suyos).
    *
-   * La pantalla los necesita para ofrecerlos al crear una competencia; sin la
-   * lista no habría forma de mapear nada sin escribir el código a mano.
+   * Con `planId`, los de la carrera del plan. Sin él, los de la carrera que lee
+   * quien tiene alcance `CARRERA` (ninguno si no tiene carrera asignada); con
+   * alcance `TODAS`, los de todas las carreras, y cada fila lleva su `carreraId`.
    */
-  async atributos(actor: Actor): Promise<DatosAtributo[]> {
+  async atributos(actor: Actor, planId?: string): Promise<DatosAtributo[]> {
     await this.exigir(actor, 'competencia.leer', null);
-    return this.competencias.atributos(MARCO_VIGENTE);
+    if (planId) {
+      const plan = await this.planLegible(actor, planId);
+      return this.competencias.atributos(MARCO_VIGENTE, plan.carreraId);
+    }
+
+    const alcance = await this.alcance.alcanceDeLectura(actor.id);
+    if (alcance.tipo === 'TODAS') return this.competencias.atributos(MARCO_VIGENTE);
+    if (alcance.carreraId === null) return [];
+    return this.competencias.atributos(MARCO_VIGENTE, alcance.carreraId);
   }
 
   /**
    * Cobertura del marco: qué atributo desarrolla cada competencia y cuál no
-   * desarrolla ninguna (§6.2). Con `planId`, la del plan (RF-CH-017). Sin él,
-   * el mismo alcance que `listar`: quien lee solo su carrera cuenta solo las
-   * suyas (ninguna si no tiene carrera asignada); los demás, el catálogo entero.
+   * desarrolla ninguna (§6.2). Con `planId`, los atributos de la carrera del plan
+   * con las competencias del plan (RF-CH-017). Sin él, el mismo alcance que
+   * `listar`: quien lee solo su carrera ve solo sus atributos y competencias
+   * (nada si no tiene carrera asignada); los demás, todas las carreras.
    *
    * Se devuelven todos los atributos, también los vacíos, porque el hallazgo
    * que importa es el que falta.
@@ -135,16 +146,13 @@ export class GestionarCompetencias {
   async cobertura(actor: Actor, planId?: string): Promise<CoberturaAtributo[]> {
     await this.exigir(actor, 'competencia.leer', null);
     if (planId) {
-      await this.planLegible(actor, planId);
-      return this.competencias.cobertura(MARCO_VIGENTE, planId);
+      const plan = await this.planLegible(actor, planId);
+      return this.competencias.cobertura(MARCO_VIGENTE, planId, plan.carreraId);
     }
 
     const alcance = await this.alcance.alcanceDeLectura(actor.id);
     if (alcance.tipo === 'TODAS') return this.competencias.cobertura(MARCO_VIGENTE);
-    if (alcance.carreraId === null) {
-      const atributos = await this.competencias.atributos(MARCO_VIGENTE);
-      return atributos.map((a) => ({ ...a, competencias: [] }));
-    }
+    if (alcance.carreraId === null) return [];
     return this.competencias.cobertura(MARCO_VIGENTE, undefined, alcance.carreraId);
   }
 
@@ -162,6 +170,7 @@ export class GestionarCompetencias {
     const plan = await this.planLegible(actor, planId);
     await this.exigir(actor, 'competencia.gestionar', plan.carreraId);
     exigirEditable(plan);
+    await this.exigirAtributosDeCarrera(plan.carreraId, atributoIds);
 
     const limpio = await this.validar(nombre, plan.carreraId);
     const codigo = siguienteCodigoCompetencia(await this.competencias.codigos());
@@ -194,6 +203,7 @@ export class GestionarCompetencias {
     atributoIds: readonly string[] = [],
   ): Promise<DatosCompetencia> {
     const actual = await this.filaGestionable(actor, id);
+    await this.exigirAtributosDeCarrera(actual.carreraId, atributoIds);
 
     const limpio = await this.validar(nombre, actual.carreraId, id);
     const editada = await this.competencias.actualizar(id, limpio, sinRepetir(atributoIds));
@@ -318,6 +328,30 @@ export class GestionarCompetencias {
   }
 
   /* ── Apoyo ──────────────────────────────────────────────────────────── */
+
+  /**
+   * Bloque 5: un atributo de otra carrera nunca se vincula a una competencia,
+   * aunque el identificador se envíe a mano. Una competencia sin carrera (heredada
+   * del 4b) tampoco puede mapearse: la migración le borró los vínculos.
+   */
+  private async exigirAtributosDeCarrera(
+    carreraId: string | null,
+    atributoIds: readonly string[],
+  ): Promise<void> {
+    const ids = sinRepetir(atributoIds);
+    if (ids.length === 0) return;
+    if (carreraId === null) {
+      throw new ReglaDeNegocioViolada(
+        'La competencia no tiene carrera: no puede vincularse a atributos del graduado.',
+      );
+    }
+    const ajenos = await this.competencias.atributosFueraDeCarrera(carreraId, ids);
+    if (ajenos.length > 0) {
+      throw new ReglaDeNegocioViolada(
+        `Estos atributos del graduado no existen o no son de la carrera de la competencia: ${ajenos.join(', ')}.`,
+      );
+    }
+  }
 
   /** Lectura, existencia, alcance y gestión sobre la carrera de la fila. */
   private async filaGestionable(actor: Actor, id: string): Promise<DatosCompetencia> {

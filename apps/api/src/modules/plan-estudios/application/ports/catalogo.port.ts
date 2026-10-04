@@ -14,6 +14,8 @@
 /** Un atributo del graduado del marco de acreditación vigente (§6.2). */
 export interface DatosAtributo {
   readonly id: string;
+  /** Bloque 5: cada carrera tiene sus atributos. */
+  readonly carreraId: string;
   readonly marco: string;
   readonly codigo: string;
   readonly nombre: string;
@@ -69,14 +71,18 @@ export interface RepositorioCompetenciaPort {
   listar(filtro?: FiltroCatalogo): Promise<DatosCompetencia[]>;
 
   /**
-   * Los atributos del marco, con las competencias que cubren cada uno. Con
-   * `planId`, solo cuentan las vinculadas a ese plan; con `carreraId` (el
-   * alcance de un Director), solo las de esa carrera.
+   * Cobertura del marco. Los **atributos** se filtran por `carreraId` si llega;
+   * las **competencias**, por `planId` si llega y, si no, por `carreraId`. Con
+   * `planId` y `carreraId` a la vez (la carrera del plan) salen los atributos de
+   * esa carrera con las competencias del plan, incluidas las heredadas sin carrera.
    */
   cobertura(marco: string, planId?: string, carreraId?: string): Promise<CoberturaAtributo[]>;
 
-  /** Para poder asignar el atributo al crear o editar una competencia. */
-  atributos(marco: string): Promise<DatosAtributo[]>;
+  /** Los atributos del marco; de una carrera si llega `carreraId`, de todas si no. */
+  atributos(marco: string, carreraId?: string): Promise<DatosAtributo[]>;
+
+  /** Bloque 5: de estos ids, los que no existen o no son de esa carrera. */
+  atributosFueraDeCarrera(carreraId: string, ids: readonly string[]): Promise<string[]>;
   porId(id: string): Promise<DatosCompetencia | null>;
   codigos(): Promise<string[]>;
 

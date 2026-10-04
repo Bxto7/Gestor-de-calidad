@@ -44,14 +44,22 @@ function dondeEstado(activo: boolean | undefined) {
     : { estado: activo ? ('ACTIVO' as const) : ('INACTIVO' as const) };
 }
 
+const SELECCION_ATRIBUTO = {
+  id: true,
+  carreraId: true,
+  marco: true,
+  codigo: true,
+  nombre: true,
+} as const;
+
 /**
  * Excepción deliberada de aislamiento (Fase 0d, dashboard por rol):
  * este repositorio sigue consultando `AtributoGraduado`/`CompetenciaAtributo`
  * por Prisma directo (`listar`, `porId`, `crear`, `actualizar`,
  * `cambiarEstado`, `cobertura`, `atributos`) aunque `AtributoGraduado`
  * vive en su propio módulo (`acreditacion`, antes `atributos-graduado`) desde esa fase.
- * Desde el Bloque 5 cada carrera tiene sus propios atributos: el filtro por
- * carrera de estos métodos lo añade la Tarea 6. Aislar
+ * Desde el Bloque 5 cada carrera tiene sus propios atributos: `cobertura`,
+ * `atributos` y `atributosFueraDeCarrera` filtran por carrera. Aislar
  * esto de verdad exigiría refactorizar `GestionarCompetencias` entero
  * para resolver atributos vía un puerto cross-módulo en lote — decisión
  * consciente de no hacerlo: el costo de tocar código de Competencia que
@@ -77,7 +85,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
         _count: { select: { planes: true, asignaturas: true } },
         atributos: {
           select: {
-            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+            atributo: { select: SELECCION_ATRIBUTO },
           },
         },
       },
@@ -92,7 +100,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
         _count: { select: { planes: true, asignaturas: true } },
         atributos: {
           select: {
-            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+            atributo: { select: SELECCION_ATRIBUTO },
           },
         },
       },
@@ -113,17 +121,18 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     carreraId?: string,
   ): Promise<CoberturaAtributo[]> {
     const filas = await this.prisma.atributoGraduado.findMany({
-      where: { marco },
-      orderBy: { orden: 'asc' },
+      // Bloque 5: los atributos son de una carrera; sin este filtro la cobertura
+      // de un plan mezclaría los de todas.
+      where: { marco, ...(carreraId ? { carreraId } : {}) },
+      orderBy: [{ carrera: { codigo: 'asc' } }, { orden: 'asc' }],
       include: {
         competencias: {
           // RF-CH-017: con plan, la cobertura es la de ese plan, no la de todo
-          // el catálogo.
+          // el catálogo; sin plan, la de la carrera si llega.
           where: {
             competencia: {
               estado: 'ACTIVO',
-              ...(planId ? { planes: { some: { planId } } } : {}),
-              ...(carreraId ? { carreraId } : {}),
+              ...(planId ? { planes: { some: { planId } } } : carreraId ? { carreraId } : {}),
             },
           },
           select: { competencia: { select: { id: true, codigo: true, nombre: true } } },
@@ -133,6 +142,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
 
     return filas.map((a) => ({
       id: a.id,
+      carreraId: a.carreraId,
       marco: a.marco,
       codigo: a.codigo,
       nombre: a.nombre,
@@ -143,12 +153,22 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
     }));
   }
 
-  async atributos(marco: string): Promise<DatosAtributo[]> {
+  async atributos(marco: string, carreraId?: string): Promise<DatosAtributo[]> {
     return this.prisma.atributoGraduado.findMany({
-      where: { marco },
-      orderBy: { orden: 'asc' },
-      select: { id: true, marco: true, codigo: true, nombre: true },
+      where: { marco, ...(carreraId ? { carreraId } : {}) },
+      orderBy: [{ carrera: { codigo: 'asc' } }, { orden: 'asc' }],
+      select: SELECCION_ATRIBUTO,
     });
+  }
+
+  async atributosFueraDeCarrera(carreraId: string, ids: readonly string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const validos = await this.prisma.atributoGraduado.findMany({
+      where: { id: { in: [...ids] }, carreraId },
+      select: { id: true },
+    });
+    const encontrados = new Set(validos.map((v) => v.id));
+    return ids.filter((id) => !encontrados.has(id));
   }
 
   async codigos(): Promise<string[]> {
@@ -179,7 +199,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
         _count: { select: { planes: true, asignaturas: true } },
         atributos: {
           select: {
-            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+            atributo: { select: SELECCION_ATRIBUTO },
           },
         },
       },
@@ -207,7 +227,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
           _count: { select: { planes: true, asignaturas: true } },
           atributos: {
             select: {
-              atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+              atributo: { select: SELECCION_ATRIBUTO },
             },
           },
         },
@@ -224,7 +244,7 @@ export class CompetenciaRepositoryPrisma implements RepositorioCompetenciaPort {
         _count: { select: { planes: true, asignaturas: true } },
         atributos: {
           select: {
-            atributo: { select: { id: true, marco: true, codigo: true, nombre: true } },
+            atributo: { select: SELECCION_ATRIBUTO },
           },
         },
       },
@@ -292,7 +312,9 @@ function aCompetencia(fila: {
   carreraId: string | null;
   creadoEn: Date;
   _count: { planes: number; asignaturas: number };
-  atributos: { atributo: { id: string; marco: string; codigo: string; nombre: string } }[];
+  atributos: {
+    atributo: { id: string; carreraId: string; marco: string; codigo: string; nombre: string };
+  }[];
 }): DatosCompetencia {
   return {
     id: fila.id,

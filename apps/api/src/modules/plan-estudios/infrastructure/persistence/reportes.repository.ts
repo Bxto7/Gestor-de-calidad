@@ -185,12 +185,13 @@ export class ReportesRepositoryPrisma implements RepositorioReportesPort {
         where: { marco },
         select: {
           codigo: true,
+          carrera: { select: { codigo: true } },
           competencias: {
             where: { competencia: { estado: 'ACTIVO' } },
             select: { atributoId: true },
           },
         },
-        orderBy: { orden: 'asc' },
+        orderBy: [{ carrera: { codigo: 'asc' } }, { orden: 'asc' }],
       }),
     ]);
 
@@ -207,7 +208,11 @@ export class ReportesRepositoryPrisma implements RepositorioReportesPort {
       competencias,
       objetivos,
       carrerasSinPlanVigente: sinVigente,
-      atributosSinCubrir: atributos.filter((a) => a.competencias.length === 0).map((a) => a.codigo),
+      // Cada carrera tiene sus atributos: el panel los cuenta todos y rotula
+      // cada uno con su carrera, porque «AG-I06» a secas ya no dice de quién es.
+      atributosSinCubrir: atributos
+        .filter((a) => a.competencias.length === 0)
+        .map((a) => `${a.codigo} (${a.carrera.codigo})`),
       totalAtributos: atributos.length,
     };
   }

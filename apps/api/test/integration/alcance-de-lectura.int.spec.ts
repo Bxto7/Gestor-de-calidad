@@ -183,48 +183,70 @@ describe('RF-CH-017 / RF-CH-009 — competencias según el alcance de lectura', 
     expect(r.map((c) => c.codigo)).toEqual(['CPE-01']);
   });
 
-  it('la cobertura sin planId del Director solo cuenta las competencias de su carrera', async () => {
+  it('la cobertura sin planId del Director solo cuenta los atributos y las competencias de su carrera', async () => {
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const director = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
     await sembrarAtributosIcacit(prisma, sis);
-    const atributo = await prisma.atributoGraduado.findFirstOrThrow({ orderBy: { orden: 'asc' } });
+    await sembrarAtributosIcacit(prisma, civ);
     for (const [codigo, carreraId] of [
       ['CPE-01', sis],
       ['CPE-02', civ],
-      ['CPE-03', null],
     ] as const) {
       const id = await competenciaEn(codigo, carreraId);
+      const atributo = await prisma.atributoGraduado.findFirstOrThrow({
+        where: { carreraId, codigo: 'AG-I01' },
+      });
       await prisma.competenciaAtributo.create({
         data: { competenciaId: id, atributoId: atributo.id },
       });
     }
 
     const r = await gestionarCompetencias().cobertura(como(director));
-    const codigos = r.flatMap((a) => a.competencias.map((c) => c.codigo));
-    expect(codigos).toEqual(['CPE-01']);
+
+    expect(r).toHaveLength(11);
+    expect(new Set(r.map((a) => a.carreraId))).toEqual(new Set([sis]));
+    expect(r.flatMap((a) => a.competencias.map((c) => c.codigo))).toEqual(['CPE-01']);
   });
 
-  it('la cobertura sin planId del Coordinador cuenta el catálogo entero', async () => {
+  it('la cobertura sin planId del Coordinador cuenta los atributos y las competencias de todas las carreras', async () => {
     const sis = await crearCarrera('SIS');
     const civ = await crearCarrera('CIV');
     const coordinador = await crearUsuario('coo@x.pe', 'COORDINADOR_ACADEMICO', sis);
     await sembrarAtributosIcacit(prisma, sis);
-    const atributo = await prisma.atributoGraduado.findFirstOrThrow({ orderBy: { orden: 'asc' } });
+    await sembrarAtributosIcacit(prisma, civ);
     for (const [codigo, carreraId] of [
       ['CPE-01', sis],
       ['CPE-02', civ],
-      ['CPE-03', null],
     ] as const) {
       const id = await competenciaEn(codigo, carreraId);
+      const atributo = await prisma.atributoGraduado.findFirstOrThrow({
+        where: { carreraId, codigo: 'AG-I01' },
+      });
       await prisma.competenciaAtributo.create({
         data: { competenciaId: id, atributoId: atributo.id },
       });
     }
 
     const r = await gestionarCompetencias().cobertura(como(coordinador));
-    const codigos = r.flatMap((a) => a.competencias.map((c) => c.codigo));
-    expect(codigos).toEqual(['CPE-01', 'CPE-02', 'CPE-03']);
+
+    expect(r).toHaveLength(22);
+    // La cobertura ordena por carrera (CIV antes que SIS) y no por código de competencia.
+    expect(r.flatMap((a) => a.competencias.map((c) => c.codigo))).toEqual(['CPE-02', 'CPE-01']);
+  });
+
+  it('los atributos sin planId del Director son los de su carrera; sin carrera asignada, ninguno', async () => {
+    const sis = await crearCarrera('SIS');
+    const civ = await crearCarrera('CIV');
+    await sembrarAtributosIcacit(prisma, sis);
+    await sembrarAtributosIcacit(prisma, civ);
+    const conCarrera = await crearUsuario('dir@x.pe', 'DIRECTOR_CARRERA', sis);
+    const sinCarrera = await crearUsuario('dir2@x.pe', 'DIRECTOR_CARRERA', null);
+
+    const propios = await gestionarCompetencias().atributos(como(conCarrera));
+    expect(propios).toHaveLength(11);
+    expect(new Set(propios.map((a) => a.carreraId))).toEqual(new Set([sis]));
+    expect(await gestionarCompetencias().atributos(como(sinCarrera))).toEqual([]);
   });
 
   it('el Director recibe NoEncontrado al pedir las de un plan de otra carrera', async () => {

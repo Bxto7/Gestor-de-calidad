@@ -592,3 +592,71 @@ describe('RF-CH-018 — quitar del plan', () => {
     ]);
   });
 });
+
+describe('Bloque 5 — los atributos son de la carrera', () => {
+  async function otraCarrera(): Promise<string> {
+    const facultad = await prisma.facultad.findFirstOrThrow();
+    const c = await prisma.carrera.create({
+      data: { facultadId: facultad.id, nombre: 'Civil', codigo: 'CIV', duracionAnios: 2 },
+    });
+    await sembrarAtributosIcacit(prisma, c.id);
+    return c.id;
+  }
+
+  it('`atributos` con carrera trae solo los de esa carrera; sin carrera, los de todas con su carreraId', async () => {
+    const civ = await otraCarrera();
+
+    const deIsi = await competencias.atributos('ICACIT', carreraId);
+    expect(deIsi).toHaveLength(11);
+    expect(new Set(deIsi.map((a) => a.carreraId))).toEqual(new Set([carreraId]));
+
+    const todos = await competencias.atributos('ICACIT');
+    expect(todos).toHaveLength(22);
+    expect(new Set(todos.map((a) => a.carreraId))).toEqual(new Set([carreraId, civ]));
+  });
+
+  it('`atributosFueraDeCarrera` delata los de otra carrera y los inexistentes, y deja pasar los propios', async () => {
+    const civ = await otraCarrera();
+    const propio = await prisma.atributoGraduado.findFirstOrThrow({ where: { carreraId } });
+    const ajeno = await prisma.atributoGraduado.findFirstOrThrow({ where: { carreraId: civ } });
+    const fantasma = '00000000-0000-4000-8000-000000000000';
+
+    const malos = await competencias.atributosFueraDeCarrera(carreraId, [
+      propio.id,
+      ajeno.id,
+      fantasma,
+    ]);
+
+    expect(malos.sort()).toEqual([ajeno.id, fantasma].sort());
+    expect(await competencias.atributosFueraDeCarrera(carreraId, [])).toEqual([]);
+  });
+
+  it('la cobertura de un plan trae solo los atributos de la carrera del plan', async () => {
+    const civ = await otraCarrera();
+    const propio = await prisma.atributoGraduado.findFirstOrThrow({
+      where: { carreraId, codigo: 'AG-I08' },
+    });
+    await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Del plan', [propio.id]);
+
+    const cobertura = await competencias.cobertura('ICACIT', planId, carreraId);
+
+    expect(cobertura).toHaveLength(11);
+    expect(new Set(cobertura.map((a) => a.carreraId))).toEqual(new Set([carreraId]));
+    expect(cobertura.find((a) => a.codigo === 'AG-I08')?.competencias.map((c) => c.codigo)).toEqual(
+      ['CPE-01'],
+    );
+    expect(cobertura.some((a) => a.carreraId === civ)).toBe(false);
+  });
+
+  it('la competencia trae sus atributos con su carreraId', async () => {
+    const propio = await prisma.atributoGraduado.findFirstOrThrow({
+      where: { carreraId, codigo: 'AG-I06' },
+    });
+
+    const creada = await competencias.crearEnPlan(planId, carreraId, 'CPE-01', 'Con atributo', [
+      propio.id,
+    ]);
+
+    expect(creada.atributos.map((a) => [a.codigo, a.carreraId])).toEqual([['AG-I06', carreraId]]);
+  });
+});

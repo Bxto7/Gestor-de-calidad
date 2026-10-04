@@ -58,11 +58,12 @@ export class CompetenciasController {
   @ApiOperation({
     summary: 'Atributos del graduado del marco vigente',
     description:
-      'CLAUDE.md §6.2. Los once que define ICACIT, para poder mapear cada ' +
-      'competencia a los atributos que desarrolla.',
+      'CLAUDE.md §6.2. Los de la carrera del plan si se indica `planId`; sin él, ' +
+      'los de la carrera de quien lee, o los de todas si lee sin restricción (cada ' +
+      'fila trae su `carreraId`).',
   })
-  async atributos(@ActorActual() actor: Actor) {
-    return this.competencias.atributos(actor);
+  async atributos(@ActorActual() actor: Actor, @Query() consulta: CoberturaDto) {
+    return this.competencias.atributos(actor, consulta.planId);
   }
 
   @Get('cobertura')

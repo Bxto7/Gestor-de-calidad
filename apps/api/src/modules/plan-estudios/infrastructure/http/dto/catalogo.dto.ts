@@ -30,7 +30,7 @@ export class CrearCompetenciaDto extends DatosCompetenciaDto {
   planId!: string;
 }
 
-/** RF-CH-017: la cobertura de un plan concreto, o la del catálogo entero. */
+/** RF-CH-017: la cobertura —y los atributos que se ofrecen— de un plan concreto, o los del alcance de quien lee. */
 export class CoberturaDto {
   @IsOptional()
   @IsUUID('4')

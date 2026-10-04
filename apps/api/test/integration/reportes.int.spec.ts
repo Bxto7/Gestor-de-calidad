@@ -213,7 +213,7 @@ describe('panel estadístico', () => {
     });
 
     const p = await reportes.panel('ICACIT');
-    expect(p.atributosSinCubrir).toContain('AG-I06');
+    expect(p.atributosSinCubrir).toContain('AG-I06 (ISI)');
     expect(p.totalAtributos).toBe(11);
   });
 
@@ -231,7 +231,31 @@ describe('panel estadístico', () => {
     });
 
     const p = await reportes.panel('ICACIT');
-    expect(p.atributosSinCubrir).not.toContain('AG-I06');
+    expect(p.atributosSinCubrir).not.toContain('AG-I06 (ISI)');
+  });
+
+  it('con dos carreras el panel cuenta los atributos de cada una y dice cuál dejó AG-I06 sin cubrir', async () => {
+    await sembrarAtributosIcacit(prisma, otraCarreraId);
+    const deIsi = await prisma.atributoGraduado.findFirstOrThrow({
+      where: { carreraId, codigo: 'AG-I06' },
+    });
+    await prisma.competencia.create({
+      data: {
+        codigo: 'CPE-01',
+        nombre: 'Activa de ISI',
+        carreraId,
+        atributos: { create: { atributoId: deIsi.id } },
+      },
+    });
+
+    const p = await reportes.panel('ICACIT');
+
+    // 11 × 2 y no 11: cada carrera tiene los suyos.
+    expect(p.totalAtributos).toBe(22);
+    expect(p.atributosSinCubrir).not.toContain('AG-I06 (ISI)');
+    expect(p.atributosSinCubrir).toContain('AG-I06 (ENF)');
+    // Un solo AG-I06 sin cubrir, rotulado con su carrera: no un código repetido sin contexto.
+    expect(p.atributosSinCubrir.filter((c) => c.startsWith('AG-I06'))).toEqual(['AG-I06 (ENF)']);
   });
 
   it('el panel no mezcla marcos de acreditación', async () => {

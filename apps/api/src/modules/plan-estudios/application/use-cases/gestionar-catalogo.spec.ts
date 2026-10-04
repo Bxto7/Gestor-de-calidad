@@ -87,7 +87,13 @@ function plan(estado: EstadoPlan = 'Borrador', carreraId: string = ISI): PlanDeE
  * salen en la bitácora en vez de con UUID opacos.
  */
 function atributos(codigos: readonly string[]) {
-  return codigos.map((codigo) => ({ id: codigo, marco: 'ICACIT', codigo, nombre: codigo }));
+  return codigos.map((codigo) => ({
+    id: codigo,
+    carreraId: ISI,
+    marco: 'ICACIT',
+    codigo,
+    nombre: codigo,
+  }));
 }
 
 function montarCompetencias(
@@ -105,6 +111,8 @@ function montarCompetencias(
     usadaPor?: string[];
     /** Lo que responde Mejora Continua. */
     enUso?: UsoDeElemento;
+    /** Ids que el repositorio dice que no son de la carrera. */
+    fueraDeCarrera?: string[];
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -118,6 +126,8 @@ function montarCompetencias(
   const quitadas: { planId: string; id: string; borrarRegistro: boolean }[] = [];
   const consultasEnUso: string[] = [];
   const orden: string[] = [];
+  const atributosPedidos: (string | undefined)[] = [];
+  const consultasDeAtributos: { carreraId: string; ids: readonly string[] }[] = [];
 
   const repo: RepositorioCompetenciaPort = {
     listar: async (filtro) => {
@@ -131,7 +141,14 @@ function montarCompetencias(
       coberturasPorCarrera.push(carreraId);
       return [];
     },
-    atributos: async () => [],
+    atributos: async (_marco, carreraId) => {
+      atributosPedidos.push(carreraId);
+      return [];
+    },
+    atributosFueraDeCarrera: async (carreraId, ids) => {
+      consultasDeAtributos.push({ carreraId, ids });
+      return opciones.fueraDeCarrera ?? [];
+    },
     crearEnPlan: async (planId, carreraId, codigo, nombre, atributoIds) => {
       creadas.push({ planId, carreraId, codigo, nombre });
       return competencia({
@@ -210,6 +227,8 @@ function montarCompetencias(
     quitadas,
     consultasEnUso,
     orden,
+    atributosPedidos,
+    consultasDeAtributos,
   };
 }
 
@@ -370,11 +389,14 @@ describe('RF-CH-017 / RF-CH-009 — listar y leer', () => {
     expect(coberturasPorCarrera).toEqual([ISI]);
   });
 
-  it('la cobertura sin planId y sin carrera asignada no consulta competencias', async () => {
-    const { caso, coberturas } = montarCompetencias({ alcance: soloCarrera(null) });
+  it('la cobertura sin planId y sin carrera asignada es vacía: no se ven los atributos de ninguna carrera', async () => {
+    const { caso, coberturas, atributosPedidos } = montarCompetencias({
+      alcance: soloCarrera(null),
+    });
     const r = await caso.cobertura(ACTOR);
+    expect(r).toEqual([]);
     expect(coberturas).toHaveLength(0);
-    expect(r.every((a) => a.competencias.length === 0)).toBe(true);
+    expect(atributosPedidos).toHaveLength(0);
   });
 
   it('la cobertura sin planId y sin restricción es la del catálogo entero', async () => {
@@ -666,5 +688,112 @@ describe('RF-CH-018 — quitar una competencia del plan', () => {
     );
     expect(autorizaciones).toContainEqual({ permiso: 'competencia.gestionar', carreraId: IIN });
     expect(quitadas).toHaveLength(0);
+  });
+});
+
+describe('Bloque 5 — los atributos que se ofrecen son los de la carrera', () => {
+  it('atributos con planId: los de la carrera del plan', async () => {
+    const { caso, atributosPedidos } = montarCompetencias({ plan: plan('Borrador', IIN) });
+
+    await caso.atributos(ACTOR, 'plan-1');
+
+    expect(atributosPedidos).toEqual([IIN]);
+  });
+
+  it('atributos con planId de otra carrera, para quien lee solo la suya: NoEncontrado y no consulta', async () => {
+    const { caso, atributosPedidos } = montarCompetencias({
+      plan: plan('Borrador', IIN),
+      alcance: soloCarrera(ISI),
+    });
+
+    await expect(caso.atributos(ACTOR, 'plan-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(atributosPedidos).toHaveLength(0);
+  });
+
+  it('atributos sin planId: quien lee solo su carrera recibe los suyos; sin carrera asignada, ninguno', async () => {
+    const propio = montarCompetencias({ alcance: soloCarrera(ISI) });
+    await propio.caso.atributos(ACTOR);
+    expect(propio.atributosPedidos).toEqual([ISI]);
+
+    const sinCarrera = montarCompetencias({ alcance: soloCarrera(null) });
+    expect(await sinCarrera.caso.atributos(ACTOR)).toEqual([]);
+    expect(sinCarrera.atributosPedidos).toHaveLength(0);
+  });
+
+  it('atributos sin planId y con alcance TODAS: los de todas las carreras', async () => {
+    const { caso, atributosPedidos } = montarCompetencias();
+
+    await caso.atributos(ACTOR);
+
+    expect(atributosPedidos).toEqual([undefined]);
+  });
+
+  it('la cobertura con planId pide los atributos de la carrera del plan y las competencias del plan', async () => {
+    const { caso, coberturas, coberturasPorCarrera } = montarCompetencias({
+      plan: plan('Borrador', IIN),
+    });
+
+    await caso.cobertura(ACTOR, 'plan-1');
+
+    expect(coberturas).toEqual(['plan-1']);
+    expect(coberturasPorCarrera).toEqual([IIN]);
+  });
+
+  it('crear valida los atributos contra la carrera del plan y rechaza los ajenos sin crear nada', async () => {
+    const { caso, creadas, consultasDeAtributos, publicados } = montarCompetencias({
+      plan: plan('Borrador', IIN),
+      fueraDeCarrera: ['AG-I06'],
+    });
+
+    await expect(
+      caso.crear(ACTOR, 'plan-1', 'Nueva competencia', ['AG-I06', 'AG-I08']),
+    ).rejects.toThrow(
+      'Estos atributos del graduado no existen o no son de la carrera de la competencia: AG-I06.',
+    );
+    expect(consultasDeAtributos).toEqual([{ carreraId: IIN, ids: ['AG-I06', 'AG-I08'] }]);
+    expect(creadas).toHaveLength(0);
+    expect(publicados).toHaveLength(0);
+  });
+
+  it('crear sin atributos no consulta nada; y el estado del plan se rechaza antes que los atributos', async () => {
+    const sin = montarCompetencias();
+    await sin.caso.crear(ACTOR, 'plan-1', 'Sin atributos', []);
+    expect(sin.consultasDeAtributos).toHaveLength(0);
+
+    const vigente = montarCompetencias({ plan: plan('Vigente'), fueraDeCarrera: ['AG-I06'] });
+    await expect(vigente.caso.crear(ACTOR, 'plan-1', 'Nueva', ['AG-I06'])).rejects.toThrow(
+      'El plan está en estado Vigente y no admite cambios.',
+    );
+    expect(vigente.consultasDeAtributos).toHaveLength(0);
+  });
+
+  it('editar valida los atributos contra la carrera de la competencia, no contra otra', async () => {
+    const { caso, consultasDeAtributos } = montarCompetencias({
+      existente: competencia({ carreraId: IIN }),
+      fueraDeCarrera: ['AG-I06'],
+    });
+
+    await expect(
+      caso.editar(ACTOR, 'cpe-1', 'Resolver problemas', ['AG-I06']),
+    ).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
+    expect(consultasDeAtributos).toEqual([{ carreraId: IIN, ids: ['AG-I06'] }]);
+  });
+
+  it('editar con una lista vacía de atributos no consulta y permite retirar todos', async () => {
+    const { caso, consultasDeAtributos } = montarCompetencias({
+      existente: competencia({ atributos: atributos(['AG-I06']) }),
+    });
+
+    await caso.editar(ACTOR, 'cpe-1', 'Resolver problemas', []);
+
+    expect(consultasDeAtributos).toHaveLength(0);
+  });
+
+  it('una competencia sin carrera no se puede mapear a ningún atributo', async () => {
+    const { caso } = montarCompetencias({ existente: competencia({ carreraId: null }) });
+
+    await expect(caso.editar(ACTOR, 'cpe-1', 'Heredada', ['AG-I06'])).rejects.toThrow(
+      'no tiene carrera',
+    );
   });
 });
