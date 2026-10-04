@@ -1286,6 +1286,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         RENDERIZADOR_HOJA,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        REPOSITORIO_PLAN_MEDICION,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         documentos: RepositorioDocumentosMedicionPort,
@@ -1296,6 +1298,8 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         hoja: RenderizadorHojaPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        planes: RepositorioPlanMedicionPort,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GenerarDocumentoMedicion(
           documentos,
@@ -1306,16 +1310,26 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           hoja,
           autorizacion,
           eventos,
+          planes,
+          alcance,
         ),
     },
     {
       provide: ConsultarDocumentoMedicion,
-      inject: [REPOSITORIO_DOCUMENTOS_MEDICION, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      inject: [
+        REPOSITORIO_DOCUMENTOS_MEDICION,
+        ALMACEN_ARCHIVOS,
+        AUTHORIZATION_PORT,
+        REPOSITORIO_PLAN_MEDICION,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         documentos: RepositorioDocumentosMedicionPort,
         almacen: AlmacenDeArchivosPort,
         autorizacion: AuthorizationPort,
-      ) => new ConsultarDocumentoMedicion(documentos, almacen, autorizacion),
+        planes: RepositorioPlanMedicionPort,
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarDocumentoMedicion(documentos, almacen, autorizacion, planes, alcance),
     },
     {
       provide: GenerarDocumentoEvaluacion,
@@ -1332,6 +1346,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         RENDERIZADOR_HOJA,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         documentos: RepositorioDocumentosEvaluacionPort,
@@ -1346,6 +1361,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         hoja: RenderizadorHojaPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GenerarDocumentoEvaluacion(
           documentos,
@@ -1360,16 +1376,26 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           hoja,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {
       provide: ConsultarDocumentoEvaluacion,
-      inject: [REPOSITORIO_DOCUMENTOS_EVALUACION, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      inject: [
+        REPOSITORIO_DOCUMENTOS_EVALUACION,
+        ALMACEN_ARCHIVOS,
+        AUTHORIZATION_PORT,
+        REPOSITORIO_PLAN_EVALUACION,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         documentos: RepositorioDocumentosEvaluacionPort,
         almacen: AlmacenDeArchivosPort,
         autorizacion: AuthorizationPort,
-      ) => new ConsultarDocumentoEvaluacion(documentos, almacen, autorizacion),
+        evaluaciones: RepositorioPlanEvaluacionPort,
+        alcance: AlcanceDeLecturaPort,
+      ) =>
+        new ConsultarDocumentoEvaluacion(documentos, almacen, autorizacion, evaluaciones, alcance),
     },
     {
       // El worker despacha por esta clave y no conoce ningún módulo. Añadir un

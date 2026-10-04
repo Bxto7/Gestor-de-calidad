@@ -31,7 +31,8 @@
  * dos consultas de un documento con datos de acreditación— a diferencia del
  * gemelo de medición, que trata exportar como una lectura. Las lecturas
  * (`estado`, `listarDePlan`, `descargar`) exigen `evaluacion.leer` con la
- * carrera en `null`: no están acotadas.
+ * carrera en `null` y, después, el alcance de lectura de la carrera del plan: el
+ * documento de un plan de otra carrera responde 404 (Bloque 6a).
  */
 
 import type {
@@ -49,6 +50,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { DirectorioDeUsuariosPort } from '../../../../auth/application/ports/directorio-usuarios.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
@@ -56,6 +58,7 @@ import type {
   DatosPlanMedicion,
   RepositorioPlanMedicionPort,
 } from '../../../medicion/application/ports/plan-medicion.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import {
   armarDocumentoEvaluacion,
   type DatosParaDocumentoEvaluacion,
@@ -68,10 +71,7 @@ import type {
   TipoDocEvaluacion,
   TrabajoDocumentoEvaluacion,
 } from '../ports/documentos-evaluacion.port.js';
-import type {
-  DatosPlanEvaluacion,
-  RepositorioPlanEvaluacionPort,
-} from '../ports/plan-evaluacion.port.js';
+import type { RepositorioPlanEvaluacionPort } from '../ports/plan-evaluacion.port.js';
 
 /** Con qué se dibuja cada tipo y cómo acaba llamándose el archivo. */
 const FORMATO: Readonly<
@@ -120,6 +120,7 @@ export class GenerarDocumentoEvaluacion {
     private readonly hoja: RenderizadorHojaPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
     private readonly reloj: Reloj = { ahora: () => new Date() },
   ) {}
 
@@ -132,7 +133,16 @@ export class GenerarDocumentoEvaluacion {
     // Se comprueban antes de crear la fila: un trabajo de un plan inexistente
     // solo serviría para aparecer como Fallido en una pantalla que tampoco
     // existe.
-    const plan = await this.exigirPlan(planEvaluacionId);
+    // (1) lectura (403), (2) existencia y alcance (404, antes de cualquier 403
+    // acotado) y (3) el permiso de escritura sobre la carrera del plan.
+    await this.exigir(actor, 'evaluacion.leer', null);
+    const plan = await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(planEvaluacionId),
+      'el plan de evaluación',
+      planEvaluacionId,
+    );
     const base = await this.exigirBase(plan.planMedicionId);
     await this.exigir(actor, 'evaluacion.editar', await this.carreraDe(base.planEstudiosId));
 
@@ -256,7 +266,8 @@ export class GenerarDocumentoEvaluacion {
           nombre: cat?.nombre ?? SIN_NOMBRE,
           instrumento: c.instrumento,
           frecuencia: c.frecuencia,
-          responsableNombre: c.responsableId === null ? null : (nombres.get(c.responsableId) ?? null),
+          responsableNombre:
+            c.responsableId === null ? null : (nombres.get(c.responsableId) ?? null),
         };
       }),
       periodos: base.periodos.map((p) => ({ id: p.id, etiqueta: p.etiqueta })),
@@ -283,12 +294,6 @@ export class GenerarDocumentoEvaluacion {
         enlaceResultados: i.enlaceResultados,
       })),
     };
-  }
-
-  private async exigirPlan(id: string): Promise<DatosPlanEvaluacion> {
-    const plan = await this.evaluaciones.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de evaluación', id);
-    return plan;
   }
 
   private async exigirBase(planMedicionId: string): Promise<DatosPlanMedicion> {
@@ -336,12 +341,22 @@ export class ConsultarDocumentoEvaluacion {
     private readonly documentos: RepositorioDocumentosEvaluacionPort,
     private readonly almacen: AlmacenDeArchivosPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly evaluaciones: RepositorioPlanEvaluacionPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async estado(actor: Actor, trabajoId: string): Promise<TrabajoDocumentoEvaluacion> {
     await this.exigirLectura(actor);
     const trabajo = await this.documentos.porId(trabajoId);
     if (trabajo === null) throw new NoEncontrado('el documento', trabajoId);
+    // El documento de un plan de otra carrera no existe para quien no la lee.
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(trabajo.planEvaluacionId),
+      'el documento',
+      trabajoId,
+    );
     return trabajo;
   }
 
@@ -351,6 +366,13 @@ export class ConsultarDocumentoEvaluacion {
     limite = 20,
   ): Promise<TrabajoDocumentoEvaluacion[]> {
     await this.exigirLectura(actor);
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(planEvaluacionId),
+      'el plan de evaluación',
+      planEvaluacionId,
+    );
     return this.documentos.listarDePlan(planEvaluacionId, limite);
   }
 
@@ -382,8 +404,8 @@ export class ConsultarDocumentoEvaluacion {
   }
 
   private async exigirLectura(actor: Actor): Promise<void> {
-    // No acotado por carrera (2c-C): exportar es leer, y quien puede ver el
-    // plan en pantalla puede llevárselo, sin importar qué carrera dirija.
+    // El permiso no se acota por carrera: el alcance de lectura de la carrera
+    // del plan lo aplica `exigirPlanLegible` después.
     const decision = await this.autorizacion.puede(actor.id, 'evaluacion.leer', null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }

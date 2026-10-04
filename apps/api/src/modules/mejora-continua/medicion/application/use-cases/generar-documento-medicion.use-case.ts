@@ -31,7 +31,9 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import {
   armarDocumentoMedicion,
   type FormatoDocumentoMedicion,
@@ -43,6 +45,7 @@ import type {
   TipoDocumentoMedicion,
   TrabajoDocumentoMedicion,
 } from '../ports/documentos-medicion.port.js';
+import type { RepositorioPlanMedicionPort } from '../ports/plan-medicion.port.js';
 
 /** Con qué se dibuja cada tipo y cómo acaba llamándose el archivo. */
 const FORMATO: Readonly<
@@ -84,6 +87,8 @@ export class GenerarDocumentoMedicion {
     private readonly hoja: RenderizadorHojaPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly planes: RepositorioPlanMedicionPort,
+    private readonly alcance: AlcanceDeLecturaPort,
     private readonly reloj: Reloj = { ahora: () => new Date() },
   ) {}
 
@@ -98,6 +103,16 @@ export class GenerarDocumentoMedicion {
     // consultor, que es quien la pide para el expediente.
     const decision = await this.autorizacion.puede(actor.id, 'medicion.leer');
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
+
+    // (2) Existe y su carrera entra en el alcance de lectura: un plan de otra
+    // carrera responde 404, igual que en pantalla (RF-CH-034 RN1).
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(planMedicionId),
+      'el plan de medición',
+      planMedicionId,
+    );
 
     // Se comprueba antes de crear la fila: un trabajo de un plan inexistente
     // solo serviría para aparecer como Fallido en una pantalla que tampoco
@@ -189,12 +204,22 @@ export class ConsultarDocumentoMedicion {
     private readonly documentos: RepositorioDocumentosMedicionPort,
     private readonly almacen: AlmacenDeArchivosPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly planes: RepositorioPlanMedicionPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async estado(actor: Actor, trabajoId: string): Promise<TrabajoDocumentoMedicion> {
     await this.exigirLectura(actor);
     const trabajo = await this.documentos.porId(trabajoId);
     if (trabajo === null) throw new NoEncontrado('el documento', trabajoId);
+    // El documento de un plan de otra carrera no existe para quien no la lee.
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(trabajo.planMedicionId),
+      'el documento',
+      trabajoId,
+    );
     return trabajo;
   }
 
@@ -204,6 +229,13 @@ export class ConsultarDocumentoMedicion {
     limite = 20,
   ): Promise<TrabajoDocumentoMedicion[]> {
     await this.exigirLectura(actor);
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(planMedicionId),
+      'el plan de medición',
+      planMedicionId,
+    );
     return this.documentos.listarDePlan(planMedicionId, limite);
   }
 

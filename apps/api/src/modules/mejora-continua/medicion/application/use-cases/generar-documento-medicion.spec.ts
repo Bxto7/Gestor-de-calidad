@@ -25,6 +25,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { DatosParaDocumentoMedicion } from '../../domain/documentos/armar-documento-medicion.js';
 import type {
@@ -32,6 +33,7 @@ import type {
   RepositorioDocumentosMedicionPort,
   TrabajoDocumentoMedicion,
 } from '../ports/documentos-medicion.port.js';
+import type { RepositorioPlanMedicionPort } from '../ports/plan-medicion.port.js';
 
 import {
   ConsultarDocumentoMedicion,
@@ -56,6 +58,29 @@ function denegar(): AuthorizationPort {
     carreraACargoDe: async () => null,
     rolesDe: async () => [],
   };
+}
+
+/** Alcance global: Consultor, Administrador. */
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Lee solo su carrera; `null` es un Coordinador sin carrera asignada. */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
+/** Solo `porId` importa aquí: de él salen la existencia y la carrera del plan. */
+function repoPlanes(carreraId: string | null = 'car-1'): RepositorioPlanMedicionPort {
+  return {
+    porId: async () => (carreraId === null ? null : { id: 'pm-1', carreraId }),
+  } as unknown as RepositorioPlanMedicionPort;
 }
 
 function trabajo(sobre: Partial<TrabajoDocumentoMedicion> = {}): TrabajoDocumentoMedicion {
@@ -106,6 +131,8 @@ interface Dobles {
     hoja?: RenderizadorHojaPort['render'];
   };
   autorizacion?: AuthorizationPort;
+  planes?: RepositorioPlanMedicionPort;
+  alcance?: AlcanceDeLecturaPort;
 }
 
 function montar(dobles: Dobles = {}) {
@@ -138,6 +165,8 @@ function montar(dobles: Dobles = {}) {
     { render: dobles.renderizadores?.hoja ?? (async () => Buffer.from('hoja')) },
     dobles.autorizacion ?? permitirTodo(),
     eventos,
+    dobles.planes ?? repoPlanes(),
+    dobles.alcance ?? sinRestriccion(),
     { ahora: () => new Date('2026-09-04T12:00:00Z') },
   );
 
@@ -296,6 +325,8 @@ function montarConsulta(dobles: {
   repo?: Partial<RepositorioDocumentosMedicionPort>;
   almacen?: Partial<AlmacenDeArchivosPort>;
   autorizacion?: AuthorizationPort;
+  planes?: RepositorioPlanMedicionPort;
+  alcance?: AlcanceDeLecturaPort;
 }) {
   const repo: RepositorioDocumentosMedicionPort = {
     crear: async () => trabajo(),
@@ -316,6 +347,8 @@ function montarConsulta(dobles: {
       ...dobles.almacen,
     },
     dobles.autorizacion ?? permitirTodo(),
+    dobles.planes ?? repoPlanes(),
+    dobles.alcance ?? sinRestriccion(),
   );
 }
 
@@ -375,5 +408,97 @@ describe('RF-PM-027 — consultar y descargar', () => {
     const caso = montarConsulta({ repo: { porId: async () => null } });
 
     await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(NoEncontrado);
+  });
+});
+
+/**
+ * El alcance por carrera en la exportación (cierre del Bloque 6a): un plan de
+ * otra carrera y su documento responden 404, no solo el detalle en pantalla.
+ */
+describe('RF-CH-034 — el documento de un plan de otra carrera', () => {
+  it('encolar es NoEncontrado, no crea fila y no encola', async () => {
+    const creados: string[] = [];
+    const encolados: string[] = [];
+    const { caso, publicados } = montar({
+      alcance: soloCarrera('otra-carrera'),
+      repo: { crear: async () => (creados.push('x'), trabajo()) },
+      cola: { encolar: async (id) => void encolados.push(id) },
+    });
+
+    await expect(caso.encolar(ACTOR, 'pm-1', 'PLAN_MEDICION_PDF')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+    expect(creados).toEqual([]);
+    expect(encolados).toEqual([]);
+    expect(publicados).toEqual([]);
+  });
+
+  it('encolar sin permiso de lectura es 403 aunque el plan sea ajeno (el 403 va primero)', async () => {
+    const { caso } = montar({ autorizacion: denegar(), alcance: soloCarrera('otra-carrera') });
+
+    await expect(caso.encolar(ACTOR, 'pm-1', 'PLAN_MEDICION_PDF')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+  });
+
+  it('un Coordinador sin carrera asignada no ve nada: encolar es 404', async () => {
+    const { caso } = montar({ alcance: soloCarrera(null) });
+
+    await expect(caso.encolar(ACTOR, 'pm-1', 'PLAN_MEDICION_PDF')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('un plan inexistente es 404 también para quien lee todo', async () => {
+    const { caso } = montar({ planes: repoPlanes(null) });
+
+    await expect(caso.encolar(ACTOR, 'pm-1', 'PLAN_MEDICION_PDF')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('el Consultor (lectura global) sigue encolando', async () => {
+    const { caso } = montar({ alcance: sinRestriccion(), planes: repoPlanes('cualquiera') });
+
+    await expect(caso.encolar(ACTOR, 'pm-1', 'PLAN_MEDICION_PDF')).resolves.toBeDefined();
+  });
+
+  it.each([
+    ['estado', (c: ConsultarDocumentoMedicion) => c.estado(ACTOR, 't-1')],
+    ['descargar', (c: ConsultarDocumentoMedicion) => c.descargar(ACTOR, 't-1')],
+    ['listarDePlan', (c: ConsultarDocumentoMedicion) => c.listarDePlan(ACTOR, 'pm-1')],
+  ] as const)('%s de otra carrera es NoEncontrado', async (_nombre, ejecutar) => {
+    const caso = montarConsulta({
+      alcance: soloCarrera('otra-carrera'),
+      repo: {
+        porId: async () =>
+          trabajo({ estado: 'Listo', nombreArchivo: 'p.pdf', tipoMime: 'application/pdf' }),
+      },
+    });
+
+    await expect(ejecutar(caso)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it.each([
+    ['estado', (c: ConsultarDocumentoMedicion) => c.estado(ACTOR, 't-1')],
+    ['descargar', (c: ConsultarDocumentoMedicion) => c.descargar(ACTOR, 't-1')],
+    ['listarDePlan', (c: ConsultarDocumentoMedicion) => c.listarDePlan(ACTOR, 'pm-1')],
+  ] as const)('%s sin carrera asignada es NoEncontrado', async (_nombre, ejecutar) => {
+    const caso = montarConsulta({ alcance: soloCarrera(null) });
+
+    await expect(ejecutar(caso)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('el Consultor (lectura global) descarga el documento de cualquier carrera', async () => {
+    const caso = montarConsulta({
+      alcance: sinRestriccion(),
+      planes: repoPlanes('cualquiera'),
+      repo: {
+        porId: async () =>
+          trabajo({ estado: 'Listo', nombreArchivo: 'p.pdf', tipoMime: 'application/pdf' }),
+      },
+    });
+
+    await expect(caso.descargar(ACTOR, 't-1')).resolves.toMatchObject({ nombreArchivo: 'p.pdf' });
   });
 });

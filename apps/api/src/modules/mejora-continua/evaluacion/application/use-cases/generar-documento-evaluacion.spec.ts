@@ -33,6 +33,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { DirectorioDeUsuariosPort } from '../../../../auth/application/ports/directorio-usuarios.port.js';
 import type {
@@ -83,6 +84,22 @@ function denegar(): AuthorizationPort {
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => null,
     rolesDe: async () => [],
+  };
+}
+
+/** Alcance global: Consultor, Administrador. */
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Lee solo su carrera; `null` es un Coordinador sin carrera asignada. */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
   };
 }
 
@@ -397,6 +414,7 @@ let disco: AlmacenDeArchivosPort;
 let pdf: RenderizadorPdfPort;
 let hoja: RenderizadorHojaPort;
 let autorizacion: AuthorizationPort;
+let alcance: AlcanceDeLecturaPort;
 let publicados: DomainEvent[];
 let eventos: PublicadorDeEventos;
 let generador: GenerarDocumentoEvaluacion;
@@ -416,6 +434,7 @@ beforeEach(() => {
   pdf = { render: async () => Buffer.from('pdf') };
   hoja = { render: async () => Buffer.from('hoja') };
   autorizacion = permitirTodo();
+  alcance = sinRestriccion();
   publicados = [];
   eventos = {
     publicar: async (es) => void publicados.push(...es),
@@ -434,10 +453,17 @@ beforeEach(() => {
     hoja,
     autorizacion,
     eventos,
+    alcance,
     { ahora: () => new Date('2026-09-10T12:00:00Z') },
   );
 
-  consulta = new ConsultarDocumentoEvaluacion(documentos, disco, autorizacion);
+  consulta = new ConsultarDocumentoEvaluacion(
+    documentos,
+    disco,
+    autorizacion,
+    evaluaciones,
+    alcance,
+  );
 });
 
 /* ── encolar ─────────────────────────────────────────────────────────────── */
@@ -472,6 +498,7 @@ describe('RF-PE-032 — encolar', () => {
       hoja,
       autorizacion,
       eventos,
+      alcance,
     );
 
     await expect(generador.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).rejects.toThrow(
@@ -502,6 +529,7 @@ describe('RF-PE-032 — encolar', () => {
       hoja,
       autorizacion,
       eventos,
+      alcance,
     );
 
     await generador.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF').catch(() => undefined);
@@ -543,6 +571,7 @@ describe('RF-PE-032 — encolar', () => {
       hoja,
       autorizacion,
       eventos,
+      alcance,
     );
 
     await generador.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF');
@@ -594,6 +623,7 @@ describe('RF-PE-032 — ejecutar', () => {
       hoja,
       autorizacion,
       eventos,
+      alcance,
     );
 
     await generador.ejecutar(trabajoId);
@@ -630,6 +660,7 @@ describe('RF-PE-032 — ejecutar', () => {
       hoja,
       autorizacion,
       eventos,
+      alcance,
     );
 
     await generador.ejecutar('t-excel');
@@ -717,6 +748,7 @@ describe('RF-PE-032 — ejecutar', () => {
       hoja,
       autorizacion,
       eventos,
+      alcance,
     );
 
     await generador.ejecutar(trabajoId);
@@ -782,7 +814,13 @@ describe('RF-PE-032 — consultar y descargar', () => {
   });
 
   it('sin `evaluacion.leer` no se consulta ni se descarga', async () => {
-    const denegado = new ConsultarDocumentoEvaluacion(documentos, disco, denegar());
+    const denegado = new ConsultarDocumentoEvaluacion(
+      documentos,
+      disco,
+      denegar(),
+      evaluaciones,
+      alcance,
+    );
 
     await expect(denegado.estado(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
     await expect(denegado.listarDePlan(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
@@ -797,10 +835,146 @@ describe('RF-PE-032 — consultar y descargar', () => {
       carreraACargoDe: async () => null,
       rolesDe: async () => [],
     };
-    const consultaEspia = new ConsultarDocumentoEvaluacion(documentos, disco, autorizacionEspia);
+    const consultaEspia = new ConsultarDocumentoEvaluacion(
+      documentos,
+      disco,
+      autorizacionEspia,
+      evaluaciones,
+      alcance,
+    );
 
     await consultaEspia.estado(ACTOR, 't-1');
 
     expect(puede).toHaveBeenCalledWith(ACTOR.id, 'evaluacion.leer', null);
+  });
+});
+
+/**
+ * El alcance por carrera en la exportación (cierre del Bloque 6a): un plan de
+ * otra carrera y su documento responden 404, y el 404 va antes de cualquier 403
+ * acotado.
+ */
+describe('RF-CH-034 — el documento de un plan de otra carrera', () => {
+  function generadorCon(alc: AlcanceDeLecturaPort, aut: AuthorizationPort) {
+    return new GenerarDocumentoEvaluacion(
+      documentos,
+      evaluaciones,
+      mediciones,
+      curricular,
+      configuraciones,
+      dirUsuarios,
+      cola,
+      disco,
+      pdf,
+      hoja,
+      aut,
+      eventos,
+      alc,
+    );
+  }
+
+  /** Lee todo pero no edita ninguna carrera: lo que sí lee no basta para el 403. */
+  function sinEditar(): AuthorizationPort {
+    return {
+      ...permitirTodo(),
+      puede: async (_u, permiso) =>
+        permiso === 'evaluacion.editar'
+          ? { permitido: false, motivo: 'No dirige esa carrera.' }
+          : { permitido: true },
+    };
+  }
+
+  it('encolar es NoEncontrado, no crea fila y no encola', async () => {
+    const antes = (await documentos.listarDePlan('ev-1', 50)).length;
+    const g = generadorCon(soloCarrera('otra-carrera'), permitirTodo());
+
+    await expect(g.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+    expect(cola.encolado).toBeNull();
+    expect(await documentos.listarDePlan('ev-1', 50)).toHaveLength(antes);
+    expect(publicados).toEqual([]);
+  });
+
+  it('el 404 va antes del 403: sin `evaluacion.editar` y fuera del alcance, sigue siendo 404', async () => {
+    const g = generadorCon(soloCarrera('otra-carrera'), sinEditar());
+
+    await expect(g.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it('dentro del alcance pero sin `evaluacion.editar` es 403', async () => {
+    const g = generadorCon(sinRestriccion(), sinEditar());
+
+    await expect(g.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+  });
+
+  it('sin `evaluacion.leer` es 403 aunque el plan no exista (no revela existencia)', async () => {
+    const g = generadorCon(sinRestriccion(), denegar());
+
+    await expect(g.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    await expect(g.encolar(ACTOR, 'ev-inventado', 'PLAN_EVALUACION_PDF')).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+  });
+
+  it('un Coordinador sin carrera asignada no ve nada: encolar es 404', async () => {
+    const g = generadorCon(soloCarrera(null), permitirTodo());
+
+    await expect(g.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+
+  it.each([
+    ['estado', (c: ConsultarDocumentoEvaluacion) => c.estado(ACTOR, 't-1')],
+    ['descargar', (c: ConsultarDocumentoEvaluacion) => c.descargar(ACTOR, 't-1')],
+    ['listarDePlan', (c: ConsultarDocumentoEvaluacion) => c.listarDePlan(ACTOR, 'ev-1')],
+  ] as const)('%s de otra carrera es NoEncontrado', async (_nombre, ejecutar) => {
+    const c = new ConsultarDocumentoEvaluacion(
+      documentos,
+      disco,
+      permitirTodo(),
+      evaluaciones,
+      soloCarrera('otra-carrera'),
+    );
+
+    await expect(ejecutar(c)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it.each([
+    ['estado', (c: ConsultarDocumentoEvaluacion) => c.estado(ACTOR, 't-1')],
+    ['descargar', (c: ConsultarDocumentoEvaluacion) => c.descargar(ACTOR, 't-1')],
+    ['listarDePlan', (c: ConsultarDocumentoEvaluacion) => c.listarDePlan(ACTOR, 'ev-1')],
+  ] as const)('%s sin carrera asignada es NoEncontrado', async (_nombre, ejecutar) => {
+    const c = new ConsultarDocumentoEvaluacion(
+      documentos,
+      disco,
+      permitirTodo(),
+      evaluaciones,
+      soloCarrera(null),
+    );
+
+    await expect(ejecutar(c)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('el Consultor (lectura global) sigue consultando y encolando', async () => {
+    const c = new ConsultarDocumentoEvaluacion(
+      documentos,
+      disco,
+      permitirTodo(),
+      evaluaciones,
+      sinRestriccion(),
+    );
+    await expect(c.estado(ACTOR, 't-1')).resolves.toMatchObject({ id: 't-1' });
+    await expect(c.listarDePlan(ACTOR, 'ev-1')).resolves.toHaveLength(1);
+
+    const g = generadorCon(sinRestriccion(), permitirTodo());
+    await expect(g.encolar(ACTOR, 'ev-1', 'PLAN_EVALUACION_PDF')).resolves.toBeDefined();
   });
 });
