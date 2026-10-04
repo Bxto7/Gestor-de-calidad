@@ -187,6 +187,28 @@ describe('RF-CH-035 — eliminar un plan de medición', () => {
     expect(await repoMedicion.eliminar(pm.id)).toEqual({ tipo: 'no-existe' });
   });
 
+  it('el estado se vuelve a comprobar con la fila bloqueada: un plan Aprobado no se borra', async () => {
+    // Simula la carrera: el caso de uso leyó el plan en En revisión y, antes de que
+    // el repositorio bloquee la fila, otra transacción lo aprobó. Se llama al
+    // repositorio con el plan ya Aprobado. Sin la relectura del estado, borraría.
+    const pm = await medicion('PM-1', 'APROBADO');
+
+    expect(await repoMedicion.eliminar(pm.id)).toEqual({
+      tipo: 'estado-no-permite',
+      estado: 'Aprobado',
+    });
+    expect(await prisma.planMedicion.count({ where: { id: pm.id } })).toBe(1);
+  });
+
+  it.each(['BORRADOR', 'EN_REVISION'] as const)(
+    'el repositorio borra en %s (guardia de regresión: la relectura no puede bloquear lo borrable)',
+    async (estado) => {
+      const pm = await medicion('PM-1', estado);
+
+      expect(await repoMedicion.eliminar(pm.id)).toEqual({ tipo: 'eliminado' });
+    },
+  );
+
   it('secuencial: un plan de evaluación ya existente lo detiene (no prueba el bloqueo de la fila)', async () => {
     const pm = await medicion('PM-1');
     await evaluacionSobre(pm.id, 'EV-1');
@@ -317,6 +339,27 @@ describe('RF-CH-039 — eliminar un plan de evaluación', () => {
 
     expect(resultados.map((r) => r.tipo).sort()).toEqual(['eliminado', 'no-existe']);
   });
+
+  it('el estado se vuelve a comprobar con la fila bloqueada: un plan Aprobado no se borra', async () => {
+    const base = await medicion('PM-1', 'APROBADO');
+    const ev = await evaluacionSobre(base.id, 'EV-1', 'APROBADO');
+
+    expect(await repoEvaluacion.eliminar(ev.id)).toEqual({
+      tipo: 'estado-no-permite',
+      estado: 'Aprobado',
+    });
+    expect(await prisma.planEvaluacion.count({ where: { id: ev.id } })).toBe(1);
+  });
+
+  it.each(['BORRADOR', 'EN_REVISION'] as const)(
+    'el repositorio borra en %s (guardia de regresión: la relectura no puede bloquear lo borrable)',
+    async (estado) => {
+      const base = await medicion('PM-1', 'APROBADO');
+      const ev = await evaluacionSobre(base.id, 'EV-1', estado);
+
+      expect(await repoEvaluacion.eliminar(ev.id)).toEqual({ tipo: 'eliminado' });
+    },
+  );
 
   it('el repositorio: eliminado, y la segunda vez no-existe', async () => {
     const base = await medicion('PM-1', 'APROBADO');

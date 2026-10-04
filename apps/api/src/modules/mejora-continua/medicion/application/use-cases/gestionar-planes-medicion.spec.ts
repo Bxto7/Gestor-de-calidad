@@ -435,6 +435,21 @@ describe('RF-CH-035 — eliminar en Borrador o En revisión', () => {
     },
   );
 
+  it('si otra transacción lo aprobó entre la lectura y el borrado: 409 con su estado y sin evento', async () => {
+    // El plan se leyó en Borrador; el repositorio, ya con la fila bloqueada, lo
+    // encuentra Aprobado y no borra nada. El motivo nombra el estado real.
+    const { caso, vistos } = montar({
+      repo: { eliminar: async () => ({ tipo: 'estado-no-permite', estado: 'Aprobado' }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'pm-1')).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'No se puede eliminar el plan de medición PM-PE-ISI-2026-v1-D-v1: está en Aprobado. Solo se eliminan planes en Borrador o En revisión.',
+      ),
+    );
+    expect(vistos).toHaveLength(0);
+  });
+
   it('si otro lo eliminó entre la lectura y el borrado: NoEncontrado y sin evento', async () => {
     const { caso, vistos } = montar({ repo: { eliminar: async () => ({ tipo: 'no-existe' }) } });
 

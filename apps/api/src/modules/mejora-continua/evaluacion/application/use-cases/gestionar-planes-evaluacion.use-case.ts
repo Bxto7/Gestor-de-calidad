@@ -216,14 +216,12 @@ export class GestionarPlanesEvaluacion {
   async eliminar(actor: Actor, id: string): Promise<void> {
     const plan = await this.planGestionable(actor, id, 'evaluacion.eliminar');
 
-    if (!permiteEliminacion(plan.estado)) {
-      throw new ReglaDeNegocioViolada(
-        `No se puede eliminar el plan de evaluación ${plan.codigo}: está en ${plan.estado}. Solo se eliminan planes en Borrador o En revisión.`,
-      );
-    }
+    if (!permiteEliminacion(plan.estado)) throw estadoNoEliminable(plan.codigo, plan.estado);
 
     const r = await this.evaluaciones.eliminar(id);
     if (r.tipo === 'no-existe') throw new NoEncontrado('el plan de evaluación', id);
+    // El estado cambió entre la lectura y el bloqueo de la fila: no se borró nada.
+    if (r.tipo === 'estado-no-permite') throw estadoNoEliminable(plan.codigo, r.estado);
     if (r.tipo === 'en-uso') {
       throw new ReglaDeNegocioViolada(
         `No se puede eliminar el plan de evaluación ${plan.codigo}: tiene ${contar(r.asociados, 'plan de mejora asociado', 'planes de mejora asociados')}.`,
@@ -391,6 +389,12 @@ export class GestionarPlanesEvaluacion {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
+}
+
+function estadoNoEliminable(codigo: string, estado: string): ReglaDeNegocioViolada {
+  return new ReglaDeNegocioViolada(
+    `No se puede eliminar el plan de evaluación ${codigo}: está en ${estado}. Solo se eliminan planes en Borrador o En revisión.`,
+  );
 }
 
 function contar(n: number, singular: string, plural: string): string {

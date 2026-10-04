@@ -573,6 +573,19 @@ describe('RF-PE-008 — el borrado', () => {
     },
   );
 
+  it('si otra transacción lo aprobó entre la lectura y el borrado: 409 con su estado y sin evento', async () => {
+    const { caso, publicados } = montar({
+      planes: { eliminar: async () => ({ tipo: 'estado-no-permite', estado: 'Aprobado' }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'ev-1')).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'No se puede eliminar el plan de evaluación EV-PE-ISI-2026-v2-D-v1: está en Aprobado. Solo se eliminan planes en Borrador o En revisión.',
+      ),
+    );
+    expect(publicados).toHaveLength(0);
+  });
+
   it('si otro lo eliminó antes: NoEncontrado y sin evento', async () => {
     const { caso, publicados } = montar({
       planes: { eliminar: async () => ({ tipo: 'no-existe' }) },

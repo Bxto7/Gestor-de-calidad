@@ -71,12 +71,16 @@ export interface FiltroPlanesMedicion {
 /**
  * RF-CH-035 y RF-CH-039: el resultado de un borrado que comprueba el uso en la
  * misma transacción en que borra. `en-uso` lleva cuántos planes lo referencian,
- * para que el motivo diga cuántos; `no-existe`, que otro lo borró antes.
+ * para que el motivo diga cuántos; `no-existe`, que otro lo borró antes;
+ * `estado-no-permite`, que entre la lectura del caso de uso y el bloqueo de la fila
+ * otra transacción cambió el estado (p. ej. una aprobación) y ya no es borrable:
+ * no se borra nada.
  */
 export type ResultadoEliminacion =
   | { readonly tipo: 'eliminado' }
   | { readonly tipo: 'no-existe' }
-  | { readonly tipo: 'en-uso'; readonly asociados: number };
+  | { readonly tipo: 'en-uso'; readonly asociados: number }
+  | { readonly tipo: 'estado-no-permite'; readonly estado: EstadoMedicion };
 
 export interface RepositorioPlanMedicionPort {
   listar(filtro?: FiltroPlanesMedicion): Promise<DatosPlanMedicion[]>;

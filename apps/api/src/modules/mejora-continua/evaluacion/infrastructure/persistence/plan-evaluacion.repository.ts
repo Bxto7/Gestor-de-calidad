@@ -10,7 +10,10 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
 import { ReglaDeNegocioViolada } from '../../../../../shared-kernel/errors/errores.js';
-import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import {
+  permiteEliminacion,
+  type EstadoMedicion,
+} from '../../../domain/value-objects/estado-plan.js';
 import type { ResultadoEliminacion } from '../../../medicion/application/ports/plan-medicion.port.js';
 import type { TipoMedicion } from '../../../medicion/domain/value-objects/tipo-medicion.js';
 import type {
@@ -205,9 +208,16 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
    */
   async eliminar(id: string): Promise<ResultadoEliminacion> {
     return this.prisma.$transaction(async (tx) => {
-      const bloqueada = await tx.$queryRaw<{ id: string }[]>`
-        SELECT "id" FROM "mejora_continua"."planes_evaluacion" WHERE "id" = ${id}::uuid FOR UPDATE`;
-      if (bloqueada.length === 0) return { tipo: 'no-existe' } as const;
+      const bloqueada = await tx.$queryRaw<{ id: string; estado: string }[]>`
+        SELECT "id", "estado"::text AS "estado" FROM "mejora_continua"."planes_evaluacion" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      const fila = bloqueada[0];
+      if (!fila) return { tipo: 'no-existe' } as const;
+
+      // El estado se relee con la fila ya bloqueada: el que vio el caso de uso pudo
+      // cambiar en medio (una aprobación concurrente), y borrar un plan Aprobado
+      // no se puede deshacer.
+      const estado = A_DOMINIO[fila.estado as EstadoBd] ?? 'Borrador';
+      if (!permiteEliminacion(estado)) return { tipo: 'estado-no-permite', estado } as const;
 
       const asociados = await tx.planMejora.count({ where: { planEvaluacionId: id } });
       if (asociados > 0) return { tipo: 'en-uso', asociados } as const;
