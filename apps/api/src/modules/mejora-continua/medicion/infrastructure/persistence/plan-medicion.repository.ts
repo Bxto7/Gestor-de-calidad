@@ -109,6 +109,7 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
     const filas = await this.prisma.planMedicion.findMany({
       where: {
         ...(filtro?.planEstudiosId ? { planEstudiosId: filtro.planEstudiosId } : {}),
+        ...(filtro?.carreraId ? { carreraId: filtro.carreraId } : {}),
         ...(filtro?.tipo ? { tipo: filtro.tipo } : {}),
         ...(filtro?.estado ? { estado: A_BD[filtro.estado] } : {}),
         ...(texto ? { codigo: { contains: texto, mode: 'insensitive' as const } } : {}),

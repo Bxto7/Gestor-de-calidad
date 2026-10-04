@@ -95,6 +95,8 @@ describe('aislamiento de mejora-continua', () => {
     // repositorio de usuarios sería la misma erosión, con otro nombre.
     const permitidos = [
       'ports/authorization.port.js',
+      // Bloque 6a: el alcance de lectura de los planes de Medición y Evaluación.
+      'ports/alcance-de-lectura.port.js',
       'ports/directorio-usuarios.port.js',
       // Puerto que `auth` define para preguntar si un docente está en uso
       // (RF-CH-014). Mejora Continua lo implementa con sus propias tablas.
@@ -186,6 +188,7 @@ describe('aislamiento de mejora-continua', () => {
     const infractores: string[] = [];
 
     for (const raiz of [
+      join(RAIZ, 'application'),
       join(RAIZ, 'medicion', 'application'),
       join(RAIZ, 'evaluacion', 'application'),
     ]) {

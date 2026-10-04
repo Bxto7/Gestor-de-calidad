@@ -765,13 +765,15 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanMedicionPort,
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new GestionarPlanesMedicion(planes, curricular, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new GestionarPlanesMedicion(planes, curricular, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarPlanesEvaluacion,

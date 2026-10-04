@@ -61,6 +61,8 @@ export interface CeldaMatriz {
 /** RF-PM-010 y RF-PM-040: consulta por plan de estudios, tipo y estado. */
 export interface FiltroPlanesMedicion {
   readonly planEstudiosId?: string;
+  /** RF-CH-034: la impone el caso de uso según el alcance de lectura, nunca el cliente. */
+  readonly carreraId?: string;
   readonly tipo?: TipoMedicion;
   readonly estado?: EstadoMedicion;
   readonly texto?: string;

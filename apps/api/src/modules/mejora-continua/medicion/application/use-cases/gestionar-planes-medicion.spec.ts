@@ -8,7 +8,7 @@
  * pedida puede ejecutarse.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type {
   Actor,
@@ -20,6 +20,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   ContenidoCurricularPort,
@@ -27,6 +28,7 @@ import type {
 } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type {
   DatosPlanMedicion,
+  FiltroPlanesMedicion,
   RepositorioPlanMedicionPort,
 } from '../ports/plan-medicion.port.js';
 import { GestionarPlanesMedicion } from './gestionar-planes-medicion.use-case.js';
@@ -37,7 +39,7 @@ function permitirTodo(): AuthorizationPort {
   return {
     puede: async () => ({ permitido: true }),
     permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
+    carreraACargoDe: async () => 'car-1',
     rolesDe: async () => [],
   };
 }
@@ -46,7 +48,56 @@ function denegar(): AuthorizationPort {
   return {
     puede: async () => ({ permitido: false, motivo: 'Falta el permiso.' }),
     permisosDe: async () => new Set(),
-    carreraACargoDe: async () => null,
+    carreraACargoDe: async () => 'car-1',
+    rolesDe: async () => [],
+  };
+}
+
+/** Sin restricción de lectura, como el Consultor. */
+function sinRestriccion(): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+    puedeLeerCarrera: async () => true,
+  };
+}
+
+/** Quien lee solo una carrera (o ninguna si es `null`): el Coordinador desde el Bloque 6a. */
+function soloCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
+/**
+ * Como la política real: concede toda lectura y la escritura solo sobre
+ * `carreraPropia`. Anota cada permiso pedido; `sinPermisos` los niega aunque la
+ * carrera sea la suya.
+ */
+function autorizarEn(
+  carreraPropia: string | null,
+  pedidos: string[] = [],
+  sinPermisos: readonly string[] = [],
+): AuthorizationPort {
+  return {
+    puede: async (_id, permiso, carreraId) => {
+      pedidos.push(permiso);
+      if (sinPermisos.includes(permiso)) {
+        return { permitido: false, motivo: `Falta el permiso ${permiso}.` };
+      }
+      if (permiso.endsWith('.leer')) return { permitido: true };
+      if (carreraPropia === null) {
+        return { permitido: false, motivo: 'El usuario no tiene ninguna carrera asignada.' };
+      }
+      return carreraId === carreraPropia
+        ? { permitido: true }
+        : {
+            permitido: false,
+            motivo: 'El usuario no dirige la carrera a la que pertenece este plan.',
+          };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => carreraPropia,
     rolesDe: async () => [],
   };
 }
@@ -139,6 +190,7 @@ function montar(
     repo?: Partial<RepositorioPlanMedicionPort>;
     contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const vistos: DomainEvent[] = [];
@@ -152,6 +204,7 @@ function montar(
     contenido(opciones.contenido),
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    opciones.alcance ?? sinRestriccion(),
   );
   return { caso, vistos };
 }
@@ -569,75 +622,190 @@ describe('RF-PM-039 — quién aprobó y cuándo', () => {
   });
 });
 
-/**
- * El alcance por carrera (2c-C): `mejora-continua` no comprobaba la carrera en
- * ninguno de sus casos de uso. `crear` usa `base.carreraId` directo —el
- * `PlanBase` que ya trae para el resto de la validación—; `editar`,
- * `eliminar` y `transicionar` la resuelven con `carreraDe` a partir de
- * `plan.planEstudiosId`.
- */
-describe('el alcance por carrera (2c-C)', () => {
-  it('crear un plan de medición en la carrera de otro se deniega', async () => {
-    const puede = vi.fn(async (_id: string, _permiso: string, carreraId: string | null) =>
-      carreraId === 'carrera-propia'
-        ? ({ permitido: true } as const)
-        : ({ permitido: false, motivo: 'No dirige esa carrera.' } as const),
-    );
+const NUEVO = {
+  planEstudiosId: 'pe-1',
+  tipo: 'DIRECTA',
+  metaPorcentaje: 70,
+  periodoInicio: null,
+} as const;
+
+describe('RF-CH-033 — el alta en la carrera de la sesión', () => {
+  it('el plan se guarda con la carrera de la sesión, que el cliente no envía', async () => {
+    let recibida = '';
     const { caso } = montar({
-      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
-      autorizacion: {
-        puede,
-        permisosDe: async () => new Set(),
-        carreraACargoDe: async () => null,
-        rolesDe: async () => [],
+      autorizacion: autorizarEn('car-1'),
+      repo: {
+        crear: async (d) => {
+          recibida = d.carreraId;
+          return plan({ carreraId: d.carreraId, codigo: d.codigo });
+        },
       },
     });
 
-    await expect(
-      caso.crear(ACTOR, {
-        planEstudiosId: 'pe-1',
-        tipo: 'DIRECTA',
-        metaPorcentaje: 70,
-        periodoInicio: null,
-      }),
-    ).rejects.toThrow(AccesoDenegado);
-    expect(puede).toHaveBeenCalledWith(ACTOR.id, 'medicion.crear', 'carrera-ajena');
+    await caso.crear(ACTOR, NUEVO);
+
+    expect(recibida).toBe('car-1');
   });
 
-  it.each([
-    [
-      'crear',
-      (caso: GestionarPlanesMedicion) =>
-        caso.crear(ACTOR, {
-          planEstudiosId: 'pe-1',
-          tipo: 'DIRECTA',
-          metaPorcentaje: 70,
-          periodoInicio: null,
-        }),
-    ],
-    [
-      'editar',
-      (caso: GestionarPlanesMedicion) => caso.editar(ACTOR, 'pm-1', { metaPorcentaje: 80 }),
-    ],
-    ['eliminar', (caso: GestionarPlanesMedicion) => caso.eliminar(ACTOR, 'pm-1')],
-    [
-      'transicionar',
-      (caso: GestionarPlanesMedicion) => caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {}),
-    ],
-  ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
-    const puede = vi.fn(async () => ({ permitido: true }) as const);
+  it('un plan de estudios de otra carrera es 409 y no se crea nada', async () => {
+    let creados = 0;
+    const { caso, vistos } = montar({
+      autorizacion: autorizarEn('car-1'),
+      contenido: { planPorId: async () => planBase({ carreraId: 'car-2' }) },
+      repo: {
+        crear: async (d) => {
+          creados++;
+          return plan({ codigo: d.codigo });
+        },
+      },
+    });
+
+    await expect(caso.crear(ACTOR, NUEVO)).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'El plan de estudios base no es de tu carrera: un plan de medición se construye sobre un plan de estudios de la carrera con la que trabajas.',
+      ),
+    );
+    expect(creados).toBe(0);
+    expect(vistos).toHaveLength(0);
+  });
+
+  it('sin carrera asignada: AccesoDenegado con el motivo, antes de mirar el plan de estudios', async () => {
+    let consultado = false;
     const { caso } = montar({
-      contenido: { planPorId: async () => planBase({ carreraId: 'carrera-ajena' }) },
+      autorizacion: autorizarEn(null),
+      contenido: {
+        planPorId: async () => {
+          consultado = true;
+          return planBase();
+        },
+      },
+    });
+
+    await expect(caso.crear(ACTOR, NUEVO)).rejects.toThrow('No tienes una carrera asignada');
+    expect(consultado).toBe(false);
+  });
+
+  it('pide medicion.leer y luego medicion.crear sobre la carrera de la sesión', async () => {
+    const pedidos: string[] = [];
+    const { caso } = montar({ autorizacion: autorizarEn('car-1', pedidos, ['medicion.crear']) });
+
+    await expect(caso.crear(ACTOR, NUEVO)).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(pedidos).toEqual(['medicion.leer', 'medicion.crear']);
+  });
+});
+
+describe('RF-CH-034 — el listado según el alcance de lectura', () => {
+  function capturando() {
+    const filtros: (FiltroPlanesMedicion | undefined)[] = [];
+    const listar = async (f?: FiltroPlanesMedicion) => {
+      filtros.push(f);
+      return [];
+    };
+    return { filtros, listar };
+  }
+
+  it('quien lee solo su carrera recibe la suya aunque el filtro pida otra', async () => {
+    const { filtros, listar } = capturando();
+    const { caso } = montar({ alcance: soloCarrera('car-1'), repo: { listar } });
+
+    await caso.listar(ACTOR, { carreraId: 'car-2', tipo: 'DIRECTA' });
+
+    expect(filtros).toEqual([{ carreraId: 'car-1', tipo: 'DIRECTA' }]);
+  });
+
+  it('sin restricción no se acota a ninguna', async () => {
+    const { filtros, listar } = capturando();
+    const { caso } = montar({ alcance: sinRestriccion(), repo: { listar } });
+
+    await caso.listar(ACTOR, { tipo: 'DIRECTA' });
+
+    expect(filtros[0]?.carreraId).toBeUndefined();
+  });
+
+  it('quien lee solo su carrera y no tiene ninguna recibe la lista vacía, sin consultar', async () => {
+    const { filtros, listar } = capturando();
+    const { caso } = montar({ alcance: soloCarrera(null), repo: { listar } });
+
+    expect(await caso.listar(ACTOR)).toEqual([]);
+    expect(filtros).toEqual([]);
+  });
+});
+
+type Operacion = (caso: GestionarPlanesMedicion) => Promise<unknown>;
+
+const SOBRE_UN_PLAN: readonly (readonly [string, Operacion])[] = [
+  ['porId', (caso) => caso.porId(ACTOR, 'pm-1')],
+  ['consistencia', (caso) => caso.consistencia(ACTOR, 'pm-1')],
+  ['linaje', (caso) => caso.linaje(ACTOR, 'pm-1')],
+  ['editar', (caso) => caso.editar(ACTOR, 'pm-1', { metaPorcentaje: 80 })],
+  ['eliminar', (caso) => caso.eliminar(ACTOR, 'pm-1')],
+  ['transicionar', (caso) => caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {})],
+];
+
+describe('Orden de comprobación sobre un plan existente (RF-CH-034)', () => {
+  it('(1) sin medicion.leer: AccesoDenegado, aunque el plan sea de otra carrera', async () => {
+    const pedidos: string[] = [];
+    const { caso } = montar({
+      autorizacion: autorizarEn('car-1', pedidos, ['medicion.leer']),
+      alcance: soloCarrera('car-2'),
+    });
+
+    await expect(caso.porId(ACTOR, 'pm-1')).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(pedidos).toEqual(['medicion.leer']);
+  });
+
+  it.each(SOBRE_UN_PLAN)(
+    '(2) %s sobre un plan de otra carrera es NoEncontrado y no pide ningún permiso de escritura',
+    async (_nombre, ejecutar) => {
+      const pedidos: string[] = [];
+      const { caso, vistos } = montar({
+        autorizacion: autorizarEn('car-2', pedidos),
+        alcance: soloCarrera('car-2'),
+      });
+
+      await expect(ejecutar(caso)).rejects.toBeInstanceOf(NoEncontrado);
+      expect(pedidos.every((p) => p === 'medicion.leer')).toBe(true);
+      expect(vistos).toHaveLength(0);
+    },
+  );
+
+  it('(2) un plan que no existe es NoEncontrado', async () => {
+    const { caso } = montar({ repo: { porId: async () => null } });
+
+    await expect(caso.porId(ACTOR, 'pm-9')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('(3) legible pero de otra carrera: AccesoDenegado, con la carrera del plan', async () => {
+    const carreras: (string | null | undefined)[] = [];
+    const { caso } = montar({
+      alcance: sinRestriccion(),
       autorizacion: {
-        puede,
+        puede: async (_id, permiso, carreraId) => {
+          if (permiso === 'medicion.editar') carreras.push(carreraId);
+          return permiso === 'medicion.leer'
+            ? { permitido: true }
+            : { permitido: false, motivo: 'El usuario no dirige la carrera.' };
+        },
         permisosDe: async () => new Set(),
-        carreraACargoDe: async () => null,
+        carreraACargoDe: async () => 'car-2',
         rolesDe: async () => [],
       },
     });
 
-    await ejecutar(caso).catch(() => undefined);
+    await expect(caso.editar(ACTOR, 'pm-1', { metaPorcentaje: 80 })).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
+    expect(carreras).toEqual(['car-1']);
+  });
 
-    expect(puede).toHaveBeenCalledWith(ACTOR.id, expect.any(String), 'carrera-ajena');
+  it('(4) la regla de negocio va después del permiso: sin medicion.editar, 403 y no 409', async () => {
+    const { caso } = montar({
+      autorizacion: autorizarEn('car-1', [], ['medicion.editar']),
+      repo: { porId: async () => plan({ estado: 'Vigente' }) },
+    });
+
+    await expect(caso.editar(ACTOR, 'pm-1', { metaPorcentaje: 80 })).rejects.toBeInstanceOf(
+      AccesoDenegado,
+    );
   });
 });

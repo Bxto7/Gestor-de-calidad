@@ -5,6 +5,14 @@
  * `ContenidoCurricularPort`. Ni una consulta directa a sus tablas: es la
  * frontera que §3.2 exige entre módulos, y la que permitirá extraer Mejora
  * Continua a su propio servicio cambiando solo el adaptador que hay detrás.
+ *
+ * Bloque 6a (RF-CH-033, RF-CH-034): el plan es de una carrera —la de la sesión
+ * de quien lo crea— y se lee según el alcance de lectura. Orden de comprobación
+ * de toda operación sobre un plan existente, el mismo que Acreditación:
+ * (1) `medicion.leer` — AccesoDenegado; (2) existencia y alcance de la carrera
+ * del plan — NoEncontrado, nunca AccesoDenegado, para no revelar que existe;
+ * (3) el permiso de escritura acotado a la carrera del plan — AccesoDenegado;
+ * (4) reglas de negocio — ReglaDeNegocioViolada.
  */
 
 import type {
@@ -16,8 +24,14 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
+import {
+  carreraDeLaSesion,
+  carreraImpuesta,
+  exigirPlanLegible,
+} from '../../../application/alcance-de-planes.js';
 import {
   PlanMedicionCreado,
   PlanMedicionEditado,
@@ -57,31 +71,44 @@ export class GestionarPlanesMedicion {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
-  /** RF-PM-010: consulta por plan de estudios, tipo y estado. */
+  /**
+   * RF-PM-010 y RF-CH-034: consulta por plan de estudios, tipo y estado, dentro
+   * de la carrera que impone el alcance. La del filtro no cuenta: se pisa.
+   */
   async listar(actor: Actor, filtro?: FiltroPlanesMedicion): Promise<DatosPlanMedicion[]> {
     await this.exigir(actor, 'medicion.leer', null);
-    return this.planes.listar(filtro);
+    const carrera = await carreraImpuesta(this.alcance, actor);
+    if (carrera === null) return [];
+    return this.planes.listar({ ...filtro, carreraId: carrera });
   }
 
   async porId(actor: Actor, id: string): Promise<DatosPlanMedicion> {
     await this.exigir(actor, 'medicion.leer', null);
-    return this.exigirPlan(id);
+    return this.planLegible(actor, id);
   }
 
   /**
-   * RF-PM-001 a RF-PM-004.
-   *
-   * La carrera sale directamente de `base`, el `PlanBase` que ya hay que traer
-   * para el resto de esta validación: no hace falta el salto por `carreraDe`
-   * porque el dato ya está en la mano.
+   * RF-PM-001 a RF-PM-004 y RF-CH-033: el plan nace en la carrera de la sesión,
+   * que el cliente no envía, y su plan de estudios base tiene que ser de ella.
    */
   async crear(actor: Actor, datos: DatosNuevoPlan): Promise<DatosPlanMedicion> {
+    await this.exigir(actor, 'medicion.leer', null);
+    const carreraId = await carreraDeLaSesion(this.autorizacion, actor, 'planes de medición');
+    await this.exigir(actor, 'medicion.crear', carreraId);
+
     const base = await this.curricular.planPorId(datos.planEstudiosId);
     if (!base) throw new NoEncontrado('el plan de estudios', datos.planEstudiosId);
 
-    await this.exigir(actor, 'medicion.crear', base.carreraId);
+    // RF-CH-033 RN1: la asociación es automática y no editable, así que una base
+    // de otra carrera no tiene cabida.
+    if (base.carreraId !== carreraId) {
+      throw new ReglaDeNegocioViolada(
+        'El plan de estudios base no es de tu carrera: un plan de medición se construye sobre un plan de estudios de la carrera con la que trabajas.',
+      );
+    }
 
     // RF-PM-001 RN2.
     if (!base.elegible) {
@@ -101,12 +128,8 @@ export class GestionarPlanesMedicion {
 
     // Aquí NO se comprueba que exista un Vigente, y es deliberado. RF-PM-041 RN1
     // prohíbe DOS VIGENTES, no crear: el plan nace en Borrador y el índice
-    // parcial solo restringe las filas VIGENTE. La comprobación que había antes
-    // era más estricta que el invariante que decía proteger, y con eso dejaba el
-    // módulo sin salida —una vez en vigor el primer plan, no se podía crear
-    // ninguno más— además de hacer imposible RF-PM-030, que exige partir de un
-    // plan Aprobado o Vigente. El relevo se resuelve al marcar vigente, en
-    // `transicionar`.
+    // parcial solo restringe las filas VIGENTE. El relevo se resuelve al marcar
+    // vigente, en `transicionar`.
 
     const meta = metaDesdePorcentaje(datos.metaPorcentaje);
     const codigo = siguienteCodigo(
@@ -117,9 +140,7 @@ export class GestionarPlanesMedicion {
 
     const creado = await this.planes.crear({
       planEstudiosId: datos.planEstudiosId,
-      // La de la base, como hace el relleno de la migración. La Tarea 3 pasa a
-      // la carrera de la sesión (RF-CH-033).
-      carreraId: base.carreraId,
+      carreraId,
       tipo: datos.tipo,
       codigo,
       meta,
@@ -138,8 +159,7 @@ export class GestionarPlanesMedicion {
     id: string,
     datos: { metaPorcentaje?: number },
   ): Promise<DatosPlanMedicion> {
-    const previo = await this.exigirPlan(id);
-    await this.exigir(actor, 'medicion.editar', await this.carreraDe(previo.planEstudiosId));
+    const previo = await this.planGestionable(actor, id, 'medicion.editar');
     this.verificarEditable(previo);
 
     const cambios: string[] = [];
@@ -158,10 +178,9 @@ export class GestionarPlanesMedicion {
     return editado;
   }
 
-  /** RF-PM-009: solo un Borrador se elimina. */
+  /** RF-PM-009: solo un Borrador se elimina (la Tarea 6 lo amplía a En revisión). */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    const plan = await this.exigirPlan(id);
-    await this.exigir(actor, 'medicion.eliminar', await this.carreraDe(plan.planEstudiosId));
+    const plan = await this.planGestionable(actor, id, 'medicion.eliminar');
 
     if (!permiteEliminacion(plan.estado)) {
       throw new ReglaDeNegocioViolada(
@@ -176,7 +195,7 @@ export class GestionarPlanesMedicion {
   /** RF-PM-038: la validación integral, consultable sin transicionar. */
   async consistencia(actor: Actor, id: string): Promise<ResultadoConsistencia> {
     await this.exigir(actor, 'medicion.leer', null);
-    return this.evaluar(await this.exigirPlan(id));
+    return this.evaluar(await this.planLegible(actor, id));
   }
 
   /** RF-PM-006: transición con su permiso y su validación previa. */
@@ -186,13 +205,8 @@ export class GestionarPlanesMedicion {
     accion: AccionMedicion,
     contexto: { comentario?: string },
   ): Promise<DatosPlanMedicion> {
-    const plan = await this.exigirPlan(id);
     const transicion = describirTransicion(accion);
-    await this.exigir(
-      actor,
-      `medicion.${transicion.permiso}`,
-      await this.carreraDe(plan.planEstudiosId),
-    );
+    const plan = await this.planGestionable(actor, id, `medicion.${transicion.permiso}`);
 
     // RF-PM-038 RN1: la validación integral es requisito previo. Se evalúa solo
     // si la transición la exige: volver a pedirla al archivar dejaría planes
@@ -258,13 +272,13 @@ export class GestionarPlanesMedicion {
   /**
    * RF-PM-031: el linaje de versiones del plan.
    *
-   * Exige solo `medicion.leer`: consultar cómo evolucionó un plan es lectura, y
-   * el requerimiento la ofrece también al Usuario consultor.
+   * Exige solo `medicion.leer`: consultar cómo evolucionó un plan es lectura.
+   * Las versiones comparten plan de estudios, luego carrera: basta con que el
+   * plan pedido sea legible.
    */
   async linaje(actor: Actor, id: string): Promise<DatosPlanMedicion[]> {
     await this.exigir(actor, 'medicion.leer', null);
-    // Que exista, para distinguir «sin linaje» de «no hay tal plan».
-    await this.exigirPlan(id);
+    await this.planLegible(actor, id);
     return this.planes.linajeDe(id);
   }
 
@@ -286,9 +300,7 @@ export class GestionarPlanesMedicion {
       competencias: plan.competenciaIds.map((id) => {
         const c = porId.get(id);
         // Una competencia declarada aquí y retirada después del plan de
-        // estudios se queda sin código. Se dice eso en vez de dejarla fuera:
-        // sigue siendo una competencia sin programar, y un id a secas haría
-        // pensar en un fallo del sistema y no en un cambio del plan.
+        // estudios se queda sin código. Se dice eso en vez de dejarla fuera.
         return c
           ? { id, codigo: c.codigo, nombre: c.nombre }
           : { id, codigo: id, nombre: 'ya no está en el plan de estudios' };
@@ -305,9 +317,26 @@ export class GestionarPlanesMedicion {
     });
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanMedicion> {
-    const plan = await this.planes.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de medición', id);
+  /** (2) Existe y su carrera entra en el alcance de lectura; si no, NoEncontrado. */
+  private async planLegible(actor: Actor, id: string): Promise<DatosPlanMedicion> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(id),
+      'el plan de medición',
+      id,
+    );
+  }
+
+  /** (1) a (3): lectura, existencia y alcance, y el permiso sobre la carrera del plan. */
+  private async planGestionable(
+    actor: Actor,
+    id: string,
+    permiso: string,
+  ): Promise<DatosPlanMedicion> {
+    await this.exigir(actor, 'medicion.leer', null);
+    const plan = await this.planLegible(actor, id);
+    await this.exigir(actor, permiso, plan.carreraId);
     return plan;
   }
 
@@ -318,21 +347,6 @@ export class GestionarPlanesMedicion {
         `El plan de medición ${plan.codigo} está en ${plan.estado}; solo se edita en Borrador.`,
       );
     }
-  }
-
-  /**
-   * La carrera del plan, para acotar el permiso.
-   *
-   * Sale de la cadena que ya existe —medición → plan de estudios— y no de una
-   * columna propia: desnormalizarla es una migración que se añade el día que
-   * el número lo justifique, y hoy no hay número.
-   */
-  private async carreraDe(planEstudiosId: string): Promise<string> {
-    const plan = await this.curricular.planPorId(planEstudiosId);
-    if (!plan) {
-      throw new NoEncontrado('el plan de estudios', planEstudiosId);
-    }
-    return plan.carreraId;
   }
 
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
