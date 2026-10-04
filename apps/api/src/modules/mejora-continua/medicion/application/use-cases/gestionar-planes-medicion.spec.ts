@@ -68,6 +68,7 @@ function plan(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
   return {
     id: 'pm-1',
     planEstudiosId: 'pe-1',
+    carreraId: 'car-1',
     tipo: 'DIRECTA',
     codigo: 'PM-PE-ISI-2026-v1-D-v1',
     version: 1,
@@ -621,8 +622,7 @@ describe('el alcance por carrera (2c-C)', () => {
     ['eliminar', (caso: GestionarPlanesMedicion) => caso.eliminar(ACTOR, 'pm-1')],
     [
       'transicionar',
-      (caso: GestionarPlanesMedicion) =>
-        caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {}),
+      (caso: GestionarPlanesMedicion) => caso.transicionar(ACTOR, 'pm-1', 'enviar-a-revision', {}),
     ],
   ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);

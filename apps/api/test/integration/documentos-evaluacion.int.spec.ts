@@ -15,6 +15,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { DocumentoEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/documentos-evaluacion.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
+import { carreraDeLaMedicion } from './carrera-de-los-planes.js';
 
 const prisma = new PrismaService();
 const repo = new DocumentoEvaluacionRepositoryPrisma(prisma);
@@ -52,12 +53,23 @@ beforeEach(async () => {
   planEstudiosId = pe.id;
 
   const base = await prisma.planMedicion.create({
-    data: { planEstudiosId, tipo: 'DIRECTA', codigo: 'PM-EV-E2E', meta: 0.7, estado: 'APROBADO' },
+    data: {
+      planEstudiosId,
+      carreraId: carrera.id,
+      tipo: 'DIRECTA',
+      codigo: 'PM-EV-E2E',
+      meta: 0.7,
+      estado: 'APROBADO',
+    },
   });
   baseId = base.id;
 
   const plan = await prisma.planEvaluacion.create({
-    data: { planMedicionId: baseId, codigo: 'EV-PE-E2E-v1' },
+    data: {
+      planMedicionId: baseId,
+      carreraId: await carreraDeLaMedicion(prisma, baseId),
+      codigo: 'EV-PE-E2E-v1',
+    },
   });
   planId = plan.id;
 });
@@ -92,7 +104,13 @@ describe('RF-PE-032 y RF-PE-033 — el ciclo de vida del documento', () => {
   it('borrar la versión de origen no se lleva la derivada', async () => {
     // RF-PE-034 RN1 con SetNull: el linaje se pierde, la evidencia no.
     const v2 = await prisma.planEvaluacion.create({
-      data: { planMedicionId: baseId, codigo: 'EV-PE-E2E-v1-D-v2', version: 2, derivadoDeId: planId },
+      data: {
+        planMedicionId: baseId,
+        carreraId: await carreraDeLaMedicion(prisma, baseId),
+        codigo: 'EV-PE-E2E-v1-D-v2',
+        version: 2,
+        derivadoDeId: planId,
+      },
     });
     await prisma.planEvaluacion.delete({ where: { id: planId } });
 
@@ -153,7 +171,11 @@ describe('Task 3 — el repositorio de documentos del plan de evaluación', () =
     // Un segundo plan de evaluación, derivado del primero, para comprobar que
     // el listado no se cuela entre planes.
     const otroPlan = await prisma.planEvaluacion.create({
-      data: { planMedicionId: baseId, codigo: 'EV-PE-E2E-v1-OTRO' },
+      data: {
+        planMedicionId: baseId,
+        carreraId: await carreraDeLaMedicion(prisma, baseId),
+        codigo: 'EV-PE-E2E-v1-OTRO',
+      },
     });
     const otroPlanId = otroPlan.id;
 

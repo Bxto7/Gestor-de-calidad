@@ -790,6 +790,10 @@ enum EstadoMedicion {
 model PlanMedicion {
   id             String         @id @default(uuid()) @db.Uuid
   planEstudiosId String         @map("plan_estudios_id") @db.Uuid
+  /// RF-CH-033 (Bloque 6a): la carrera del plan, la de la sesión de quien lo
+  /// crea. Sin clave foránea, como `PlanMejora.carreraId`: apunta a otro
+  /// esquema (§3.2) y la integridad la fija el caso de uso.
+  carreraId      String         @map("carrera_id") @db.Uuid
   tipo           TipoMedicion
   /// RF-PM-004 RN1: autogenerado, no editable.
   codigo         String         @unique @db.VarChar(64)
@@ -827,6 +831,7 @@ model PlanMedicion {
   evaluaciones PlanEvaluacion[]
 
   @@index([planEstudiosId, tipo])
+  @@index([carreraId])
   @@map("planes_medicion")
   @@schema("mejora_continua")
 }
@@ -992,6 +997,10 @@ model DocumentoMedicion {
 model PlanEvaluacion {
   id             String         @id @default(uuid()) @db.Uuid
   planMedicionId String         @map("plan_medicion_id") @db.Uuid
+  /// RF-CH-037 (Bloque 6a): la carrera del plan, la de la sesión de quien lo
+  /// crea —la misma que la de su plan de medición base—. Sin clave foránea, como
+  /// `PlanMejora.carreraId`.
+  carreraId      String         @map("carrera_id") @db.Uuid
   codigo         String         @unique @db.VarChar(80)
   version        Int            @default(1)
   estado         EstadoMedicion @default(BORRADOR)
@@ -1026,6 +1035,7 @@ model PlanEvaluacion {
   indicaciones  IndicacionDeMedicion[]
 
   @@index([planMedicionId])
+  @@index([carreraId])
   @@map("planes_evaluacion")
   @@schema("mejora_continua")
 }

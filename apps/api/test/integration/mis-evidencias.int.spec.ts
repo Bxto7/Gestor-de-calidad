@@ -5,6 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { MisEvidenciasRepositoryPrisma } from '../../src/modules/mejora-continua/mis-evidencias/infrastructure/persistence/mis-evidencias.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
+import { carreraDelPlanDeEstudios } from './carrera-de-los-planes.js';
 
 const prisma = new PrismaService();
 const repo = new MisEvidenciasRepositoryPrisma(prisma);
@@ -57,6 +58,7 @@ async function evaluacion(opciones: {
   const medicion = await prisma.planMedicion.create({
     data: {
       planEstudiosId: opciones.planEstudiosId,
+      carreraId: await carreraDelPlanDeEstudios(prisma, opciones.planEstudiosId),
       tipo: opciones.tipo ?? 'DIRECTA',
       codigo: `PM-${randomUUID().slice(0, 8)}`,
       meta: 0.7,
@@ -74,6 +76,7 @@ async function evaluacion(opciones: {
   const plan = await prisma.planEvaluacion.create({
     data: {
       planMedicionId: medicion.id,
+      carreraId: medicion.carreraId,
       codigo: `EV-${randomUUID().slice(0, 8)}`,
       estado: opciones.estadoPlan ?? 'VIGENTE',
     },

@@ -117,6 +117,9 @@ export class GestionarPlanesMedicion {
 
     const creado = await this.planes.crear({
       planEstudiosId: datos.planEstudiosId,
+      // La de la base, como hace el relleno de la migración. La Tarea 3 pasa a
+      // la carrera de la sesión (RF-CH-033).
+      carreraId: base.carreraId,
       tipo: datos.tipo,
       codigo,
       meta,

@@ -53,6 +53,7 @@ async function planDeEvaluacion() {
   const medicion = await prisma.planMedicion.create({
     data: {
       planEstudiosId: planEstudios.id,
+      carreraId: carrera.id,
       tipo: 'DIRECTA',
       codigo: `PM-${randomUUID().slice(0, 8)}`,
       meta: 0.7,
@@ -65,6 +66,7 @@ async function planDeEvaluacion() {
   const evaluacion = await prisma.planEvaluacion.create({
     data: {
       planMedicionId: medicion.id,
+      carreraId: medicion.carreraId,
       codigo: `EV-${randomUUID().slice(0, 8)}`,
       estado: 'BORRADOR',
     },

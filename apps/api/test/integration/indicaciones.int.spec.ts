@@ -54,6 +54,7 @@ beforeEach(async () => {
   const base = await prisma.planMedicion.create({
     data: {
       planEstudiosId,
+      carreraId: carrera.id,
       tipo: 'INDIRECTA',
       codigo: 'PM-IND-2026-v1',
       meta: 0.7,
@@ -62,7 +63,9 @@ beforeEach(async () => {
   });
 
   planId = (
-    await prisma.planEvaluacion.create({ data: { planMedicionId: base.id, codigo: 'EV-IND-1' } })
+    await prisma.planEvaluacion.create({
+      data: { planMedicionId: base.id, carreraId: base.carreraId, codigo: 'EV-IND-1' },
+    })
   ).id;
 
   comp = randomUUID();
@@ -121,7 +124,12 @@ describe('RF-PE-028 RN1 — una indicación por grupo y año', () => {
     // RF-PE-030 RN1 prohíbe, y la razón de que las indicaciones cuelguen del
     // año y no del cruce— y quiera que borrarlas arrastre el porcentaje.
     await prisma.medicionAlcanzada.create({
-      data: { planEvaluacionId: planId, competenciaId: comp, periodoId: anio2026, porcentajeAlcanzado: 80 },
+      data: {
+        planEvaluacionId: planId,
+        competenciaId: comp,
+        periodoId: anio2026,
+        porcentajeAlcanzado: 80,
+      },
     });
     const i = await crear({ grupoObjetivo: 'EMPLEADORES' });
     await prisma.indicacionDeMedicion.delete({ where: { id: i.id } });

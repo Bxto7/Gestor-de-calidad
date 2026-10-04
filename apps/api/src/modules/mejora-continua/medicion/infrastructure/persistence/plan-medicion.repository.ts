@@ -38,6 +38,7 @@ const A_DOMINIO = Object.fromEntries(Object.entries(A_BD).map(([k, v]) => [v, k]
 const SELECCION = {
   id: true,
   planEstudiosId: true,
+  carreraId: true,
   tipo: true,
   codigo: true,
   version: true,
@@ -59,6 +60,7 @@ const SELECCION = {
 interface Fila {
   id: string;
   planEstudiosId: string;
+  carreraId: string;
   tipo: string;
   codigo: string;
   version: number;
@@ -78,6 +80,7 @@ function aDatos(fila: Fila): DatosPlanMedicion {
   return {
     id: fila.id,
     planEstudiosId: fila.planEstudiosId,
+    carreraId: fila.carreraId,
     tipo: fila.tipo as TipoMedicion,
     codigo: fila.codigo,
     version: fila.version,
@@ -140,6 +143,7 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
 
   async crear(datos: {
     planEstudiosId: string;
+    carreraId: string;
     tipo: TipoMedicion;
     codigo: string;
     meta: number;
@@ -148,6 +152,7 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
     const fila = await this.prisma.planMedicion.create({
       data: {
         planEstudiosId: datos.planEstudiosId,
+        carreraId: datos.carreraId,
         tipo: datos.tipo,
         codigo: datos.codigo,
         meta: datos.meta,
@@ -227,6 +232,7 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
   /** RNF12: todo el contenido en una transaccion. Media copia es peor que ninguna. */
   async copiar(datos: {
     planEstudiosId: string;
+    carreraId: string;
     tipo: TipoMedicion;
     codigo: string;
     version: number;
@@ -239,6 +245,7 @@ export class PlanMedicionRepositoryPrisma implements RepositorioPlanMedicionPort
       const creado = await tx.planMedicion.create({
         data: {
           planEstudiosId: datos.planEstudiosId,
+          carreraId: datos.carreraId,
           tipo: datos.tipo,
           codigo: datos.codigo,
           version: datos.version,

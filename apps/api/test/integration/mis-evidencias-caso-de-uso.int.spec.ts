@@ -9,6 +9,7 @@ import type { ContenidoCurricularPort } from '../../src/modules/plan-estudios/ap
 import { PlanVigenteAdapter } from '../../src/modules/plan-estudios/infrastructure/plan-vigente.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { AccesoDenegado, ReglaDeNegocioViolada } from '../../src/shared-kernel/errors/errores.js';
+import { carreraDelPlanDeEstudios } from './carrera-de-los-planes.js';
 
 const prisma = new PrismaService();
 
@@ -63,6 +64,7 @@ async function evaluacionDe(
   const medicion = await prisma.planMedicion.create({
     data: {
       planEstudiosId,
+      carreraId: await carreraDelPlanDeEstudios(prisma, planEstudiosId),
       tipo: 'DIRECTA',
       codigo: `PM-${randomUUID().slice(0, 8)}`,
       meta: 0.7,
@@ -75,6 +77,7 @@ async function evaluacionDe(
   const plan = await prisma.planEvaluacion.create({
     data: {
       planMedicionId: medicion.id,
+      carreraId: medicion.carreraId,
       codigo: `EV-${randomUUID().slice(0, 8)}`,
       estado: estadoPlan,
     },

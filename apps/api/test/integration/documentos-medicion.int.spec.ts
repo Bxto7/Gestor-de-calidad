@@ -21,6 +21,7 @@ const repo = new DocumentoMedicionRepositoryPrisma(prisma);
 const planes = new PlanMedicionRepositoryPrisma(prisma);
 
 let planEstudiosId: string;
+let carreraId: string;
 /** Quien pide el documento llega como UUID sin clave foránea, como el resto. */
 const ACTOR_ID = randomUUID();
 
@@ -48,6 +49,7 @@ beforeEach(async () => {
     },
   });
   planEstudiosId = pe.id;
+  carreraId = carrera.id;
 });
 
 afterAll(async () => {
@@ -57,6 +59,7 @@ afterAll(async () => {
 async function crearPlanMedicion(codigo = 'PM-1') {
   return planes.crear({
     planEstudiosId,
+    carreraId,
     tipo: 'DIRECTA',
     codigo,
     meta: 0.7,

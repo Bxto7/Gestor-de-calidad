@@ -38,6 +38,7 @@ const A_DOMINIO = Object.fromEntries(Object.entries(A_BD).map(([k, v]) => [v, k]
 const SELECCION = {
   id: true,
   planMedicionId: true,
+  carreraId: true,
   codigo: true,
   version: true,
   estado: true,
@@ -51,6 +52,7 @@ const SELECCION = {
 interface Fila {
   id: string;
   planMedicionId: string;
+  carreraId: string;
   codigo: string;
   version: number;
   estado: string;
@@ -65,6 +67,7 @@ function aDatos(fila: Fila): DatosPlanEvaluacion {
   return {
     id: fila.id,
     planMedicionId: fila.planMedicionId,
+    carreraId: fila.carreraId,
     codigo: fila.codigo,
     version: fila.version,
     estado: A_DOMINIO[fila.estado as EstadoBd] ?? 'Borrador',
@@ -147,7 +150,11 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
     return filas.map((f) => f.codigo);
   }
 
-  async crear(datos: { planMedicionId: string; codigo: string }): Promise<DatosPlanEvaluacion> {
+  async crear(datos: {
+    planMedicionId: string;
+    carreraId: string;
+    codigo: string;
+  }): Promise<DatosPlanEvaluacion> {
     const fila = await this.prisma.planEvaluacion.create({ data: datos, select: SELECCION });
     return aDatos(fila);
   }
@@ -162,7 +169,9 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
         where: { id },
         data: {
           estado: A_BD[estado],
-          ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
+          ...(aprobacion
+            ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha }
+            : {}),
         },
         select: SELECCION,
       });
@@ -198,6 +207,7 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
    */
   async copiar(datos: {
     planMedicionId: string;
+    carreraId: string;
     codigo: string;
     version: number;
     derivadoDeId: string;
@@ -209,6 +219,7 @@ export class PlanEvaluacionRepositoryPrisma implements RepositorioPlanEvaluacion
       const creado = await tx.planEvaluacion.create({
         data: {
           planMedicionId: datos.planMedicionId,
+          carreraId: datos.carreraId,
           codigo: datos.codigo,
           version: datos.version,
           derivadoDeId: datos.derivadoDeId,

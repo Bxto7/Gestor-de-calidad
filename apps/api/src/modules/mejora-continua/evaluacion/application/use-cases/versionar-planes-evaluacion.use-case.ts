@@ -108,6 +108,7 @@ export class VersionarPlanesEvaluacion {
 
     const creado = await this.evaluaciones.copiar({
       planMedicionId: origen.planMedicionId,
+      carreraId: origen.carreraId,
       codigo,
       version,
       derivadoDeId: origen.id,

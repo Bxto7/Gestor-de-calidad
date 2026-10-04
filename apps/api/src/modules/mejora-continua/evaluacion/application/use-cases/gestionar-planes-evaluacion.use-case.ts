@@ -172,7 +172,11 @@ export class GestionarPlanesEvaluacion {
       await this.evaluaciones.codigosDe(base.planEstudiosId, base.tipo),
     );
 
-    const creado = await this.evaluaciones.crear({ planMedicionId: base.id, codigo });
+    const creado = await this.evaluaciones.crear({
+      planMedicionId: base.id,
+      carreraId: base.carreraId,
+      codigo,
+    });
 
     await this.eventos.publicar([
       new PlanEvaluacionCreado(actor, creado.id, creado.codigo, base.codigo),

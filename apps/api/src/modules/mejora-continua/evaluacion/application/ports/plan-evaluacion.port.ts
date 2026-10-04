@@ -16,6 +16,8 @@ import type { GrupoObjetivo } from './configuracion-evaluacion.port.js';
 export interface DatosPlanEvaluacion {
   readonly id: string;
   readonly planMedicionId: string;
+  /** RF-CH-037: la carrera del plan, propia (Bloque 6a). */
+  readonly carreraId: string;
   readonly codigo: string;
   readonly version: number;
   readonly estado: EstadoMedicion;
@@ -85,7 +87,11 @@ export interface RepositorioPlanEvaluacionPort {
   vigenteDe(planMedicionId: string): Promise<DatosPlanEvaluacion | null>;
   /** Códigos ya usados de ese plan de estudios y ese tipo, para el correlativo. */
   codigosDe(planEstudiosId: string, tipo: TipoMedicion): Promise<string[]>;
-  crear(datos: { planMedicionId: string; codigo: string }): Promise<DatosPlanEvaluacion>;
+  crear(datos: {
+    planMedicionId: string;
+    carreraId: string;
+    codigo: string;
+  }): Promise<DatosPlanEvaluacion>;
   cambiarEstado(
     id: string,
     estado: EstadoMedicion,
@@ -97,6 +103,7 @@ export interface RepositorioPlanEvaluacionPort {
   /** RF-PE-034: crea la versión nueva con su contenido copiado, en una transacción. */
   copiar(datos: {
     planMedicionId: string;
+    carreraId: string;
     codigo: string;
     version: number;
     derivadoDeId: string;

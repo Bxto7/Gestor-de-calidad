@@ -138,6 +138,7 @@ function planMedicion(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion
   return {
     id: 'pm-1',
     planEstudiosId: 'pe-1',
+    carreraId: 'car-1',
     tipo: 'DIRECTA',
     codigo: 'PM-PE-ISI-2026-v2-D-v1',
     version: 1,
@@ -155,12 +156,12 @@ function planMedicion(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion
 }
 
 /** Doble completo de `RepositorioPlanMedicionPort`: este caso de uso solo usa `porId`. */
-function repoMedicion(sobre: Partial<RepositorioPlanMedicionPort> = {}): RepositorioPlanMedicionPort {
-  const noUsado =
-    (metodo: string) =>
-    async (): Promise<never> => {
-      throw new Error(`${metodo} no se usa en este spec.`);
-    };
+function repoMedicion(
+  sobre: Partial<RepositorioPlanMedicionPort> = {},
+): RepositorioPlanMedicionPort {
+  const noUsado = (metodo: string) => async (): Promise<never> => {
+    throw new Error(`${metodo} no se usa en este spec.`);
+  };
   return {
     listar: noUsado('listar'),
     porId: async () => planMedicion(),
@@ -187,6 +188,7 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
   return {
     id: 'ev-1',
     planMedicionId: 'pm-1',
+    carreraId: 'car-1',
     codigo: 'EV-PE-ISI-2026-v2-D-v1',
     version: 1,
     estado: 'Vigente',
@@ -202,11 +204,9 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
 function repoEvaluacion(
   sobre: Partial<RepositorioPlanEvaluacionPort> = {},
 ): RepositorioPlanEvaluacionPort {
-  const noUsado =
-    (metodo: string) =>
-    async (): Promise<never> => {
-      throw new Error(`${metodo} no se usa en este spec.`);
-    };
+  const noUsado = (metodo: string) => async (): Promise<never> => {
+    throw new Error(`${metodo} no se usa en este spec.`);
+  };
   return {
     listar: noUsado('listar'),
     porId: async (id) => (id === 'ev-1' ? evaluacion() : null),
@@ -228,11 +228,9 @@ function configuracionVacia(): ConfiguracionDelPlan {
 function repoConfiguraciones(
   sobre: Partial<RepositorioConfiguracionEvaluacionPort> = {},
 ): RepositorioConfiguracionEvaluacionPort {
-  const noUsado =
-    (metodo: string) =>
-    async (): Promise<never> => {
-      throw new Error(`${metodo} no se usa en este spec.`);
-    };
+  const noUsado = (metodo: string) => async (): Promise<never> => {
+    throw new Error(`${metodo} no se usa en este spec.`);
+  };
   return {
     del: async () => configuracionVacia(),
     guardarCompetencia: noUsado('guardarCompetencia'),
@@ -334,7 +332,12 @@ class DocumentosFake implements RepositorioDocumentosEvaluacionPort {
   async marcarFallido(id: string, error: string): Promise<void> {
     const t = this.filas.get(id);
     if (!t) return;
-    this.filas.set(id, { ...t, estado: 'Fallido', error, terminadoEn: new Date('2026-09-10T12:00:00Z') });
+    this.filas.set(id, {
+      ...t,
+      estado: 'Fallido',
+      error,
+      terminadoEn: new Date('2026-09-10T12:00:00Z'),
+    });
   }
 
   async ubicacionDe(id: string): Promise<string | null> {
@@ -448,9 +451,9 @@ describe('RF-PE-032 — encolar', () => {
   });
 
   it('encolar sobre un plan que no existe es 404, y no encola nada', async () => {
-    await expect(
-      generador.encolar(ACTOR, 'ev-inventado', 'PLAN_EVALUACION_PDF'),
-    ).rejects.toThrow(NoEncontrado);
+    await expect(generador.encolar(ACTOR, 'ev-inventado', 'PLAN_EVALUACION_PDF')).rejects.toThrow(
+      NoEncontrado,
+    );
     expect(cola.encolado).toBeNull();
   });
 
@@ -660,7 +663,12 @@ describe('RF-PE-032 — ejecutar', () => {
     configuraciones = repoConfiguraciones({
       del: async () => ({
         competencias: [
-          { competenciaId: 'c-1', instrumento: 'Rúbrica', frecuencia: 'Anual', responsableId: 'u-r' },
+          {
+            competenciaId: 'c-1',
+            instrumento: 'Rúbrica',
+            frecuencia: 'Anual',
+            responsableId: 'u-r',
+          },
         ],
         mediciones: [
           {
@@ -751,7 +759,9 @@ describe('RF-PE-032 — consultar y descargar', () => {
   });
 
   it('un trabajo Listo al que le falta el archivo se nombra, no devuelve 0 bytes', async () => {
-    documentos.sembrar(trabajo({ estado: 'Listo', nombreArchivo: 'p.pdf', tipoMime: 'application/pdf' }));
+    documentos.sembrar(
+      trabajo({ estado: 'Listo', nombreArchivo: 'p.pdf', tipoMime: 'application/pdf' }),
+    );
     // No se pasó por `marcarListo`, así que no hay ubicación registrada:
     // incoherencia de datos deliberada para esta prueba.
 

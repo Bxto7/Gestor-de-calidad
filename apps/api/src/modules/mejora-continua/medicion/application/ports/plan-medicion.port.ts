@@ -26,6 +26,8 @@ export interface DatosPeriodo {
 export interface DatosPlanMedicion {
   readonly id: string;
   readonly planEstudiosId: string;
+  /** RF-CH-033: la carrera del plan, propia (Bloque 6a). */
+  readonly carreraId: string;
   readonly tipo: TipoMedicion;
   readonly codigo: string;
   readonly version: number;
@@ -74,6 +76,7 @@ export interface RepositorioPlanMedicionPort {
 
   crear(datos: {
     planEstudiosId: string;
+    carreraId: string;
     tipo: TipoMedicion;
     codigo: string;
     meta: number;
@@ -93,6 +96,7 @@ export interface RepositorioPlanMedicionPort {
   /** RF-PM-030 y RF-PM-034: crea el plan nuevo con todo su contenido, en una transacción. */
   copiar(datos: {
     planEstudiosId: string;
+    carreraId: string;
     tipo: TipoMedicion;
     codigo: string;
     version: number;

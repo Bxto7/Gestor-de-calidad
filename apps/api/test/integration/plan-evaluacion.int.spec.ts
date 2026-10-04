@@ -16,6 +16,7 @@ const prisma = new PrismaService();
 const repo = new PlanEvaluacionRepositoryPrisma(prisma);
 
 let planEstudiosId: string;
+let carreraId: string;
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
@@ -41,6 +42,7 @@ beforeEach(async () => {
     },
   });
   planEstudiosId = pe.id;
+  carreraId = carrera.id;
 });
 
 afterAll(async () => {
@@ -49,12 +51,12 @@ afterAll(async () => {
 
 async function crearPlanMedicion(codigo = 'PM-1', tipo: 'DIRECTA' | 'INDIRECTA' = 'DIRECTA') {
   return prisma.planMedicion.create({
-    data: { planEstudiosId, tipo, codigo, meta: 0.7, estado: 'APROBADO' },
+    data: { planEstudiosId, carreraId, tipo, codigo, meta: 0.7, estado: 'APROBADO' },
   });
 }
 
 async function crearEvaluacion(planMedicionId: string, codigo: string) {
-  return prisma.planEvaluacion.create({ data: { planMedicionId, codigo } });
+  return prisma.planEvaluacion.create({ data: { planMedicionId, carreraId, codigo } });
 }
 
 describe('RF-PE-044 RN1 — un único Vigente por plan de medición', () => {
@@ -110,7 +112,7 @@ describe('el repositorio', () => {
   it('crea en Borrador y lo devuelve con su código', async () => {
     const base = await crearPlanMedicion();
 
-    const e = await repo.crear({ planMedicionId: base.id, codigo: 'EV-X-D-v1' });
+    const e = await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-X-D-v1' });
 
     expect(e.estado).toBe('Borrador');
     expect(e.codigo).toBe('EV-X-D-v1');
@@ -119,7 +121,7 @@ describe('el repositorio', () => {
 
   it('el estado viaja al vocabulario del dominio, no en MAYÚSCULAS', async () => {
     const base = await crearPlanMedicion();
-    const e = await repo.crear({ planMedicionId: base.id, codigo: 'EV-X-D-v1' });
+    const e = await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-X-D-v1' });
 
     const tras = await repo.cambiarEstado(e.id, 'En revisión');
 
@@ -129,7 +131,7 @@ describe('el repositorio', () => {
 
   it('vigenteDe devuelve el único vigente, o null', async () => {
     const base = await crearPlanMedicion();
-    const e = await repo.crear({ planMedicionId: base.id, codigo: 'EV-X-D-v1' });
+    const e = await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-X-D-v1' });
 
     expect(await repo.vigenteDe(base.id)).toBeNull();
 
@@ -143,8 +145,8 @@ describe('el repositorio', () => {
     // fuente de verdad de un dato que además no puede cambiar.
     const directa = await crearPlanMedicion('PM-D', 'DIRECTA');
     const indirecta = await crearPlanMedicion('PM-I', 'INDIRECTA');
-    await repo.crear({ planMedicionId: directa.id, codigo: 'EV-D-v1' });
-    await repo.crear({ planMedicionId: indirecta.id, codigo: 'EV-I-v1' });
+    await repo.crear({ planMedicionId: directa.id, carreraId, codigo: 'EV-D-v1' });
+    await repo.crear({ planMedicionId: indirecta.id, carreraId, codigo: 'EV-I-v1' });
 
     const soloDirectas = await repo.listar({ tipo: 'DIRECTA' });
 
@@ -154,8 +156,8 @@ describe('el repositorio', () => {
   it('codigosDe solo trae los de ese plan de estudios y ese tipo', async () => {
     const directa = await crearPlanMedicion('PM-D', 'DIRECTA');
     const indirecta = await crearPlanMedicion('PM-I', 'INDIRECTA');
-    await repo.crear({ planMedicionId: directa.id, codigo: 'EV-D-v1' });
-    await repo.crear({ planMedicionId: indirecta.id, codigo: 'EV-I-v1' });
+    await repo.crear({ planMedicionId: directa.id, carreraId, codigo: 'EV-D-v1' });
+    await repo.crear({ planMedicionId: indirecta.id, carreraId, codigo: 'EV-I-v1' });
 
     expect(await repo.codigosDe(planEstudiosId, 'DIRECTA')).toEqual(['EV-D-v1']);
   });
@@ -164,8 +166,8 @@ describe('el repositorio', () => {
     // El índice parcial lo rechaza con un P2002 que nombra el índice. Dejarlo
     // salir tal cual daría un 500 con el nombre de una estructura interna.
     const base = await crearPlanMedicion();
-    const a = await repo.crear({ planMedicionId: base.id, codigo: 'EV-1' });
-    const b = await repo.crear({ planMedicionId: base.id, codigo: 'EV-2' });
+    const a = await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-1' });
+    const b = await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-2' });
     await repo.cambiarEstado(a.id, 'Vigente');
 
     await expect(repo.cambiarEstado(b.id, 'Vigente')).rejects.toThrow(
@@ -175,8 +177,8 @@ describe('el repositorio', () => {
 
   it('el listado va del más reciente al más antiguo', async () => {
     const base = await crearPlanMedicion();
-    await repo.crear({ planMedicionId: base.id, codigo: 'EV-1' });
-    await repo.crear({ planMedicionId: base.id, codigo: 'EV-2' });
+    await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-1' });
+    await repo.crear({ planMedicionId: base.id, carreraId, codigo: 'EV-2' });
 
     expect((await repo.listar()).map((e) => e.codigo)).toEqual(['EV-2', 'EV-1']);
   });

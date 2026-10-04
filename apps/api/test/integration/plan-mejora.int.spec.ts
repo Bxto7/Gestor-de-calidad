@@ -724,6 +724,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
       const planMedicion = await prisma.planMedicion.create({
         data: {
           planEstudiosId: planEstudios.id,
+          carreraId,
           tipo: 'DIRECTA',
           codigo: `PM-${randomUUID()}`,
           meta: 0.7,
@@ -741,7 +742,12 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
         data: { planMedicionId: planMedicion.id, etiqueta: '2026-II', orden: 2 },
       });
       const planEvaluacion = await prisma.planEvaluacion.create({
-        data: { planMedicionId: planMedicion.id, codigo: `EV-${randomUUID()}`, estado: 'APROBADO' },
+        data: {
+          planMedicionId: planMedicion.id,
+          carreraId,
+          codigo: `EV-${randomUUID()}`,
+          estado: 'APROBADO',
+        },
       });
       return { planEstudios, planMedicion, competenciaId, periodo1, periodo2, planEvaluacion };
     }

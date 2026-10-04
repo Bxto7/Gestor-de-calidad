@@ -135,6 +135,7 @@ describe('ConsultarResumenDeCarrera contra la base real', () => {
     const pm = await prisma.planMedicion.create({
       data: {
         planEstudiosId: ajena.planId,
+        carreraId: ajena.carreraId,
         tipo: 'DIRECTA',
         codigo: `PM-${randomUUID().slice(0, 8)}`,
         meta: 0.7,
@@ -154,6 +155,7 @@ describe('ConsultarResumenDeCarrera contra la base real', () => {
     const ev = await prisma.planEvaluacion.create({
       data: {
         planMedicionId: pm.id,
+        carreraId: pm.carreraId,
         codigo: `EV-${randomUUID().slice(0, 8)}`,
         estado: 'VIGENTE',
       },

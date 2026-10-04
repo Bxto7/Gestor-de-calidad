@@ -59,6 +59,7 @@ function plan(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
   return {
     id: 'pm-1',
     planEstudiosId: 'pe-1',
+    carreraId: 'car-1',
     tipo: 'DIRECTA',
     codigo: 'PM-1',
     version: 1,

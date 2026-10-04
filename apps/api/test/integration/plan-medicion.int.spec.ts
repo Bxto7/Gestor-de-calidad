@@ -19,6 +19,7 @@ const prisma = new PrismaService();
 const repo = new PlanMedicionRepositoryPrisma(prisma);
 
 let planEstudiosId: string;
+let carreraId: string;
 /** El usuario que marca una medición también llega como UUID sin FK. */
 const ACTOR_ID = randomUUID();
 
@@ -49,6 +50,7 @@ beforeEach(async () => {
     },
   });
   planEstudiosId = pe.id;
+  carreraId = carrera.id;
   // Las competencias viven en otro esquema y llegan como UUID sueltos, sin clave
   // foránea (§3.2). Para el repositorio son identificadores opacos, pero la
   // columna sigue siendo UUID y no acepta cualquier cadena.
@@ -79,6 +81,7 @@ async function conMatriz(competencias: string[], etiquetas: string[]) {
 async function crear(tipo: 'DIRECTA' | 'INDIRECTA' = 'DIRECTA', codigo = 'PM-1', meta = 0.7) {
   return repo.crear({
     planEstudiosId,
+    carreraId,
     tipo,
     codigo,
     meta,
@@ -135,6 +138,7 @@ describe('estado y meta sobreviven al viaje a la base', () => {
   it('RF-PM-011 RN2: 0.705 se lee igual que se guardó', async () => {
     const p = await repo.crear({
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo: 'PM-1',
       meta: 0.705,
@@ -148,6 +152,7 @@ describe('estado y meta sobreviven al viaje a la base', () => {
     const con = await crear();
     const sin = await repo.crear({
       planEstudiosId,
+      carreraId,
       tipo: 'INDIRECTA',
       codigo: 'PM-2',
       meta: 0.7,
@@ -356,6 +361,7 @@ describe('RF-PM-030 RN1 — el linaje', () => {
     // la cadena que ese requerimiento existe para mostrar.
     const v1 = await repo.crear({
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo: 'PM-LINAJE-D-v1',
       meta: 0.7,
@@ -364,6 +370,7 @@ describe('RF-PM-030 RN1 — el linaje', () => {
     const v2 = await prisma.planMedicion.create({
       data: {
         planEstudiosId,
+        carreraId,
         tipo: 'DIRECTA',
         codigo: 'PM-LINAJE-D-v2',
         version: 2,
@@ -389,6 +396,7 @@ describe('RF-PM-030 y RF-PM-034 — copiar un plan', () => {
 
     const copia = await repo.copiar({
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo: 'PM-COPIA-D-v9',
       version: 9,
@@ -414,6 +422,7 @@ describe('RF-PM-030 y RF-PM-034 — copiar un plan', () => {
 
     await repo.copiar({
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo: 'PM-INTACTO-D-v9',
       version: 9,
@@ -497,6 +506,7 @@ describe('RF-PM-031 — el linaje', () => {
     const contenido = await repo.contenidoDe(v1.id);
     const v2 = await repo.copiar({
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo: 'PM-CADENA-D-v2',
       version: 2,
@@ -505,6 +515,7 @@ describe('RF-PM-031 — el linaje', () => {
     });
     const v3 = await repo.copiar({
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo: 'PM-CADENA-D-v3',
       version: 3,

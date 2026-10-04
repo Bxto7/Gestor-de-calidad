@@ -68,6 +68,7 @@ function plan(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion {
   return {
     id: 'pm-1',
     planEstudiosId: 'pe-1',
+    carreraId: 'car-1',
     tipo: 'DIRECTA',
     codigo: 'PM-PE-ISI-2026-v1-D-v1',
     version: 1,
@@ -154,6 +155,14 @@ describe('RF-PM-030 — nueva versión', () => {
     expect(copiados[0]?.derivadoDeId).toBe('pm-1');
     expect(copiados[0]?.codigo).toBe('PM-PE-ISI-2026-v1-D-v2');
     expect(copiados[0]?.version).toBe(2);
+  });
+
+  it('la copia hereda la carrera del plan que copia (RF-CH-033)', async () => {
+    const { caso, copiados } = montar();
+
+    await caso.generarNuevaVersion(ACTOR, 'pm-1');
+
+    expect(copiados[0]?.carreraId).toBe('car-1');
   });
 
   it('conserva las marcas de realizada: son evidencia del mismo plan', async () => {
@@ -255,7 +264,10 @@ describe('el alcance por carrera (2c-C)', () => {
   });
 
   it.each([
-    ['generarNuevaVersion', (caso: VersionarPlanesMedicion) => caso.generarNuevaVersion(ACTOR, 'pm-1')],
+    [
+      'generarNuevaVersion',
+      (caso: VersionarPlanesMedicion) => caso.generarNuevaVersion(ACTOR, 'pm-1'),
+    ],
     ['duplicarPlan', (caso: VersionarPlanesMedicion) => caso.duplicarPlan(ACTOR, 'pm-1')],
   ] as const)('%s pasa la carrera del plan, no null', async (_nombre, ejecutar) => {
     const puede = vi.fn(async () => ({ permitido: true }) as const);

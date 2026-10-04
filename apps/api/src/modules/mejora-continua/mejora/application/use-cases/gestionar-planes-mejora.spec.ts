@@ -201,6 +201,7 @@ function planEvaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEval
   return {
     id: 'pe-1',
     planMedicionId: 'pm-1',
+    carreraId: CARRERA,
     codigo: 'EVD-1',
     version: 1,
     estado: 'Vigente',
@@ -217,6 +218,7 @@ function planMedicion(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion
   return {
     id: 'pm-1',
     planEstudiosId: 'plan-1',
+    carreraId: CARRERA,
     tipo: 'DIRECTA',
     codigo: 'PMD-1',
     version: 1,

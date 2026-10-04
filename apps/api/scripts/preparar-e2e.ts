@@ -247,7 +247,7 @@ async function main(): Promise<void> {
     });
   }
 
-  await planDeMedicionVigente(plan.id);
+  await planDeMedicionVigente(plan.id, carrera.id);
   await planDeMedicionIndirectaAprobada(plan.id, carrera.id);
   await criterioYObjetivoDePrueba(carrera.id);
 
@@ -308,7 +308,7 @@ async function criterioYObjetivoDePrueba(carreraId: string): Promise<void> {
  * mismo que el plan de estudios de arriba: llegar hasta Vigente es lo que prueba
  * `flujo-medicion`, no esto. Aquí es el punto de partida.
  */
-async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
+async function planDeMedicionVigente(planEstudiosId: string, carreraId: string): Promise<void> {
   const codigo = 'PM-PE-E2E-v1-D-v1';
 
   const existente = await prisma.planMedicion.findUnique({ where: { codigo } });
@@ -332,6 +332,7 @@ async function planDeMedicionVigente(planEstudiosId: string): Promise<void> {
   const creado = await prisma.planMedicion.create({
     data: {
       planEstudiosId,
+      carreraId,
       tipo: 'DIRECTA',
       codigo,
       version: 1,
@@ -454,6 +455,7 @@ async function planDeMedicionIndirectaAprobada(
   const creado = await prisma.planMedicion.create({
     data: {
       planEstudiosId,
+      carreraId,
       tipo: 'INDIRECTA',
       codigo,
       version: 1,

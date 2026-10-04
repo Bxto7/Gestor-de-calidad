@@ -109,6 +109,7 @@ function planMedicion(sobre: Partial<DatosPlanMedicion> = {}): DatosPlanMedicion
   return {
     id: 'pm-1',
     planEstudiosId: 'pe-1',
+    carreraId: 'car-1',
     tipo: 'DIRECTA',
     codigo: 'PM-PE-ISI-2026-v2-D-v1',
     version: 1,
@@ -132,6 +133,7 @@ function evaluacion(sobre: Partial<DatosPlanEvaluacion> = {}): DatosPlanEvaluaci
   return {
     id: 'ev-1',
     planMedicionId: 'pm-1',
+    carreraId: 'car-1',
     codigo: 'EV-PE-ISI-2026-v2-D-v1',
     version: 1,
     estado: 'Borrador',
@@ -212,7 +214,8 @@ function repoEvaluacion(
         ...(aprobacion ? { aprobadoPorId: aprobacion.actorId, aprobadoEn: aprobacion.fecha } : {}),
       }),
     eliminar: async () => undefined,
-    copiar: async (d) => evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
+    copiar: async (d) =>
+      evaluacion({ planMedicionId: d.planMedicionId, codigo: d.codigo, version: d.version }),
     linajeDe: async () => [evaluacion()],
     ...sobre,
   };
@@ -321,6 +324,20 @@ describe('RF-PE-001 y RF-PE-002 — el alta', () => {
 
     expect(creado.estado).toBe('Borrador');
     expect(creado.codigo).toBe('EV-PE-ISI-2026-v2-D-v1');
+  });
+
+  it('el plan de evaluación se guarda con la carrera de su base (RF-CH-037)', async () => {
+    let recibida = '';
+    const { caso } = montar({ base: planMedicion({ carreraId: 'car-1' }) });
+    const original = caso['evaluaciones'].crear.bind(caso['evaluaciones']);
+    caso['evaluaciones'].crear = async (d) => {
+      recibida = d.carreraId;
+      return original(d);
+    };
+
+    await caso.crear(ACTOR, 'pm-1');
+
+    expect(recibida).toBe('car-1');
   });
 
   it('RN3: una base que no está Aprobado ni Vigente se rechaza', async () => {

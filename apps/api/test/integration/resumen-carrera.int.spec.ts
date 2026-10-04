@@ -5,6 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ResumenCarreraRepositoryPrisma } from '../../src/modules/mejora-continua/resumen/infrastructure/persistence/resumen-carrera.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
+import { carreraDeLaMedicion, carreraDelPlanDeEstudios } from './carrera-de-los-planes.js';
 
 const prisma = new PrismaService();
 const repo = new ResumenCarreraRepositoryPrisma(prisma);
@@ -49,13 +50,25 @@ async function planMedicion(
   meta = 0.7,
 ) {
   return prisma.planMedicion.create({
-    data: { planEstudiosId, tipo, codigo: `PM-${randomUUID().slice(0, 8)}`, meta, estado },
+    data: {
+      planEstudiosId,
+      carreraId: await carreraDelPlanDeEstudios(prisma, planEstudiosId),
+      tipo,
+      codigo: `PM-${randomUUID().slice(0, 8)}`,
+      meta,
+      estado,
+    },
   });
 }
 
 async function planEvaluacion(planMedicionId: string, estado: 'VIGENTE' | 'BORRADOR' = 'VIGENTE') {
   return prisma.planEvaluacion.create({
-    data: { planMedicionId, codigo: `EV-${randomUUID().slice(0, 8)}`, estado },
+    data: {
+      planMedicionId,
+      carreraId: await carreraDeLaMedicion(prisma, planMedicionId),
+      codigo: `EV-${randomUUID().slice(0, 8)}`,
+      estado,
+    },
   });
 }
 

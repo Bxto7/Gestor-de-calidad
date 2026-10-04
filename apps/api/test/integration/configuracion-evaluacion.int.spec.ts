@@ -13,6 +13,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ConfiguracionEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
+import { carreraDelPlanDeEstudios } from './carrera-de-los-planes.js';
 
 const prisma = new PrismaService();
 
@@ -74,13 +75,16 @@ async function crearEvaluacion(codigo = 'EV-1') {
   const base = await prisma.planMedicion.create({
     data: {
       planEstudiosId,
+      carreraId: await carreraDelPlanDeEstudios(prisma, planEstudiosId),
       tipo: 'DIRECTA',
       codigo: `PM-${codigo}`,
       meta: 0.7,
       estado: 'APROBADO',
     },
   });
-  return prisma.planEvaluacion.create({ data: { planMedicionId: base.id, codigo } });
+  return prisma.planEvaluacion.create({
+    data: { planMedicionId: base.id, carreraId: base.carreraId, codigo },
+  });
 }
 
 async function crearMedicion() {

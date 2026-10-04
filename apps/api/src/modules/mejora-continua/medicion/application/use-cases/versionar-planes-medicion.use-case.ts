@@ -87,6 +87,8 @@ export class VersionarPlanesMedicion {
 
     const creado = await this.planes.copiar({
       planEstudiosId: plan.planEstudiosId,
+      // La copia es del mismo plan de estudios, luego de la misma carrera.
+      carreraId: plan.carreraId,
       tipo: plan.tipo,
       codigo,
       version,
