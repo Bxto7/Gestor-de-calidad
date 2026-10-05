@@ -240,11 +240,15 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
     return fila ? aDatos(fila) : null;
   }
 
-  /** RF-AC-020: periodoAcademico y estado son exactos; texto busca en código y título. */
-  async listar(filtro?: FiltroActas): Promise<readonly ActaResumen[]> {
+  /** RF-AC-020: periodoAcademico y estado son exactos; texto busca en código y título. RF-CH-049: solo la carrera pedida. */
+  async listar(
+    carreraId: string | undefined,
+    filtro?: FiltroActas,
+  ): Promise<readonly ActaResumen[]> {
     const texto = filtro?.texto?.trim();
     const filas = await this.prisma.actaAprobacion.findMany({
       where: {
+        ...(carreraId ? { carreraId } : {}),
         ...(filtro?.periodoAcademico ? { periodoAcademico: filtro.periodoAcademico } : {}),
         ...(filtro?.estado ? { estado: A_BD[filtro.estado] } : {}),
         ...(texto

@@ -57,14 +57,14 @@ export class ActasController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Un acta de aprobación' })
-  @ApiResponse({ status: 404, description: 'El acta no existe.' })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
   async porId(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.casos.porId(actor, id);
   }
 
   @Get(':id/contenido')
   @ApiOperation({ summary: 'El acta con sus acciones de mejora, enriquecidas con PlanMejora (RF-AC-009)' })
-  @ApiResponse({ status: 404, description: 'El acta no existe.' })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
   async contenido(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.casos.obtenerContenido(actor, id);
   }
@@ -122,16 +122,16 @@ export class ActasController {
 
   @Patch(':id/textos')
   @ApiOperation({ summary: 'Editar los textos institucionales de introducción y cierre (RF-AC-011)' })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
   @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
   async editarTextos(
     @Param('id', ParseUUIDPipe) id: string,
     @ActorActual() actor: Actor,
     @Body() dto: TextosActaDto,
   ) {
-    const actual = await this.casos.porId(actor, id);
     return this.casos.editarTextosInstitucionales(actor, id, {
-      textoIntroduccion: dto.textoIntroduccion ?? actual.textoIntroduccion,
-      textoAcuerdoCierre: dto.textoAcuerdoCierre ?? actual.textoAcuerdoCierre,
+      ...(dto.textoIntroduccion !== undefined ? { textoIntroduccion: dto.textoIntroduccion } : {}),
+      ...(dto.textoAcuerdoCierre !== undefined ? { textoAcuerdoCierre: dto.textoAcuerdoCierre } : {}),
     });
   }
 

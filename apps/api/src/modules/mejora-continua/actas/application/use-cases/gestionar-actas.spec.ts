@@ -14,14 +14,20 @@ import type {
 } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import {
   AccesoDenegado,
+  NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   CarreraBase,
   ContenidoCurricularPort,
 } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
-import type { DatosActa, RepositorioActaAprobacionPort } from '../ports/acta-aprobacion.port.js';
+import type {
+  AccionActaDato,
+  DatosActa,
+  RepositorioActaAprobacionPort,
+} from '../ports/acta-aprobacion.port.js';
 import { GestionarActas } from './gestionar-actas.use-case.js';
 import type {
   DatosPlanMejora,
@@ -48,6 +54,43 @@ function denegarRegistrando(pedidos: string[]): AuthorizationPort {
     puede: async (_id, permiso) => {
       pedidos.push(permiso);
       return { permitido: false, motivo: 'Falta el permiso.' };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => CARRERA,
+    rolesDe: async () => [],
+  };
+}
+
+const OTRA_CARRERA = 'carrera-2';
+
+function alcanceDeCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuario, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
+const alcanceTotal: AlcanceDeLecturaPort = {
+  alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+  puedeLeerCarrera: async () => true,
+};
+
+/**
+ * Concede todo salvo lo que se le pide negar, y registra cada permiso consultado
+ * (y la carrera sobre la que se consultó): sirve para comprobar el orden 403→404→403.
+ */
+function denegarSolo(
+  pedidos: string[],
+  denegados: readonly string[],
+  carreras: (string | null)[] = [],
+): AuthorizationPort {
+  return {
+    puede: async (_id, permiso, carreraId) => {
+      pedidos.push(permiso);
+      carreras.push(carreraId ?? null);
+      return denegados.includes(permiso)
+        ? { permitido: false, motivo: 'Falta el permiso.' }
+        : { permitido: true };
     },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => CARRERA,
@@ -297,6 +340,7 @@ function montar(
     curricular?: ContenidoCurricularPort;
     autorizacion?: AuthorizationPort;
     eventos?: PublicadorDeEventos;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ): GestionarActas {
   return new GestionarActas(
@@ -308,6 +352,7 @@ function montar(
     opciones.curricular ?? curricular(),
     opciones.autorizacion ?? permitirTodo(),
     opciones.eventos ?? { publicar: async () => {} },
+    opciones.alcance ?? alcanceTotal,
   );
 }
 
@@ -407,7 +452,7 @@ describe('editarCabecera', () => {
 
   it('exige actas.editar acotado a la carrera del acta', async () => {
     const pedidos: string[] = [];
-    const casos = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const casos = montar({ autorizacion: denegarSolo(pedidos, ['actas.editar']) });
 
     await expect(casos.editarCabecera(ACTOR, 'acta-1', cabecera())).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toContain('actas.editar');
@@ -484,7 +529,7 @@ describe('eliminar', () => {
 
   it('exige actas.eliminar acotado a la carrera del acta', async () => {
     const pedidos: string[] = [];
-    const casos = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const casos = montar({ autorizacion: denegarSolo(pedidos, ['actas.eliminar']) });
 
     await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toContain('actas.eliminar');
@@ -1048,15 +1093,15 @@ describe('listar', () => {
     expect(pedidos).toContain('actas.leer');
   });
 
-  it('pasa el filtro tal cual al repositorio', async () => {
-    let recibido: unknown;
+  it('acota al alcance: la carrera del actor viaja al repositorio junto con el filtro', async () => {
+    let recibido: unknown[] = [];
     const actas = repoActas({
-      listar: async (filtro) => {
-        recibido = filtro;
+      listar: async (...args) => {
+        recibido = args;
         return [actaResumen()];
       },
     });
-    const casos = montar({ actas });
+    const casos = montar({ actas, alcance: alcanceDeCarrera(CARRERA) });
 
     const filtro = {
       periodoAcademico: '2025-10',
@@ -1065,23 +1110,37 @@ describe('listar', () => {
     };
     const resultado = await casos.listar(ACTOR, filtro);
 
-    expect(recibido).toEqual(filtro);
+    expect(recibido).toEqual([CARRERA, filtro]);
     expect(resultado).toEqual([actaResumen()]);
   });
 
-  it('sin filtro, delega un listado sin restricciones', async () => {
-    let recibido: unknown = 'no-llamado';
+  it('quien lee todo (Consultor) consulta sin restricción de carrera', async () => {
+    let recibido: unknown[] = ['no-llamado'];
     const actas = repoActas({
-      listar: async (filtro) => {
-        recibido = filtro;
+      listar: async (...args) => {
+        recibido = args;
         return [];
       },
     });
-    const casos = montar({ actas });
+    const casos = montar({ actas, alcance: alcanceTotal });
 
     await casos.listar(ACTOR);
 
-    expect(recibido).toBeUndefined();
+    expect(recibido).toEqual([undefined, undefined]);
+  });
+
+  it('sin carrera asignada la lista es vacía y ni siquiera se consulta el repositorio', async () => {
+    let consultado = false;
+    const actas = repoActas({
+      listar: async () => {
+        consultado = true;
+        return [actaResumen()];
+      },
+    });
+    const casos = montar({ actas, alcance: alcanceDeCarrera(null) });
+
+    expect(await casos.listar(ACTOR)).toEqual([]);
+    expect(consultado).toBe(false);
   });
 });
 
@@ -1448,7 +1507,7 @@ describe('transicionar', () => {
       porId: async () => actaCompleta({ estado: 'Borrador' }),
       accionesDe: async () => unaAccionIncluida,
     });
-    const casos = montar({ actas, autorizacion: denegarRegistrando(pedidos) });
+    const casos = montar({ actas, autorizacion: denegarSolo(pedidos, ['actas.editar']) });
 
     await expect(casos.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {})).rejects.toThrow(
       AccesoDenegado,
@@ -1461,7 +1520,7 @@ describe('transicionar', () => {
     });
     const casosAprobar = montar({
       actas: actasEnRevision,
-      autorizacion: denegarRegistrando(pedidos),
+      autorizacion: denegarSolo(pedidos, ['actas.aprobar']),
     });
     await expect(casosAprobar.transicionar(ACTOR, 'acta-1', 'aprobar', {})).rejects.toThrow(
       AccesoDenegado,
@@ -1480,5 +1539,298 @@ describe('transicionar', () => {
     await casos.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {});
 
     expect(eventos.map((e) => e.nombre)).toEqual(['actas.transicion']);
+  });
+});
+
+describe('RF-CH-049 — lectura acotada a la carrera del usuario', () => {
+  const deOtraCarrera = repoActas({ porId: async () => acta({ carreraId: OTRA_CARRERA }) });
+
+  it('porId de un acta de otra carrera es NoEncontrado, nunca AccesoDenegado', async () => {
+    const casos = montar({ actas: deOtraCarrera, alcance: alcanceDeCarrera(CARRERA) });
+
+    const fallo = await casos.porId(ACTOR, 'acta-1').catch((e: unknown) => e);
+
+    expect(fallo).toBeInstanceOf(NoEncontrado);
+    expect(fallo).not.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('porId de un acta que no existe es NoEncontrado', async () => {
+    const casos = montar({ actas: repoActas({ porId: async () => null }) });
+
+    await expect(casos.porId(ACTOR, 'acta-x')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('sin carrera asignada, ni la propia acta se lee: NoEncontrado', async () => {
+    const casos = montar({ alcance: alcanceDeCarrera(null) });
+
+    await expect(casos.porId(ACTOR, 'acta-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('obtenerContenido de un acta de otra carrera es NoEncontrado y no lee sus acciones', async () => {
+    let leyoAcciones = false;
+    const actas = repoActas({
+      porId: async () => acta({ carreraId: OTRA_CARRERA }),
+      accionesDe: async () => {
+        leyoAcciones = true;
+        return [];
+      },
+    });
+    const casos = montar({ actas, alcance: alcanceDeCarrera(CARRERA) });
+
+    await expect(casos.obtenerContenido(ACTOR, 'acta-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(leyoAcciones).toBe(false);
+  });
+
+  it('el Consultor (lee todas) sí abre un acta de otra carrera', async () => {
+    const casos = montar({ actas: deOtraCarrera, alcance: alcanceTotal });
+
+    expect((await casos.porId(ACTOR, 'acta-1')).carreraId).toBe(OTRA_CARRERA);
+  });
+
+  it('sin actas.leer es 403 antes de mirar si el acta existe', async () => {
+    const pedidos: string[] = [];
+    let leyo = false;
+    const actas = repoActas({
+      porId: async () => {
+        leyo = true;
+        return null;
+      },
+    });
+    const casos = montar({ actas, autorizacion: denegarSolo(pedidos, ['actas.leer']) });
+
+    await expect(casos.porId(ACTOR, 'acta-x')).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(leyo).toBe(false);
+  });
+});
+
+describe('RF-CH-048 — el alta usa la carrera de la sesión', () => {
+  it('sin carrera asignada: AccesoDenegado con el motivo, como en Mejora', async () => {
+    const autorizacion: AuthorizationPort = {
+      ...permitirTodo(),
+      carreraACargoDe: async () => null,
+    };
+    const casos = montar({ autorizacion });
+
+    await expect(casos.crear(ACTOR, { periodoAcademico: '2025-10' })).rejects.toThrow(
+      new AccesoDenegado(
+        'No tienes una carrera asignada: pide que te asignen una para crear actas de aprobación.',
+      ),
+    );
+  });
+
+  it('crea con la carrera de la sesión y pide actas.crear sobre ella, antes de validar nada más', async () => {
+    const pedidos: string[] = [];
+    const carreras: (string | null)[] = [];
+    let recibida: string | undefined;
+    const actas = repoActas({
+      crear: async (datos) => {
+        recibida = datos.carreraId;
+        return acta({ ...datos });
+      },
+    });
+    const casos = montar({ actas, autorizacion: denegarSolo(pedidos, [], carreras) });
+
+    await casos.crear(ACTOR, { periodoAcademico: '2025-10' });
+
+    expect(recibida).toBe(CARRERA);
+    expect(pedidos).toEqual(['actas.crear']);
+    expect(carreras).toEqual([CARRERA]);
+  });
+});
+
+const ESCRITURAS: readonly {
+  nombre: string;
+  permiso: string;
+  llamar: (casos: GestionarActas) => Promise<unknown>;
+}[] = [
+  {
+    nombre: 'editarCabecera',
+    permiso: 'actas.editar',
+    llamar: (c) => c.editarCabecera(ACTOR, 'acta-1', cabecera()),
+  },
+  {
+    nombre: 'reemplazarAsistentes',
+    permiso: 'actas.editar',
+    llamar: (c) => c.reemplazarAsistentes(ACTOR, 'acta-1', ['Ana Pérez']),
+  },
+  {
+    nombre: 'cargarAccionesDelPeriodo',
+    permiso: 'actas.editar',
+    llamar: (c) => c.cargarAccionesDelPeriodo(ACTOR, 'acta-1'),
+  },
+  {
+    nombre: 'actualizarSeleccionDeAcciones',
+    permiso: 'actas.editar',
+    llamar: (c) =>
+      c.actualizarSeleccionDeAcciones(ACTOR, 'acta-1', [
+        { planMejoraId: 'plan-1', incluida: false },
+      ]),
+  },
+  {
+    nombre: 'editarTextosInstitucionales',
+    permiso: 'actas.editar',
+    llamar: (c) => c.editarTextosInstitucionales(ACTOR, 'acta-1', { textoIntroduccion: 'Nuevo' }),
+  },
+  {
+    nombre: 'transicionar (enviar-a-revision)',
+    permiso: 'actas.editar',
+    llamar: (c) => c.transicionar(ACTOR, 'acta-1', 'enviar-a-revision', {}),
+  },
+  {
+    nombre: 'transicionar (aprobar)',
+    permiso: 'actas.aprobar',
+    llamar: (c) => c.transicionar(ACTOR, 'acta-1', 'aprobar', {}),
+  },
+  {
+    nombre: 'eliminar',
+    permiso: 'actas.eliminar',
+    llamar: (c) => c.eliminar(ACTOR, 'acta-1'),
+  },
+];
+
+describe.each(ESCRITURAS)('orden 403 → 404 → 403 → 409 en $nombre', ({ permiso, llamar }) => {
+  it('(1) sin actas.leer es 403 y no toca el repositorio', async () => {
+    const pedidos: string[] = [];
+    let leyo = false;
+    const actas = repoActas({
+      porId: async () => {
+        leyo = true;
+        return acta();
+      },
+    });
+
+    await expect(
+      llamar(montar({ actas, autorizacion: denegarSolo(pedidos, ['actas.leer']) })),
+    ).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(pedidos).toEqual(['actas.leer']);
+    expect(leyo).toBe(false);
+  });
+
+  it('(2) un acta de otra carrera es 404 aunque tenga el permiso de escritura, y ni se le pregunta', async () => {
+    const pedidos: string[] = [];
+    const actas = repoActas({ porId: async () => acta({ carreraId: OTRA_CARRERA }) });
+    const casos = montar({
+      actas,
+      alcance: alcanceDeCarrera(CARRERA),
+      autorizacion: denegarSolo(pedidos, []),
+    });
+
+    const fallo = await llamar(casos).catch((e: unknown) => e);
+
+    expect(fallo).toBeInstanceOf(NoEncontrado);
+    expect(fallo).not.toBeInstanceOf(AccesoDenegado);
+    expect(pedidos).toEqual(['actas.leer']);
+  });
+
+  it('(2) un acta que no existe es 404', async () => {
+    const casos = montar({ actas: repoActas({ porId: async () => null }) });
+
+    await expect(llamar(casos)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('(3) un acta legible sin el permiso de escritura es 403, acotado a la carrera DEL ACTA', async () => {
+    const pedidos: string[] = [];
+    const carreras: (string | null)[] = [];
+    const actas = repoActas({ porId: async () => acta({ carreraId: 'carrera-9' }) });
+    const casos = montar({
+      actas,
+      alcance: alcanceTotal,
+      autorizacion: denegarSolo(pedidos, [permiso], carreras),
+    });
+
+    await expect(llamar(casos)).rejects.toBeInstanceOf(AccesoDenegado);
+    expect(pedidos).toEqual(['actas.leer', permiso]);
+    expect(carreras).toEqual([null, 'carrera-9']);
+  });
+
+  it('(4) con todo concedido pero un acta Aprobada es 409', async () => {
+    const actas = repoActas({ porId: async () => acta({ estado: 'Aprobada' }) });
+
+    await expect(llamar(montar({ actas }))).rejects.toBeInstanceOf(ReglaDeNegocioViolada);
+  });
+});
+
+describe('editarTextosInstitucionales — la fusión de textos vive en el caso de uso', () => {
+  it('completa con los textos actuales el que no viene', async () => {
+    let recibido: { textoIntroduccion: string; textoAcuerdoCierre: string } | undefined;
+    const actas = repoActas({
+      porId: async () =>
+        acta({ textoIntroduccion: 'Intro vigente', textoAcuerdoCierre: 'Cierre vigente' }),
+      editarTextos: async (_id, datos) => {
+        recibido = datos;
+        return acta(datos);
+      },
+    });
+    const casos = montar({ actas });
+
+    await casos.editarTextosInstitucionales(ACTOR, 'acta-1', { textoIntroduccion: 'Intro nueva' });
+
+    expect(recibido).toEqual({
+      textoIntroduccion: 'Intro nueva',
+      textoAcuerdoCierre: 'Cierre vigente',
+    });
+  });
+});
+
+describe('I1 — un plan de otra carrera vinculado al acta no se lee ni se congela', () => {
+  const vinculo = (planMejoraId: string, orden: number): AccionActaDato => ({
+    id: `aa-${orden}`,
+    planMejoraId,
+    aspecto: 'CRITERIO_ACREDITACION',
+    incluida: true,
+    porcentajeMedicionCompetencia: null,
+    orden,
+    codigoSnapshot: null,
+    nombreSnapshot: null,
+    plazoSnapshot: null,
+    recursosSnapshot: null,
+    metasSnapshot: null,
+    responsableSnapshot: null,
+    metaCompetenciaSnapshot: null,
+  });
+  const planes = () =>
+    repoPlanesMejora({
+      planesPorIds: async () => [
+        planMejora({ id: 'plan-propio' }),
+        planMejora({ id: 'plan-ajeno', carreraId: OTRA_CARRERA, nombre: 'Plan de otra carrera' }),
+      ],
+    });
+
+  it('obtenerContenido en vivo omite la fila del plan ajeno', async () => {
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      accionesDe: async () => [vinculo('plan-propio', 0), vinculo('plan-ajeno', 1)],
+    });
+    const casos = montar({ actas, planes: planes() });
+
+    const contenido = await casos.obtenerContenido(ACTOR, 'acta-1');
+
+    expect(contenido.acciones.map((a) => a.plan.id)).toEqual(['plan-propio']);
+  });
+
+  it('aprobar no congela el plan ajeno', async () => {
+    let snapshots: readonly { accionActaId: string }[] | undefined;
+    const actas = repoActas({
+      porId: async () =>
+        acta({
+          estado: 'En revisión',
+          convocadaPor: 'Directora de Escuela',
+          fechaReunion: new Date('2026-03-09'),
+          lugarReunion: 'Sala de reuniones',
+          lugarEmision: 'Huancayo',
+          fechaEmision: new Date('2026-03-20'),
+          asistentes: [{ id: 'as-1', nombre: 'Ana Pérez' }],
+        }),
+      accionesDe: async () => [vinculo('plan-propio', 0), vinculo('plan-ajeno', 1)],
+      cambiarEstado: async (_id, estado, opciones) => {
+        snapshots = opciones?.snapshots;
+        return acta({ estado });
+      },
+    });
+    const casos = montar({ actas, planes: planes() });
+
+    await casos.transicionar(ACTOR, 'acta-1', 'aprobar', {});
+
+    expect(snapshots?.map((s) => s.accionActaId)).toEqual(['aa-0']);
   });
 });

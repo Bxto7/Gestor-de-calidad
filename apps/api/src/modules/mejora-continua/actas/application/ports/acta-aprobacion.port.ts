@@ -154,8 +154,12 @@ export interface PlanResumenParaActa {
 export interface RepositorioActaAprobacionPort {
   crear(datos: NuevaActa): Promise<DatosActa>;
   porId(id: string): Promise<DatosActa | null>;
-  /** RF-AC-020: listado con filtros, más reciente primero. */
-  listar(filtro?: FiltroActas): Promise<readonly ActaResumen[]>;
+  /**
+   * RF-AC-020 y RF-CH-049: listado con filtros, más reciente primero. `carreraId`
+   * `undefined` es «sin restricción» (el alcance global del Consultor); el caso de
+   * uso nunca pasa `null`: quien no tiene carrera no consulta nada.
+   */
+  listar(carreraId: string | undefined, filtro?: FiltroActas): Promise<readonly ActaResumen[]>;
   editarCabecera(id: string, datos: CabeceraActa): Promise<DatosActa>;
   /** RF-AC-005: reemplaza el conjunto completo, en el orden recibido. */
   reemplazarAsistentes(id: string, nombres: readonly string[]): Promise<DatosActa>;

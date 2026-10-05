@@ -16,6 +16,7 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
 import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
@@ -25,6 +26,11 @@ import type {
   RepositorioPlanMejoraPort,
 } from '../../../mejora/application/ports/plan-mejora.port.js';
 import { ultimasAprobadasDelLinaje } from '../../../domain/services/ultima-aprobada-del-linaje.js';
+import {
+  carreraDeLaSesion,
+  carreraImpuesta,
+  exigirPlanLegible,
+} from '../../../application/alcance-de-planes.js';
 import { porcentajeDeMeta } from '../../../medicion/domain/value-objects/meta.js';
 import { candidatasParaCargar } from '../../domain/services/candidatas-acciones-acta.js';
 import { calcularPorcentajeMedicionAnterior } from '../../../mejora/application/services/porcentaje-periodo-anterior.js';
@@ -93,41 +99,57 @@ export class GestionarActas {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async porId(actor: Actor, id: string): Promise<DatosActa> {
     await this.exigir(actor, 'actas.leer', null);
-    return this.exigirActa(id);
+    return this.actaLegible(actor, id);
   }
 
-  /** RF-AC-020: búsqueda/filtro, sin acotar a la carrera del actor (mismo criterio que medición/evaluación). */
+  /**
+   * RF-AC-020 y RF-CH-049: listado de la carrera que impone el alcance. El cliente
+   * no la pide: quien lee solo su carrera ve la suya, y sin carrera no ve nada
+   * (lista vacía, no «todas»).
+   */
   async listar(actor: Actor, filtro?: FiltroActas): Promise<readonly ActaResumen[]> {
     await this.exigir(actor, 'actas.leer', null);
-    return this.actas.listar(filtro);
+    const carreraId = await carreraImpuesta(this.alcance, actor);
+    if (carreraId === null) return [];
+    return this.actas.listar(carreraId, filtro);
   }
 
   /** RF-AC-009: la cabecera del acta con sus acciones. */
   async obtenerContenido(actor: Actor, id: string): Promise<ContenidoActa> {
     await this.exigir(actor, 'actas.leer', null);
-    const acta = await this.exigirActa(id);
+    const acta = await this.actaLegible(actor, id);
     const vinculos = await this.actas.accionesDe(id);
 
     const acciones =
       acta.estado === 'Borrador' || acta.estado === 'En revisión'
-        ? await this.accionesEnVivo(vinculos)
+        ? await this.accionesEnVivo(vinculos, acta.carreraId)
         : this.accionesDesdeSnapshot(vinculos);
 
     return { ...acta, acciones };
   }
 
-  /** Mientras el acta es editable, cada fila lee su PlanMejora en vivo. */
-  private async accionesEnVivo(vinculos: readonly AccionActaDato[]): Promise<AccionDelActa[]> {
+  /**
+   * Mientras el acta es editable, cada fila lee su PlanMejora en vivo. Un plan que
+   * no es de la carrera del acta se descarta: los vínculos solo nacen por
+   * `cargarAccionesDelPeriodo`, que ya acota, pero `AccionActa.planMejoraId` no
+   * tiene clave foránea y un dato forzado o legado no debe filtrar planes ajenos
+   * (cierre del ítem I1 del 6b).
+   */
+  private async accionesEnVivo(
+    vinculos: readonly AccionActaDato[],
+    carreraId: string,
+  ): Promise<AccionDelActa[]> {
     const planes = await this.planes.planesPorIds(vinculos.map((v) => v.planMejoraId));
     const planesPorId = new Map(planes.map((p) => [p.id, p]));
 
     return vinculos.flatMap((v) => {
       const plan = planesPorId.get(v.planMejoraId);
-      if (!plan) return []; // defensivo: un plan en un acta no se elimina (RF-CH-042), así que no debería faltar
+      if (!plan || plan.carreraId !== carreraId) return []; // defensivo: ausente (RF-CH-042) o de otra carrera
       return [
         {
           id: v.id,
@@ -190,12 +212,9 @@ export class GestionarActas {
     });
   }
 
-  /** RF-AC-001 a RF-AC-003: alta con la carrera real del actor. */
+  /** RF-AC-001 a RF-AC-003 y RF-CH-048: alta con la carrera de la sesión; el cliente no la envía. */
   async crear(actor: Actor, datos: DatosCrearActa): Promise<DatosActa> {
-    const carreraId = await this.autorizacion.carreraACargoDe(actor.id);
-    if (!carreraId) {
-      throw new AccesoDenegado('El usuario no dirige ninguna carrera.');
-    }
+    const carreraId = await carreraDeLaSesion(this.autorizacion, actor, 'actas de aprobación');
     // RF-AC-023: el alta queda restringida a roles autorizados.
     await this.exigir(actor, 'actas.crear', carreraId);
 
@@ -242,8 +261,7 @@ export class GestionarActas {
 
   /** RF-AC-003/004/006: reemplaza la cabecera entera. Solo en Borrador (RF-AC-017). */
   async editarCabecera(actor: Actor, id: string, datos: CabeceraActa): Promise<DatosActa> {
-    const acta = await this.exigirActa(id);
-    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, 'actas.editar');
     if (acta.estado !== 'Borrador') {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
@@ -259,8 +277,7 @@ export class GestionarActas {
     id: string,
     nombres: readonly string[],
   ): Promise<DatosActa> {
-    const acta = await this.exigirActa(id);
-    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, 'actas.editar');
     if (acta.estado !== 'Borrador') {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
@@ -280,8 +297,7 @@ export class GestionarActas {
    * se agregaron.
    */
   async cargarAccionesDelPeriodo(actor: Actor, id: string): Promise<number> {
-    const acta = await this.exigirActa(id);
-    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, 'actas.editar');
     if (acta.estado !== 'Borrador') {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
@@ -351,8 +367,7 @@ export class GestionarActas {
     id: string,
     seleccion: readonly { planMejoraId: string; incluida: boolean }[],
   ): Promise<void> {
-    const acta = await this.exigirActa(id);
-    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, 'actas.editar');
     if (acta.estado !== 'Borrador') {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
@@ -372,19 +387,21 @@ export class GestionarActas {
     ]);
   }
 
-  /** RF-AC-011: reemplazo parcial, mismo criterio que `editarCabecera`. */
+  /** RF-AC-011: reemplazo parcial; el texto que no viene conserva el vigente. */
   async editarTextosInstitucionales(
     actor: Actor,
     id: string,
-    datos: { textoIntroduccion: string; textoAcuerdoCierre: string },
+    datos: { textoIntroduccion?: string; textoAcuerdoCierre?: string },
   ): Promise<DatosActa> {
-    const acta = await this.exigirActa(id);
-    await this.exigir(actor, 'actas.editar', acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, 'actas.editar');
     if (acta.estado !== 'Borrador') {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
 
-    const editada = await this.actas.editarTextos(id, datos);
+    const editada = await this.actas.editarTextos(id, {
+      textoIntroduccion: datos.textoIntroduccion ?? acta.textoIntroduccion,
+      textoAcuerdoCierre: datos.textoAcuerdoCierre ?? acta.textoAcuerdoCierre,
+    });
     await this.eventos.publicar([new ActaTextosEditados(actor, id, editada.codigo)]);
     return editada;
   }
@@ -396,9 +413,8 @@ export class GestionarActas {
     accion: AccionActaTransicion,
     contexto: { comentario?: string },
   ): Promise<DatosActa> {
-    const acta = await this.exigirActa(id);
     const transicion = describirTransicion(accion);
-    await this.exigir(actor, `actas.${transicion.permiso}`, acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, `actas.${transicion.permiso}`);
 
     const vinculos = await this.actas.accionesDe(id);
 
@@ -419,7 +435,7 @@ export class GestionarActas {
       accion === 'aprobar'
         ? await this.actas.cambiarEstado(id, r.nuevoEstado, {
             aprobacion: { actorId: actor.id, fecha: new Date() },
-            snapshots: await this.construirSnapshots(vinculos),
+            snapshots: await this.construirSnapshots(vinculos, acta.carreraId),
           })
         : await this.actas.cambiarEstado(id, r.nuevoEstado);
 
@@ -443,6 +459,7 @@ export class GestionarActas {
    */
   private async construirSnapshots(
     vinculos: readonly AccionActaDato[],
+    carreraId: string,
   ): Promise<SnapshotAccionActa[]> {
     const incluidas = vinculos.filter((v) => v.incluida);
     if (incluidas.length === 0) return [];
@@ -453,9 +470,9 @@ export class GestionarActas {
     const snapshots: SnapshotAccionActa[] = [];
     for (const v of incluidas) {
       const plan = planesPorId.get(v.planMejoraId);
-      // El plan de mejora desapareció entre "cargar acciones" y "aprobar":
-      // no hay nada que congelar, se omite la fila huérfana.
-      if (!plan) continue;
+      // El plan desapareció entre "cargar acciones" y "aprobar", o no es de la
+      // carrera del acta (dato forzado o legado): no hay nada que congelar.
+      if (!plan || plan.carreraId !== carreraId) continue;
 
       const metaCompetenciaSnapshot =
         plan.aspecto === 'COMPETENCIA' && v.porcentajeMedicionCompetencia !== null
@@ -487,8 +504,7 @@ export class GestionarActas {
   }
 
   async eliminar(actor: Actor, id: string): Promise<void> {
-    const acta = await this.exigirActa(id);
-    await this.exigir(actor, 'actas.eliminar', acta.carreraId);
+    const acta = await this.actaGestionable(actor, id, 'actas.eliminar');
     if (acta.estado !== 'Borrador') {
       throw new ReglaDeNegocioViolada(
         'RF-AC-017: un acta que no está en Borrador no puede eliminarse.',
@@ -499,9 +515,22 @@ export class GestionarActas {
     await this.eventos.publicar([new ActaEliminada(actor, id, acta.codigo)]);
   }
 
-  private async exigirActa(id: string): Promise<DatosActa> {
-    const acta = await this.actas.porId(id);
-    if (!acta) throw new NoEncontrado('el acta de aprobación', id);
+  /** (2) El acta existe y su carrera entra en el alcance de lectura; si no, 404 (nunca 403). */
+  private async actaLegible(actor: Actor, id: string): Promise<DatosActa> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.actas.porId(id),
+      'el acta de aprobación',
+      id,
+    );
+  }
+
+  /** (1) a (3): lectura, existencia y alcance, y el permiso sobre la carrera **del acta**. */
+  private async actaGestionable(actor: Actor, id: string, permiso: string): Promise<DatosActa> {
+    await this.exigir(actor, 'actas.leer', null);
+    const acta = await this.actaLegible(actor, id);
+    await this.exigir(actor, permiso, acta.carreraId);
     return acta;
   }
 

@@ -940,6 +940,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         actas: RepositorioActaAprobacionPort,
@@ -950,6 +951,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GestionarActas(
           actas,
@@ -960,6 +962,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           curricular,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     { provide: REPOSITORIO_DOCUMENTOS_MEJORA, useClass: DocumentoMejoraRepositoryPrisma },
