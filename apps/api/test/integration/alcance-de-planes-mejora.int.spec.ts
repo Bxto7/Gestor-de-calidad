@@ -17,6 +17,7 @@ import type {
 } from '../../src/shared-kernel/domain-events/domain-event.js';
 import { AccesoDenegado, NoEncontrado } from '../../src/shared-kernel/errors/errores.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
+import { DirectorioDeUsuariosAdapter } from '../../src/modules/auth/infrastructure/directorio-usuarios.adapter.js';
 import { ConfiguracionEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/configuracion-evaluacion.repository.js';
 import { PlanEvaluacionRepositoryPrisma } from '../../src/modules/mejora-continua/evaluacion/infrastructure/persistence/plan-evaluacion.repository.js';
 import { PlanMedicionRepositoryPrisma } from '../../src/modules/mejora-continua/medicion/infrastructure/persistence/plan-medicion.repository.js';
@@ -47,6 +48,7 @@ function gestionar(): GestionarPlanesMejora {
     },
     adaptador,
     publicador,
+    new DirectorioDeUsuariosAdapter(prisma),
     adaptador,
   );
 }

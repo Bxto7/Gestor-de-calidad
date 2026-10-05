@@ -889,6 +889,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        DIRECTORIO_USUARIOS,
         ALCANCE_DE_LECTURA,
       ],
       useFactory: (
@@ -901,6 +902,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        directorio: DirectorioDeUsuariosPort,
         alcance: AlcanceDeLecturaPort,
       ) =>
         new GestionarPlanesMejora(
@@ -913,6 +915,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           curricular,
           autorizacion,
           eventos,
+          directorio,
           alcance,
         ),
     },

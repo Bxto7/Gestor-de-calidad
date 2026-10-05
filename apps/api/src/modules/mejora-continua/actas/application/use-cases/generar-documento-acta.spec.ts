@@ -73,7 +73,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     criterioAcreditacionId: 'cri-1', objetivoEducacionalId: null, competenciaId: null, periodoId: null,
     planEvaluacionId: null, planMedicionAfectadoId: null, estado: 'Aprobado', estadoImplementacion: 'Pendiente',
     nombre: 'Reforzar bibliografía', causaRaiz: 'x', justificacion: 'x', input: null,
-    plazo: new Date('2026-12-01'), recursos: 'r', metas: 'm', responsable: 'resp',
+    plazo: new Date('2026-12-01'), recursos: 'r', metas: 'm', responsable: 'resp', responsableId: null,
     logroMeta: null, impacto: null, creadoEn: new Date('2026-01-01'), evidencias: [], version: 1, derivadoDeId: null,
     ...sobre,
   };

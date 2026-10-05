@@ -14,6 +14,8 @@
  * que estos campos estén llenos al guardarlos, solo al completarlos.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { describe, expect, it } from 'vitest';
@@ -27,7 +29,6 @@ const BASE = {
   plazo: new Date(0).toISOString(),
   recursos: '',
   metas: '',
-  responsable: '',
 };
 
 function fallos(plano: Record<string, unknown>): string[] {
@@ -56,6 +57,14 @@ describe('RF-PJ-006 a RF-PJ-013 — la definición nace vacía y se completa de 
 
   it('sigue exigiendo que `plazo` sea una fecha', () => {
     expect(fallos({ ...BASE, plazo: 'no-es-una-fecha' })).toContain('plazo');
+  });
+});
+
+describe('RF-CH-045 — el responsable', () => {
+  it('viaja como `responsableId` (UUID) y es opcional', () => {
+    expect(fallos(BASE)).toEqual([]);
+    expect(fallos({ ...BASE, responsableId: randomUUID() })).toEqual([]);
+    expect(fallos({ ...BASE, responsableId: 'no-uuid' })).toEqual(['responsableId']);
   });
 });
 

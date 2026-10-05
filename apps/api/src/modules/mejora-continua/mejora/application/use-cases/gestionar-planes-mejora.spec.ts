@@ -26,6 +26,7 @@ import {
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import type { DirectorioDeUsuariosPort } from '../../../../auth/application/ports/directorio-usuarios.port.js';
 import type {
   AcreditacionPort,
   DatosCriterioMejora,
@@ -90,7 +91,7 @@ function permitirSolo(permitidos: string[], pedidos: string[] = []): Authorizati
   };
 }
 
-function definicion() {
+function definicionSinResponsable() {
   return {
     nombre: 'Reforzar',
     causaRaiz: 'x',
@@ -99,7 +100,21 @@ function definicion() {
     plazo: new Date('2026-12-31'),
     recursos: 'x',
     metas: 'x',
-    responsable: 'Coordinación',
+  };
+}
+
+function definicion() {
+  return { ...definicionSinResponsable(), responsableId: null };
+}
+
+function directorioDouble(
+  sobre: Partial<DirectorioDeUsuariosPort> = {},
+): DirectorioDeUsuariosPort {
+  return {
+    nombresDe: async () => new Map(),
+    porRol: async () => [],
+    docentesActivosDeCarrera: async () => [{ id: 'doc-1', nombre: 'Ana Docente' }],
+    ...sobre,
   };
 }
 
@@ -164,6 +179,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     recursos: 'Presupuesto asignado por la facultad',
     metas: 'Subir 10 puntos porcentuales',
     responsable: 'Coordinador académico',
+    responsableId: null,
     logroMeta: null,
     impacto: null,
     creadoEn: new Date('2026-03-01'),
@@ -386,6 +402,7 @@ function montar(
     configuraciones?: Partial<RepositorioConfiguracionEvaluacionPort>;
     curricular?: Partial<ContenidoCurricularPort>;
     alcance?: AlcanceDeLecturaPort;
+    directorio?: Partial<DirectorioDeUsuariosPort>;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -416,6 +433,7 @@ function montar(
     curricularDouble(opciones.curricular),
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    directorioDouble(opciones.directorio),
     opciones.alcance ?? alcanceDeCarrera(CARRERA),
   );
 
@@ -854,7 +872,7 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
     plazo: new Date('2026-12-31'),
     recursos: 'Dos tutores adicionales',
     metas: 'Elevar la tasa 10 puntos',
-    responsable: 'Coordinación académica',
+    responsableId: null,
   };
 
   it('se edita en Borrador', async () => {
@@ -887,6 +905,124 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
     await caso.editarDefinicion(ACTOR, 'pj-1', DATOS);
 
     expect(publicados[0]?.nombre).toBe('mejora.definicion_editada');
+  });
+});
+
+describe('RF-CH-045 y RF-CH-046 — el responsable es un docente activo de la carrera', () => {
+  it('guarda el id y su nombre como nombre mostrado', async () => {
+    let recibido: { responsable: string; responsableId: string | null } | null = null;
+    const { caso } = montar({
+      planes: { editarDefinicion: async (_id, d) => ((recibido = d), plan({ ...d })) },
+    });
+
+    await caso.editarDefinicion(ACTOR, 'pj-1', {
+      ...definicionSinResponsable(),
+      responsableId: 'doc-1',
+    });
+
+    expect(recibido).toMatchObject({ responsable: 'Ana Docente', responsableId: 'doc-1' });
+  });
+
+  it('el docente se busca entre los de la carrera DEL PLAN', async () => {
+    const pedidas: string[] = [];
+    const { caso } = montar({
+      plan: plan({ carreraId: CARRERA }),
+      directorio: {
+        docentesActivosDeCarrera: async (c) => (
+          pedidas.push(c),
+          [{ id: 'doc-1', nombre: 'Ana Docente' }]
+        ),
+      },
+    });
+
+    await caso.editarDefinicion(ACTOR, 'pj-1', {
+      ...definicionSinResponsable(),
+      responsableId: 'doc-1',
+    });
+
+    expect(pedidas).toEqual([CARRERA]);
+  });
+
+  it('uno que no es docente activo de la carrera es 409 y no se guarda nada', async () => {
+    let guardados = 0;
+    const { caso } = montar({
+      directorio: { docentesActivosDeCarrera: async () => [{ id: 'otro', nombre: 'Otro' }] },
+      planes: { editarDefinicion: async () => (guardados++, plan()) },
+    });
+
+    await expect(
+      caso.editarDefinicion(ACTOR, 'pj-1', {
+        ...definicionSinResponsable(),
+        responsableId: 'doc-1',
+      }),
+    ).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'RF-CH-045: el responsable debe ser un docente activo de la carrera del plan.',
+      ),
+    );
+    expect(guardados).toBe(0);
+  });
+
+  it('un plan heredado (texto libre, sin id) se edita en otros campos sin exigir responsable y conserva el texto', async () => {
+    let recibido: { responsable: string; responsableId: string | null } | null = null;
+    let busquedas = 0;
+    const { caso } = montar({
+      plan: plan({ responsable: 'Coordinación académica', responsableId: null }),
+      directorio: { docentesActivosDeCarrera: async () => (busquedas++, []) },
+      planes: { editarDefinicion: async (_id, d) => ((recibido = d), plan({ ...d })) },
+    });
+
+    await caso.editarDefinicion(ACTOR, 'pj-1', {
+      ...definicionSinResponsable(),
+      responsableId: null,
+    });
+
+    expect(recibido).toMatchObject({ responsable: 'Coordinación académica', responsableId: null });
+    expect(busquedas).toBe(0);
+  });
+
+  it('el responsable ya guardado no se revalida: un docente inactivado después no bloquea guardar otros campos', async () => {
+    let busquedas = 0;
+    const { caso } = montar({
+      plan: plan({ responsable: 'Ana Docente', responsableId: 'doc-1' }),
+      directorio: { docentesActivosDeCarrera: async () => (busquedas++, []) },
+    });
+
+    await expect(
+      caso.editarDefinicion(ACTOR, 'pj-1', {
+        ...definicionSinResponsable(),
+        responsableId: 'doc-1',
+      }),
+    ).resolves.toBeDefined();
+    expect(busquedas).toBe(0);
+  });
+
+  it('el 404 por alcance va antes que la validación del responsable', async () => {
+    const { caso } = montar({
+      plan: plan({ carreraId: OTRA_CARRERA }),
+      alcance: alcanceDeCarrera(CARRERA),
+      directorio: { docentesActivosDeCarrera: async () => [] },
+    });
+
+    await expect(
+      caso.editarDefinicion(ACTOR, 'pj-1', {
+        ...definicionSinResponsable(),
+        responsableId: 'doc-1',
+      }),
+    ).rejects.toThrow(NoEncontrado);
+  });
+
+  it('docentesDelPlan: los de la carrera del plan; 404 si el plan es de otra carrera', async () => {
+    const { caso } = montar();
+    expect(await caso.docentesDelPlan(ACTOR, 'pj-1')).toEqual([
+      { id: 'doc-1', nombre: 'Ana Docente' },
+    ]);
+
+    const ajeno = montar({
+      plan: plan({ carreraId: OTRA_CARRERA }),
+      alcance: alcanceDeCarrera(CARRERA),
+    });
+    await expect(ajeno.caso.docentesDelPlan(ACTOR, 'pj-1')).rejects.toThrow(NoEncontrado);
   });
 });
 
@@ -1294,7 +1430,7 @@ describe('el aspecto no es editable una vez creado (RF-PJ-001 RN1)', () => {
       plazo: new Date(),
       recursos: 'x',
       metas: 'x',
-      responsable: 'x',
+      responsableId: null,
     });
 
     expect(actualizado.aspecto).toBe('CRITERIO_ACREDITACION');

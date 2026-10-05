@@ -57,6 +57,7 @@ import {
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import type { DirectorioDeUsuariosPort } from '../../../../auth/application/ports/directorio-usuarios.port.js';
 import {
   carreraDeLaSesion,
   carreraImpuesta,
@@ -141,6 +142,12 @@ export interface AlertaMinimoAcciones {
  * método que cambia estado publica su propio evento de
  * `../../domain/events/eventos-mejora.js` vía `this.eventos.publicar(...)`.
  */
+/** RF-CH-045: lo que se pide al editar la definición. El nombre del responsable lo pone el servidor. */
+export type DatosEdicionDefinicion = Omit<DefinicionAccionMejora, 'responsable'> & {
+  /** Nulo: se conserva el responsable que ya tiene el plan (también el texto libre de los anteriores al 6b). */
+  readonly responsableId: string | null;
+};
+
 export class GestionarPlanesMejora {
   constructor(
     private readonly planes: RepositorioPlanMejoraPort,
@@ -152,6 +159,7 @@ export class GestionarPlanesMejora {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly directorio: DirectorioDeUsuariosPort,
     private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
@@ -270,19 +278,31 @@ export class GestionarPlanesMejora {
     return creado;
   }
 
-  /** RF-PJ-006 y RF-PJ-007: la definición solo se edita en Borrador. */
+  /** RF-PJ-006 y RF-PJ-007: la definición solo se edita en Borrador. RF-CH-045: el responsable es un docente de la carrera. */
   async editarDefinicion(
     actor: Actor,
     id: string,
-    datos: DefinicionAccionMejora,
+    datos: DatosEdicionDefinicion,
   ): Promise<DatosPlanMejora> {
     // RF-PJ-043: editar la definición queda restringido a roles autorizados.
     const plan = await this.planGestionable(actor, id, 'mejora.editar');
     this.exigirDefinicionEditable(plan);
+    const responsable = await this.resolverResponsable(plan, datos.responsableId);
 
-    const actualizado = await this.planes.editarDefinicion(id, datos);
+    const actualizado = await this.planes.editarDefinicion(id, {
+      ...datos,
+      responsable: responsable.nombre,
+      responsableId: responsable.id,
+    });
     await this.eventos.publicar([new PlanMejoraDefinicionEditada(actor, id, plan.codigo)]);
     return actualizado;
+  }
+
+  /** RF-CH-045: los docentes activos de la carrera del plan, para el selector. */
+  async docentesDelPlan(actor: Actor, id: string): Promise<{ id: string; nombre: string }[]> {
+    await this.exigir(actor, 'mejora.leer', null);
+    const plan = await this.planLegible(actor, id);
+    return this.directorio.docentesActivosDeCarrera(plan.carreraId);
   }
 
   /** RF-CH-042: Borrador o En revisión, salvo si está en un acta o tiene versiones derivadas. */
@@ -558,6 +578,30 @@ export class GestionarPlanesMejora {
       .map((h) => `${h.titulo} (${h.afectados.join(', ')})`)
       .join('; ');
     return `Hay inconsistencias bloqueantes sin resolver: ${detalle}.`;
+  }
+
+  /**
+   * RF-CH-045 y RF-CH-046. Sin id nuevo, el plan conserva lo que tiene (los planes
+   * anteriores al Bloque 6b siguen con su texto libre). El que ya está guardado no
+   * se revalida: un docente que se inactiva después sigue siendo el responsable
+   * mostrado y no bloquea guardar otros campos. Uno nuevo debe ser un docente
+   * activo de la carrera del plan.
+   */
+  private async resolverResponsable(
+    plan: DatosPlanMejora,
+    responsableId: string | null,
+  ): Promise<{ id: string | null; nombre: string }> {
+    if (!responsableId || responsableId === plan.responsableId) {
+      return { id: plan.responsableId, nombre: plan.responsable };
+    }
+    const docentes = await this.directorio.docentesActivosDeCarrera(plan.carreraId);
+    const elegido = docentes.find((d) => d.id === responsableId);
+    if (!elegido) {
+      throw new ReglaDeNegocioViolada(
+        'RF-CH-045: el responsable debe ser un docente activo de la carrera del plan.',
+      );
+    }
+    return { id: elegido.id, nombre: elegido.nombre };
   }
 
   /** (2) El plan existe y su carrera entra en el alcance de lectura; si no, 404. */

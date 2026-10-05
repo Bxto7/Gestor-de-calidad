@@ -92,6 +92,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     recursos: '',
     metas: '',
     responsable: '',
+    responsableId: null,
     logroMeta: null,
     impacto: null,
     creadoEn: new Date('2026-03-01'),

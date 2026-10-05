@@ -317,6 +317,7 @@ function montar(
 
   const directorio: DirectorioDeUsuariosPort = {
     nombresDe: async () => new Map(),
+    docentesActivosDeCarrera: async () => [],
     porRol: async (rol) => {
       opciones.registrarRolPedido?.(rol);
       return [{ id: 'doc-1', nombre: 'Docente Uno' }];

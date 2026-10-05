@@ -144,6 +144,7 @@ export class PlanesMejoraController {
       ...dto,
       input: dto.input ?? null,
       plazo: new Date(dto.plazo),
+      responsableId: dto.responsableId ?? null,
     });
   }
 
@@ -170,6 +171,15 @@ export class PlanesMejoraController {
   @ApiOperation({ summary: 'Consultar el linaje de versiones (RF-PJ-037)' })
   async versiones(@ActorActual() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
     return this.versionar.versionesDe(actor, id);
+  }
+
+  @Get(':id/docentes')
+  @ApiOperation({
+    summary: 'Docentes activos de la carrera del plan, para elegir responsable (RF-CH-045)',
+  })
+  @ApiResponse({ status: 404, description: 'El plan de mejora no existe o es de otra carrera.' })
+  async docentes(@ActorActual() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.casos.docentesDelPlan(actor, id);
   }
 
   @Patch(':id/implementacion')

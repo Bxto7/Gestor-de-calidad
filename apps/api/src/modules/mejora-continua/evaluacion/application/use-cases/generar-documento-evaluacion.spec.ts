@@ -266,6 +266,7 @@ function directorio(sobre: Partial<DirectorioDeUsuariosPort> = {}): DirectorioDe
   return {
     nombresDe: async (ids) => new Map(ids.map((id) => [id, `Nombre de ${id}`])),
     porRol: async () => [],
+    docentesActivosDeCarrera: async () => [],
     ...sobre,
   };
 }

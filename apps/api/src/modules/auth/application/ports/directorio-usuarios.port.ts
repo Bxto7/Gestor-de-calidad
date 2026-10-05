@@ -31,6 +31,17 @@ export interface DirectorioDeUsuariosPort {
    * histórico se conserva aunque la persona ya no esté.
    */
   porRol(codigoRol: string): Promise<{ id: string; nombre: string }[]>;
+
+  /**
+   * Docentes **activos** de una carrera, para elegir un responsable
+   * (RF-CH-045, RF-CH-046).
+   *
+   * Cuenta ACTIVA, rol DOCENTE y la carrera a cargo (`usuario_carrera`: una por
+   * usuario). Las inactivas no salen: no se puede responsabilizar a una cuenta
+   * apagada. Los ya guardados como responsables siguen resolviéndose con
+   * `nombresDe`, que no filtra por estado.
+   */
+  docentesActivosDeCarrera(carreraId: string): Promise<{ id: string; nombre: string }[]>;
 }
 
 export const DIRECTORIO_USUARIOS = Symbol('DirectorioDeUsuariosPort');

@@ -43,6 +43,7 @@ import { CriterioRepositoryPrisma } from '../../src/modules/acreditacion/infrast
 import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educacionales/infrastructure/persistence/objetivos.repository.js';
 import { ObjetivosCrossModuloAdapter } from '../../src/modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
+import { DirectorioDeUsuariosAdapter } from '../../src/modules/auth/infrastructure/directorio-usuarios.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { NoEncontrado, ReglaDeNegocioViolada } from '../../src/shared-kernel/errors/errores.js';
 
@@ -115,6 +116,7 @@ const DEFINICION = {
   recursos: 'Dos ayudantes de laboratorio adicionales',
   metas: 'Elevar el indicador sobre el umbral en el siguiente periodo',
   responsable: 'Coordinador de laboratorios',
+  responsableId: null,
 };
 
 describe('el repositorio', () => {
@@ -340,6 +342,7 @@ function datosBase(plan: DatosPlanMejora) {
     recursos: plan.recursos,
     metas: plan.metas,
     responsable: plan.responsable,
+    responsableId: plan.responsableId,
   };
 }
 
@@ -620,6 +623,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
     curricular,
     autorizacion,
     eventos,
+    new DirectorioDeUsuariosAdapter(prisma),
     autorizacion,
   );
 

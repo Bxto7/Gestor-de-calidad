@@ -110,6 +110,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     recursos: 'Dos horas semanales de taller adicional.',
     metas: 'Elevar el logro al 70%.',
     responsable: 'Coordinación académica',
+    responsableId: null,
     logroMeta: null,
     impacto: null,
     creadoEn: new Date('2026-03-01'),

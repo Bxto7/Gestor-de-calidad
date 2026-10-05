@@ -95,6 +95,7 @@ const SELECCION = {
   recursos: true,
   metas: true,
   responsable: true,
+  responsableId: true,
   logroMeta: true,
   impacto: true,
   creadoEn: true,
@@ -133,6 +134,7 @@ interface Fila {
   recursos: string;
   metas: string;
   responsable: string;
+  responsableId: string | null;
   logroMeta: string | null;
   impacto: string | null;
   creadoEn: Date;
@@ -175,6 +177,7 @@ function aDatos(fila: Fila): DatosPlanMejora {
     recursos: fila.recursos,
     metas: fila.metas,
     responsable: fila.responsable,
+    responsableId: fila.responsableId,
     logroMeta: fila.logroMeta,
     impacto: fila.impacto,
     creadoEn: fila.creadoEn,
@@ -231,7 +234,10 @@ export class PlanMejoraRepositoryPrisma
     return fila ? aDatos(fila) : null;
   }
 
-  async editarDefinicion(id: string, datos: DefinicionAccionMejora): Promise<DatosPlanMejora> {
+  async editarDefinicion(
+    id: string,
+    datos: DefinicionAccionMejora & { responsableId: string | null },
+  ): Promise<DatosPlanMejora> {
     const fila = await this.prisma.planMejora.update({
       where: { id },
       data: {
@@ -243,6 +249,7 @@ export class PlanMejoraRepositoryPrisma
         recursos: datos.recursos,
         metas: datos.metas,
         responsable: datos.responsable,
+        responsableId: datos.responsableId,
       },
       select: SELECCION,
     });
@@ -475,6 +482,7 @@ export class PlanMejoraRepositoryPrisma
           recursos: contenido.recursos,
           metas: contenido.metas,
           responsable: contenido.responsable,
+          responsableId: contenido.responsableId,
           estadoImplementacion: IMPLEMENTACION_A_BD[contenido.estadoImplementacion],
           logroMeta: contenido.logroMeta,
           impacto: contenido.impacto,

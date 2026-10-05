@@ -29,6 +29,7 @@ function origen(sobre: Partial<PlanMejoraACopiar> = {}): PlanMejoraACopiar {
     recursos: 'Docente coordinador, 4 horas/semana',
     metas: 'Subir el indicador 10 puntos',
     responsable: 'Ana Quispe',
+    responsableId: 'doc-1',
     estadoImplementacion: 'En proceso',
     logroMeta: '70% cumplido',
     impacto: 'Mejora observable en el segundo periodo',
@@ -45,6 +46,13 @@ function origen(sobre: Partial<PlanMejoraACopiar> = {}): PlanMejoraACopiar {
 }
 
 describe('lo que se copia', () => {
+  it('la copia conserva el responsable y su id', () => {
+    const copia = copiarPlanMejora(origen({ responsable: 'Ana Docente' }));
+
+    expect(copia.responsableId).toBe('doc-1');
+    expect(copia.responsable).toBe('Ana Docente');
+  });
+
   it('toda la definición, tal cual', () => {
     const copia = copiarPlanMejora(origen());
 

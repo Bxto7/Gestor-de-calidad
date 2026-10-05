@@ -35,4 +35,17 @@ export class DirectorioDeUsuariosAdapter implements DirectorioDeUsuariosPort {
     });
     return filas.map((f) => ({ id: f.id, nombre: f.nombreCompleto }));
   }
+
+  async docentesActivosDeCarrera(carreraId: string): Promise<{ id: string; nombre: string }[]> {
+    const filas = await this.prisma.usuario.findMany({
+      where: {
+        estado: 'ACTIVO',
+        carreras: { some: { carreraId } },
+        roles: { some: { rol: { codigo: 'DOCENTE' } } },
+      },
+      select: { id: true, nombreCompleto: true },
+      orderBy: { nombreCompleto: 'asc' },
+    });
+    return filas.map((f) => ({ id: f.id, nombre: f.nombreCompleto }));
+  }
 }

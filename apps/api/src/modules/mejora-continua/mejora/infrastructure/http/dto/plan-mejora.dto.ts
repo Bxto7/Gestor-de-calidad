@@ -102,11 +102,14 @@ export class DefinicionPlanMejoraDto {
   @MaxLength(4000)
   metas!: string;
 
-  @ApiProperty()
-  @Recortado()
-  @IsString()
-  @MaxLength(300)
-  responsable!: string;
+  /**
+   * RF-CH-045: el docente elegido, de los activos de la carrera. Sin él se conserva
+   * el responsable que ya tiene el plan; el nombre lo pone el servidor.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  responsableId?: string;
 }
 
 export class TransicionMejoraDto {

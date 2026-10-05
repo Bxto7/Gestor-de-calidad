@@ -60,6 +60,8 @@ export interface DatosPlanMejora extends DefinicionAccionMejora {
   readonly aspecto: AspectoPlanMejora;
   /** 2c-J-B, §2a del diseño: siempre la del actor que creó el plan. */
   readonly carreraId: string;
+  /** RF-CH-045: el docente elegido; nulo en los planes anteriores al Bloque 6b (queda el texto de `responsable`). */
+  readonly responsableId: string | null;
   readonly criterioAcreditacionId: string | null;
   readonly objetivoEducacionalId: string | null;
   readonly competenciaId: string | null;
@@ -128,7 +130,10 @@ export interface FiltroListadoMejora {
 export interface RepositorioPlanMejoraPort {
   crear(datos: NuevoPlanMejora): Promise<DatosPlanMejora>;
   porId(id: string): Promise<DatosPlanMejora | null>;
-  editarDefinicion(id: string, datos: DefinicionAccionMejora): Promise<DatosPlanMejora>;
+  editarDefinicion(
+    id: string,
+    datos: DefinicionAccionMejora & { readonly responsableId: string | null },
+  ): Promise<DatosPlanMejora>;
   eliminar(id: string): Promise<ResultadoEliminacionMejora>;
   cambiarEstado(id: string, estado: EstadoMejora): Promise<DatosPlanMejora>;
   actualizarImplementacion(id: string, estado: EstadoImplementacion): Promise<DatosPlanMejora>;

@@ -28,6 +28,7 @@ export interface EvidenciaACopiar {
 export interface PlanMejoraACopiar extends DefinicionAccionMejora {
   readonly aspecto: AspectoPlanMejora;
   readonly carreraId: string;
+  readonly responsableId: string | null;
   readonly criterioAcreditacionId: string | null;
   readonly objetivoEducacionalId: string | null;
   readonly competenciaId: string | null;
@@ -61,6 +62,7 @@ export function copiarPlanMejora(origen: PlanMejoraACopiar): CopiaPlanMejora {
     recursos: origen.recursos,
     metas: origen.metas,
     responsable: origen.responsable,
+    responsableId: origen.responsableId,
     estadoImplementacion: origen.estadoImplementacion,
     logroMeta: origen.logroMeta,
     impacto: origen.impacto,

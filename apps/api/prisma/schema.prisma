@@ -1288,7 +1288,14 @@ model PlanMejora {
   plazo         DateTime @db.Date
   recursos      String   @db.Text
   metas         String   @db.Text
+  /// RF-CH-045: el nombre mostrado. Desde el Bloque 6b se elige entre los docentes
+  /// activos de la carrera y aquí se guarda su nombre; los planes anteriores
+  /// conservan el texto libre.
   responsable   String   @db.VarChar(300)
+  /// RF-CH-045: el docente elegido. Sin clave foránea, como `AsignaturaEvaluada.docenteId`:
+  /// el usuario vive en `auth` (§3.2) y puede inactivarse sin romper el plan.
+  /// Nulo en los planes anteriores al Bloque 6b.
+  responsableId String?  @map("responsable_id") @db.Uuid
 
   /// RF-PJ-018: logro de meta e impacto, cada uno opcional hasta completarse.
   logroMeta String? @map("logro_meta") @db.Text
