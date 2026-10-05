@@ -67,8 +67,8 @@ decide nada académico**.
 | Carreras | leer, crear, editar, inactivar | — |
 | Planes de estudio | leer, ver histórico | crear, editar, eliminar, aprobar, observar, enviar a revisión, nueva versión |
 | Contenido curricular | leer todo (objetivos, competencias, atributos, criterios, asignaturas) | gestionar (crear/editar) contenido |
-| Mejora continua | leer planes de medición, evaluación y mejora | crear, editar, aprobar |
-| Actas de Aprobación | leer | crear, editar, eliminar, aprobar |
+| Mejora continua | — | leer, crear, editar, aprobar planes de medición, evaluación y mejora (no tiene ningún permiso de Mejora Continua) |
+| Actas de Aprobación | — | leer, crear, editar, eliminar, aprobar (no tiene `actas.*`) |
 | Auditoría | leer la bitácora entera | — |
 | Usuarios y roles | gestionar usuarios y sus roles, administrar roles/permisos | — |
 | Reportes | **no tiene `reporte.generar`** | generar PDF/Excel (responsabilidad académica) |
@@ -82,23 +82,23 @@ responsabilidad académica, no de administración.
 ## 3. DIRECTOR_CARRERA — Director de carrera
 
 **Requiere carrera:** Sí (una).
-**Filosofía:** gestión y **aprobación** del plan y de la mejora continua **de su
-carrera**. Es el rol más poderoso en lo académico.
+**Filosofía:** gestión y **aprobación** del plan de estudios y de las Actas de
+Aprobación **de su carrera**. Los planes de Medición, de Evaluación y de Mejora los
+arma y aprueba el Coordinador (§4): el Director no tiene ningún permiso `medicion.*`,
+`evaluacion.*` ni `mejora.*`.
 
 | Área | Puede |
 |---|---|
 | Facultades / Carreras | consultar (leer) |
 | Planes de estudio | leer, ver histórico, crear, editar, eliminar, enviar a revisión, **aprobar** (único rol), observar/devolver, nueva versión, justificar observaciones |
 | Contenido curricular | leer + gestionar: objetivos, competencias, atributos del graduado, criterios de acreditación, asignaturas, malla |
-| Plan de medición | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
-| Plan de evaluación | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
-| Plan de mejora | leer, crear, editar, eliminar (en Borrador o En revisión), **aprobar/observar** |
+| Plan de medición, de evaluación y de mejora | — (sin permisos `medicion.*`, `evaluacion.*` ni `mejora.*`) |
 | Actas de Aprobación | leer, crear, editar, eliminar, **aprobar** |
 | Reportes | generar PDF y Excel |
 | Auditoría | leer historial de cambios |
 
-**Nota:** es el **único** con `plan.aprobar`, `medicion.aprobar`,
-`evaluacion.aprobar` y `mejora.aprobar`. Todo lo académico lo hace **sobre su
+**Nota:** es el **único** con `plan.aprobar` y con `actas.aprobar`. `medicion.aprobar`,
+`evaluacion.aprobar` y `mejora.aprobar` son del Coordinador. Todo lo académico lo hace **sobre su
 carrera**. Lleva `lectura.solo_su_carrera`: en los módulos que ya la aplican
 (§1) lo de otra carrera le responde 404, no solo le niega editarlo.
 
@@ -111,19 +111,19 @@ carrera**. Lleva `lectura.solo_su_carrera`: en los módulos que ya la aplican
 Los planes de Medición y de Evaluación (con sus documentos) y Acreditación de
 otra carrera le responden 404; el panel general de Reportes, 403. Los planes de
 Mejora (con sus documentos) también; las Actas todavía no (§1).
-**Filosofía:** apoyo operativo: **arma** el plan y lo envía a revisión, pero
-**no aprueba ni observa**. La separación es deliberada: *quien construye no
-puede ser quien da el visto bueno* — eso es lo que hace que la aprobación
-signifique algo en una auditoría.
+**Filosofía:** apoyo operativo: arma los planes de Mejora Continua y **también los
+aprueba** (decisión de la universidad al revisar el Bloque 1, 2026-09-29), pero
+**no aprueba el plan de estudios** ni las Actas de Aprobación, que siguen siendo del
+Director.
 
 | Área | Puede | No puede |
 |---|---|---|
 | Facultades / Carreras | consultar | — |
 | Planes de estudio | leer, ver histórico, crear, editar, enviar a revisión, justificar | **aprobar, observar, eliminar, nueva versión** |
 | Contenido curricular | leer + gestionar (objetivos, competencias, atributos, criterios, asignaturas, malla) | — |
-| Plan de medición | leer, crear, editar, eliminar | **aprobar** |
-| Plan de evaluación | leer, crear, editar, eliminar | **aprobar** |
-| Plan de mejora | leer, crear, editar, eliminar | **aprobar** |
+| Plan de medición | leer, crear, editar, eliminar, **aprobar** | — |
+| Plan de evaluación | leer, crear, editar, eliminar, **aprobar** | — |
+| Plan de mejora | leer, crear, editar, eliminar (en Borrador o En revisión), **aprobar** | — |
 | Actas de Aprobación | leer, crear, editar, eliminar | **aprobar** |
 | Reportes | generar PDF y Excel | — |
 | Auditoría | solo historial de su entidad (`auditoria.leer_entidad`), no la bitácora entera | ver bitácora completa de accesos |
@@ -143,14 +143,12 @@ responsable.
 
 | Área | Puede |
 |---|---|
-| Facultades / Carreras | consultar |
-| Planes de estudio | leer (detalle curricular y competencias de las asignaturas que dicta) |
-| Contenido curricular | leer objetivos, competencias, atributos del graduado, criterios, asignaturas |
-| Mejora continua | leer planes de medición, evaluación y mejora (ver en qué periodos se mide su competencia) |
-| Actas de Aprobación | leer |
-| Reportes | generar PDF y Excel |
+| Carreras | consultar |
+| Contenido curricular | leer objetivos, competencias y criterios de acreditación |
+| Mejora continua | leer planes de mejora (todos los de su carrera) y de evaluación, y registrar evidencias de las evaluaciones que tiene asignadas (`evidencia.registrar`) |
 
-**No puede:** crear/editar nada, aprobar nada, gestionar usuarios, ver auditoría.
+**No puede:** crear/editar planes, aprobar nada, leer actas ni planes de medición, generar
+reportes, gestionar usuarios, ver auditoría.
 
 ---
 
@@ -180,9 +178,10 @@ generar reportes, ni nada de escritura.
 | Crear/editar plan | — | ✅ | ✅ | — | — |
 | **Aprobar plan** | — | ✅ | — | — | — |
 | Gestionar contenido curricular | — | ✅ | ✅ | — | — |
-| Gestionar plan de medición/evaluación/mejora | — | ✅ | ✅ | — | — |
-| **Aprobar medición/evaluación/mejora** | — | ✅ | — | — | — |
-| Generar reportes PDF/Excel | — | ✅ | ✅ | ✅ | — |
+| Gestionar plan de medición/evaluación/mejora | — | — | ✅ | — | — |
+| **Aprobar medición/evaluación/mejora** | — | — | ✅ | — | — |
+| **Aprobar actas** | — | ✅ | — | — | — |
+| Generar reportes PDF/Excel | — | ✅ | ✅ | — | — |
 | Ver auditoría completa | ✅ | ✅ | — | — | — |
 | Gestionar usuarios/roles | ✅ | — | — | — | — |
 
@@ -191,9 +190,10 @@ generar reportes, ni nada de escritura.
 ## 8. Flujo típico de acreditación
 
 1. **Coordinador** arma el plan de estudios y lo envía a revisión.
-2. **Director** lo aprueba, observa o devuelve; también aprueba los planes de
-   medición, evaluación y mejora que el Coordinador configura.
-3. **Docente** consulta el detalle de su asignatura y ve cuándo se mide.
+2. **Director** lo aprueba, observa o devuelve. El **Coordinador** arma y aprueba
+   los planes de medición, evaluación y mejora; el Director aprueba las actas.
+3. **Docente** lee los planes de mejora de su carrera y registra las evidencias de
+   las evaluaciones que tiene asignadas.
 4. **Consultor** ve los planes vigentes.
 5. **Admin** mantiene facultades, carreras, cuentas y roles; ve la auditoría de
    todo.
