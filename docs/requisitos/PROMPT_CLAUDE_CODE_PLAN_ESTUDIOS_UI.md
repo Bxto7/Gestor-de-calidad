@@ -4,7 +4,7 @@
 >
 > Ese "tal cual" es la regla que sostiene el archivo: **el texto de un RF no se reescribe nunca**. Cuando lo implementado se aparta de lo que pide un RF, la diferencia se anota en la sección 8, no editando el requisito. Si se editara, el documento dejaría de servir para contrastar lo construido contra lo pedido, que es justo para lo que existe.
 >
-> **Estado de la construcción (25 de agosto de 2026).** El módulo ya no es solo UI: existe API NestJS + Prisma + PostgreSQL, worker de BullMQ para generación de documentos, y el frontend consume HTTP real. No queda ningún dato mock. Los bloques que la sección 6 declaraba fuera de alcance —RF101–RF110 y RF111–RF119— están implementados.
+> **Estado de la construcción (25 de agosto de 2026).** El módulo ya no es solo UI: existe API NestJS + Prisma + PostgreSQL, worker de BullMQ para generación de documentos, y el frontend consume HTTP real. No queda nigún dato mock. Los bloques que la sección 6 declaraba fuera de alcance —RF101–RF110 y RF111–RF119— están implementados.
 >
 > **Antes de citar cualquier RF en un expediente, lee la sección 8.** Hay cuatro puntos en los que el sistema se aparta del requisito y que **la universidad todavía no ha ratificado**.
 >
