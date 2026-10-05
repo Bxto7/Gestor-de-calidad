@@ -1271,8 +1271,10 @@ model PlanMejora {
   /// cambio — opcional, solo Competencia.
   planMedicionAfectadoId String?           @map("plan_medicion_afectado_id") @db.Uuid
 
-  /// Mismo VO que `PlanMedicion`/`PlanEvaluacion` — RF-PJ-004 lo exige
-  /// explícitamente ("replicando el mismo esquema").
+  /// El enum se comparte con Medición y Evaluación, pero Mejora usa solo tres
+  /// valores (Bloque 6b, RF-CH-043): BORRADOR, EN_REVISION y APROBADO. «Vigente»
+  /// es la última aprobada del linaje, calculada; la migración
+  /// `20261005120000_estados_de_planes_mejora_en_tres` llevó VIGENTE e HISTORICO a APROBADO.
   estado               EstadoMedicion             @default(BORRADOR)
   estadoImplementacion EstadoImplementacionMejora @default(PENDIENTE) @map("estado_implementacion")
 

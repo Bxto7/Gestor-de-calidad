@@ -18,7 +18,7 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
-import { DefinicionPlanMejoraDto } from './plan-mejora.dto.js';
+import { DefinicionPlanMejoraDto, TransicionMejoraDto } from './plan-mejora.dto.js';
 
 const BASE = {
   nombre: '',
@@ -56,5 +56,16 @@ describe('RF-PJ-006 a RF-PJ-013 — la definición nace vacía y se completa de 
 
   it('sigue exigiendo que `plazo` sea una fecha', () => {
     expect(fallos({ ...BASE, plazo: 'no-es-una-fecha' })).toContain('plazo');
+  });
+});
+
+describe('RF-CH-043 — las acciones de transición de Mejora', () => {
+  it.each(['marcar-vigente', 'archivar'])('la acción «%s» ya no existe para Mejora', (accion) => {
+    const errores = validateSync(plainToInstance(TransicionMejoraDto, { accion }));
+    expect(errores.map((e) => e.property)).toEqual(['accion']);
+  });
+
+  it.each(['enviar-a-revision', 'aprobar', 'observar'])('«%s» se acepta', (accion) => {
+    expect(validateSync(plainToInstance(TransicionMejoraDto, { accion }))).toEqual([]);
   });
 });

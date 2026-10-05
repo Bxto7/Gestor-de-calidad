@@ -10,6 +10,8 @@ import {
 } from 'class-validator';
 
 import { Recortado } from '../../../../../../platform/http/recortado.js';
+import { ACCIONES_MEJORA } from '../../../domain/value-objects/estado-plan-mejora.js';
+import type { AccionMejora } from '../../../domain/value-objects/estado-plan-mejora.js';
 import { ESTADOS_IMPLEMENTACION } from '../../../domain/value-objects/estado-implementacion.js';
 import type { EstadoImplementacion } from '../../../domain/value-objects/estado-implementacion.js';
 import type { AspectoPlanMejora } from '../../../application/ports/plan-mejora.port.js';
@@ -108,8 +110,9 @@ export class DefinicionPlanMejoraDto {
 }
 
 export class TransicionMejoraDto {
-  @IsIn(['enviar-a-revision', 'aprobar', 'observar', 'marcar-vigente', 'archivar'])
-  accion!: 'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
+  /** RF-CH-043: `marcar-vigente` y `archivar` ya no existen para Mejora. */
+  @IsIn(ACCIONES_MEJORA)
+  accion!: AccionMejora;
 
   @IsOptional() @IsString() @MaxLength(500) comentario?: string;
 }

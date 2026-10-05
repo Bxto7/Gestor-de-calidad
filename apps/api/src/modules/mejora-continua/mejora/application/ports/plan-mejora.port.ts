@@ -19,7 +19,7 @@
  * opcional).
  */
 
-import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { EstadoMejora } from '../../domain/value-objects/estado-plan-mejora.js';
 import type { CopiaPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 
@@ -62,7 +62,7 @@ export interface DatosPlanMejora extends DefinicionAccionMejora {
   readonly planEvaluacionId: string | null;
   /** RF-PJ-031: el plan de medición afectado, si se registró trazabilidad. */
   readonly planMedicionAfectadoId: string | null;
-  readonly estado: EstadoMedicion;
+  readonly estado: EstadoMejora;
   readonly estadoImplementacion: EstadoImplementacion;
   /** RF-PJ-018: logro de meta e impacto, cada uno opcional hasta que se complete. */
   readonly logroMeta: string | null;
@@ -112,7 +112,7 @@ export interface RepositorioPlanMejoraPort {
   porId(id: string): Promise<DatosPlanMejora | null>;
   editarDefinicion(id: string, datos: DefinicionAccionMejora): Promise<DatosPlanMejora>;
   eliminar(id: string): Promise<void>;
-  cambiarEstado(id: string, estado: EstadoMedicion): Promise<DatosPlanMejora>;
+  cambiarEstado(id: string, estado: EstadoMejora): Promise<DatosPlanMejora>;
   actualizarImplementacion(id: string, estado: EstadoImplementacion): Promise<DatosPlanMejora>;
   actualizarRetroalimentacion(
     id: string,
@@ -150,8 +150,8 @@ export interface RepositorioPlanMejoraPort {
       texto?: string;
       aspecto?: AspectoPlanMejora;
       estadoImplementacion?: EstadoImplementacion;
-      /** 2c-AC-B: acepta varios estados en una sola consulta (RF-AC-007: Aprobado o Vigente). */
-      estado?: EstadoMedicion | readonly EstadoMedicion[];
+      /** 2c-AC-B: acepta varios estados en una sola consulta. */
+      estado?: EstadoMejora | readonly EstadoMejora[];
       /** 2c-AC-B (RF-AC-007): solo tiene sentido para el aspecto Competencia. */
       periodoId?: string;
     },

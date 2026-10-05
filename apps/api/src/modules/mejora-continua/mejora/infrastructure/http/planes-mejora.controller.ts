@@ -29,7 +29,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../../auth/infrastructure/http/jwt.guard.js';
-import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { EstadoMejora } from '../../domain/value-objects/estado-plan-mejora.js';
 import { GestionarPlanesMejora } from '../../application/use-cases/gestionar-planes-mejora.use-case.js';
 import { VersionarPlanMejora } from '../../application/use-cases/versionar-plan-mejora.use-case.js';
 import type { AspectoPlanMejora } from '../../application/ports/plan-mejora.port.js';
@@ -67,7 +67,7 @@ export class PlanesMejoraController {
     @Query('texto') texto?: string,
     @Query('aspecto') aspecto?: AspectoPlanMejora,
     @Query('estadoImplementacion') estadoImplementacion?: EstadoImplementacion,
-    @Query('estado') estado?: EstadoMedicion,
+    @Query('estado') estado?: EstadoMejora,
   ) {
     return this.casos.listar(actor, carreraId, { texto, aspecto, estadoImplementacion, estado });
   }
@@ -240,7 +240,7 @@ export class EvidenciasPlanMejoraController {
   @ApiResponse({ status: 404, description: 'La evidencia no existe.' })
   @ApiResponse({
     status: 409,
-    description: 'El plan está en Histórico, o el seguimiento no admite cambios.',
+    description: 'El plan no está Aprobado, o el seguimiento no admite cambios.',
   })
   async eliminar(
     @Param('evidenciaId', ParseUUIDPipe) evidenciaId: string,

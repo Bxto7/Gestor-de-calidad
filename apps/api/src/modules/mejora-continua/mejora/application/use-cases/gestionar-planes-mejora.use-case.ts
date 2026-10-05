@@ -10,9 +10,8 @@
  * - La **definición** (nombre, causa raíz, justificación, input, plazo,
  *   recursos, metas, responsable) solo se edita en Borrador (RF-PJ-006/007).
  * - El **seguimiento** (estado de implementación, evidencias,
- *   retroalimentación) se edita en Borrador y en Vigente, y se bloquea
- *   también en "En revisión" y "Aprobado" — no solo en Histórico. El
- *   guardián vive en `permiteActualizarSeguimiento`, no como un `if`
+ *   retroalimentación) se edita en Aprobado, y se bloquea en Borrador y
+ *   En revisión (RF-CH-044). El guardián vive en `permiteSeguimientoMejora`, no como un `if`
  *   repetido en cada método.
  *
  * Alcance por carrera (2c-J-B, §2a del diseño — decisión 1): la carrera de
@@ -54,14 +53,16 @@ import type { AuthorizationPort } from '../../../../auth/application/ports/autho
 import type { AcreditacionPort } from '../../../../acreditacion/application/ports/acreditacion-cross-modulo.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { ObjetivosCrossModuloPort } from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
+// La Tarea 3 lo sustituye por `permiteEliminacionMejora`.
+import { permiteEliminacionDeMejora } from '../../../domain/value-objects/estado-plan.js';
 import {
-  type AccionMedicion,
-  type EstadoMedicion,
-  describirTransicion,
-  intentarTransicion,
-  permiteEdicion,
-  permiteEliminacionDeMejora,
-} from '../../../domain/value-objects/estado-plan.js';
+  type AccionMejora,
+  type EstadoMejora,
+  describirTransicionMejora,
+  intentarTransicionMejora,
+  permiteEdicionMejora,
+  permiteSeguimientoMejora,
+} from '../../domain/value-objects/estado-plan-mejora.js';
 import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
 import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
 import type { RepositorioPlanMedicionPort } from '../../../medicion/application/ports/plan-medicion.port.js';
@@ -76,7 +77,6 @@ import {
   PlanMejoraTransicionado,
   RetroalimentacionRegistrada,
 } from '../../domain/events/eventos-mejora.js';
-import { permiteActualizarSeguimiento } from '../../domain/value-objects/estado-implementacion.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 import { siguienteCodigoMejora } from '../../domain/value-objects/codigo-mejora.js';
 import {
@@ -156,7 +156,7 @@ export class GestionarPlanesMejora {
       texto?: string;
       aspecto?: AspectoPlanMejora;
       estadoImplementacion?: EstadoImplementacion;
-      estado?: EstadoMedicion;
+      estado?: EstadoMejora;
     },
   ): Promise<readonly DatosPlanMejora[]> {
     await this.exigir(actor, 'mejora.leer', null);
@@ -294,22 +294,15 @@ export class GestionarPlanesMejora {
     await this.eventos.publicar([new PlanMejoraEliminado(actor, id, plan.codigo)]);
   }
 
-  /**
-   * RF-PJ-004, RF-PJ-005, RF-PJ-039, RF-PJ-040 y RF-PJ-041: reusa
-   * `estado-plan.ts` tal cual, mismo estado documental que
-   * `medicion`/`evaluacion`. RF-PJ-039 (enviar a revisión), RF-PJ-040
-   * (aprobar) y RF-PJ-041 (rechazar/observar) son las tres acciones de este
-   * mismo método genérico, distinguidas por `accion` — no hay un método por
-   * cada una porque la máquina de estados compartida ya las modela.
-   */
+  /** RF-CH-043: Borrador → En revisión → Aprobado, observar vuelve a Borrador. */
   async transicionar(
     actor: Actor,
     id: string,
-    accion: AccionMedicion,
+    accion: AccionMejora,
     contexto: { comentario?: string },
   ): Promise<DatosPlanMejora> {
     const plan = await this.exigirPlan(id);
-    const transicion = describirTransicion(accion);
+    const transicion = describirTransicionMejora(accion);
     // RF-PJ-044: la aprobación queda restringida al rol que tiene el permiso
     // `mejora.aprobar` — este mismo `exigir` ya hace cumplir esa
     // restricción, sea cual sea el permiso que le corresponda a `accion`.
@@ -322,7 +315,7 @@ export class GestionarPlanesMejora {
     // justamente lo que se hace cuando los tiene.
     const resultado = transicion.exigeSinBloqueos ? this.evaluar(plan) : null;
 
-    const r = intentarTransicion(plan.estado, accion, {
+    const r = intentarTransicionMejora(plan.estado, accion, {
       tieneBloqueos: resultado?.tieneBloqueos ?? false,
       comentario: contexto.comentario,
     });
@@ -382,9 +375,7 @@ export class GestionarPlanesMejora {
    * plan del que depende — se resuelve con `planDeEvidencia`, mismo patrón
    * que `guardarEvidencias` en `ConfigurarPlanEvaluacion`.
    *
-   * El bloqueo en Histórico ya lo cubre `exigirSeguimientoEditable`, pero se
-   * mantiene un mensaje específico porque RF-PJ-017 lo pide como
-   * precondición propia — conserva la trazabilidad al requisito.
+   * El bloqueo fuera de Aprobado lo cubre `exigirSeguimientoEditable`.
    */
   async eliminarEvidencia(actor: Actor, evidenciaId: string): Promise<void> {
     const planId = await this.planes.planDeEvidencia(evidenciaId);
@@ -395,11 +386,6 @@ export class GestionarPlanesMejora {
     const plan = await this.exigirPlan(planId);
     await this.exigir(actor, 'mejora.editar', plan.carreraId);
 
-    if (plan.estado === 'Histórico') {
-      throw new ReglaDeNegocioViolada(
-        `RF-PJ-017: no se puede eliminar una evidencia de un plan de mejora en Histórico; ${plan.codigo} está en Histórico.`,
-      );
-    }
     this.exigirSeguimientoEditable(plan);
 
     await this.planes.eliminarEvidencia(evidenciaId);
@@ -559,7 +545,7 @@ export class GestionarPlanesMejora {
 
   /** RF-PJ-006/007: la definición solo se edita en Borrador. */
   private exigirDefinicionEditable(plan: DatosPlanMejora): void {
-    if (!permiteEdicion(plan.estado)) {
+    if (!permiteEdicionMejora(plan.estado)) {
       throw new ReglaDeNegocioViolada(
         `La definición del plan de mejora ${plan.codigo} no admite cambios en estado ${plan.estado}; solo se edita en Borrador.`,
       );
@@ -572,9 +558,9 @@ export class GestionarPlanesMejora {
    * bloquea también en "En revisión" y "Aprobado", no solo en Histórico.
    */
   private exigirSeguimientoEditable(plan: DatosPlanMejora): void {
-    if (!permiteActualizarSeguimiento(plan.estado)) {
+    if (!permiteSeguimientoMejora(plan.estado)) {
       throw new ReglaDeNegocioViolada(
-        `El seguimiento del plan de mejora ${plan.codigo} solo se actualiza en Borrador o Vigente; está en ${plan.estado}.`,
+        `El seguimiento del plan de mejora ${plan.codigo} solo se actualiza en Aprobado; está en ${plan.estado}.`,
       );
     }
   }

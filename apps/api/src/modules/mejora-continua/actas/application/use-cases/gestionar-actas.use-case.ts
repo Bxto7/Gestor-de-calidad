@@ -279,7 +279,7 @@ export class GestionarActas {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
 
-    const ESTADOS_ELEGIBLES = ['Aprobado', 'Vigente'] as const;
+    const ESTADOS_ELEGIBLES = ['Aprobado'] as const; // La Tarea 4 lo sustituye por la última aprobada del linaje.
     const [criterios, objetivos, competencias] = await Promise.all([
       this.planes.listarDeCarrera(acta.carreraId, {
         aspecto: 'CRITERIO_ACREDITACION',

@@ -72,7 +72,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     periodoId: null,
     planEvaluacionId: null,
     planMedicionAfectadoId: null,
-    estado: 'Vigente',
+    estado: 'Aprobado',
     estadoImplementacion: 'Pendiente',
     nombre: '',
     causaRaiz: '',
@@ -144,7 +144,7 @@ describe('RF-PJ-035 — nueva versión', () => {
         porId: async () =>
           plan({
             id: 'pj-1',
-            estado: 'Vigente',
+            estado: 'Aprobado',
             aspecto: 'CRITERIO_ACREDITACION',
             criterioAcreditacionId: 'crit-1',
             codigo: 'PJ-CRI-3',
@@ -169,7 +169,7 @@ describe('RF-PJ-035 — nueva versión', () => {
         porId: async () =>
           plan({
             id: 'pj-3',
-            estado: 'Vigente',
+            estado: 'Aprobado',
             aspecto: 'OBJETIVO_EDUCACIONAL',
             criterioAcreditacionId: null,
             objetivoEducacionalId: 'obj-1',
@@ -214,7 +214,7 @@ describe('RF-PJ-035 — nueva versión', () => {
         porId: async () =>
           plan({
             id: 'pj-1',
-            estado: 'Vigente',
+            estado: 'Aprobado',
             estadoImplementacion: 'En proceso',
             logroMeta: '70%',
             evidencias: [
@@ -243,17 +243,25 @@ describe('RF-PJ-035 — nueva versión', () => {
     await expect(caso.generarNuevaVersion(ACTOR, 'pj-1')).rejects.toThrow(ReglaDeNegocioViolada);
   });
 
+  it('un plan En revisión tampoco: solo se versiona uno Aprobado', async () => {
+    const { caso } = montar({ repo: { porId: async () => plan({ estado: 'En revisión' }) } });
+
+    await expect(caso.generarNuevaVersion(ACTOR, 'pj-1')).rejects.toThrow(
+      'Solo se versiona un plan de mejora Aprobado; PJ-CRI-1 está en En revisión.',
+    );
+  });
+
   it('exige mejora.crear: la nueva versión es un plan nuevo', async () => {
     const { caso } = montar({
       autorizacion: denegar(),
-      repo: { porId: async () => plan({ estado: 'Vigente' }) },
+      repo: { porId: async () => plan({ estado: 'Aprobado' }) },
     });
 
     await expect(caso.generarNuevaVersion(ACTOR, 'pj-1')).rejects.toThrow(AccesoDenegado);
   });
 
   it('deja rastro en la bitácora con su propia acción', async () => {
-    const { caso, vistos } = montar({ repo: { porId: async () => plan({ estado: 'Vigente' }) } });
+    const { caso, vistos } = montar({ repo: { porId: async () => plan({ estado: 'Aprobado' }) } });
 
     await caso.generarNuevaVersion(ACTOR, 'pj-1');
 
@@ -274,14 +282,14 @@ describe('RF-PJ-035 — ramificación: versionar el mismo origen más de una vez
     // Revisión final de rama completa (post 2c-J-C): `origen.version + 1`
     // calcula "profundidad desde la raíz", no "cuántas veces se versionó este
     // linaje". El esquema y `permiteVersionado` sí permiten ramificar — el
-    // origen sigue Vigente/Aprobado/Histórico después de versionarse una vez
+    // origen sigue Aprobado después de versionarse una vez
     // —, así que dos llamadas seguidas sobre el mismo origen deben producir
     // dos hijos con `version` distinta. Este repo doble es intencionalmente
     // *con estado*, a diferencia de `montar()`, porque el propio origen del
     // bug solo aparece cuando `linajeDe` refleja lo que ya se creó entre una
     // llamada y la siguiente — un doble sin estado (como el `linajeDe: async
     // () => [plan()]` por defecto de `montar()`) no lo habría detectado.
-    const origen = plan({ id: 'pj-1', estado: 'Vigente', version: 1, codigo: 'PJ-CRI-1' });
+    const origen = plan({ id: 'pj-1', estado: 'Aprobado', version: 1, codigo: 'PJ-CRI-1' });
     const creadas: DatosPlanMejora[] = [];
 
     const repo: Partial<RepositorioPlanMejoraPort> = {

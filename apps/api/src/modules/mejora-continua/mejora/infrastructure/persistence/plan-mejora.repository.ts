@@ -5,15 +5,14 @@
  *
  * Sigue el patrón de `plan-evaluacion.repository.ts`: `@Injectable`,
  * `PrismaService` por constructor, una `SELECCION` explícita, y
- * traductores `A_BD`/`A_DOMINIO` para los enums. El de `estado` es el mismo
- * mapa que usa `PlanEvaluacionRepositoryPrisma` — es el mismo enum
- * `EstadoMedicion` reutilizado, no uno nuevo.
+ * traductores `A_BD`/`A_DOMINIO` para los enums. El enum de la base es el de
+ * Medición y Evaluación, pero Mejora usa solo tres valores (Bloque 6b).
  */
 
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
-import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
+import type { EstadoMejora } from '../../domain/value-objects/estado-plan-mejora.js';
 import type { CopiaPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 import type { ImpactoPlanMejoraPort } from '../../application/ports/impacto-plan-mejora.port.js';
@@ -31,19 +30,25 @@ import type {
 type EstadoBd = 'BORRADOR' | 'EN_REVISION' | 'APROBADO' | 'VIGENTE' | 'HISTORICO';
 type EstadoImplementacionBd = 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADO';
 
-/** Mismo mapa que `plan-evaluacion.repository.ts`: es el mismo enum de dominio. */
-const A_BD: Readonly<Record<EstadoMedicion, EstadoBd>> = {
+/** Mejora usa tres de los cinco valores del enum de la base (Bloque 6b). */
+const A_BD: Readonly<Record<EstadoMejora, EstadoBd>> = {
   Borrador: 'BORRADOR',
   'En revisión': 'EN_REVISION',
   Aprobado: 'APROBADO',
-  Vigente: 'VIGENTE',
-  Histórico: 'HISTORICO',
 };
 
-const A_DOMINIO = Object.fromEntries(Object.entries(A_BD).map(([k, v]) => [v, k])) as Record<
-  EstadoBd,
-  EstadoMedicion
->;
+/**
+ * Lo que se lee. `VIGENTE` e `HISTORICO` ya no los escribe nadie y la migración
+ * `20261005120000` los llevó a `APROBADO`; se leen como Aprobado por si una base
+ * restaurada de una copia vieja los trae, en lugar de caer en `Borrador`.
+ */
+const A_DOMINIO: Readonly<Record<EstadoBd, EstadoMejora>> = {
+  BORRADOR: 'Borrador',
+  EN_REVISION: 'En revisión',
+  APROBADO: 'Aprobado',
+  VIGENTE: 'Aprobado',
+  HISTORICO: 'Aprobado',
+};
 
 const IMPLEMENTACION_A_BD: Readonly<Record<EstadoImplementacion, EstadoImplementacionBd>> = {
   Pendiente: 'PENDIENTE',
@@ -243,7 +248,7 @@ export class PlanMejoraRepositoryPrisma
     await this.prisma.planMejora.delete({ where: { id } });
   }
 
-  async cambiarEstado(id: string, estado: EstadoMedicion): Promise<DatosPlanMejora> {
+  async cambiarEstado(id: string, estado: EstadoMejora): Promise<DatosPlanMejora> {
     const fila = await this.prisma.planMejora.update({
       where: { id },
       data: { estado: A_BD[estado] },
@@ -342,16 +347,16 @@ export class PlanMejoraRepositoryPrisma
       texto?: string;
       aspecto?: AspectoPlanMejora;
       estadoImplementacion?: EstadoImplementacion;
-      estado?: EstadoMedicion | readonly EstadoMedicion[];
+      estado?: EstadoMejora | readonly EstadoMejora[];
       periodoId?: string;
     },
   ): Promise<DatosPlanMejora[]> {
     let estadoBd: { in: EstadoBd[] } | EstadoBd | undefined;
     const { estado: estadoFiltro } = filtro ?? {};
     if (estadoFiltro && Array.isArray(estadoFiltro)) {
-      estadoBd = { in: estadoFiltro.map((e) => A_BD[e as EstadoMedicion]) };
+      estadoBd = { in: estadoFiltro.map((e) => A_BD[e as EstadoMejora]) };
     } else if (estadoFiltro) {
-      estadoBd = A_BD[estadoFiltro as EstadoMedicion];
+      estadoBd = A_BD[estadoFiltro as EstadoMejora];
     } else {
       estadoBd = undefined;
     }

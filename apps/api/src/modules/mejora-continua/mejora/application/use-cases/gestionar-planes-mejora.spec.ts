@@ -7,8 +7,8 @@
  * puertos, `permitirTodo()` / `denegarRegistrando()` para la autorización, y
  * un `montar()` que arma el caso de uso con esos dobles. El núcleo de la
  * suite de 2c-J-A es la matriz de estados de §2b del diseño: los campos de
- * seguimiento se editan en Borrador y Vigente, y se bloquean en los otros
- * tres estados documentales. El núcleo de 2c-J-B es la resolución real de
+ * seguimiento se editan solo en Aprobado (RF-CH-044), y se bloquean en
+ * Borrador y En revisión. El núcleo de 2c-J-B es la resolución real de
  * `carreraId` (ya no `null`, §2a del diseño) y la validación por aspecto.
  */
 
@@ -37,7 +37,6 @@ import type {
   DatosObjetivoMejora,
   ObjetivosCrossModuloPort,
 } from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
-import type { EstadoMedicion } from '../../../domain/value-objects/estado-plan.js';
 import type {
   ConfiguracionDelPlan,
   RepositorioConfiguracionEvaluacionPort,
@@ -820,7 +819,7 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
     expect(actualizado.nombre).toBe('Reforzar tutoría');
   });
 
-  it.each(['En revisión', 'Aprobado', 'Vigente', 'Histórico'] as const)(
+  it.each(['En revisión', 'Aprobado'] as const)(
     'se bloquea en %s',
     async (estado) => {
       const { caso } = montar({ plan: plan({ estado }) });
@@ -850,7 +849,7 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
 
 describe('RF-PJ-008 — el borrado', () => {
   it('solo en Borrador', async () => {
-    const { caso } = montar({ plan: plan({ estado: 'Vigente' }) });
+    const { caso } = montar({ plan: plan({ estado: 'Aprobado' }) });
 
     await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(ReglaDeNegocioViolada);
   });
@@ -880,12 +879,34 @@ describe('RF-PJ-008 — el borrado', () => {
 });
 
 describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
-  it('reusa la máquina de estados documental compartida', async () => {
+  it('usa la máquina propia de Mejora: Borrador → En revisión', async () => {
     const { caso } = montar({ plan: plan({ estado: 'Borrador' }) });
 
     const resultado = await caso.transicionar(ACTOR, 'pj-1', 'enviar-a-revision', {});
 
     expect(resultado.estado).toBe('En revisión');
+  });
+
+  it('observar devuelve a Borrador y pide comentario', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'En revisión' }) });
+
+    await expect(caso.transicionar(ACTOR, 'pj-1', 'observar', {})).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+    const resultado = await caso.transicionar(ACTOR, 'pj-1', 'observar', {
+      comentario: 'Falta justificar',
+    });
+    expect(resultado.estado).toBe('Borrador');
+  });
+
+  it('aprobar es el final: un plan Aprobado no tiene más transiciones', async () => {
+    const { caso } = montar({ plan: plan({ estado: 'Aprobado' }) });
+
+    for (const accion of ['enviar-a-revision', 'aprobar', 'observar'] as const) {
+      await expect(caso.transicionar(ACTOR, 'pj-1', accion, { comentario: 'x' })).rejects.toThrow(
+        ReglaDeNegocioViolada,
+      );
+    }
   });
 
   it('una transición imposible se rechaza', async () => {
@@ -960,7 +981,7 @@ describe('RF-PJ-042 — la validación integral antes de enviar a revisión o ap
   });
 
   it('observar (rechazar) nunca se bloquea por esta validación, sin importar qué tan incompleto esté el plan', async () => {
-    // `observar` tiene `exigeSinBloqueos: false` en estado-plan.ts: devolver
+    // `observar` tiene `exigeSinBloqueos: false` en estado-plan-mejora.ts: devolver
     // un plan con problemas es justamente lo que se hace cuando los tiene —
     // exigirle estar limpio para eso sería contradictorio.
     const { caso } = montar({
@@ -1004,15 +1025,13 @@ describe('RF-PJ-042 — la validación integral antes de enviar a revisión o ap
  * §2b del diseño de 2c-J-A: la matriz de estados del seguimiento. Se recorre
  * una sola vez con `it.each` y se reutiliza para las cuatro operaciones de
  * seguimiento, porque la propiedad que se comprueba es la misma en las
- * cuatro: el guardián `permiteActualizarSeguimiento`.
+ * cuatro: el guardián `permiteSeguimientoMejora`.
  */
-const MATRIZ_SEGUIMIENTO: readonly [EstadoMedicion, boolean][] = [
-  ['Borrador', true],
+const MATRIZ_SEGUIMIENTO = [
+  ['Borrador', false],
   ['En revisión', false],
-  ['Aprobado', false],
-  ['Vigente', true],
-  ['Histórico', false],
-];
+  ['Aprobado', true],
+] as const;
 
 describe('RF-PJ-014 — el estado de implementación', () => {
   it.each(MATRIZ_SEGUIMIENTO)('en %s, permitido = %s', async (estado, permitido) => {
@@ -1037,7 +1056,7 @@ describe('RF-PJ-014 — el estado de implementación', () => {
   });
 
   it('deja constancia en la bitácora', async () => {
-    const { caso, publicados } = montar();
+    const { caso, publicados } = montar({ plan: plan({ estado: 'Aprobado' }) });
 
     await caso.actualizarImplementacion(ACTOR, 'pj-1', 'En proceso');
 
@@ -1075,12 +1094,6 @@ describe('RF-PJ-016 y RF-PJ-017 — evidencias', () => {
     }
   });
 
-  it('RF-PJ-017: eliminar en Histórico lleva el mensaje específico del requisito', async () => {
-    const { caso } = montar({ plan: plan({ estado: 'Histórico' }) });
-
-    await expect(caso.eliminarEvidencia(ACTOR, 'evi-1')).rejects.toThrow(/Histórico/);
-  });
-
   it('una evidencia sin plan es 404', async () => {
     const { caso } = montar({ planes: { planDeEvidencia: async () => null } });
 
@@ -1103,6 +1116,7 @@ describe('RF-PJ-016 y RF-PJ-017 — evidencias', () => {
 
   it('cargar deja constancia en la bitácora', async () => {
     const { caso, publicados } = montar({
+      plan: plan({ estado: 'Aprobado' }),
       planes: { agregarEvidencia: async (id, e) => evidencia({ planMejoraId: id, ...e }) },
     });
 
@@ -1116,7 +1130,7 @@ describe('RF-PJ-016 y RF-PJ-017 — evidencias', () => {
   });
 
   it('eliminar deja constancia en la bitácora', async () => {
-    const { caso, publicados } = montar();
+    const { caso, publicados } = montar({ plan: plan({ estado: 'Aprobado' }) });
 
     await caso.eliminarEvidencia(ACTOR, 'evi-1');
 
@@ -1152,7 +1166,7 @@ describe('RF-PJ-018 — la retroalimentación', () => {
   });
 
   it('deja constancia en la bitácora', async () => {
-    const { caso, publicados } = montar();
+    const { caso, publicados } = montar({ plan: plan({ estado: 'Aprobado' }) });
 
     await caso.actualizarRetroalimentacion(ACTOR, 'pj-1', 'logro', 'impacto');
 
@@ -1187,11 +1201,11 @@ describe('RepositorioPlanMejoraPort — contrato ampliado (2c-AC-B)', () => {
     // archivo entero deja de tipar y ningún test de este spec corre.
     const _firmaEstadoArreglo: Parameters<
       import('../ports/plan-mejora.port.js').RepositorioPlanMejoraPort['listarDeCarrera']
-    >[1] = { estado: ['Aprobado', 'Vigente'] };
+    >[1] = { estado: ['Aprobado'] };
     const _firmaPlanesPorIds: ReturnType<
       import('../ports/plan-mejora.port.js').RepositorioPlanMejoraPort['planesPorIds']
     > = Promise.resolve([]);
-    expect(_firmaEstadoArreglo.estado).toEqual(['Aprobado', 'Vigente']);
+    expect(_firmaEstadoArreglo.estado).toEqual(['Aprobado']);
     void _firmaPlanesPorIds;
   });
 });

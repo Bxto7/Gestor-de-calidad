@@ -478,7 +478,7 @@ describe('eliminar', () => {
 });
 
 describe('cargarAccionesDelPeriodo', () => {
-  it('carga candidatas Aprobado/Vigente de Criterio y Objetivo sin filtrar por periodo', async () => {
+  it('carga candidatas Aprobadas de Criterio y Objetivo sin filtrar por periodo', async () => {
     const filtrosRecibidos: unknown[] = [];
     const planes = repoPlanesMejora({
       listarDeCarrera: async (_carreraId, filtro) => {
@@ -497,8 +497,8 @@ describe('cargarAccionesDelPeriodo', () => {
 
     expect(cantidad).toBe(2);
     expect(filtrosRecibidos).toEqual([
-      { aspecto: 'CRITERIO_ACREDITACION', estado: ['Aprobado', 'Vigente'] },
-      { aspecto: 'OBJETIVO_EDUCACIONAL', estado: ['Aprobado', 'Vigente'] },
+      { aspecto: 'CRITERIO_ACREDITACION', estado: ['Aprobado'] },
+      { aspecto: 'OBJETIVO_EDUCACIONAL', estado: ['Aprobado'] },
     ]);
   });
 

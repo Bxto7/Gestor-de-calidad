@@ -18,7 +18,7 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
-import { permiteVersionado } from '../../../domain/value-objects/estado-plan.js';
+import { permiteVersionadoMejora } from '../../domain/value-objects/estado-plan-mejora.js';
 import { copiarPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import { PlanMejoraVersionado } from '../../domain/events/eventos-mejora.js';
 import { siguienteCodigoMejora } from '../../domain/value-objects/codigo-mejora.js';
@@ -48,10 +48,9 @@ export class VersionarPlanMejora {
     // RF-PJ-042 (2c-J-D): las escrituras que crean un plan exigen `mejora.crear`.
     await this.exigir(actor, 'mejora.crear', origen.carreraId);
 
-    if (!permiteVersionado(origen.estado)) {
+    if (!permiteVersionadoMejora(origen.estado)) {
       throw new ReglaDeNegocioViolada(
-        `Solo se versiona un plan de mejora aprobado, vigente o histórico. Este está en ` +
-          `${origen.estado} y se puede editar directamente.`,
+        `Solo se versiona un plan de mejora Aprobado; ${origen.codigo} está en ${origen.estado}.`,
       );
     }
 
@@ -68,7 +67,7 @@ export class VersionarPlanMejora {
     // `origen.version + 1` calcula "profundidad desde la raíz", no "cuántas
     // veces se versionó este linaje": si el mismo plan se versiona dos veces
     // (dos hijos del mismo origen — ramificación, que el esquema y
-    // `permiteVersionado` permiten porque el origen sigue en un estado
+    // `permiteVersionadoMejora` permiten porque el origen sigue en un estado
     // elegible tras versionarse), ambos hijos calcularían el mismo número y
     // colisionarían. El máximo del linaje entero sí es único por construcción:
     // cada versión nueva queda por encima de cualquier otra ya creada a

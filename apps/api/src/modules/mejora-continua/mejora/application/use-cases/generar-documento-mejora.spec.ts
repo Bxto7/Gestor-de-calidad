@@ -91,7 +91,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
     periodoId: null,
     planEvaluacionId: null,
     planMedicionAfectadoId: null,
-    estado: 'Vigente',
+    estado: 'Aprobado',
     estadoImplementacion: 'En proceso',
     nombre: 'Reforzar el taller de fundamentos',
     causaRaiz: 'Bajo desempeño en la evaluación diagnóstica.',
