@@ -16,6 +16,7 @@ import { ConfirmarEliminacion } from '@/shared/components/ConfirmarEliminacion';
 import { Boton } from '@/shared/components/ui';
 
 import { permiteEliminacion } from '../domain/estado-medicion';
+import { permiteEliminacionMejora } from '../domain/estado-mejora';
 import type { EstadoMedicion, EstadoMejora } from '../domain/tipos';
 
 export function EliminarPlan({
@@ -36,7 +37,12 @@ export function EliminarPlan({
 }) {
   const [abierto, setAbierto] = useState(false);
 
-  if (!permiteEliminacion(plan.estado)) return null;
+  // Cada ciclo decide con su propia regla: Mejora tiene tres estados; Medición y Evaluación, cinco.
+  const permitido =
+    permiso === 'mejora.eliminar'
+      ? permiteEliminacionMejora(plan.estado as EstadoMejora)
+      : permiteEliminacion(plan.estado);
+  if (!permitido) return null;
 
   return (
     <SiPuede permiso={permiso} carreraId={plan.carreraId}>

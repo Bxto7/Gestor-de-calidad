@@ -12,7 +12,7 @@
  * aserción a nivel de componente.
  */
 
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -257,6 +257,77 @@ describe('RF-CH-045 — el responsable es un selector de docentes de la carrera'
     expect(
       await screen.findByRole('option', { name: 'Coordinación académica (sin vincular)' }),
     ).toBeInTheDocument();
+  });
+
+  it('si el docente guardado no está entre los activos, se sigue mostrando su nombre', async () => {
+    planDevuelto({ estado: 'Aprobado', responsable: 'Beatriz Baja', responsableId: 'doc-baja' });
+    docentesDelPlan([{ id: 'doc-1', nombre: 'Ana Docente' }]);
+    renderizar(['mejora.leer']);
+
+    const selector = await screen.findByRole<HTMLSelectElement>('combobox', {
+      name: 'Responsable',
+    });
+    await screen.findByRole('option', { name: 'Ana Docente' });
+    expect(selector.value).toBe('doc-baja');
+    expect(selector.selectedOptions[0]?.textContent).toBe('Beatriz Baja');
+  });
+
+  it('mientras los docentes cargan (o fallan) el responsable guardado ya se ve', async () => {
+    planDevuelto({ estado: 'Aprobado', responsable: 'Beatriz Baja', responsableId: 'doc-baja' });
+    api.docentesDelPlanMejora.mockRejectedValue(new ErrorDeNegocio('Sin permiso', 403));
+    renderizar(['mejora.leer']);
+
+    const selector = await screen.findByRole<HTMLSelectElement>('combobox', {
+      name: 'Responsable',
+    });
+    expect(selector.selectedOptions[0]?.textContent).toBe('Beatriz Baja');
+  });
+
+  it('plan heredado: dejar la opción heredada no envía nada, y editar otro campo no manda responsable ni responsableId', async () => {
+    planDevuelto({
+      estado: 'Borrador',
+      responsable: 'Coordinación académica',
+      responsableId: null,
+    });
+    docentesDelPlan([{ id: 'doc-1', nombre: 'Ana Docente' }]);
+    renderizar(['mejora.leer', 'mejora.editar']);
+
+    const selector = await screen.findByRole('combobox', { name: 'Responsable' });
+    await screen.findByRole('option', { name: 'Ana Docente' });
+    await userEvent.selectOptions(selector, '');
+    expect(api.editarDefinicionMejora).not.toHaveBeenCalled();
+
+    const metas = screen.getByRole('textbox', { name: 'Metas' });
+    await userEvent.clear(metas);
+    await userEvent.type(metas, 'Otras metas');
+    await userEvent.tab();
+
+    expect(api.editarDefinicionMejora).toHaveBeenCalledTimes(1);
+    const datos = api.editarDefinicionMejora.mock.calls[0]?.[1] as
+      Record<string, unknown> | undefined;
+    expect(datos).not.toHaveProperty('responsable');
+    expect(datos?.responsableId).toBeUndefined();
+  });
+
+  it('el aviso de «sin docentes» no sale a quien no puede editar', async () => {
+    planDevuelto({ estado: 'Aprobado' });
+    docentesDelPlan([]);
+    renderizar(['mejora.leer']);
+
+    await screen.findByRole('combobox', { name: 'Responsable' });
+    await waitFor(() => expect(api.docentesDelPlanMejora).toHaveBeenCalled());
+    expect(screen.queryByText(/registrar primero docentes/i)).not.toBeInTheDocument();
+  });
+
+  it('a quien puede editar se le avisa y el aviso queda asociado al selector', async () => {
+    planDevuelto({ estado: 'Borrador' });
+    docentesDelPlan([]);
+    renderizar(['mejora.leer', 'mejora.editar']);
+
+    const aviso = await screen.findByText(/registrar primero docentes/i);
+    expect(screen.getByRole('combobox', { name: 'Responsable' })).toHaveAccessibleDescription(
+      aviso.textContent ?? '',
+    );
   });
 
   it('un cambio de otro campo reenvía el `responsableId` vigente y nunca el texto', async () => {

@@ -121,6 +121,11 @@ describe('EliminarPlan — planes de mejora (RF-CH-042)', () => {
     expect(screen.queryByRole('button', { name: 'Eliminar PJ-1' })).not.toBeInTheDocument();
   });
 
+  it('en un plan de mejora, Vigente e Histórico (ajenos a su ciclo) no se ofrecen', () => {
+    montarMejora('Vigente' as EstadoMejora);
+    expect(screen.queryByRole('button', { name: 'Eliminar PJ-1' })).not.toBeInTheDocument();
+  });
+
   it('sin `mejora.eliminar` no se ofrece', () => {
     montarMejora('Borrador', ['mejora.leer']);
     expect(screen.queryByRole('button', { name: 'Eliminar PJ-1' })).not.toBeInTheDocument();

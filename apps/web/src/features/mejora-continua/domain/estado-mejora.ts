@@ -1,9 +1,10 @@
 /**
  * Copia del ciclo propio de Mejora (RF-CH-043, RF-CH-044).
  *
- * El backend es la autoridad: aquí solo se decide qué acciones pintar. Comparte
- * juego de pruebas con el original, de modo que si las dos divergen alguna de las
- * dos suites falla. No incluye `intentarTransicion`: validar es cosa del servidor.
+ * El backend es la autoridad: aquí solo se decide qué acciones pintar. Sus
+ * reglas se repiten en las pruebas de este archivo y en las del backend, así que
+ * si divergen alguna de las dos suites falla. No incluye `intentarTransicion`:
+ * validar es cosa del servidor.
  */
 
 import type { AccionMejora, EstadoMejora } from './tipos';

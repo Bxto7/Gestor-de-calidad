@@ -456,7 +456,14 @@ export function PlanMejoraPage() {
                 )}
               </Campo>
 
-              <Campo etiqueta="Responsable">
+              <Campo
+                etiqueta="Responsable"
+                ayuda={
+                  editableDefinicion && docentes?.length === 0
+                    ? 'Esta carrera no tiene docentes activos: registrar primero docentes en Plan de Estudios.'
+                    : undefined
+                }
+              >
                 {(props) => (
                   <Selector
                     {...props}
@@ -479,6 +486,12 @@ export function PlanMejoraPage() {
                         ? `${plan.responsable} (sin vincular)`
                         : 'Selecciona un docente…'}
                     </option>
+                    {/* Docente guardado que ya no figura entre los activos (o la lista aún no llega): se muestra su nombre. */}
+                    {plan.responsableId && !docentes?.some((d) => d.id === plan.responsableId) && (
+                      <option value={plan.responsableId}>
+                        {plan.responsable || 'Docente asignado'}
+                      </option>
+                    )}
                     {(docentes ?? []).map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.nombre}
@@ -487,12 +500,6 @@ export function PlanMejoraPage() {
                   </Selector>
                 )}
               </Campo>
-              {docentes?.length === 0 && (
-                <p className="text-sm text-tinta-suave">
-                  Esta carrera no tiene docentes activos: registrar primero docentes en Plan de
-                  Estudios.
-                </p>
-              )}
             </div>
           </Tarjeta>
         </div>
