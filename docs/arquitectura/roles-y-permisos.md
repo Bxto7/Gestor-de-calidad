@@ -16,18 +16,18 @@ cuál carrera*. Son una conjunción: no basta con tener el permiso.
   carrera (siguiente punto); el Consultor y el Administrador leen todas.
 - **Permisos de solo lectura** (los `.leer`): no están acotados por la política;
   lo que los acota es la marca **`lectura.solo_su_carrera`**. Quien la tiene
-  —Director y, desde el Bloque 6a (RF-CH-034, RF-CH-038), Coordinador— lee solo
-  la carrera que tiene a cargo, y sin carrera asignada no lee ninguna. Sin la
+  —Director, Coordinador (desde el Bloque 6a, RF-CH-034, RF-CH-038) y Docente
+  (desde el 6b, RF-CH-041)— lee solo la carrera que tiene a cargo, y sin carrera asignada no lee ninguna. Sin la
   marca (Administrador, Consultor) se lee cualquier carrera. Hoy la marca hace que
   lo de otra carrera responda 404, como si no existiera, en Acreditación
-  (atributos del graduado y criterios), en los planes de Medición y de Evaluación
-  y en sus documentos (exportación, estado y descarga). **Todavía no** en los
-  planes de Mejora ni en las Actas de Aprobación: los bloques siguientes los
-  acotan.
+  (atributos del graduado y criterios), en los planes de Medición, de Evaluación
+  **y de Mejora** y en sus documentos (exportación, estado y descarga).
+  **Todavía no** en las Actas de Aprobación: el Bloque 6c las acota.
 - La marca llega a una base de datos **solo** al ejecutar el seed
   (`npx tsx prisma/seed.ts`, después de `prisma migrate deploy`): el seed
   reemplaza el conjunto de permisos de cada rol, así que una base migrada pero sin
-  re-sembrar no la tiene.
+  re-sembrar no la tiene. Esto incluye a los Docentes, que reciben la marca en el
+  6b: sin re-sembrar leen todas las carreras.
 - Un usuario tiene **una sola** carrera a cargo (lo impone un `UNIQUE` sobre
   `usuario_id` en `usuario_carrera`).
 - El rol y la carrera llegan juntos a la decisión: un Director sin carrera
@@ -44,6 +44,14 @@ evaluacion.crear, evaluacion.editar, evaluacion.eliminar, evaluacion.aprobar,
 mejora.crear, mejora.editar, mejora.eliminar, mejora.aprobar,
 actas.crear, actas.editar, actas.eliminar, actas.aprobar
 ```
+
+### Responsables
+
+El responsable de un plan de Mejora y el docente evaluador y el responsable de
+competencia indirecta de Evaluación se eligen entre los **docentes activos de la
+carrera del plan** (`DirectorioDeUsuariosPort.docentesActivosDeCarrera`,
+RF-CH-045, RF-CH-046). Lo ya guardado se sigue mostrando aunque esa persona se
+inactive.
 
 ---
 
@@ -84,7 +92,7 @@ carrera**. Es el rol más poderoso en lo académico.
 | Contenido curricular | leer + gestionar: objetivos, competencias, atributos del graduado, criterios de acreditación, asignaturas, malla |
 | Plan de medición | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
 | Plan de evaluación | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
-| Plan de mejora | leer, crear, editar, eliminar, **aprobar/observar/dar vigencia** |
+| Plan de mejora | leer, crear, editar, eliminar (en Borrador o En revisión), **aprobar/observar** |
 | Actas de Aprobación | leer, crear, editar, eliminar, **aprobar** |
 | Reportes | generar PDF y Excel |
 | Auditoría | leer historial de cambios |
@@ -102,7 +110,7 @@ carrera**. Lleva `lectura.solo_su_carrera`: en los módulos que ya la aplican
 **Alcance de lectura:** solo su carrera (`lectura.solo_su_carrera`, Bloque 6a).
 Los planes de Medición y de Evaluación (con sus documentos) y Acreditación de
 otra carrera le responden 404; el panel general de Reportes, 403. Los planes de
-Mejora y las Actas todavía no se acotan por carrera en la lectura (§1).
+Mejora (con sus documentos) también; las Actas todavía no (§1).
 **Filosofía:** apoyo operativo: **arma** el plan y lo envía a revisión, pero
 **no aprueba ni observa**. La separación es deliberada: *quien construye no
 puede ser quien da el visto bueno* — eso es lo que hace que la aprobación
@@ -128,6 +136,9 @@ entidad que edita, RF-PM-032), y le falta `plan.eliminar` y `plan.nueva_version`
 ## 5. DOCENTE — Docente
 
 **Requiere carrera:** Sí (una).
+**Alcance de lectura:** solo su carrera (`lectura.solo_su_carrera`, Bloque 6b): ve
+**todos** los planes de mejora de su carrera, no solo aquellos en los que es
+responsable.
 **Filosofía:** solo lectura del detalle curricular ligado a su labor.
 
 | Área | Puede |
