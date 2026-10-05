@@ -155,110 +155,59 @@ describe('planesMejoraDeCarrera', () => {
     plazo: new Date('2026-10-12'),
   };
 
-  it('trae los planes de la carrera, con sus estados, y omite las versiones históricas', async () => {
+  async function planMejora(
+    codigo: string,
+    carreraId: string,
+    estado: 'BORRADOR' | 'EN_REVISION' | 'APROBADO',
+    derivadoDeId: string | null = null,
+  ) {
+    return prisma.planMejora.create({
+      data: {
+        ...definicion,
+        codigo,
+        aspecto: 'CRITERIO_ACREDITACION',
+        carreraId,
+        estado,
+        derivadoDeId,
+      },
+    });
+  }
+
+  it('trae los planes de la carrera, con sus estados', async () => {
     const { carreraId } = await planDeEstudios();
     const otra = await planDeEstudios();
-    const k = randomUUID();
-    await prisma.planMejora.createMany({
-      data: [
-        {
-          ...definicion,
-          codigo: 'PM-1',
-          aspecto: 'COMPETENCIA',
-          carreraId,
-          competenciaId: k,
-          estado: 'EN_REVISION',
-        },
-        {
-          ...definicion,
-          codigo: 'PM-2',
-          aspecto: 'CRITERIO_ACREDITACION',
-          carreraId,
-          estado: 'VIGENTE',
-          estadoImplementacion: 'EN_PROCESO',
-        },
-        {
-          ...definicion,
-          codigo: 'PM-3',
-          aspecto: 'CRITERIO_ACREDITACION',
-          carreraId,
-          estado: 'HISTORICO',
-        },
-        {
-          ...definicion,
-          codigo: 'PM-4',
-          aspecto: 'CRITERIO_ACREDITACION',
-          carreraId: otra.carreraId,
-        },
-      ],
-    });
+    await planMejora('PJ-B', carreraId, 'BORRADOR');
+    await planMejora('PJ-R', carreraId, 'EN_REVISION');
+    await planMejora('PJ-A', carreraId, 'APROBADO');
+    await planMejora('PJ-X', otra.carreraId, 'APROBADO');
 
-    const r = await repo.planesMejoraDeCarrera(carreraId);
+    const planes = await repo.planesMejoraDeCarrera(carreraId);
 
-    expect(r.map((p) => p.codigo).sort()).toEqual(['PM-1', 'PM-2']);
-    const pm1 = r.find((p) => p.codigo === 'PM-1');
-    expect(pm1).toMatchObject({
-      aspecto: 'COMPETENCIA',
-      competenciaId: k,
-      estado: 'EN_REVISION',
-      estadoImplementacion: 'PENDIENTE',
-      responsable: 'L. Vidal',
-      plazo: new Date('2026-10-12'),
-    });
+    expect(planes.map((p) => [p.codigo, p.estado]).sort()).toEqual([
+      ['PJ-A', 'APROBADO'],
+      ['PJ-B', 'BORRADOR'],
+      ['PJ-R', 'EN_REVISION'],
+    ]);
   });
 
-  it('de un linaje versionado trae solo la versión más nueva', async () => {
+  it('de un linaje con varias versiones aprobadas cuenta solo la última (RF-CH-043)', async () => {
     const { carreraId } = await planDeEstudios();
-    const origen = await prisma.planMejora.create({
-      data: {
-        ...definicion,
-        codigo: 'PM-O',
-        aspecto: 'CRITERIO_ACREDITACION',
-        carreraId,
-        estado: 'VIGENTE',
-      },
-    });
-    await prisma.planMejora.create({
-      data: {
-        ...definicion,
-        codigo: 'PM-O-V2',
-        aspecto: 'CRITERIO_ACREDITACION',
-        carreraId,
-        estado: 'BORRADOR',
-        derivadoDeId: origen.id,
-      },
-    });
+    const v1 = await planMejora('PJ-1', carreraId, 'APROBADO');
+    await planMejora('PJ-2', carreraId, 'APROBADO', v1.id);
 
-    const r = await repo.planesMejoraDeCarrera(carreraId);
+    const planes = await repo.planesMejoraDeCarrera(carreraId);
 
-    expect(r.map((p) => p.codigo)).toEqual(['PM-O-V2']);
+    expect(planes.map((p) => p.codigo)).toEqual(['PJ-2']);
   });
 
-  it('si la versión derivada es histórica, el origen sigue contando', async () => {
+  it('una versión derivada en Borrador no esconde a la aprobada que sigue en vigor: cuentan las dos', async () => {
     const { carreraId } = await planDeEstudios();
-    const origen = await prisma.planMejora.create({
-      data: {
-        ...definicion,
-        codigo: 'PM-O',
-        aspecto: 'CRITERIO_ACREDITACION',
-        carreraId,
-        estado: 'VIGENTE',
-      },
-    });
-    await prisma.planMejora.create({
-      data: {
-        ...definicion,
-        codigo: 'PM-O-V2',
-        aspecto: 'CRITERIO_ACREDITACION',
-        carreraId,
-        estado: 'HISTORICO',
-        derivadoDeId: origen.id,
-      },
-    });
+    const v1 = await planMejora('PJ-1', carreraId, 'APROBADO');
+    await planMejora('PJ-2', carreraId, 'BORRADOR', v1.id);
 
-    const r = await repo.planesMejoraDeCarrera(carreraId);
+    const planes = await repo.planesMejoraDeCarrera(carreraId);
 
-    expect(r.map((p) => p.codigo)).toEqual(['PM-O']);
+    expect(planes.map((p) => p.codigo).sort()).toEqual(['PJ-1', 'PJ-2']);
   });
 });
 

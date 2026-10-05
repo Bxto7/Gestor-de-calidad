@@ -118,19 +118,28 @@ describe('chip de cada plan de mejora abierto', () => {
 });
 
 describe('qué es un plan de mejora abierto', () => {
-  it('excluye los completados y las versiones históricas', () => {
+  it('excluye los completados', () => {
     const r = calcularResumenDeCarrera(
       entrada({
-        planesMejora: [
-          plan({ id: '1' }),
-          plan({ id: '2', estadoImplementacion: 'COMPLETADO' }),
-          plan({ id: '3', estado: 'HISTORICO' }),
-        ],
+        planesMejora: [plan({ id: '1' }), plan({ id: '2', estadoImplementacion: 'COMPLETADO' })],
       }),
     );
     expect(r.planesMejoraAbiertos.map((p) => p.id)).toEqual(['1']);
     expect(r.kpis.planesMejoraAbiertos).toBe(1);
     expect(r.mejoraContinua.planesMejoraAbiertos).toBe(1);
+  });
+
+  it('cuenta todos los planes que le llegan: filtrar lo superado es de la lectura, no del cálculo', () => {
+    const r = calcularResumenDeCarrera(
+      entrada({
+        planesMejora: [
+          plan({ id: 'p1', estado: 'APROBADO' }),
+          plan({ id: 'p2', codigo: 'PJ-2', estado: 'EN_REVISION' }),
+        ],
+      }),
+    );
+
+    expect(r.kpis.planesMejoraAbiertos).toBe(2);
   });
 });
 

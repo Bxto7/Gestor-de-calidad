@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
+import { ultimasAprobadasDelLinaje } from '../../../domain/services/ultima-aprobada-del-linaje.js';
 import type {
   LecturaResumenCarreraPort,
   SinResponsableCrudo,
@@ -71,17 +72,15 @@ export class ResumenCarreraRepositoryPrisma implements LecturaResumenCarreraPort
   }
 
   async planesMejoraDeCarrera(carreraId: string): Promise<readonly PlanMejoraLeido[]> {
+    // RF-CH-043: «vigente» es la última aprobada del linaje (regla única). Los planes
+    // en Borrador y En revisión siguen contando: son trabajo en curso, y el pendiente
+    // «Aprobar planes» del Director sale de los que están En revisión. Una aprobada
+    // superada por otra aprobada de su linaje ya no cuenta (duplicaría la acción).
     const filas = await this.prisma.planMejora.findMany({
-      // La versión más reciente de cada linaje, salvo las históricas: una versión
-      // nueva copia nombre, plazo y responsable, y el origen sigue Vigente hasta
-      // que alguien lo archiva; contar ambas duplicaría la misma acción.
-      where: {
-        carreraId,
-        estado: { not: 'HISTORICO' },
-        derivados: { none: { estado: { not: 'HISTORICO' } } },
-      },
+      where: { carreraId },
       select: {
         id: true,
+        derivadoDeId: true,
         codigo: true,
         nombre: true,
         aspecto: true,
@@ -92,7 +91,22 @@ export class ResumenCarreraRepositoryPrisma implements LecturaResumenCarreraPort
         plazo: true,
       },
     });
-    return filas;
+    const vigentes = new Set(
+      ultimasAprobadasDelLinaje(filas, (f) => f.estado === 'APROBADO').map((f) => f.id),
+    );
+    return filas
+      .filter((f) => f.estado !== 'APROBADO' || vigentes.has(f.id))
+      .map((f) => ({
+        id: f.id,
+        codigo: f.codigo,
+        nombre: f.nombre,
+        aspecto: f.aspecto,
+        competenciaId: f.competenciaId,
+        estado: f.estado,
+        estadoImplementacion: f.estadoImplementacion,
+        responsable: f.responsable,
+        plazo: f.plazo,
+      }));
   }
 
   async actasPorCerrarDeCarrera(carreraId: string): Promise<readonly ActaLeida[]> {

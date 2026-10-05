@@ -20,11 +20,18 @@ import type { ContenidoCurricularPort } from '../../../../plan-estudios/applicat
 import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
 import type { RepositorioPlanEvaluacionPort } from '../../../evaluacion/application/ports/plan-evaluacion.port.js';
 import type { RepositorioPlanMedicionPort } from '../../../medicion/application/ports/plan-medicion.port.js';
-import type { RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
+import type {
+  AspectoPlanMejora,
+  RepositorioPlanMejoraPort,
+} from '../../../mejora/application/ports/plan-mejora.port.js';
+import { ultimasAprobadasDelLinaje } from '../../../domain/services/ultima-aprobada-del-linaje.js';
 import { porcentajeDeMeta } from '../../../medicion/domain/value-objects/meta.js';
 import { candidatasParaCargar } from '../../domain/services/candidatas-acciones-acta.js';
 import { calcularPorcentajeMedicionAnterior } from '../../../mejora/application/services/porcentaje-periodo-anterior.js';
-import { formatearCodigoActa, siguienteCorrelativoActa } from '../../domain/value-objects/correlativo-acta.js';
+import {
+  formatearCodigoActa,
+  siguienteCorrelativoActa,
+} from '../../domain/value-objects/correlativo-acta.js';
 import {
   describirTransicion,
   intentarTransicion,
@@ -279,22 +286,18 @@ export class GestionarActas {
       throw new ReglaDeNegocioViolada('RF-AC-017: el acta solo se edita en estado Borrador.');
     }
 
-    const ESTADOS_ELEGIBLES = ['Aprobado'] as const; // La Tarea 4 lo sustituye por la última aprobada del linaje.
+    // RF-CH-043: con varias versiones aprobadas de un linaje, solo la última es la
+    // vigente. La regla vive en un solo sitio (`ultimasAprobadasDelLinaje`).
+    const ultimasAprobadas = async (filtro: { aspecto: AspectoPlanMejora; periodoId?: string }) =>
+      ultimasAprobadasDelLinaje(
+        await this.planes.listarDeCarrera(acta.carreraId, { ...filtro, estado: 'Aprobado' }),
+        () => true, // `listarDeCarrera` ya filtró por Aprobado
+      );
     const [criterios, objetivos, competencias] = await Promise.all([
-      this.planes.listarDeCarrera(acta.carreraId, {
-        aspecto: 'CRITERIO_ACREDITACION',
-        estado: ESTADOS_ELEGIBLES,
-      }),
-      this.planes.listarDeCarrera(acta.carreraId, {
-        aspecto: 'OBJETIVO_EDUCACIONAL',
-        estado: ESTADOS_ELEGIBLES,
-      }),
+      ultimasAprobadas({ aspecto: 'CRITERIO_ACREDITACION' }),
+      ultimasAprobadas({ aspecto: 'OBJETIVO_EDUCACIONAL' }),
       acta.periodoMedicionId
-        ? this.planes.listarDeCarrera(acta.carreraId, {
-            aspecto: 'COMPETENCIA',
-            estado: ESTADOS_ELEGIBLES,
-            periodoId: acta.periodoMedicionId,
-          })
+        ? ultimasAprobadas({ aspecto: 'COMPETENCIA', periodoId: acta.periodoMedicionId })
         : Promise.resolve([]),
     ]);
     // RF-AC-007 RN2: orden fijo de secciones.
@@ -317,7 +320,11 @@ export class GestionarActas {
         candidata.competenciaId &&
         candidata.periodoId
           ? await calcularPorcentajeMedicionAnterior(
-              { evaluaciones: this.evaluaciones, mediciones: this.mediciones, configuraciones: this.configuraciones },
+              {
+                evaluaciones: this.evaluaciones,
+                mediciones: this.mediciones,
+                configuraciones: this.configuraciones,
+              },
               candidata.planEvaluacionId,
               candidata.competenciaId,
               candidata.periodoId,
@@ -417,7 +424,14 @@ export class GestionarActas {
         : await this.actas.cambiarEstado(id, r.nuevoEstado);
 
     await this.eventos.publicar([
-      new ActaTransicionada(actor, id, acta.codigo, acta.estado, r.nuevoEstado, contexto.comentario),
+      new ActaTransicionada(
+        actor,
+        id,
+        acta.codigo,
+        acta.estado,
+        r.nuevoEstado,
+        contexto.comentario,
+      ),
     ]);
     return actualizada;
   }

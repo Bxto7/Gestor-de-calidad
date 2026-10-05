@@ -225,9 +225,8 @@ function pendientesDe(entrada: EntradaResumenDeCarrera): PendienteVista[] {
 }
 
 export function calcularResumenDeCarrera(entrada: EntradaResumenDeCarrera): ResumenDeCarrera {
-  const abiertos = entrada.planesMejora.filter(
-    (p) => p.estadoImplementacion !== 'COMPLETADO' && p.estado !== 'HISTORICO',
-  );
+  // La lectura ya dejó solo lo que cuenta (RF-CH-043): aquí solo falta lo ya completado.
+  const abiertos = entrada.planesMejora.filter((p) => p.estadoImplementacion !== 'COMPLETADO');
 
   const conChip = abiertos.map((p) => ({ plan: p, chip: chipDe(p, entrada.hoy) }));
   const accionesQueVencen = conChip.filter(
