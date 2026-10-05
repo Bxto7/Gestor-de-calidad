@@ -14,10 +14,11 @@ import type {
 } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import {
   AccesoDenegado,
-  NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import { permiteVersionadoMejora } from '../../domain/value-objects/estado-plan-mejora.js';
 import { copiarPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import { PlanMejoraVersionado } from '../../domain/events/eventos-mejora.js';
@@ -39,11 +40,13 @@ export class VersionarPlanMejora {
     private readonly planes: RepositorioPlanMejoraPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   /** RF-PJ-035: copia con vínculo al origen, conservando definición y seguimiento. */
   async generarNuevaVersion(actor: Actor, id: string): Promise<DatosPlanMejora> {
-    const origen = await this.exigirPlan(id);
+    await this.exigir(actor, 'mejora.leer', null);
+    const origen = await this.planLegible(actor, id);
 
     // RF-PJ-042 (2c-J-D): las escrituras que crean un plan exigen `mejora.crear`.
     await this.exigir(actor, 'mejora.crear', origen.carreraId);
@@ -92,6 +95,7 @@ export class VersionarPlanMejora {
   /** RF-PJ-037 RN1: el linaje, de la más reciente a la más antigua. */
   async versionesDe(actor: Actor, id: string): Promise<DatosPlanMejora[]> {
     await this.exigir(actor, 'mejora.leer', null);
+    await this.planLegible(actor, id);
     return this.planes.linajeDe(id);
   }
 
@@ -100,10 +104,15 @@ export class VersionarPlanMejora {
     return plan.objetivoEducacionalId!;
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanMejora> {
-    const plan = await this.planes.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de mejora', id);
-    return plan;
+  /** Existe y su carrera entra en el alcance de lectura; si no, 404 (RF-CH-041). */
+  private async planLegible(actor: Actor, id: string): Promise<DatosPlanMejora> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(id),
+      'el plan de mejora',
+      id,
+    );
   }
 
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {

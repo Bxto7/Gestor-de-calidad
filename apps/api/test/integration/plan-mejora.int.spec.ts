@@ -458,7 +458,13 @@ describe('RF-PJ-035 — ramificación real contra Postgres', () => {
     rolesDe: async () => [],
   };
   const eventos: PublicadorDeEventos = { async publicar() {} };
-  const casoVersionar = new VersionarPlanMejora(repo, autorizacionPermiteTodo, eventos);
+  const casoVersionar = new VersionarPlanMejora(
+    repo,
+    autorizacionPermiteTodo,
+    eventos,
+    // Este bloque prueba el versionado, no el alcance: lee todas las carreras.
+    { alcanceDeLectura: async () => ({ tipo: 'TODAS' }), puedeLeerCarrera: async () => true },
+  );
   const ACTOR = { id: randomUUID(), nombre: 'Actor de prueba' };
 
   it('versionar el mismo plan dos veces produce dos hijos con version distinta', async () => {
@@ -611,6 +617,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
     curricular,
     autorizacion,
     eventos,
+    autorizacion,
   );
 
   let carreraA: string;

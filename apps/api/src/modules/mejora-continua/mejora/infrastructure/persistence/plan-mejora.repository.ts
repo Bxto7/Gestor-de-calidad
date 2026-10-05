@@ -22,6 +22,7 @@ import type {
   DatosParametroPlanMejora,
   DatosPlanMejora,
   DefinicionAccionMejora,
+  FiltroListadoMejora,
   NuevaEvidencia,
   NuevoPlanMejora,
   RepositorioPlanMejoraPort,
@@ -343,13 +344,14 @@ export class PlanMejoraRepositoryPrisma
 
   async listarDeCarrera(
     carreraId: string,
-    filtro?: {
-      texto?: string;
-      aspecto?: AspectoPlanMejora;
-      estadoImplementacion?: EstadoImplementacion;
-      estado?: EstadoMejora | readonly EstadoMejora[];
-      periodoId?: string;
-    },
+    filtro?: FiltroListadoMejora,
+  ): Promise<DatosPlanMejora[]> {
+    return this.listar(carreraId, filtro);
+  }
+
+  async listar(
+    carreraId: string | undefined,
+    filtro?: FiltroListadoMejora,
   ): Promise<DatosPlanMejora[]> {
     let estadoBd: { in: EstadoBd[] } | EstadoBd | undefined;
     const { estado: estadoFiltro } = filtro ?? {};
@@ -363,7 +365,7 @@ export class PlanMejoraRepositoryPrisma
 
     const filas = await this.prisma.planMejora.findMany({
       where: {
-        carreraId,
+        ...(carreraId ? { carreraId } : {}),
         ...(filtro?.aspecto ? { aspecto: filtro.aspecto } : {}),
         ...(filtro?.estadoImplementacion
           ? { estadoImplementacion: IMPLEMENTACION_A_BD[filtro.estadoImplementacion] }

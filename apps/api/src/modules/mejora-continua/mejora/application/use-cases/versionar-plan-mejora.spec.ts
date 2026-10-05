@@ -17,6 +17,7 @@ import type {
 } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import {
   AccesoDenegado,
+  NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
@@ -25,10 +26,19 @@ import type {
   DatosPlanMejora,
   RepositorioPlanMejoraPort,
 } from '../ports/plan-mejora.port.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import { VersionarPlanMejora } from './versionar-plan-mejora.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 const CARRERA = 'carrera-1';
+
+/** Lee solo `carreraId`. */
+function alcanceDeCarrera(carreraId: string): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuario, carrera) => carrera === carreraId,
+  };
+}
 
 function permitirTodo(): AuthorizationPort {
   return {
@@ -98,6 +108,7 @@ function montar(
   opciones: {
     repo?: Partial<RepositorioPlanMejoraPort>;
     autorizacion?: AuthorizationPort;
+    alcance?: AlcanceDeLecturaPort;
     /** Códigos que `codigosDe` devuelve, sin dejar de capturar con qué se la llamó. */
     codigosUsados?: readonly string[];
   } = {},
@@ -132,7 +143,12 @@ function montar(
     },
   };
 
-  const caso = new VersionarPlanMejora(repo, opciones.autorizacion ?? permitirTodo(), publicador);
+  const caso = new VersionarPlanMejora(
+    repo,
+    opciones.autorizacion ?? permitirTodo(),
+    publicador,
+    opciones.alcance ?? alcanceDeCarrera(CARRERA),
+  );
 
   return { caso, vistos, copiados, vistoCodigosDe };
 }
@@ -317,5 +333,23 @@ describe('RF-PJ-035 — ramificación: versionar el mismo origen más de una vez
     expect(hijo1.derivadoDeId).toBe('pj-1');
     expect(hijo2.derivadoDeId).toBe('pj-1');
     expect(hijo1.version).not.toBe(hijo2.version);
+  });
+});
+
+describe('RF-CH-041 — el alcance por carrera', () => {
+  it('el plan de otra carrera es 404 (también en versiones) aunque no haya permiso de escritura', async () => {
+    const { caso } = montar({
+      repo: { porId: async () => plan({ carreraId: 'otra' }) },
+      autorizacion: {
+        ...permitirTodo(),
+        puede: async (_id, permiso) =>
+          permiso === 'mejora.leer'
+            ? { permitido: true }
+            : { permitido: false, motivo: 'Falta el permiso.' },
+      },
+    });
+
+    await expect(caso.generarNuevaVersion(ACTOR, 'pj-1')).rejects.toThrow(NoEncontrado);
+    await expect(caso.versionesDe(ACTOR, 'pj-1')).rejects.toThrow(NoEncontrado);
   });
 });

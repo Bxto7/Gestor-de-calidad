@@ -135,7 +135,9 @@ function montar(dobles: Dobles = {}) {
     planDeEvidencia: async () => null, eliminarEvidencia: async () => {}, codigosDe: async () => [],
     parametros: async () => ({ minimoAccionesCriterio: 1, minimoAccionesObjetivo: 1 }),
     registrarImpactoEnMedicion: async () => plan(), copiar: async () => plan(), linajeDe: async () => [],
-    listarDeCarrera: async () => [], planesPorIds: async () => [plan()],
+    listar: async () => [],
+    listarDeCarrera: async () => [],
+    planesPorIds: async () => [plan()],
     ...dobles.planes,
   };
 

@@ -24,6 +24,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   AcreditacionPort,
@@ -59,6 +60,48 @@ import { GestionarPlanesMejora } from './gestionar-planes-mejora.use-case.js';
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 const CARRERA = 'carrera-1';
+const OTRA_CARRERA = 'carrera-2';
+
+/** Lee solo `carreraId`; `null` es «lee solo su carrera y no tiene ninguna». */
+function alcanceDeCarrera(carreraId: string | null): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuario, carrera) => carreraId !== null && carrera === carreraId,
+  };
+}
+
+const alcanceTotal: AlcanceDeLecturaPort = {
+  alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+  puedeLeerCarrera: async () => true,
+};
+
+/** Concede solo estos permisos, y registra todo lo que se pide. */
+function permitirSolo(permitidos: string[], pedidos: string[] = []): AuthorizationPort {
+  return {
+    puede: async (_id, permiso) => {
+      pedidos.push(permiso);
+      return permitidos.includes(permiso)
+        ? { permitido: true }
+        : { permitido: false, motivo: 'Falta el permiso.' };
+    },
+    permisosDe: async () => new Set(),
+    carreraACargoDe: async () => CARRERA,
+    rolesDe: async () => [],
+  };
+}
+
+function definicion() {
+  return {
+    nombre: 'Reforzar',
+    causaRaiz: 'x',
+    justificacion: 'x',
+    input: null,
+    plazo: new Date('2026-12-31'),
+    recursos: 'x',
+    metas: 'x',
+    responsable: 'Coordinación',
+  };
+}
 
 function permitirTodo(): AuthorizationPort {
   return {
@@ -164,6 +207,7 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
     parametros: async () => parametros(),
     registrarImpactoEnMedicion: async (_id, planMedicionAfectadoId) =>
       plan({ planMedicionAfectadoId }),
+    listar: async () => [],
     listarDeCarrera: async () => [],
     planesPorIds: async () => [],
     copiar: noUsado('copiar'),
@@ -341,6 +385,7 @@ function montar(
     mediciones?: Partial<RepositorioPlanMedicionPort>;
     configuraciones?: Partial<RepositorioConfiguracionEvaluacionPort>;
     curricular?: Partial<ContenidoCurricularPort>;
+    alcance?: AlcanceDeLecturaPort;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -371,6 +416,7 @@ function montar(
     curricularDouble(opciones.curricular),
     opciones.autorizacion ?? permitirTodo(),
     publicador,
+    opciones.alcance ?? alcanceDeCarrera(CARRERA),
   );
 
   return { caso, publicados, planes };
@@ -403,9 +449,9 @@ describe('la lectura', () => {
 describe('el listado', () => {
   it('devuelve lo que el repositorio lista para esa carrera', async () => {
     const unPlan = plan({ id: 'pj-listado' });
-    const { caso } = montar({ planes: { listarDeCarrera: async () => [unPlan] } });
+    const { caso } = montar({ planes: { listar: async () => [unPlan] } });
 
-    const listado = await caso.listar(ACTOR, CARRERA);
+    const listado = await caso.listar(ACTOR);
 
     expect(listado).toEqual([unPlan]);
   });
@@ -414,7 +460,7 @@ describe('el listado', () => {
     const pedidos: string[] = [];
     const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
 
-    await expect(caso.listar(ACTOR, CARRERA)).rejects.toThrow(AccesoDenegado);
+    await expect(caso.listar(ACTOR)).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toEqual(['mejora.leer']);
   });
 });
@@ -819,23 +865,20 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
     expect(actualizado.nombre).toBe('Reforzar tutoría');
   });
 
-  it.each(['En revisión', 'Aprobado'] as const)(
-    'se bloquea en %s',
-    async (estado) => {
-      const { caso } = montar({ plan: plan({ estado }) });
+  it.each(['En revisión', 'Aprobado'] as const)('se bloquea en %s', async (estado) => {
+    const { caso } = montar({ plan: plan({ estado }) });
 
-      await expect(caso.editarDefinicion(ACTOR, 'pj-1', DATOS)).rejects.toThrow(
-        ReglaDeNegocioViolada,
-      );
-    },
-  );
+    await expect(caso.editarDefinicion(ACTOR, 'pj-1', DATOS)).rejects.toThrow(
+      ReglaDeNegocioViolada,
+    );
+  });
 
   it('exige `mejora.editar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: permitirSolo(['mejora.leer'], pedidos) });
 
     await expect(caso.editarDefinicion(ACTOR, 'pj-1', DATOS)).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['mejora.editar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.editar']);
   });
 
   it('deja constancia en la bitácora', async () => {
@@ -863,10 +906,10 @@ describe('RF-PJ-008 — el borrado', () => {
 
   it('exige `mejora.eliminar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: permitirSolo(['mejora.leer'], pedidos) });
 
     await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['mejora.eliminar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.eliminar']);
   });
 
   it('deja constancia en la bitácora', async () => {
@@ -934,7 +977,7 @@ describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
 
     await caso.transicionar(ACTOR, 'pj-1', 'aprobar', {});
 
-    expect(pedidos).toEqual(['mejora.aprobar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.aprobar']);
   });
 
   it('deja constancia del antes y el después', async () => {
@@ -1047,12 +1090,12 @@ describe('RF-PJ-014 — el estado de implementación', () => {
 
   it('exige `mejora.editar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: permitirSolo(['mejora.leer'], pedidos) });
 
     await expect(caso.actualizarImplementacion(ACTOR, 'pj-1', 'En proceso')).rejects.toThrow(
       AccesoDenegado,
     );
-    expect(pedidos).toEqual(['mejora.editar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.editar']);
   });
 
   it('deja constancia en la bitácora', async () => {
@@ -1102,7 +1145,7 @@ describe('RF-PJ-016 y RF-PJ-017 — evidencias', () => {
 
   it('cargar exige `mejora.editar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: permitirSolo(['mejora.leer'], pedidos) });
 
     await expect(
       caso.cargarEvidencia(ACTOR, 'pj-1', {
@@ -1111,7 +1154,7 @@ describe('RF-PJ-016 y RF-PJ-017 — evidencias', () => {
         subidoPor: ACTOR.id,
       }),
     ).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['mejora.editar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.editar']);
   });
 
   it('cargar deja constancia en la bitácora', async () => {
@@ -1157,12 +1200,12 @@ describe('RF-PJ-018 — la retroalimentación', () => {
 
   it('exige `mejora.editar`', async () => {
     const pedidos: string[] = [];
-    const { caso } = montar({ autorizacion: denegarRegistrando(pedidos) });
+    const { caso } = montar({ autorizacion: permitirSolo(['mejora.leer'], pedidos) });
 
     await expect(
       caso.actualizarRetroalimentacion(ACTOR, 'pj-1', 'logro', 'impacto'),
     ).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toEqual(['mejora.editar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.editar']);
   });
 
   it('deja constancia en la bitácora', async () => {
@@ -1207,5 +1250,238 @@ describe('RepositorioPlanMejoraPort — contrato ampliado (2c-AC-B)', () => {
     > = Promise.resolve([]);
     expect(_firmaEstadoArreglo.estado).toEqual(['Aprobado']);
     void _firmaPlanesPorIds;
+  });
+});
+
+describe('RF-CH-040 y RF-CH-041 — el alcance por carrera', () => {
+  describe('el orden: lectura 403 → existencia y alcance 404 → escritura 403 → reglas 409', () => {
+    it('sin `mejora.leer`, un plan de otra carrera es 403 y no 404', async () => {
+      const { caso } = montar({
+        plan: plan({ carreraId: OTRA_CARRERA }),
+        autorizacion: permitirSolo([]),
+      });
+
+      await expect(caso.porId(ACTOR, 'pj-1')).rejects.toThrow(AccesoDenegado);
+    });
+
+    it('un plan de otra carrera es 404, aunque tampoco haya permiso de escritura', async () => {
+      const { caso } = montar({
+        plan: plan({ carreraId: OTRA_CARRERA }),
+        autorizacion: permitirSolo(['mejora.leer']),
+      });
+
+      await expect(caso.editarDefinicion(ACTOR, 'pj-1', definicion())).rejects.toThrow(
+        NoEncontrado,
+      );
+      await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(NoEncontrado);
+      await expect(caso.transicionar(ACTOR, 'pj-1', 'enviar-a-revision', {})).rejects.toThrow(
+        NoEncontrado,
+      );
+      await expect(caso.actualizarImplementacion(ACTOR, 'pj-1', 'En proceso')).rejects.toThrow(
+        NoEncontrado,
+      );
+      await expect(caso.actualizarRetroalimentacion(ACTOR, 'pj-1', 'a', 'b')).rejects.toThrow(
+        NoEncontrado,
+      );
+      await expect(caso.registrarImpactoEnMedicion(ACTOR, 'pj-1', null)).rejects.toThrow(
+        NoEncontrado,
+      );
+      await expect(
+        caso.cargarEvidencia(ACTOR, 'pj-1', {
+          referencia: 'x',
+          nombreArchivo: null,
+          subidoPor: 'u-1',
+        }),
+      ).rejects.toThrow(NoEncontrado);
+    });
+
+    it('en su carrera, sin permiso de escritura, es 403', async () => {
+      const { caso } = montar({ plan: plan(), autorizacion: permitirSolo(['mejora.leer']) });
+
+      await expect(caso.editarDefinicion(ACTOR, 'pj-1', definicion())).rejects.toThrow(
+        AccesoDenegado,
+      );
+    });
+
+    it('el permiso de escritura se pide sobre la carrera del plan', async () => {
+      const pedidos: [string, string | null][] = [];
+      const { caso } = montar({
+        plan: plan({ carreraId: CARRERA }),
+        autorizacion: {
+          puede: async (_id, permiso, carreraId) => {
+            pedidos.push([permiso, carreraId ?? null]);
+            return { permitido: true };
+          },
+          permisosDe: async () => new Set(),
+          carreraACargoDe: async () => CARRERA,
+          rolesDe: async () => [],
+        },
+      });
+
+      await caso.eliminar(ACTOR, 'pj-1');
+
+      expect(pedidos).toEqual([
+        ['mejora.leer', null],
+        ['mejora.eliminar', CARRERA],
+      ]);
+    });
+
+    it('la evidencia de un plan de otra carrera es 404', async () => {
+      const { caso } = montar({
+        plan: plan({ carreraId: OTRA_CARRERA }),
+        autorizacion: permitirSolo(['mejora.leer']),
+      });
+
+      await expect(caso.eliminarEvidencia(ACTOR, 'evi-1')).rejects.toThrow(NoEncontrado);
+    });
+
+    it('una evidencia inexistente sin `mejora.leer` es 403 y no 404', async () => {
+      const { caso } = montar({
+        planes: { planDeEvidencia: async () => null },
+        autorizacion: permitirSolo([]),
+      });
+
+      await expect(caso.eliminarEvidencia(ACTOR, 'evi-x')).rejects.toThrow(AccesoDenegado);
+    });
+  });
+
+  describe('el listado', () => {
+    it('lo acota el servidor a la carrera del alcance', async () => {
+      const recibidas: (string | undefined)[] = [];
+      const { caso } = montar({
+        alcance: alcanceDeCarrera(CARRERA),
+        planes: { listar: async (carreraId) => (recibidas.push(carreraId), []) },
+      });
+
+      await caso.listar(ACTOR, { texto: 'refuerzo' });
+
+      expect(recibidas).toEqual([CARRERA]);
+    });
+
+    it('quien lee solo su carrera y no tiene ninguna ve una lista vacía y no consulta nada', async () => {
+      let consultas = 0;
+      const { caso } = montar({
+        alcance: alcanceDeCarrera(null),
+        planes: { listar: async () => (consultas++, []) },
+      });
+
+      expect(await caso.listar(ACTOR)).toEqual([]);
+      expect(consultas).toBe(0);
+    });
+
+    it('quien lee todas las carreras no lleva filtro de carrera', async () => {
+      const recibidas: (string | undefined)[] = [];
+      const { caso } = montar({
+        alcance: alcanceTotal,
+        planes: { listar: async (carreraId) => (recibidas.push(carreraId), []) },
+      });
+
+      await caso.listar(ACTOR);
+
+      expect(recibidas).toEqual([undefined]);
+    });
+
+    it('exige `mejora.leer`', async () => {
+      const { caso } = montar({ autorizacion: permitirSolo([]) });
+
+      await expect(caso.listar(ACTOR)).rejects.toThrow(AccesoDenegado);
+    });
+  });
+
+  describe('el alta (RF-CH-040)', () => {
+    it('toma la carrera de la sesión: la que viaja al repositorio es esa', async () => {
+      let guardada = '';
+      const { caso } = montar({
+        planes: {
+          crear: async (d) => ((guardada = d.carreraId), plan({ carreraId: d.carreraId })),
+        },
+      });
+
+      await caso.crear(ACTOR, { aspecto: 'CRITERIO_ACREDITACION', elementoId: 'cri-1' });
+
+      expect(guardada).toBe(CARRERA);
+    });
+
+    it('sin carrera asignada, AccesoDenegado con el motivo, antes de mirar nada más', async () => {
+      let criteriosConsultados = 0;
+      const { caso } = montar({
+        autorizacion: { ...permitirTodo(), carreraACargoDe: async () => null },
+        acreditacion: { criterioPorId: async () => (criteriosConsultados++, criterioMejora()) },
+      });
+
+      await expect(
+        caso.crear(ACTOR, { aspecto: 'CRITERIO_ACREDITACION', elementoId: 'cri-1' }),
+      ).rejects.toThrow(
+        new AccesoDenegado(
+          'No tienes una carrera asignada: pide que te asignen una para crear planes de mejora.',
+        ),
+      );
+      expect(criteriosConsultados).toBe(0);
+    });
+
+    it('con un plan de evaluación base de otra carrera que sí puede leer: 409 y no se crea nada', async () => {
+      let creados = 0;
+      const { caso } = montar({
+        alcance: alcanceTotal,
+        evaluaciones: { porId: async () => planEvaluacion({ carreraId: OTRA_CARRERA }) },
+        planes: { crear: async () => (creados++, plan()) },
+      });
+
+      await expect(
+        caso.crear(ACTOR, {
+          aspecto: 'COMPETENCIA',
+          elementoId: 'comp-1',
+          periodoId: 'per-1',
+          planEvaluacionId: 'pe-1',
+        }),
+      ).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          'El plan de evaluación base no es de tu carrera: un plan de mejora de competencias se construye sobre un plan de evaluación de la carrera con la que trabajas.',
+        ),
+      );
+      expect(creados).toBe(0);
+    });
+
+    it('con un plan de evaluación base de otra carrera que NO puede leer: 404 (hueco del 6a)', async () => {
+      const { caso } = montar({
+        alcance: alcanceDeCarrera(CARRERA),
+        evaluaciones: { porId: async () => planEvaluacion({ carreraId: OTRA_CARRERA }) },
+      });
+
+      await expect(
+        caso.crear(ACTOR, {
+          aspecto: 'COMPETENCIA',
+          elementoId: 'comp-1',
+          periodoId: 'per-1',
+          planEvaluacionId: 'pe-1',
+        }),
+      ).rejects.toThrow(NoEncontrado);
+    });
+  });
+
+  describe('el porcentaje del periodo anterior (hueco del 6a)', () => {
+    it('con un plan de evaluación de otra carrera es 404 y no calcula nada', async () => {
+      let lecturas = 0;
+      const { caso } = montar({
+        alcance: alcanceDeCarrera(CARRERA),
+        evaluaciones: {
+          porId: async () => (lecturas++, planEvaluacion({ carreraId: OTRA_CARRERA })),
+        },
+        mediciones: { porId: async () => (lecturas++, planMedicion()) },
+      });
+
+      await expect(
+        caso.porcentajeAnteriorDeCompetencia(ACTOR, 'pe-1', 'comp-1', 'per-2'),
+      ).rejects.toThrow(NoEncontrado);
+      expect(lecturas).toBe(1); // solo la lectura que decide el alcance
+    });
+  });
+
+  describe('las alertas de mínimo por criterio', () => {
+    it('de una carrera que no puede leer, 404', async () => {
+      const { caso } = montar({ alcance: alcanceDeCarrera(CARRERA) });
+
+      await expect(caso.alertasMinimoCriterio(ACTOR, OTRA_CARRERA)).rejects.toThrow(NoEncontrado);
+    });
   });
 });

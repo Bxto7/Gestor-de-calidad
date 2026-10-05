@@ -107,6 +107,17 @@ export interface NuevaEvidencia {
   readonly subidoPor: string;
 }
 
+/** El filtro del listado (RF-PJ-038). */
+export interface FiltroListadoMejora {
+  texto?: string;
+  aspecto?: AspectoPlanMejora;
+  estadoImplementacion?: EstadoImplementacion;
+  /** Acepta varios estados en una sola consulta. */
+  estado?: EstadoMejora | readonly EstadoMejora[];
+  /** 2c-AC-B (RF-AC-007): solo tiene sentido para el aspecto Competencia. */
+  periodoId?: string;
+}
+
 export interface RepositorioPlanMejoraPort {
   crear(datos: NuevoPlanMejora): Promise<DatosPlanMejora>;
   porId(id: string): Promise<DatosPlanMejora | null>;
@@ -143,18 +154,20 @@ export interface RepositorioPlanMejoraPort {
   /** RF-PJ-037 RN1: el linaje completo, de más reciente a más antiguo. */
   linajeDe(id: string): Promise<DatosPlanMejora[]>;
 
-  /** RF-PJ-038: listado por carrera, con filtro opcional de texto/aspecto/estado/periodo. */
+  /**
+   * RF-PJ-038: listado con filtros. `carreraId` `undefined` es «todas las
+   * carreras» (Consultor y Administrador); el caso de uso decide cuál impone el
+   * alcance y nunca la pide al cliente (RF-CH-040).
+   */
+  listar(
+    carreraId: string | undefined,
+    filtro?: FiltroListadoMejora,
+  ): Promise<readonly DatosPlanMejora[]>;
+
+  /** Un listado de **una** carrera, para quien ya la conoce (actas). */
   listarDeCarrera(
     carreraId: string,
-    filtro?: {
-      texto?: string;
-      aspecto?: AspectoPlanMejora;
-      estadoImplementacion?: EstadoImplementacion;
-      /** 2c-AC-B: acepta varios estados en una sola consulta. */
-      estado?: EstadoMejora | readonly EstadoMejora[];
-      /** 2c-AC-B (RF-AC-007): solo tiene sentido para el aspecto Competencia. */
-      periodoId?: string;
-    },
+    filtro?: FiltroListadoMejora,
   ): Promise<readonly DatosPlanMejora[]>;
 
   /** 2c-AC-B: resuelve varios planes por id en una sola consulta, para el contenido del acta. */

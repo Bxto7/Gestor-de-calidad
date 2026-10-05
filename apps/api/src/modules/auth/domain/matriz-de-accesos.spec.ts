@@ -123,6 +123,7 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'criterio.leer',
         'evaluacion.leer',
         'evidencia.registrar',
+        'lectura.solo_su_carrera',
         'mejora.leer',
         'objetivo.leer',
       ].sort(),
@@ -152,11 +153,11 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
     expect(quienes).toEqual(['DIRECTOR_CARRERA']);
   });
 
-  it('Director y Coordinador leen solo su carrera (Bloque 6a); el Consultor y el Administrador, todas', () => {
+  it('Director, Coordinador y Docente leen solo su carrera (Bloques 6a y 6b); el Consultor y el Administrador, todas', () => {
     const quienes = ROLES.filter((r) => r.permisos.includes('lectura.solo_su_carrera')).map(
       (r) => r.codigo,
     );
-    expect(quienes).toEqual(['DIRECTOR_CARRERA', 'COORDINADOR_ACADEMICO']);
+    expect(quienes).toEqual(['DIRECTOR_CARRERA', 'COORDINADOR_ACADEMICO', 'DOCENTE']);
   });
 
   it('el Administrador no tiene ningún permiso de lectura de planes ni de su contenido', () => {

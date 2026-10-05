@@ -889,6 +889,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         CONTENIDO_CURRICULAR,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         planes: RepositorioPlanMejoraPort,
@@ -900,6 +901,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         curricular: ContenidoCurricularPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GestionarPlanesMejora(
           planes,
@@ -911,16 +913,18 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           curricular,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {
       provide: VersionarPlanMejora,
-      inject: [REPOSITORIO_PLAN_MEJORA, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS],
+      inject: [REPOSITORIO_PLAN_MEJORA, AUTHORIZATION_PORT, PUBLICADOR_EVENTOS, ALCANCE_DE_LECTURA],
       useFactory: (
         planes: RepositorioPlanMejoraPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
-      ) => new VersionarPlanMejora(planes, autorizacion, eventos),
+        alcance: AlcanceDeLecturaPort,
+      ) => new VersionarPlanMejora(planes, autorizacion, eventos, alcance),
     },
     {
       provide: GestionarActas,
@@ -967,6 +971,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         RENDERIZADOR_HOJA,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         documentos: RepositorioDocumentosMejoraPort,
@@ -977,6 +982,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         hoja: RenderizadorHojaPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GenerarDocumentoMejora(
           documentos,
@@ -987,16 +993,25 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           hoja,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {
       provide: ConsultarDocumentoMejora,
-      inject: [REPOSITORIO_DOCUMENTOS_MEJORA, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      inject: [
+        REPOSITORIO_DOCUMENTOS_MEJORA,
+        ALMACEN_ARCHIVOS,
+        AUTHORIZATION_PORT,
+        REPOSITORIO_PLAN_MEJORA,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         documentos: RepositorioDocumentosMejoraPort,
         almacen: AlmacenDeArchivosPort,
         autorizacion: AuthorizationPort,
-      ) => new ConsultarDocumentoMejora(documentos, almacen, autorizacion),
+        planes: RepositorioPlanMejoraPort,
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarDocumentoMejora(documentos, almacen, autorizacion, planes, alcance),
     },
     { provide: RENDERIZADOR_PDF_ACTA, useClass: RenderizadorPdfActaKit },
     { provide: RENDERIZADOR_EXCEL_ACTA, useClass: RenderizadorExcelActaJs },

@@ -60,16 +60,20 @@ export class PlanesMejoraController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listado de planes de mejora, con búsqueda y filtros (RF-PJ-038)' })
+  @ApiOperation({
+    summary:
+      'Listado de planes de mejora de la carrera del usuario, con búsqueda y filtros (RF-PJ-038, RF-CH-041)',
+    description:
+      'La carrera la impone el servidor según el alcance de lectura; un `carreraId` en la query se ignora.',
+  })
   async listar(
     @ActorActual() actor: Actor,
-    @Query('carreraId', ParseUUIDPipe) carreraId: string,
     @Query('texto') texto?: string,
     @Query('aspecto') aspecto?: AspectoPlanMejora,
     @Query('estadoImplementacion') estadoImplementacion?: EstadoImplementacion,
     @Query('estado') estado?: EstadoMejora,
   ) {
-    return this.casos.listar(actor, carreraId, { texto, aspecto, estadoImplementacion, estado });
+    return this.casos.listar(actor, { texto, aspecto, estadoImplementacion, estado });
   }
 
   // Rutas estáticas antes de `:id/...` — si no, Nest les hace perder contra

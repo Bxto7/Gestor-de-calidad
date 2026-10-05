@@ -14,6 +14,12 @@
  *   En revisión (RF-CH-044). El guardián vive en `permiteSeguimientoMejora`, no como un `if`
  *   repetido en cada método.
  *
+ * Alcance por carrera (Bloque 6b, RF-CH-040 y RF-CH-041). El orden de toda
+ * operación sobre un plan existente es: lectura 403 → existencia y alcance 404
+ * (un plan de otra carrera no existe para quien no la lee) → escritura 403 →
+ * reglas 409. `listar` ya no recibe `carreraId`: la impone el alcance de lectura.
+ * El alta toma la carrera de la sesión.
+ *
  * Alcance por carrera (2c-J-B, §2a del diseño — decisión 1): la carrera de
  * un `PlanMejora` es siempre la del actor que lo crea
  * (`AuthorizationPort.carreraACargoDe`), nunca derivada del elemento
@@ -49,7 +55,13 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import {
+  carreraDeLaSesion,
+  carreraImpuesta,
+  exigirPlanLegible,
+} from '../../../application/alcance-de-planes.js';
 import type { AcreditacionPort } from '../../../../acreditacion/application/ports/acreditacion-cross-modulo.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { ObjetivosCrossModuloPort } from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
@@ -57,7 +69,6 @@ import type { ObjetivosCrossModuloPort } from '../../../../objetivos-educacional
 import { permiteEliminacionDeMejora } from '../../../domain/value-objects/estado-plan.js';
 import {
   type AccionMejora,
-  type EstadoMejora,
   describirTransicionMejora,
   intentarTransicionMejora,
   permiteEdicionMejora,
@@ -89,6 +100,7 @@ import type {
   DatosEvidencia,
   DatosPlanMejora,
   DefinicionAccionMejora,
+  FiltroListadoMejora,
   NuevaEvidencia,
   RepositorioPlanMejoraPort,
 } from '../ports/plan-mejora.port.js';
@@ -141,26 +153,24 @@ export class GestionarPlanesMejora {
     private readonly curricular: ContenidoCurricularPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async porId(actor: Actor, id: string): Promise<DatosPlanMejora> {
     await this.exigir(actor, 'mejora.leer', null);
-    return this.exigirPlan(id);
+    return this.planLegible(actor, id);
   }
 
-  /** RF-PJ-038: listado por carrera, con filtro opcional de texto/aspecto/estado. */
-  async listar(
-    actor: Actor,
-    carreraId: string,
-    filtro?: {
-      texto?: string;
-      aspecto?: AspectoPlanMejora;
-      estadoImplementacion?: EstadoImplementacion;
-      estado?: EstadoMejora;
-    },
-  ): Promise<readonly DatosPlanMejora[]> {
+  /**
+   * RF-PJ-038 y RF-CH-041: listado de la carrera que impone el alcance. El
+   * cliente ya no la pide: quien lee solo su carrera ve la suya, y sin carrera no
+   * ve nada (lista vacía, no «todas»).
+   */
+  async listar(actor: Actor, filtro?: FiltroListadoMejora): Promise<readonly DatosPlanMejora[]> {
     await this.exigir(actor, 'mejora.leer', null);
-    return this.planes.listarDeCarrera(carreraId, filtro);
+    const carreraId = await carreraImpuesta(this.alcance, actor);
+    if (carreraId === null) return [];
+    return this.planes.listar(carreraId, filtro);
   }
 
   /**
@@ -169,10 +179,8 @@ export class GestionarPlanesMejora {
    * diseño de 2c-J-B).
    */
   async crear(actor: Actor, datos: DatosCrearPlanMejora): Promise<DatosPlanMejora> {
-    const carreraId = await this.autorizacion.carreraACargoDe(actor.id);
-    if (!carreraId) {
-      throw new AccesoDenegado('El usuario no dirige ninguna carrera.');
-    }
+    // RF-CH-040: la carrera es la de la sesión; el cliente no la envía.
+    const carreraId = await carreraDeLaSesion(this.autorizacion, actor, 'planes de mejora');
     // RF-PJ-043: el alta queda restringida a roles autorizados.
     await this.exigir(actor, 'mejora.crear', carreraId);
 
@@ -213,6 +221,7 @@ export class GestionarPlanesMejora {
           );
         }
         const { planEvaluacion, planMedicion } = await this.resolverBaseCompetencia(
+          actor,
           datos.planEvaluacionId,
           carreraId,
         );
@@ -268,9 +277,8 @@ export class GestionarPlanesMejora {
     id: string,
     datos: DefinicionAccionMejora,
   ): Promise<DatosPlanMejora> {
-    const plan = await this.exigirPlan(id);
     // RF-PJ-043: editar la definición queda restringido a roles autorizados.
-    await this.exigir(actor, 'mejora.editar', plan.carreraId);
+    const plan = await this.planGestionable(actor, id, 'mejora.editar');
     this.exigirDefinicionEditable(plan);
 
     const actualizado = await this.planes.editarDefinicion(id, datos);
@@ -280,9 +288,8 @@ export class GestionarPlanesMejora {
 
   /** RF-PJ-008: solo un Borrador se elimina. */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    const plan = await this.exigirPlan(id);
     // RF-PJ-043: eliminar queda restringido a roles autorizados.
-    await this.exigir(actor, 'mejora.eliminar', plan.carreraId);
+    const plan = await this.planGestionable(actor, id, 'mejora.eliminar');
 
     if (!permiteEliminacionDeMejora(plan.estado)) {
       throw new ReglaDeNegocioViolada(
@@ -301,12 +308,11 @@ export class GestionarPlanesMejora {
     accion: AccionMejora,
     contexto: { comentario?: string },
   ): Promise<DatosPlanMejora> {
-    const plan = await this.exigirPlan(id);
     const transicion = describirTransicionMejora(accion);
     // RF-PJ-044: la aprobación queda restringida al rol que tiene el permiso
     // `mejora.aprobar` — este mismo `exigir` ya hace cumplir esa
     // restricción, sea cual sea el permiso que le corresponda a `accion`.
-    await this.exigir(actor, `mejora.${transicion.permiso}`, plan.carreraId);
+    const plan = await this.planGestionable(actor, id, `mejora.${transicion.permiso}`);
 
     // RF-PJ-042 RN1: la validación integral es requisito previo, pero solo
     // para las transiciones que la exigen (enviar a revisión y aprobar) —
@@ -346,8 +352,7 @@ export class GestionarPlanesMejora {
     id: string,
     estado: EstadoImplementacion,
   ): Promise<DatosPlanMejora> {
-    const plan = await this.exigirPlan(id);
-    await this.exigir(actor, 'mejora.editar', plan.carreraId);
+    const plan = await this.planGestionable(actor, id, 'mejora.editar');
     this.exigirSeguimientoEditable(plan);
 
     const actualizado = await this.planes.actualizarImplementacion(id, estado);
@@ -361,8 +366,7 @@ export class GestionarPlanesMejora {
     id: string,
     evidencia: NuevaEvidencia,
   ): Promise<DatosEvidencia> {
-    const plan = await this.exigirPlan(id);
-    await this.exigir(actor, 'mejora.editar', plan.carreraId);
+    const plan = await this.planGestionable(actor, id, 'mejora.editar');
     this.exigirSeguimientoEditable(plan);
 
     const creada = await this.planes.agregarEvidencia(id, evidencia);
@@ -378,14 +382,15 @@ export class GestionarPlanesMejora {
    * El bloqueo fuera de Aprobado lo cubre `exigirSeguimientoEditable`.
    */
   async eliminarEvidencia(actor: Actor, evidenciaId: string): Promise<void> {
+    // La lectura va primero: sin ella, un 404 de «no existe la evidencia» revelaría existencia.
+    await this.exigir(actor, 'mejora.leer', null);
     const planId = await this.planes.planDeEvidencia(evidenciaId);
     if (!planId) {
       throw new NoEncontrado('la evidencia', evidenciaId);
     }
 
-    const plan = await this.exigirPlan(planId);
+    const plan = await this.planLegible(actor, planId);
     await this.exigir(actor, 'mejora.editar', plan.carreraId);
-
     this.exigirSeguimientoEditable(plan);
 
     await this.planes.eliminarEvidencia(evidenciaId);
@@ -399,8 +404,7 @@ export class GestionarPlanesMejora {
     logroMeta: string,
     impacto: string,
   ): Promise<DatosPlanMejora> {
-    const plan = await this.exigirPlan(id);
-    await this.exigir(actor, 'mejora.editar', plan.carreraId);
+    const plan = await this.planGestionable(actor, id, 'mejora.editar');
     this.exigirSeguimientoEditable(plan);
 
     const actualizado = await this.planes.actualizarRetroalimentacion(id, logroMeta, impacto);
@@ -418,8 +422,7 @@ export class GestionarPlanesMejora {
     id: string,
     planMedicionAfectadoId: string | null,
   ): Promise<DatosPlanMejora> {
-    const plan = await this.exigirPlan(id);
-    await this.exigir(actor, 'mejora.editar', plan.carreraId);
+    const plan = await this.planGestionable(actor, id, 'mejora.editar');
 
     if (plan.aspecto !== 'COMPETENCIA') {
       throw new ReglaDeNegocioViolada(
@@ -447,6 +450,14 @@ export class GestionarPlanesMejora {
     periodoId: string,
   ): Promise<number | null> {
     await this.exigir(actor, 'mejora.leer', null);
+    // La base de otra carrera no existe para quien no la lee (hueco que dejó el 6a).
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(planEvaluacionId),
+      'el plan de evaluación',
+      planEvaluacionId,
+    );
     return calcularPorcentajeMedicionAnterior(
       {
         evaluaciones: this.evaluaciones,
@@ -462,6 +473,10 @@ export class GestionarPlanesMejora {
   /** RF-PJ-022: alertas de mínimo por criterio, informativas (RN1). */
   async alertasMinimoCriterio(actor: Actor, carreraId: string): Promise<AlertaMinimoAcciones[]> {
     await this.exigir(actor, 'mejora.leer', null);
+    // La carrera llega por query: una que el actor no lee no existe para él.
+    if (!(await this.alcance.puedeLeerCarrera(actor.id, carreraId))) {
+      throw new NoEncontrado('la carrera', carreraId);
+    }
     const [criterios, parametros] = await Promise.all([
       this.acreditacion.criteriosActivosDe(carreraId),
       this.planes.parametros(),
@@ -537,9 +552,26 @@ export class GestionarPlanesMejora {
     return `Hay inconsistencias bloqueantes sin resolver: ${detalle}.`;
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanMejora> {
-    const plan = await this.planes.porId(id);
-    if (!plan) throw new NoEncontrado('el plan de mejora', id);
+  /** (2) El plan existe y su carrera entra en el alcance de lectura; si no, 404. */
+  private async planLegible(actor: Actor, id: string): Promise<DatosPlanMejora> {
+    return exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(id),
+      'el plan de mejora',
+      id,
+    );
+  }
+
+  /** (1) a (3): lectura, existencia y alcance, y el permiso sobre la carrera **del plan**. */
+  private async planGestionable(
+    actor: Actor,
+    id: string,
+    permiso: string,
+  ): Promise<DatosPlanMejora> {
+    await this.exigir(actor, 'mejora.leer', null);
+    const plan = await this.planLegible(actor, id);
+    await this.exigir(actor, permiso, plan.carreraId);
     return plan;
   }
 
@@ -554,8 +586,8 @@ export class GestionarPlanesMejora {
 
   /**
    * §2b del diseño de 2c-J-A: el seguimiento —estado de implementación,
-   * evidencias, retroalimentación— se edita en Borrador y en Vigente, y se
-   * bloquea también en "En revisión" y "Aprobado", no solo en Histórico.
+   * evidencias, retroalimentación— solo se edita en Aprobado (RF-CH-044); en
+   * Borrador y En revisión está bloqueado.
    */
   private exigirSeguimientoEditable(plan: DatosPlanMejora): void {
     if (!permiteSeguimientoMejora(plan.estado)) {
@@ -571,10 +603,20 @@ export class GestionarPlanesMejora {
    * (Aprobado o Vigente) y que pertenezca a la carrera del actor (§5e y §2a
    * del diseño de 2c-J-B).
    */
-  private async resolverBaseCompetencia(planEvaluacionId: string, carreraId: string) {
-    const planEvaluacion = await this.evaluaciones.porId(planEvaluacionId);
-    if (!planEvaluacion) {
-      throw new NoEncontrado('el plan de evaluación base', planEvaluacionId);
+  private async resolverBaseCompetencia(actor: Actor, planEvaluacionId: string, carreraId: string) {
+    // 404 si la base está fuera del alcance de lectura de quien crea (hueco del 6a);
+    // 409 si la puede leer pero no es de la carrera de la sesión (RF-CH-040).
+    const planEvaluacion = await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.evaluaciones.porId(planEvaluacionId),
+      'el plan de evaluación base',
+      planEvaluacionId,
+    );
+    if (planEvaluacion.carreraId !== carreraId) {
+      throw new ReglaDeNegocioViolada(
+        'El plan de evaluación base no es de tu carrera: un plan de mejora de competencias se construye sobre un plan de evaluación de la carrera con la que trabajas.',
+      );
     }
 
     const planMedicion = await this.mediciones.porId(planEvaluacion.planMedicionId);

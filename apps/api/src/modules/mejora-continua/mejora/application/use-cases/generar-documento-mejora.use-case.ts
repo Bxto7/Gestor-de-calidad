@@ -6,14 +6,10 @@
  * (`mejora.leer`), como en Medición — no hay razón propia de este submódulo
  * para tratarlo como escritura.
  *
- * `mejora.leer` viaja siempre con `carreraId: null`, sin excepción, en todo
- * el submódulo — así lo hacen `GestionarPlanesMejora.porId`/`listar` pese a
- * resolver un plan concreto, y así lo hacen los dos gemelos para sus propios
- * permisos de lectura (`ConsultarDocumentoMedicion`/`ConsultarDocumentoEvaluacion.exigirLectura`,
- * este último con el comentario explícito "sin importar qué carrera dirija").
- * Acotar aquí por `plan.carreraId` sería la única lectura del submódulo que
- * lo hiciera, así que se sigue el patrón establecido en vez de inventar uno
- * nuevo.
+ * Alcance por carrera (Bloque 6b, RF-CH-041): `mejora.leer` viaja con
+ * `carreraId: null` (es un permiso de lectura), y lo que acota es el alcance de
+ * lectura: el plan —y su documento— de una carrera que el actor no lee es 404,
+ * después del 403 de la lectura.
  *
  * Una sola clase con dos métodos que corren en procesos distintos:
  *
@@ -45,7 +41,9 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import {
   armarDocumentoMejora,
   type FormatoDocumentoMejora,
@@ -98,6 +96,7 @@ export class GenerarDocumentoMejora {
     private readonly hoja: RenderizadorHojaPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
     private readonly reloj: Reloj = { ahora: () => new Date() },
   ) {}
 
@@ -110,8 +109,14 @@ export class GenerarDocumentoMejora {
     // Se comprueba antes de crear la fila: un trabajo de un plan inexistente
     // solo serviría para aparecer como Fallido en una pantalla que tampoco
     // existe.
-    const plan = await this.exigirPlan(planMejoraId);
     await this.exigir(actor, 'mejora.leer', null);
+    const plan = await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(planMejoraId),
+      'el plan de mejora',
+      planMejoraId,
+    );
 
     const trabajo = await this.documentos.crear({ planMejoraId, tipo, solicitadoPor: actor.id });
 
@@ -205,12 +210,6 @@ export class GenerarDocumentoMejora {
     };
   }
 
-  private async exigirPlan(id: string): Promise<DatosPlanMejora> {
-    const plan = await this.planes.porId(id);
-    if (plan === null) throw new NoEncontrado('el plan de mejora', id);
-    return plan;
-  }
-
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
@@ -237,12 +236,22 @@ export class ConsultarDocumentoMejora {
     private readonly documentos: RepositorioDocumentosMejoraPort,
     private readonly almacen: AlmacenDeArchivosPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly planes: RepositorioPlanMejoraPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
   async estado(actor: Actor, trabajoId: string): Promise<TrabajoDocumentoMejora> {
     await this.exigirLectura(actor);
     const trabajo = await this.documentos.porId(trabajoId);
     if (trabajo === null) throw new NoEncontrado('el documento', trabajoId);
+    // Un documento de un plan de otra carrera no existe para quien no la lee.
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(trabajo.planMejoraId),
+      'el documento',
+      trabajoId,
+    );
     return trabajo;
   }
 
@@ -252,6 +261,13 @@ export class ConsultarDocumentoMejora {
     limite = 20,
   ): Promise<TrabajoDocumentoMejora[]> {
     await this.exigirLectura(actor);
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.planes.porId(planMejoraId),
+      'el plan de mejora',
+      planMejoraId,
+    );
     return this.documentos.listarDePlan(planMejoraId, limite);
   }
 
@@ -283,9 +299,8 @@ export class ConsultarDocumentoMejora {
   }
 
   private async exigirLectura(actor: Actor): Promise<void> {
-    // No acotado por carrera: exportar es leer, y quien puede ver el plan en
-    // pantalla puede llevárselo, sin importar qué carrera dirija — mismo
-    // criterio que `ConsultarDocumentoEvaluacion.exigirLectura`.
+    // El permiso de lectura viaja con `null` (es de lectura); lo que acota por
+    // carrera es el alcance, que se comprueba después sobre el plan (RF-CH-041).
     const decision = await this.autorizacion.puede(actor.id, 'mejora.leer', null);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }

@@ -168,6 +168,7 @@ function repoPlanesMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repos
     registrarImpactoEnMedicion: noUsado('registrarImpactoEnMedicion'),
     copiar: noUsado('copiar'),
     linajeDe: noUsado('linajeDe'),
+    listar: async () => [],
     listarDeCarrera: async () => [],
     planesPorIds: async () => [],
     ...sobre,

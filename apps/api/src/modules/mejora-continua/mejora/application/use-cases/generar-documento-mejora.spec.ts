@@ -30,6 +30,7 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type {
   RepositorioDocumentosMejoraPort,
@@ -44,6 +45,14 @@ import {
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 const CARRERA = 'carrera-1';
+
+/** Lee solo `carreraId`. */
+function alcanceDeCarrera(carreraId: string): AlcanceDeLecturaPort {
+  return {
+    alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+    puedeLeerCarrera: async (_usuario, carrera) => carrera === carreraId,
+  };
+}
 
 function permitirTodo(): AuthorizationPort {
   return {
@@ -121,6 +130,7 @@ function plan(sobre: Partial<DatosPlanMejora> = {}): DatosPlanMejora {
 }
 
 interface Dobles {
+  alcance?: AlcanceDeLecturaPort;
   repo?: Partial<RepositorioDocumentosMejoraPort>;
   planes?: Partial<RepositorioPlanMejoraPort>;
   cola?: Partial<ColaDeDocumentosPort>;
@@ -165,6 +175,7 @@ function montar(dobles: Dobles = {}) {
     registrarImpactoEnMedicion: async () => plan(),
     copiar: async () => plan(),
     linajeDe: async () => [],
+    listar: async () => [],
     listarDeCarrera: async () => [],
     planesPorIds: async () => [],
     ...dobles.planes,
@@ -183,6 +194,7 @@ function montar(dobles: Dobles = {}) {
     { render: dobles.renderizadores?.hoja ?? (async () => Buffer.from('hoja')) },
     dobles.autorizacion ?? permitirTodo(),
     eventos,
+    dobles.alcance ?? alcanceDeCarrera(CARRERA),
     { ahora: () => new Date('2026-09-13T12:00:00Z') },
   );
 
@@ -343,6 +355,8 @@ function montarConsulta(dobles: {
   repo?: Partial<RepositorioDocumentosMejoraPort>;
   almacen?: Partial<AlmacenDeArchivosPort>;
   autorizacion?: AuthorizationPort;
+  planes?: Partial<RepositorioPlanMejoraPort>;
+  alcance?: AlcanceDeLecturaPort;
 }) {
   const repo: RepositorioDocumentosMejoraPort = {
     crear: async () => trabajo(),
@@ -363,6 +377,8 @@ function montarConsulta(dobles: {
       ...dobles.almacen,
     },
     dobles.autorizacion ?? permitirTodo(),
+    { porId: async () => plan(), ...dobles.planes } as unknown as RepositorioPlanMejoraPort,
+    dobles.alcance ?? alcanceDeCarrera(CARRERA),
   );
 }
 
@@ -422,5 +438,45 @@ describe('RF-PJ-032 — consultar y descargar', () => {
     const caso = montarConsulta({ repo: { porId: async () => null } });
 
     await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(NoEncontrado);
+  });
+});
+
+describe('RF-CH-041 — el alcance por carrera en los documentos', () => {
+  const deOtra = { porId: async () => plan({ carreraId: 'otra' }) };
+
+  it('encolar el documento de un plan de otra carrera es 404 y no deja trabajo', async () => {
+    const encolados: string[] = [];
+    const { caso } = montar({
+      planes: deOtra,
+      cola: { encolar: async (id) => void encolados.push(id) },
+    });
+
+    await expect(caso.encolar(ACTOR, 'pj-1', 'PLAN_MEJORA_PDF')).rejects.toThrow(NoEncontrado);
+    expect(encolados).toEqual([]);
+  });
+
+  it('sin mejora.leer, encolar un plan inexistente es 403 y no 404', async () => {
+    const { caso } = montar({ planes: { porId: async () => null }, autorizacion: denegar() });
+
+    await expect(caso.encolar(ACTOR, 'pj-x', 'PLAN_MEJORA_PDF')).rejects.toThrow(AccesoDenegado);
+  });
+
+  it('el estado, el listado y la descarga de un documento de otra carrera son 404', async () => {
+    const caso = montarConsulta({
+      planes: deOtra,
+      repo: { porId: async () => trabajo({ estado: 'Listo' }) },
+    });
+
+    await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(NoEncontrado);
+    await expect(caso.listarDePlan(ACTOR, 'pj-1')).rejects.toThrow(NoEncontrado);
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow(NoEncontrado);
+  });
+
+  it('sin mejora.leer, un plan inexistente es 403 y no 404', async () => {
+    const caso = montarConsulta({ planes: { porId: async () => null }, autorizacion: denegar() });
+
+    await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
+    await expect(caso.listarDePlan(ACTOR, 'pj-x')).rejects.toThrow(AccesoDenegado);
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
   });
 });

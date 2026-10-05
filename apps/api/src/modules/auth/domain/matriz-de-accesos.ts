@@ -269,6 +269,10 @@ export const ROLES: {
       'evaluacion.leer',
       'evidencia.registrar',
       'mejora.leer',
+      // Bloque 6b (RF-CH-041): ve todos los planes de mejora de SU carrera, no los
+      // de otra. La marca acota TODAS sus lecturas: carreras, catálogo, evaluación.
+      // De paso se corrige que hoy lea los planes de Evaluación de cualquier carrera.
+      'lectura.solo_su_carrera',
     ],
   },
   {
