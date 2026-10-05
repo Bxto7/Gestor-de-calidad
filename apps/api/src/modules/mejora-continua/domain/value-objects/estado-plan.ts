@@ -170,15 +170,6 @@ export function permiteEliminacion(estado: EstadoMedicion): boolean {
 }
 
 /**
- * RF-PJ-008: un plan de mejora, solo en Borrador. Vive aparte para que ampliar
- * la regla de medición y evaluación (Bloque 6a) no la arrastre; si el Bloque 6b
- * la cambia, cambia aquí.
- */
-export function permiteEliminacionDeMejora(estado: EstadoMedicion): boolean {
-  return estado === 'Borrador';
-}
-
-/**
  * RF-PM-030: se versiona lo que ya no se puede editar.
  *
  * Desde Borrador o En revisión no tiene sentido: RF-PM-007 permite editar el

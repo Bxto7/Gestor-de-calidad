@@ -44,7 +44,7 @@ import { ObjetivoRepositoryPrisma } from '../../src/modules/objetivos-educaciona
 import { ObjetivosCrossModuloAdapter } from '../../src/modules/objetivos-educacionales/infrastructure/objetivos-cross-modulo.adapter.js';
 import { AuthorizationAdapter } from '../../src/modules/auth/infrastructure/authorization.adapter.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
-import { ReglaDeNegocioViolada } from '../../src/shared-kernel/errors/errores.js';
+import { NoEncontrado, ReglaDeNegocioViolada } from '../../src/shared-kernel/errors/errores.js';
 
 const prisma = new PrismaService();
 const repo = new PlanMejoraRepositoryPrisma(prisma);
@@ -346,7 +346,7 @@ function datosBase(plan: DatosPlanMejora) {
 const ACTOR_ID = randomUUID();
 
 describe('RF-PJ-035 RN1 — el linaje', () => {
-  it('borrar un plan intermedio no rompe el vínculo de sus descendientes', async () => {
+  it('RF-CH-042: un plan con versiones derivadas no se borra, y su derivada conserva el vínculo', async () => {
     const v1 = await crearPlan({ codigo: 'PJ-LINAJE-1' });
     const v2 = await prisma.planMejora.create({
       data: {
@@ -357,11 +357,14 @@ describe('RF-PJ-035 RN1 — el linaje', () => {
       },
     });
 
-    await repo.eliminar(v1.id);
+    expect(await repo.eliminar(v1.id)).toEqual({
+      tipo: 'en-uso',
+      motivo: 'versiones',
+      cantidad: 1,
+    });
 
     const tras = await prisma.planMejora.findUnique({ where: { id: v2.id } });
-    expect(tras).not.toBeNull();
-    expect(tras?.derivadoDeId).toBeNull();
+    expect(tras?.derivadoDeId).toBe(v1.id);
   });
 });
 
@@ -651,7 +654,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
     carreraA = a.id;
     carreraB = b.id;
 
-    const rol = await prisma.rol.findUnique({ where: { codigo: 'DIRECTOR_CARRERA' } });
+    const rol = await prisma.rol.findUnique({ where: { codigo: 'COORDINADOR_ACADEMICO' } });
     if (!rol) {
       throw new Error(
         'Falta el catálogo de roles/permisos en la base de pruebas — corre `npm run db:seed` contra sgc_test.',
@@ -825,6 +828,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
     it('rechaza un plan de evaluación base que no pertenece a la carrera del actor', async () => {
       const baseAjena = await sembrarBaseCompetencia(carreraB);
 
+      // El plan de evaluación de otra carrera no se ve para quien lee solo la suya: 404, no 409.
       await expect(
         casos.crear(director, {
           aspecto: 'COMPETENCIA',
@@ -832,7 +836,7 @@ describe('el caso de uso completo — creación real por aspecto (Tarea 5)', () 
           periodoId: baseAjena.periodo2.id,
           planEvaluacionId: baseAjena.planEvaluacion.id,
         }),
-      ).rejects.toThrow(ReglaDeNegocioViolada);
+      ).rejects.toThrow(NoEncontrado);
     });
   });
 });

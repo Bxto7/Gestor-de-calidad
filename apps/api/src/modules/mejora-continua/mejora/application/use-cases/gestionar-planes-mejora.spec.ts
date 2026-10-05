@@ -196,7 +196,7 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
       }),
     porId: async () => plan(),
     editarDefinicion: async (_id, datos) => plan({ ...datos }),
-    eliminar: async () => undefined,
+    eliminar: async () => ({ tipo: 'eliminado' }),
     cambiarEstado: async (_id, estado) => plan({ estado }),
     actualizarImplementacion: async (_id, estado) => plan({ estadoImplementacion: estado }),
     actualizarRetroalimentacion: async (_id, logroMeta, impacto) => plan({ logroMeta, impacto }),
@@ -890,34 +890,98 @@ describe('RF-PJ-006 y RF-PJ-007 — la definición', () => {
   });
 });
 
-describe('RF-PJ-008 — el borrado', () => {
-  it('solo en Borrador', async () => {
-    const { caso } = montar({ plan: plan({ estado: 'Aprobado' }) });
+describe('RF-CH-042 — el borrado', () => {
+  it.each([['Borrador'], ['En revisión']] as const)('se elimina en %s', async (estado) => {
+    const { caso, publicados } = montar({ plan: plan({ estado }) });
 
-    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(ReglaDeNegocioViolada);
+    await caso.eliminar(ACTOR, 'pj-1');
+
+    expect(publicados[0]?.detalle).toBe(`Plan de mejora PJ-CRI-1 eliminado en ${estado}.`);
   });
 
-  // Guardia de regresión: pasa antes y después de la Tarea 6, que solo protege la regla.
-  it('el Bloque 6a no lo amplía: un plan de mejora En revisión sigue sin eliminarse', async () => {
-    const { caso } = montar({ plan: plan({ estado: 'En revisión' }) });
+  it('Aprobado: 409 con el texto completo y no llega al repositorio', async () => {
+    let llamadas = 0;
+    const { caso, publicados } = montar({
+      plan: plan({ estado: 'Aprobado' }),
+      planes: { eliminar: async () => (llamadas++, { tipo: 'eliminado' }) },
+    });
 
-    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(ReglaDeNegocioViolada);
+    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(
+      new ReglaDeNegocioViolada(
+        'No se puede eliminar el plan de mejora PJ-CRI-1: está en Aprobado. Solo se eliminan planes en Borrador o En revisión.',
+      ),
+    );
+    expect(llamadas).toBe(0);
+    expect(publicados).toEqual([]);
   });
 
-  it('exige `mejora.eliminar`', async () => {
+  it('el estado cambió entre la lectura y el bloqueo de la fila: 409 con el estado real y sin evento', async () => {
+    const { caso, publicados } = montar({
+      plan: plan({ estado: 'En revisión' }),
+      planes: { eliminar: async () => ({ tipo: 'estado-no-permite', estado: 'Aprobado' }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(/está en Aprobado/);
+    expect(publicados).toEqual([]);
+  });
+
+  it.each([
+    [1, 'está incluido en 1 acta'],
+    [2, 'está incluido en 2 actas'],
+  ] as const)('en %i acta(s): 409 con el motivo y sin evento', async (cantidad, texto) => {
+    const { caso, publicados } = montar({
+      planes: { eliminar: async () => ({ tipo: 'en-uso', motivo: 'acta', cantidad }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(
+      new ReglaDeNegocioViolada(`No se puede eliminar el plan de mejora PJ-CRI-1: ${texto}.`),
+    );
+    expect(publicados).toEqual([]);
+  });
+
+  it.each([
+    [1, 'tiene 1 versión derivada'],
+    [3, 'tiene 3 versiones derivadas'],
+  ] as const)('con %i versión(es) derivada(s): 409 con el motivo', async (cantidad, texto) => {
+    const { caso } = montar({
+      planes: { eliminar: async () => ({ tipo: 'en-uso', motivo: 'versiones', cantidad }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(
+      new ReglaDeNegocioViolada(`No se puede eliminar el plan de mejora PJ-CRI-1: ${texto}.`),
+    );
+  });
+
+  it('el plan ya no existe cuando se bloquea la fila: 404 y sin evento (la bitácora no registra un borrado que no ocurrió)', async () => {
+    const { caso, publicados } = montar({
+      planes: { eliminar: async () => ({ tipo: 'no-existe' }) },
+    });
+
+    await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(NoEncontrado);
+    expect(publicados).toEqual([]);
+  });
+
+  it('el evento se publica DESPUÉS de borrar', async () => {
+    const orden: string[] = [];
+    const { caso } = montar({
+      planes: { eliminar: async () => (orden.push('borrado'), { tipo: 'eliminado' }) },
+    });
+    // `publicados` no ordena contra el repositorio: se envuelve el publicador.
+    const eventos = (caso as unknown as { eventos: PublicadorDeEventos }).eventos;
+    const original = eventos.publicar.bind(eventos);
+    eventos.publicar = async (e) => (orden.push('evento'), original(e));
+
+    await caso.eliminar(ACTOR, 'pj-1');
+
+    expect(orden).toEqual(['borrado', 'evento']);
+  });
+
+  it('exige `mejora.eliminar` sobre la carrera del plan', async () => {
     const pedidos: string[] = [];
     const { caso } = montar({ autorizacion: permitirSolo(['mejora.leer'], pedidos) });
 
     await expect(caso.eliminar(ACTOR, 'pj-1')).rejects.toThrow(AccesoDenegado);
     expect(pedidos).toEqual(['mejora.leer', 'mejora.eliminar']);
-  });
-
-  it('deja constancia en la bitácora', async () => {
-    const { caso, publicados } = montar();
-
-    await caso.eliminar(ACTOR, 'pj-1');
-
-    expect(publicados[0]?.nombre).toBe('mejora.eliminado');
   });
 });
 

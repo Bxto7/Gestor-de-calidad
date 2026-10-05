@@ -65,13 +65,12 @@ import {
 import type { AcreditacionPort } from '../../../../acreditacion/application/ports/acreditacion-cross-modulo.port.js';
 import type { ContenidoCurricularPort } from '../../../../plan-estudios/application/ports/contenido-curricular.port.js';
 import type { ObjetivosCrossModuloPort } from '../../../../objetivos-educacionales/application/ports/objetivos-cross-modulo.port.js';
-// La Tarea 3 lo sustituye por `permiteEliminacionMejora`.
-import { permiteEliminacionDeMejora } from '../../../domain/value-objects/estado-plan.js';
 import {
   type AccionMejora,
   describirTransicionMejora,
   intentarTransicionMejora,
   permiteEdicionMejora,
+  permiteEliminacionMejora,
   permiteSeguimientoMejora,
 } from '../../domain/value-objects/estado-plan-mejora.js';
 import type { RepositorioConfiguracionEvaluacionPort } from '../../../evaluacion/application/ports/configuracion-evaluacion.port.js';
@@ -286,19 +285,28 @@ export class GestionarPlanesMejora {
     return actualizado;
   }
 
-  /** RF-PJ-008: solo un Borrador se elimina. */
+  /** RF-CH-042: Borrador o En revisión, salvo si está en un acta o tiene versiones derivadas. */
   async eliminar(actor: Actor, id: string): Promise<void> {
-    // RF-PJ-043: eliminar queda restringido a roles autorizados.
     const plan = await this.planGestionable(actor, id, 'mejora.eliminar');
 
-    if (!permiteEliminacionDeMejora(plan.estado)) {
+    if (!permiteEliminacionMejora(plan.estado)) throw estadoNoEliminable(plan.codigo, plan.estado);
+
+    const r = await this.planes.eliminar(id);
+    if (r.tipo === 'no-existe') throw new NoEncontrado('el plan de mejora', id);
+    // El estado cambió entre la lectura y el bloqueo de la fila: no se borró nada.
+    if (r.tipo === 'estado-no-permite') throw estadoNoEliminable(plan.codigo, r.estado);
+    if (r.tipo === 'en-uso') {
+      const motivo =
+        r.motivo === 'acta'
+          ? `está incluido en ${contar(r.cantidad, 'acta', 'actas')}`
+          : `tiene ${contar(r.cantidad, 'versión derivada', 'versiones derivadas')}`;
       throw new ReglaDeNegocioViolada(
-        `Solo se puede eliminar un plan de mejora en Borrador; ${plan.codigo} está en ${plan.estado}.`,
+        `No se puede eliminar el plan de mejora ${plan.codigo}: ${motivo}.`,
       );
     }
 
-    await this.planes.eliminar(id);
-    await this.eventos.publicar([new PlanMejoraEliminado(actor, id, plan.codigo)]);
+    // La bitácora es append-only: el evento va después de borrar, no antes.
+    await this.eventos.publicar([new PlanMejoraEliminado(actor, id, plan.codigo, plan.estado)]);
   }
 
   /** RF-CH-043: Borrador → En revisión → Aprobado, observar vuelve a Borrador. */
@@ -654,4 +662,14 @@ export class GestionarPlanesMejora {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
+}
+
+function estadoNoEliminable(codigo: string, estado: string): ReglaDeNegocioViolada {
+  return new ReglaDeNegocioViolada(
+    `No se puede eliminar el plan de mejora ${codigo}: está en ${estado}. Solo se eliminan planes en Borrador o En revisión.`,
+  );
+}
+
+function contar(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
 }

@@ -23,6 +23,13 @@ import type { EstadoMejora } from '../../domain/value-objects/estado-plan-mejora
 import type { CopiaPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 
+/** RF-CH-042: el resultado de un borrado, decidido con la fila bloqueada. */
+export type ResultadoEliminacionMejora =
+  | { readonly tipo: 'eliminado' }
+  | { readonly tipo: 'no-existe' }
+  | { readonly tipo: 'estado-no-permite'; readonly estado: EstadoMejora }
+  | { readonly tipo: 'en-uso'; readonly motivo: 'acta' | 'versiones'; readonly cantidad: number };
+
 export type AspectoPlanMejora = 'CRITERIO_ACREDITACION' | 'OBJETIVO_EDUCACIONAL' | 'COMPETENCIA';
 
 export interface DatosEvidencia {
@@ -122,7 +129,7 @@ export interface RepositorioPlanMejoraPort {
   crear(datos: NuevoPlanMejora): Promise<DatosPlanMejora>;
   porId(id: string): Promise<DatosPlanMejora | null>;
   editarDefinicion(id: string, datos: DefinicionAccionMejora): Promise<DatosPlanMejora>;
-  eliminar(id: string): Promise<void>;
+  eliminar(id: string): Promise<ResultadoEliminacionMejora>;
   cambiarEstado(id: string, estado: EstadoMejora): Promise<DatosPlanMejora>;
   actualizarImplementacion(id: string, estado: EstadoImplementacion): Promise<DatosPlanMejora>;
   actualizarRetroalimentacion(

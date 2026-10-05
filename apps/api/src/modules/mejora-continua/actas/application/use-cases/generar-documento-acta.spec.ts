@@ -130,7 +130,7 @@ function montar(dobles: Dobles = {}) {
 
   const planes: RepositorioPlanMejoraPort = {
     crear: async () => plan(), porId: async () => plan(), editarDefinicion: async () => plan(),
-    eliminar: async () => {}, cambiarEstado: async () => plan(), actualizarImplementacion: async () => plan(),
+    eliminar: async () => ({ tipo: 'eliminado' }) as const, cambiarEstado: async () => plan(), actualizarImplementacion: async () => plan(),
     actualizarRetroalimentacion: async () => plan(), agregarEvidencia: async () => plan().evidencias[0]!,
     planDeEvidencia: async () => null, eliminarEvidencia: async () => {}, codigosDe: async () => [],
     parametros: async () => ({ minimoAccionesCriterio: 1, minimoAccionesObjetivo: 1 }),

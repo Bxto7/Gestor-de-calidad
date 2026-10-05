@@ -12,7 +12,10 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
-import type { EstadoMejora } from '../../domain/value-objects/estado-plan-mejora.js';
+import {
+  type EstadoMejora,
+  permiteEliminacionMejora,
+} from '../../domain/value-objects/estado-plan-mejora.js';
 import type { CopiaPlanMejora } from '../../domain/services/copia-de-plan-mejora.js';
 import type { EstadoImplementacion } from '../../domain/value-objects/estado-implementacion.js';
 import type { ImpactoPlanMejoraPort } from '../../application/ports/impacto-plan-mejora.port.js';
@@ -26,6 +29,7 @@ import type {
   NuevaEvidencia,
   NuevoPlanMejora,
   RepositorioPlanMejoraPort,
+  ResultadoEliminacionMejora,
 } from '../../application/ports/plan-mejora.port.js';
 
 type EstadoBd = 'BORRADOR' | 'EN_REVISION' | 'APROBADO' | 'VIGENTE' | 'HISTORICO';
@@ -245,8 +249,44 @@ export class PlanMejoraRepositoryPrisma
     return aDatos(fila);
   }
 
-  async eliminar(id: string): Promise<void> {
-    await this.prisma.planMejora.delete({ where: { id } });
+  /**
+   * RF-CH-042: borra solo si el estado lo permite y no está en un acta ni tiene
+   * versiones derivadas, **en la misma transacción**. La fila se bloquea primero:
+   * una versión nueva toma un bloqueo compartido sobre ella por su clave foránea
+   * (`derivadoDeId`), así que espera a que esta transacción termine, y la cuenta ve
+   * todo lo ya confirmado.
+   *
+   * `AccionActa.planMejoraId` NO tiene clave foránea, y por tanto no toma ese
+   * bloqueo. No hace falta: solo los planes Aprobados entran en un acta y un plan
+   * Aprobado no se elimina, así que la relectura del estado con la fila bloqueada
+   * cierra la carrera. La cuenta de actas es la defensa para estados forzados.
+   *
+   * Evidencias y documentos caen por cascada del esquema.
+   */
+  async eliminar(id: string): Promise<ResultadoEliminacionMejora> {
+    return this.prisma.$transaction(async (tx) => {
+      const bloqueada = await tx.$queryRaw<{ id: string; estado: string }[]>`
+        SELECT "id", "estado"::text AS "estado" FROM "mejora_continua"."planes_mejora" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      const fila = bloqueada[0];
+      if (!fila) return { tipo: 'no-existe' } as const;
+
+      // El estado se relee con la fila ya bloqueada: el que vio el caso de uso pudo
+      // cambiar en medio (una aprobación concurrente), y borrar un plan Aprobado
+      // no se puede deshacer.
+      const estado = A_DOMINIO[fila.estado as EstadoBd] ?? 'Borrador';
+      if (!permiteEliminacionMejora(estado)) return { tipo: 'estado-no-permite', estado } as const;
+
+      const actas = await tx.accionActa.count({ where: { planMejoraId: id } });
+      if (actas > 0) return { tipo: 'en-uso', motivo: 'acta', cantidad: actas } as const;
+
+      // `derivadoDeId` es `SetNull`: borrar el origen dejaría a sus versiones sin linaje.
+      const versiones = await tx.planMejora.count({ where: { derivadoDeId: id } });
+      if (versiones > 0)
+        return { tipo: 'en-uso', motivo: 'versiones', cantidad: versiones } as const;
+
+      await tx.planMejora.delete({ where: { id } });
+      return { tipo: 'eliminado' } as const;
+    });
   }
 
   async cambiarEstado(id: string, estado: EstadoMejora): Promise<DatosPlanMejora> {

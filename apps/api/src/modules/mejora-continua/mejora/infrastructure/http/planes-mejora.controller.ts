@@ -122,8 +122,12 @@ export class PlanesMejoraController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar un plan de mejora en Borrador (RF-PJ-008)' })
-  @ApiResponse({ status: 409, description: 'El plan no está en Borrador.' })
+  @ApiOperation({ summary: 'Eliminar un plan de mejora en Borrador o En revisión (RF-CH-042)' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'El plan no está en Borrador ni En revisión, está en un acta o tiene versiones derivadas.',
+  })
   async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     await this.casos.eliminar(actor, id);
   }
