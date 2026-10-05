@@ -18,7 +18,7 @@
  * según el orden en que lleguen.
  */
 
-import { Body, Controller, Get, Param, ParseUUIDPipe, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
@@ -56,7 +56,8 @@ export class ConfiguracionEvaluacionController {
 
   @Put('competencias/:competenciaId')
   @ApiOperation({
-    summary: 'Instrumento, frecuencia y responsable de una competencia (RF-PE-013, RF-PE-014, RF-PE-024)',
+    summary:
+      'Instrumento, frecuencia y responsable de una competencia (RF-PE-013, RF-PE-014, RF-PE-024)',
     description:
       'Valen para todos los periodos: RF-PE-013 RN1. Solo en Borrador. Reemplazo ' +
       'total: cada campo omitido se borra, igual que `instrumento` y `frecuencia`.',
@@ -134,7 +135,10 @@ export class ConfiguracionEvaluacionController {
 
   @Put('periodos/:periodoId/indicaciones')
   @ApiOperation({ summary: 'Las indicaciones de un año (RF-PE-028 a RF-PE-030)' })
-  @ApiResponse({ status: 409, description: 'El plan no es Indirecta, o el año no está en la matriz' })
+  @ApiResponse({
+    status: 409,
+    description: 'El plan no es Indirecta, o el año no está en la matriz',
+  })
   async indicaciones(
     @Param('planId', ParseUUIDPipe) planId: string,
     @Param('periodoId', ParseUUIDPipe) periodoId: string,
@@ -220,10 +224,14 @@ export class DocentesController {
 
   @Get()
   @ApiOperation({
-    summary: 'Cuentas activas con rol DOCENTE (RF-PE-018)',
-    description: 'Catálogo para elegir responsable. Exige `evaluacion.leer`.',
+    summary: 'Docentes activos de la carrera del plan de evaluación (RF-PE-018, RF-CH-045)',
+    description:
+      'Catálogo para elegir docente o responsable. Exige `evaluacion.leer`; un plan de otra carrera responde 404.',
   })
-  async listar(@ActorActual() actor: Actor) {
-    return this.casos.docentes(actor);
+  async listar(
+    @ActorActual() actor: Actor,
+    @Query('planEvaluacionId', ParseUUIDPipe) planEvaluacionId: string,
+  ) {
+    return this.casos.docentes(actor, planEvaluacionId);
   }
 }

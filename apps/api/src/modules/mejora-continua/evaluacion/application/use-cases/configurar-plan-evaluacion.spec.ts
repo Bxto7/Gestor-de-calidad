@@ -41,6 +41,7 @@ import type {
   RepositorioPlanMedicionPort,
 } from '../../../medicion/application/ports/plan-medicion.port.js';
 import type {
+  ConfiguracionDelPlan,
   GrupoObjetivo,
   RepositorioConfiguracionEvaluacionPort,
 } from '../ports/configuracion-evaluacion.port.js';
@@ -260,6 +261,8 @@ function montar(
     autorizacion?: AuthorizationPort;
     alcance?: AlcanceDeLecturaPort;
     registrarRolPedido?: (rol: string) => void;
+    directorio?: Partial<DirectorioDeUsuariosPort>;
+    configuracion?: ConfiguracionDelPlan;
   } = {},
 ) {
   const publicados: DomainEvent[] = [];
@@ -322,9 +325,12 @@ function montar(
       opciones.registrarRolPedido?.(rol);
       return [{ id: 'doc-1', nombre: 'Docente Uno' }];
     },
+    ...opciones.directorio,
   };
 
   const configuracion = repoConfiguracion({
+    del: async () =>
+      opciones.configuracion ?? { competencias: [], mediciones: [], indicaciones: [] },
     guardarCompetencia: async (datos) => {
       guardado.competencia = {
         instrumento: datos.instrumento,
@@ -452,7 +458,11 @@ describe('RF-PE-024 — el responsable de una competencia', () => {
     // configuración entera, así que omitirlo la borra. Este caso de uso lo
     // reenvía siempre, decida lo que decida quien llama, para que el campo
     // nunca llegue como `undefined` y Prisma no toque la columna en silencio.
-    const { caso, guardado } = montar();
+    const { caso, guardado } = montar({
+      directorio: {
+        docentesActivosDeCarrera: async () => [{ id: 'u-9', nombre: 'Docente Nueve' }],
+      },
+    });
 
     await caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
       instrumento: 'Encuesta',
@@ -737,15 +747,6 @@ describe('los catálogos', () => {
       'ASUC001',
     ]);
   });
-
-  it('los docentes son los usuarios con rol DOCENTE', async () => {
-    const pedidos: string[] = [];
-    const { caso } = montar({ registrarRolPedido: (r) => pedidos.push(r) });
-
-    await caso.docentes(ACTOR);
-
-    expect(pedidos).toEqual(['DOCENTE']);
-  });
 });
 
 /**
@@ -923,5 +924,167 @@ describe('orden de comprobación de las escrituras: la lectura va primero', () =
     await expect(caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', COMPETENCIA)).rejects.toBeInstanceOf(
       NoEncontrado,
     );
+  });
+});
+
+describe('RF-CH-045 / RF-CH-046 — docentes de la carrera del plan', () => {
+  it('docentes(): los activos de la carrera DEL PLAN, no los de todas', async () => {
+    const pedidas: string[] = [];
+    const { caso } = montar({
+      evaluacion: evaluacion({ carreraId: 'carrera-propia' }),
+      directorio: {
+        docentesActivosDeCarrera: async (c) => (
+          pedidas.push(c),
+          [{ id: 'd-1', nombre: 'Ana Docente' }]
+        ),
+      },
+    });
+
+    expect(await caso.docentes(ACTOR, 'ev-1')).toEqual([{ id: 'd-1', nombre: 'Ana Docente' }]);
+    expect(pedidas).toEqual(['carrera-propia']);
+  });
+
+  it('docentes() de un plan de otra carrera es 404, y sin `evaluacion.leer` es 403', async () => {
+    const ajeno = montar({
+      evaluacion: evaluacion({ carreraId: 'otra' }),
+      alcance: soloCarrera('carrera-propia'),
+    });
+    await expect(ajeno.caso.docentes(ACTOR, 'ev-1')).rejects.toThrow(NoEncontrado);
+
+    const sinLeer = montar({ autorizacion: sinPermiso('evaluacion.leer') });
+    await expect(sinLeer.caso.docentes(ACTOR, 'ev-1')).rejects.toThrow(AccesoDenegado);
+  });
+
+  describe('el docente evaluador de una asignatura (RF-PE-018)', () => {
+    const activos = { docentesActivosDeCarrera: async () => [{ id: 'd-1', nombre: 'Ana' }] };
+
+    it('uno que no es docente activo de la carrera es 409 y no se guarda nada', async () => {
+      const { caso, guardado } = montar({ directorio: activos });
+
+      await expect(
+        caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+          { asignaturaId: 'a-1', entregable: 'Informe', docenteId: 'intruso' },
+        ]),
+      ).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          'El docente elegido no es un docente activo de la carrera del plan (RF-PE-018).',
+        ),
+      );
+      expect(guardado.asignaturas).toBeUndefined();
+    });
+
+    it('uno de la carrera se guarda', async () => {
+      const { caso, guardado } = montar({ directorio: activos });
+
+      await caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+        { asignaturaId: 'a-1', entregable: 'Informe', docenteId: 'd-1' },
+      ]);
+
+      expect(guardado.asignaturas).toHaveLength(1);
+    });
+
+    it('sin docente (null) se guarda sin consultar el directorio', async () => {
+      let busquedas = 0;
+      const { caso } = montar({
+        directorio: { docentesActivosDeCarrera: async () => (busquedas++, []) },
+      });
+
+      await caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+        { asignaturaId: 'a-1', entregable: 'Informe', docenteId: null },
+      ]);
+
+      expect(busquedas).toBe(0);
+    });
+
+    it('un docente ya guardado en ese cruce no se rechaza al volver a guardar, aunque ya no sea de la carrera', async () => {
+      const { caso } = montar({
+        directorio: { docentesActivosDeCarrera: async () => [] },
+        configuracion: {
+          competencias: [],
+          indicaciones: [],
+          mediciones: [
+            {
+              competenciaId: 'c-1',
+              periodoId: 'p-1',
+              porcentajeAlcanzado: null,
+              asignaturas: [
+                {
+                  id: 'ae-1',
+                  asignaturaId: 'a-1',
+                  entregable: 'Informe',
+                  docenteId: 'viejo',
+                  evidencias: [],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      await expect(
+        caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+          { asignaturaId: 'a-1', entregable: 'Informe v2', docenteId: 'viejo' },
+        ]),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('el responsable de la competencia indirecta (RF-PE-024)', () => {
+    it('uno que no es docente activo de la carrera es 409', async () => {
+      const { caso, guardado } = montar({
+        directorio: { docentesActivosDeCarrera: async () => [{ id: 'd-1', nombre: 'Ana' }] },
+      });
+
+      await expect(
+        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+          instrumento: null,
+          frecuencia: null,
+          responsableId: 'intruso',
+        }),
+      ).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          'El responsable elegido no es un docente activo de la carrera del plan (RF-PE-024).',
+        ),
+      );
+      expect(guardado.competencia).toBeUndefined();
+    });
+
+    it('el ya guardado se acepta de nuevo (el valor heredado de «cualquier rol» no rompe)', async () => {
+      const { caso } = montar({
+        directorio: { docentesActivosDeCarrera: async () => [] },
+        configuracion: {
+          competencias: [
+            {
+              competenciaId: 'c-1',
+              instrumento: null,
+              frecuencia: null,
+              responsableId: 'coord-viejo',
+            },
+          ],
+          indicaciones: [],
+          mediciones: [],
+        },
+      });
+
+      await expect(
+        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+          instrumento: 'Rúbrica',
+          frecuencia: null,
+          responsableId: 'coord-viejo',
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('sin responsable (null) se guarda', async () => {
+      const { caso } = montar();
+
+      await expect(
+        caso.guardarCompetencia(ACTOR, 'ev-1', 'c-1', {
+          instrumento: null,
+          frecuencia: null,
+          responsableId: null,
+        }),
+      ).resolves.toBeUndefined();
+    });
   });
 });

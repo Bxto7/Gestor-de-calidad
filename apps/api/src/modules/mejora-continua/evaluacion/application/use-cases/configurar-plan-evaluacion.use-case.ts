@@ -29,11 +29,13 @@
  * hereda de la base y ninguna pantalla ni exportación de un tipo muestra los
  * datos del otro.
  *
- * El docente no se valida contra su rol al guardar: se guarda el UUID que
- * llega. Validarlo convertiría un cambio de rol futuro en un dato histórico
- * inválido — la pantalla ya ofrece solo docentes, y el registro debe
- * conservar a quien fuera responsable entonces, aunque después deje de serlo.
- * Lo mismo aplica al responsable de una competencia (RF-PE-024).
+ * RF-CH-045 / RF-CH-046 (Bloque 6b): el docente de una asignatura evaluada
+ * (RF-PE-018) y el responsable de una competencia indirecta (RF-PE-024) tienen que
+ * ser docentes **activos de la carrera del plan**. Solo se valida lo que cambia:
+ * un valor ya guardado en ese mismo cruce o competencia se acepta de nuevo, aunque
+ * esa persona haya dejado de ser docente de la carrera. El registro conserva a quien
+ * fuera responsable entonces (el id no tiene clave foránea y se sigue mostrando),
+ * y volver a guardar otro campo no puede romperse por un dato heredado.
  */
 
 import type {
@@ -89,10 +91,14 @@ export class ConfigurarPlanEvaluacion {
     return this.curricular.asignaturasDelPlan(base.planEstudiosId);
   }
 
-  /** Usuarios con rol DOCENTE, para asignar responsable a una asignatura evaluada. */
-  async docentes(actor: Actor): Promise<{ id: string; nombre: string }[]> {
+  /** RF-CH-045: los docentes activos de la carrera del plan, para elegir docente o responsable. */
+  async docentes(
+    actor: Actor,
+    planEvaluacionId: string,
+  ): Promise<{ id: string; nombre: string }[]> {
     await this.exigir(actor, 'evaluacion.leer', null);
-    return this.directorio.porRol('DOCENTE');
+    const plan = await this.exigirPlan(actor, planEvaluacionId);
+    return this.directorio.docentesActivosDeCarrera(plan.carreraId);
   }
 
   /** Todo lo configurado del plan, en una sola lectura. */
@@ -134,6 +140,17 @@ export class ConfigurarPlanEvaluacion {
       );
     }
 
+    // RF-CH-046: el responsable es un docente activo de la carrera, salvo que ya lo sea de esta competencia.
+    const guardada = (await this.configuraciones.del(planEvaluacionId)).competencias.find(
+      (c) => c.competenciaId === competenciaId,
+    );
+    await this.exigirDocentesDeLaCarrera(
+      plan,
+      [datos.responsableId],
+      new Set([guardada?.responsableId ?? '']),
+      'El responsable elegido no es un docente activo de la carrera del plan (RF-PE-024).',
+    );
+
     await this.configuraciones.guardarCompetencia({
       planEvaluacionId,
       competenciaId,
@@ -174,6 +191,17 @@ export class ConfigurarPlanEvaluacion {
         );
       }
     }
+
+    // RF-CH-045: el docente es un docente activo de la carrera, salvo los que ya figuran en este cruce.
+    const cruce = (await this.configuraciones.del(planEvaluacionId)).mediciones.find(
+      (m) => m.competenciaId === competenciaId && m.periodoId === periodoId,
+    );
+    await this.exigirDocentesDeLaCarrera(
+      plan,
+      asignaturas.map((a) => a.docenteId),
+      new Set((cruce?.asignaturas ?? []).map((a) => a.docenteId ?? '')),
+      'El docente elegido no es un docente activo de la carrera del plan (RF-PE-018).',
+    );
 
     await this.configuraciones.reemplazarAsignaturas(
       planEvaluacionId,
@@ -443,6 +471,25 @@ export class ConfigurarPlanEvaluacion {
       throw new NoEncontrado('el plan de estudios', planEstudiosId);
     }
     return plan.carreraId;
+  }
+
+  /**
+   * Los ids nuevos (los que no estaban ya guardados) deben ser docentes activos de
+   * la carrera del plan. Sin ids nuevos no se consulta el directorio.
+   */
+  private async exigirDocentesDeLaCarrera(
+    plan: DatosPlanEvaluacion,
+    ids: readonly (string | null)[],
+    yaGuardados: ReadonlySet<string>,
+    motivo: string,
+  ): Promise<void> {
+    const nuevos = [...new Set(ids)].filter((id): id is string => !!id && !yaGuardados.has(id));
+    if (nuevos.length === 0) return;
+
+    const activos = new Set(
+      (await this.directorio.docentesActivosDeCarrera(plan.carreraId)).map((d) => d.id),
+    );
+    if (nuevos.some((id) => !activos.has(id))) throw new ReglaDeNegocioViolada(motivo);
   }
 
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
