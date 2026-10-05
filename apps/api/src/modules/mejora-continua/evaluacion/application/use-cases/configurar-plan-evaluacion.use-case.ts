@@ -144,10 +144,13 @@ export class ConfigurarPlanEvaluacion {
     const guardada = (await this.configuraciones.del(planEvaluacionId)).competencias.find(
       (c) => c.competenciaId === competenciaId,
     );
+    const responsableNuevo =
+      datos.responsableId !== null && datos.responsableId !== guardada?.responsableId
+        ? [datos.responsableId]
+        : [];
     await this.exigirDocentesDeLaCarrera(
       plan,
-      [datos.responsableId],
-      new Set([guardada?.responsableId ?? '']),
+      responsableNuevo,
       'El responsable elegido no es un docente activo de la carrera del plan (RF-PE-024).',
     );
 
@@ -192,14 +195,24 @@ export class ConfigurarPlanEvaluacion {
       }
     }
 
-    // RF-CH-045: el docente es un docente activo de la carrera, salvo los que ya figuran en este cruce.
+    // RF-CH-045: el docente es un docente activo de la carrera, salvo el par
+    // (asignatura, docente) que ya figura en este cruce. Se compara el par y no
+    // el docente suelto: mover a un docente guardado a otra asignatura es un
+    // cambio y se valida.
     const cruce = (await this.configuraciones.del(planEvaluacionId)).mediciones.find(
       (m) => m.competenciaId === competenciaId && m.periodoId === periodoId,
     );
+    const paresGuardados = new Set(
+      (cruce?.asignaturas ?? []).map((a) => `${a.asignaturaId}|${a.docenteId}`),
+    );
+    const docentesNuevos = asignaturas.flatMap((a) =>
+      a.docenteId !== null && !paresGuardados.has(`${a.asignaturaId}|${a.docenteId}`)
+        ? [a.docenteId]
+        : [],
+    );
     await this.exigirDocentesDeLaCarrera(
       plan,
-      asignaturas.map((a) => a.docenteId),
-      new Set((cruce?.asignaturas ?? []).map((a) => a.docenteId ?? '')),
+      docentesNuevos,
       'El docente elegido no es un docente activo de la carrera del plan (RF-PE-018).',
     );
 
@@ -474,22 +487,20 @@ export class ConfigurarPlanEvaluacion {
   }
 
   /**
-   * Los ids nuevos (los que no estaban ya guardados) deben ser docentes activos de
-   * la carrera del plan. Sin ids nuevos no se consulta el directorio.
+   * Los ids que llegan (ya sin los que estaban guardados) deben ser docentes
+   * activos de la carrera del plan. Sin ids no se consulta el directorio.
    */
   private async exigirDocentesDeLaCarrera(
     plan: DatosPlanEvaluacion,
-    ids: readonly (string | null)[],
-    yaGuardados: ReadonlySet<string>,
+    ids: readonly string[],
     motivo: string,
   ): Promise<void> {
-    const nuevos = [...new Set(ids)].filter((id): id is string => !!id && !yaGuardados.has(id));
-    if (nuevos.length === 0) return;
+    if (ids.length === 0) return;
 
     const activos = new Set(
       (await this.directorio.docentesActivosDeCarrera(plan.carreraId)).map((d) => d.id),
     );
-    if (nuevos.some((id) => !activos.has(id))) throw new ReglaDeNegocioViolada(motivo);
+    if (ids.some((id) => !activos.has(id))) throw new ReglaDeNegocioViolada(motivo);
   }
 
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {

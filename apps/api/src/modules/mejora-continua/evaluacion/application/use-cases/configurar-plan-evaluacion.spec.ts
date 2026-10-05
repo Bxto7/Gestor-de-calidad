@@ -260,7 +260,6 @@ function montar(
     contenido?: Partial<ContenidoCurricularPort>;
     autorizacion?: AuthorizationPort;
     alcance?: AlcanceDeLecturaPort;
-    registrarRolPedido?: (rol: string) => void;
     directorio?: Partial<DirectorioDeUsuariosPort>;
     configuracion?: ConfiguracionDelPlan;
   } = {},
@@ -321,10 +320,7 @@ function montar(
   const directorio: DirectorioDeUsuariosPort = {
     nombresDe: async () => new Map(),
     docentesActivosDeCarrera: async () => [],
-    porRol: async (rol) => {
-      opciones.registrarRolPedido?.(rol);
-      return [{ id: 'doc-1', nombre: 'Docente Uno' }];
-    },
+    porRol: async () => [],
     ...opciones.directorio,
   };
 
@@ -994,6 +990,87 @@ describe('RF-CH-045 / RF-CH-046 — docentes de la carrera del plan', () => {
       ]);
 
       expect(busquedas).toBe(0);
+    });
+
+    describe('lo ya guardado se compara por el par (asignatura, docente), no por el cruce entero', () => {
+      const guardadoEnElCruce = (
+        pares: readonly [asignaturaId: string, docenteId: string][],
+      ): ConfiguracionDelPlan => ({
+        competencias: [],
+        indicaciones: [],
+        mediciones: [
+          {
+            competenciaId: 'c-1',
+            periodoId: 'p-1',
+            porcentajeAlcanzado: null,
+            asignaturas: pares.map(([asignaturaId, docenteId], i) => ({
+              id: `ae-${i}`,
+              asignaturaId,
+              entregable: 'Informe',
+              docenteId,
+              evidencias: [],
+            })),
+          },
+        ],
+      });
+      const dosAsignaturas = [asignatura({ id: 'a-1' }), asignatura({ id: 'a-2' })];
+      const motivo = new ReglaDeNegocioViolada(
+        'El docente elegido no es un docente activo de la carrera del plan (RF-PE-018).',
+      );
+
+      it('un docente guardado en una asignatura y puesto en otra del mismo cruce se valida (409)', async () => {
+        const { caso, guardado } = montar({
+          asignaturas: dosAsignaturas,
+          directorio: { docentesActivosDeCarrera: async () => [] },
+          configuracion: guardadoEnElCruce([['a-1', 'viejo']]),
+        });
+
+        await expect(
+          caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+            { asignaturaId: 'a-1', entregable: 'Informe', docenteId: null },
+            { asignaturaId: 'a-2', entregable: 'Informe', docenteId: 'viejo' },
+          ]),
+        ).rejects.toThrow(motivo);
+        expect(guardado.asignaturas).toBeUndefined();
+      });
+
+      it('intercambiar los docentes entre dos asignaturas se valida (409)', async () => {
+        const { caso } = montar({
+          asignaturas: dosAsignaturas,
+          directorio: { docentesActivosDeCarrera: async () => [] },
+          configuracion: guardadoEnElCruce([
+            ['a-1', 'viejo-1'],
+            ['a-2', 'viejo-2'],
+          ]),
+        });
+
+        await expect(
+          caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+            { asignaturaId: 'a-1', entregable: 'Informe', docenteId: 'viejo-2' },
+            { asignaturaId: 'a-2', entregable: 'Informe', docenteId: 'viejo-1' },
+          ]),
+        ).rejects.toThrow(motivo);
+      });
+
+      it('volver a mandar el mismo par se acepta sin consultar el directorio', async () => {
+        let busquedas = 0;
+        const { caso } = montar({
+          asignaturas: dosAsignaturas,
+          directorio: { docentesActivosDeCarrera: async () => (busquedas++, []) },
+          configuracion: guardadoEnElCruce([
+            ['a-1', 'viejo-1'],
+            ['a-2', 'viejo-2'],
+          ]),
+        });
+
+        await expect(
+          caso.guardarAsignaturas(ACTOR, 'ev-1', 'c-1', 'p-1', [
+            { asignaturaId: 'a-1', entregable: 'Informe v2', docenteId: 'viejo-1' },
+            { asignaturaId: 'a-2', entregable: 'Informe v2', docenteId: 'viejo-2' },
+          ]),
+        ).resolves.toBeUndefined();
+        expect(busquedas).toBe(0);
+      });
     });
 
     it('un docente ya guardado en ese cruce no se rechaza al volver a guardar, aunque ya no sea de la carrera', async () => {
