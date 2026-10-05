@@ -15,12 +15,9 @@ import { Link } from 'react-router-dom';
 
 import { Badge, Boton } from '@/shared/components/ui';
 
-import {
-  permiteEdicionDefinicionMejora,
-  permiteVersionado,
-  TONO_ESTADO,
-} from '../domain/estado-medicion';
-import type { EstadoMedicion, PlanMejora } from '../domain/tipos';
+import { TONO_ESTADO } from '../domain/estado-medicion';
+import { permiteEdicionDefinicionMejora, permiteVersionadoMejora } from '../domain/estado-mejora';
+import type { EstadoMejora, PlanMejora } from '../domain/tipos';
 
 export interface VersionesDelPlanMejoraProps {
   readonly versiones: readonly PlanMejora[];
@@ -30,8 +27,8 @@ export interface VersionesDelPlanMejoraProps {
    * lo sabe todavía (p. ej. mientras el plan sigue cargando).
    */
   readonly versionAbierta?: string | null;
-  /** Estado del plan abierto: decide si cabe «Generar nueva versión» (excluye Borrador). */
-  readonly estadoActual: EstadoMedicion;
+  /** Estado del plan abierto: «Generar nueva versión» solo cabe desde Aprobado (RF-PJ-035). */
+  readonly estadoActual: EstadoMejora;
   readonly generandoVersion?: boolean;
   readonly onGenerarVersion?: () => void;
 }
@@ -51,7 +48,7 @@ export function VersionesDelPlanMejora({
 
   return (
     <div className="space-y-4">
-      {onGenerarVersion && permiteVersionado(estadoActual) && (
+      {onGenerarVersion && permiteVersionadoMejora(estadoActual) && (
         <Boton
           variante="secundario"
           tamano="sm"

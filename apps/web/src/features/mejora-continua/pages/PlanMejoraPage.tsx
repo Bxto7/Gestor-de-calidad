@@ -34,22 +34,26 @@ import {
 import { descargarDocumentoMejora } from '../api/mejora.api';
 import { obtenerEvaluacion } from '../api/evaluacion.api';
 import { DocumentosDelPlanMejora } from '../components/DocumentosDelPlanMejora';
+import { EliminarPlan } from '../components/EliminarPlan';
+import { FalloAlCargarPlan } from '../components/FalloAlCargarPlan';
 import { HistorialDelPlan } from '../components/HistorialDelPlan';
 import { VersionesDelPlanMejora } from '../components/VersionesDelPlanMejora';
+import { TONO_ESTADO } from '../domain/estado-medicion';
 import {
-  describirTransicion,
+  describirTransicionMejora,
   permiteEdicionDefinicionMejora,
   permiteEdicionSeguimientoMejora,
-  TONO_ESTADO,
-  transicionesDisponibles,
-} from '../domain/estado-medicion';
+  transicionesDisponiblesMejora,
+} from '../domain/estado-mejora';
 import { ESTADOS_IMPLEMENTACION } from '../domain/tipos';
 import {
   useActualizarImplementacionMejora,
   useActualizarRetroalimentacionMejora,
   useCargarEvidenciaMejora,
   useDocumentosMejora,
+  useDocentesDelPlanMejora,
   useEditarDefinicionMejora,
+  useEliminarPlanMejora,
   useEliminarEvidenciaMejora,
   useGenerarDocumentoMejora,
   useHistorialMejora,
@@ -59,7 +63,7 @@ import {
   useVersionesMejora,
 } from '../api/queries';
 import type { DefinicionPlanMejora } from '../api/mejora.api';
-import type { PlanMejora } from '../domain/tipos';
+import type { AccionMejora, PlanMejora } from '../domain/tipos';
 
 /** Las cinco pestañas de esta pantalla, en el orden en que se muestran. */
 const PESTANAS = [
@@ -82,7 +86,8 @@ function datosDefinicionActual(plan: PlanMejora): DefinicionPlanMejora {
     plazo: plan.plazo,
     recursos: plan.recursos,
     metas: plan.metas,
-    responsable: plan.responsable,
+    // RF-CH-045: el servidor rechaza `responsable`; se reenvía el vínculo, no el texto.
+    responsableId: plan.responsableId ?? undefined,
   };
 }
 
@@ -92,7 +97,9 @@ export function PlanMejoraPage() {
   const { puede } = useSesion();
   const navegar = useNavigate();
 
-  const { data: plan, isLoading } = usePlanMejora(id);
+  const { data: plan, isLoading, isError, error: falloAlCargar, refetch } = usePlanMejora(id);
+  const { data: docentes } = useDocentesDelPlanMejora(id);
+  const eliminar = useEliminarPlanMejora();
   const { data: criterios } = useCriterios(plan?.carreraId ?? '');
   const { data: objetivos } = useObjetivos();
   const { data: competencias } = useCompetencias();
@@ -122,7 +129,7 @@ export function PlanMejoraPage() {
   const actualizarRetroalimentacion = useActualizarRetroalimentacionMejora();
 
   const [error, setError] = useState<string | null>(null);
-  const [enTransicion, setEnTransicion] = useState<string | null>(null);
+  const [enTransicion, setEnTransicion] = useState<AccionMejora | null>(null);
   const [comentario, setComentario] = useState('');
 
   useEffect(() => {
@@ -143,6 +150,17 @@ export function PlanMejoraPage() {
     } catch (e) {
       setError(e instanceof ErrorDeNegocio ? e.message : 'No se pudo completar la operación.');
     }
+  }
+
+  // RF-CH-034 RN1: un plan de otra carrera responde 404, igual que uno que no existe.
+  if (isError) {
+    return (
+      <FalloAlCargarPlan
+        error={falloAlCargar}
+        tituloNoEncontrado="Plan de mejora no encontrado"
+        onReintentar={() => void refetch()}
+      />
+    );
   }
 
   if (isLoading || !plan) return <Cargando etiqueta="Cargando plan de mejora…" />;
@@ -176,10 +194,10 @@ export function PlanMejoraPage() {
           <h2 className="text-sm font-semibold text-tinta">Estado del plan</h2>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tono={TONO_ESTADO[plan.estado]}>{plan.estado}</Badge>
-            {transicionesDisponibles(plan.estado)
-              .filter((a) => puede(`mejora.${describirTransicion(a).permiso}`))
+            {transicionesDisponiblesMejora(plan.estado)
+              .filter((a) => puede(`mejora.${describirTransicionMejora(a).permiso}`))
               .map((accion) => {
-                const t = describirTransicion(accion);
+                const t = describirTransicionMejora(accion);
                 return (
                   <Boton
                     key={accion}
@@ -194,6 +212,14 @@ export function PlanMejoraPage() {
                   </Boton>
                 );
               })}
+            <EliminarPlan
+              permiso="mejora.eliminar"
+              plan={plan}
+              titulo="Eliminar plan de mejora"
+              detalle="con su seguimiento y sus evidencias"
+              eliminar={(idPlan) => eliminar.mutateAsync(idPlan)}
+              onEliminado={() => void navegar('/mejora-continua/mejora')}
+            />
           </div>
           {enTransicion && (
             <div className="space-y-2">
@@ -217,7 +243,7 @@ export function PlanMejoraPage() {
                     void ejecutar(async () => {
                       await transicionar.mutateAsync({
                         id,
-                        accion: enTransicion as never,
+                        accion: enTransicion,
                         comentario,
                       });
                       setEnTransicion(null);
@@ -432,22 +458,41 @@ export function PlanMejoraPage() {
 
               <Campo etiqueta="Responsable">
                 {(props) => (
-                  <Entrada
+                  <Selector
                     {...props}
                     disabled={!editableDefinicion}
-                    defaultValue={plan.responsable}
-                    onBlur={(e) =>
-                      e.target.value !== plan.responsable &&
+                    value={plan.responsableId ?? ''}
+                    onChange={(e) =>
+                      e.target.value &&
+                      e.target.value !== plan.responsableId &&
                       void ejecutar(() =>
                         editarDefinicion.mutateAsync({
                           id,
-                          datos: { ...datosDefinicionActual(plan), responsable: e.target.value },
+                          datos: { ...datosDefinicionActual(plan), responsableId: e.target.value },
                         }),
                       )
                     }
-                  />
+                  >
+                    {/* Un plan anterior al 6b solo trae texto: se muestra, sin vincular, y no se pierde. */}
+                    <option value="">
+                      {!plan.responsableId && plan.responsable
+                        ? `${plan.responsable} (sin vincular)`
+                        : 'Selecciona un docente…'}
+                    </option>
+                    {(docentes ?? []).map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.nombre}
+                      </option>
+                    ))}
+                  </Selector>
                 )}
               </Campo>
+              {docentes?.length === 0 && (
+                <p className="text-sm text-tinta-suave">
+                  Esta carrera no tiene docentes activos: registrar primero docentes en Plan de
+                  Estudios.
+                </p>
+              )}
             </div>
           </Tarjeta>
         </div>

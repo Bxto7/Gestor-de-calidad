@@ -1,5 +1,6 @@
 /**
- * «Eliminar» de un plan de medición o de evaluación (RF-CH-035, RF-CH-039).
+ * «Eliminar» de un plan de medición, de evaluación o de mejora (RF-CH-035,
+ * RF-CH-039, RF-CH-042).
  *
  * Se ofrece solo si el estado lo permite —Borrador o En revisión— y el usuario
  * tiene el permiso sobre la carrera del plan: lo que nunca podrá hacer no se
@@ -15,18 +16,21 @@ import { ConfirmarEliminacion } from '@/shared/components/ConfirmarEliminacion';
 import { Boton } from '@/shared/components/ui';
 
 import { permiteEliminacion } from '../domain/estado-medicion';
-import type { EstadoMedicion } from '../domain/tipos';
+import type { EstadoMedicion, EstadoMejora } from '../domain/tipos';
 
 export function EliminarPlan({
   permiso,
   plan,
   titulo,
+  detalle = 'con toda su configuración',
   eliminar,
   onEliminado,
 }: {
-  permiso: 'medicion.eliminar' | 'evaluacion.eliminar';
-  plan: { id: string; codigo: string; estado: EstadoMedicion; carreraId: string };
+  permiso: 'medicion.eliminar' | 'evaluacion.eliminar' | 'mejora.eliminar';
+  plan: { id: string; codigo: string; estado: EstadoMedicion | EstadoMejora; carreraId: string };
   titulo: string;
+  /** Qué se pierde con el plan; completa «Se eliminará X …». */
+  detalle?: string;
   eliminar: (id: string) => Promise<void>;
   onEliminado?: () => void;
 }) {
@@ -49,8 +53,7 @@ export function EliminarPlan({
           titulo={titulo}
           descripcion={
             <>
-              Se eliminará <strong>{plan.codigo}</strong> con toda su configuración y no se podrá
-              recuperar.
+              Se eliminará <strong>{plan.codigo}</strong> {detalle} y no se podrá recuperar.
             </>
           }
           onConfirmar={async () => {

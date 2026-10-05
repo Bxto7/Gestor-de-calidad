@@ -25,7 +25,7 @@ import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as actasApi from './actas.api';
-import { claves, clavesEval, clavesMejora, useActas } from './queries';
+import { claves, clavesConfig, clavesEval, clavesMejora, useActas } from './queries';
 
 describe('claves.planes — Planes de Medición', () => {
   it('cambia con el tipo, aunque el resto del filtro sea igual', () => {
@@ -60,18 +60,23 @@ describe('clavesEval.lista — Planes de Evaluación', () => {
 });
 
 describe('clavesMejora.lista — Planes de Mejora', () => {
-  it('cambia con la carrera', () => {
-    const a = clavesMejora.lista({ carreraId: 'carrera-a' });
-    const b = clavesMejora.lista({ carreraId: 'carrera-b' });
-
-    expect(a).not.toEqual(b);
-  });
-
   it('clavesMejora.lista distingue por filtro, como clavesEval', () => {
-    const sinFiltro = clavesMejora.lista({ carreraId: 'c1' });
-    const conTexto = clavesMejora.lista({ carreraId: 'c1', texto: 'renovar' });
+    const sinFiltro = clavesMejora.lista({});
+    const conTexto = clavesMejora.lista({ texto: 'renovar' });
 
     expect(sinFiltro).not.toEqual(conTexto);
+  });
+
+  it('distingue por estado documental', () => {
+    expect(clavesMejora.lista({ estado: 'Borrador' })).not.toEqual(
+      clavesMejora.lista({ estado: 'Aprobado' }),
+    );
+  });
+});
+
+describe('clavesConfig.docentes — RF-CH-046', () => {
+  it('cambia con el plan de evaluación: los docentes son los de su carrera', () => {
+    expect(clavesConfig.docentes('pe-1')).not.toEqual(clavesConfig.docentes('pe-2'));
   });
 });
 

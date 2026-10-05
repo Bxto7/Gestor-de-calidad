@@ -11,7 +11,7 @@ function version(sobre: Partial<PlanMejora> = {}): PlanMejora {
   return {
     id: 'pj-1',
     codigo: 'PJ-CRI-3',
-    estado: 'Vigente',
+    estado: 'Aprobado',
     creadoEn: '2026-09-01T00:00:00.000Z',
     ...sobre,
   } as PlanMejora;
@@ -23,7 +23,7 @@ function montar(props: Partial<React.ComponentProps<typeof VersionesDelPlanMejor
       <VersionesDelPlanMejora
         versiones={[version()]}
         versionAbierta="pj-1"
-        estadoActual="Vigente"
+        estadoActual="Aprobado"
         {...props}
       />
     </MemoryRouter>,
@@ -41,6 +41,13 @@ describe('el linaje', () => {
     expect(screen.getByRole('button', { name: /generar nueva versión/i })).toBeInTheDocument();
   });
 
+  it('no ofrece generar desde En revisión', () => {
+    montar({ estadoActual: 'En revisión', onGenerarVersion: vi.fn() });
+    expect(
+      screen.queryByRole('button', { name: /generar nueva versión/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it('no ofrece generar desde Borrador', () => {
     montar({ estadoActual: 'Borrador', onGenerarVersion: vi.fn() });
     expect(
@@ -49,7 +56,7 @@ describe('el linaje', () => {
   });
 
   it('avisa de solo lectura sobre una versión no editable', () => {
-    montar({ versiones: [version({ estado: 'Histórico' })] });
+    montar({ versiones: [version({ estado: 'Aprobado' })] });
     expect(screen.getByText(/solo lectura/i)).toBeInTheDocument();
   });
 });

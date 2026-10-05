@@ -11,6 +11,10 @@ export type TipoMedicion = 'DIRECTA' | 'INDIRECTA';
 
 export type EstadoMedicion = 'Borrador' | 'En revisión' | 'Aprobado' | 'Vigente' | 'Histórico';
 
+/** RF-CH-043: Mejora tiene su propio ciclo; «Vigente» es la última aprobada del linaje. */
+export type EstadoMejora = 'Borrador' | 'En revisión' | 'Aprobado';
+export type AccionMejora = 'enviar-a-revision' | 'aprobar' | 'observar';
+
 export type AccionMedicion =
   'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
 
@@ -283,7 +287,7 @@ export interface PlanMejora {
   readonly periodoId: string | null;
   readonly planEvaluacionId: string | null;
   readonly planMedicionAfectadoId: string | null;
-  readonly estado: EstadoMedicion;
+  readonly estado: EstadoMejora;
   readonly estadoImplementacion: EstadoImplementacion;
   readonly nombre: string;
   readonly causaRaiz: string;
@@ -293,6 +297,8 @@ export interface PlanMejora {
   readonly recursos: string;
   readonly metas: string;
   readonly responsable: string;
+  /** RF-CH-045: nulo en los planes anteriores al Bloque 6b. */
+  readonly responsableId: string | null;
   readonly logroMeta: string | null;
   readonly impacto: string | null;
   readonly creadoEn: string;

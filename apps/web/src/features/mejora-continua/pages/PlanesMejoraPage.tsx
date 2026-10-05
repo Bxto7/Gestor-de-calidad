@@ -5,11 +5,11 @@
  * (ver diseño del 11 de septiembre de 2026).
  *
  * RF-PJ-038: búsqueda por texto y filtros por aspecto, estado de
- * implementación y estado documental, además del filtro por carrera. El
- * selector de estado documental reutiliza `TONO_ESTADO` en vez de una
- * constante `ESTADOS_MEDICION` — no existe tal constante en el dominio web,
- * y `PlanesMedicionPage.tsx`/`PlanesEvaluacionPage.tsx` ya listan sus
- * opciones con `Object.keys(TONO_ESTADO)`.
+ * implementación y estado documental.
+ *
+ * RF-CH-040/041: no hay selector de carrera. El servidor impone la de la
+ * sesión; aquí solo se usa para el alta y para nombrar los criterios. El
+ * estado documental ofrece los tres estados propios de Mejora (RF-CH-043).
  */
 
 import { useEffect, useState } from 'react';
@@ -18,7 +18,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useEncabezado } from '@/app/encabezado';
 import { useCriterios } from '@/features/acreditacion/api/queries';
 import { SiPuede } from '@/features/auth/components/SiPuede';
-import { useCarreras, useCompetencias, useObjetivos } from '@/features/plan-estudios/api/queries';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
+import { useCompetencias, useObjetivos } from '@/features/plan-estudios/api/queries';
 import {
   Badge,
   Boton,
@@ -30,13 +31,15 @@ import {
 } from '@/shared/components/ui';
 
 import { ModalNuevoPlanMejora } from '../components/ModalNuevoPlanMejora';
+import { EliminarPlan } from '../components/EliminarPlan';
 import { TONO_ESTADO } from '../domain/estado-medicion';
-import { usePlanesMejora } from '../api/queries';
+import { ESTADOS_MEJORA } from '../domain/estado-mejora';
+import { useEliminarPlanMejora, usePlanesMejora } from '../api/queries';
 import {
   ESTADOS_IMPLEMENTACION,
   type AspectoPlanMejora,
   type EstadoImplementacion,
-  type EstadoMedicion,
+  type EstadoMejora,
   type PlanMejora,
 } from '../domain/tipos';
 
@@ -49,23 +52,26 @@ const ETIQUETA_ASPECTO: Record<AspectoPlanMejora, string> = {
 export function PlanesMejoraPage() {
   const { publicar } = useEncabezado();
   const navegar = useNavigate();
-  const { data: carreras } = useCarreras();
-  const [elegida, setElegida] = useState('');
+  const { identidad, puede } = useSesion();
+  const eliminar = useEliminarPlanMejora();
+  // RF-CH-040/041: quien lee solo su carrera y no tiene ninguna no ve nada, y se le dice por qué.
+  const carreraId = identidad?.carreraACargo ?? '';
+  const sinCarrera = puede('lectura.solo_su_carrera') && !identidad?.carreraACargo;
   const [creando, setCreando] = useState(false);
   const [texto, setTexto] = useState('');
   const [aspecto, setAspecto] = useState<AspectoPlanMejora | ''>('');
   const [estadoImplementacion, setEstadoImplementacion] = useState<EstadoImplementacion | ''>('');
-  const [estado, setEstado] = useState<EstadoMedicion | ''>('');
+  const [estado, setEstado] = useState<EstadoMejora | ''>('');
 
-  const carreraId = elegida || (carreras?.[0]?.id ?? '');
-
-  const { data: planes, isLoading } = usePlanesMejora({
-    carreraId,
-    texto: texto || undefined,
-    aspecto: aspecto || undefined,
-    estadoImplementacion: estadoImplementacion || undefined,
-    estado: estado || undefined,
-  });
+  const { data: planes, isLoading } = usePlanesMejora(
+    {
+      texto: texto || undefined,
+      aspecto: aspecto || undefined,
+      estadoImplementacion: estadoImplementacion || undefined,
+      estado: estado || undefined,
+    },
+    { enabled: !sinCarrera },
+  );
   const { data: criterios } = useCriterios(carreraId);
   const { data: objetivos } = useObjetivos();
   const { data: competencias } = useCompetencias();
@@ -97,20 +103,6 @@ export function PlanesMejoraPage() {
           </SiPuede>
         }
       />
-
-      <Selector
-        aria-label="Carrera"
-        value={carreraId}
-        onChange={(e) => setElegida(e.target.value)}
-        className="max-w-sm"
-      >
-        <option value="">Selecciona una carrera…</option>
-        {(carreras ?? []).map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.codigo} — {c.nombre}
-          </option>
-        ))}
-      </Selector>
 
       <div className="flex flex-wrap gap-3">
         <Entrada
@@ -146,10 +138,10 @@ export function PlanesMejoraPage() {
         <Selector
           aria-label="Estado documental"
           value={estado}
-          onChange={(e) => setEstado(e.target.value as EstadoMedicion | '')}
+          onChange={(e) => setEstado(e.target.value as EstadoMejora | '')}
         >
           <option value="">Todo estado</option>
-          {Object.keys(TONO_ESTADO).map((v) => (
+          {ESTADOS_MEJORA.map((v) => (
             <option key={v} value={v}>
               {v}
             </option>
@@ -157,16 +149,21 @@ export function PlanesMejoraPage() {
         </Selector>
       </div>
 
-      {isLoading ? (
+      {sinCarrera ? (
+        <EstadoVacio
+          titulo="No tienes una carrera asignada"
+          detalle="Los planes de mejora se ven y se crean por carrera. Pide al administrador que te asigne la tuya."
+        />
+      ) : isLoading ? (
         <Cargando etiqueta="Cargando planes de mejora…" />
       ) : (planes ?? []).length === 0 ? (
         <EstadoVacio
           titulo="Todavía no hay planes de mejora"
-          detalle="Crea el primero para esta carrera con el botón de arriba."
+          detalle="Crea el primero para tu carrera con el botón de arriba."
         />
       ) : (
         <table className="w-full text-sm">
-          <caption className="sr-only">Planes de mejora de la carrera elegida</caption>
+          <caption className="sr-only">Planes de mejora de tu carrera</caption>
           <thead>
             <tr className="border-b border-borde text-left text-tinta-suave">
               <th scope="col" className="py-2 pr-4">
@@ -183,6 +180,9 @@ export function PlanesMejoraPage() {
               </th>
               <th scope="col" className="py-2 pr-4">
                 Implementación
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                <span className="sr-only">Acciones</span>
               </th>
             </tr>
           </thead>
@@ -203,6 +203,15 @@ export function PlanesMejoraPage() {
                   <Badge tono={TONO_ESTADO[p.estado]}>{p.estado}</Badge>
                 </td>
                 <td className="py-2 pr-4">{p.estadoImplementacion}</td>
+                <td className="py-2 pr-4 text-right">
+                  <EliminarPlan
+                    permiso="mejora.eliminar"
+                    plan={p}
+                    titulo="Eliminar plan de mejora"
+                    detalle="con su seguimiento y sus evidencias"
+                    eliminar={(id) => eliminar.mutateAsync(id)}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

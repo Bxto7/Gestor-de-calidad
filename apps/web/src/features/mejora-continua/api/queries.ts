@@ -22,7 +22,8 @@ import * as evaluacionApi from './evaluacion.api';
 import type { FiltroEvaluaciones } from './evaluacion.api';
 import * as configuracionApi from './configuracion-evaluacion.api';
 import * as mejoraApi from './mejora.api';
-import type { AccionMejora, DatosCrearPlanMejora, DefinicionPlanMejora } from './mejora.api';
+import type { DatosCrearPlanMejora, DefinicionPlanMejora } from './mejora.api';
+import type { AccionMejora } from '../domain/tipos';
 import type { EstadoImplementacion, TipoDocumentoActa, TipoDocumentoMejora } from '../domain/tipos';
 import * as actasApi from './actas.api';
 import type { AccionActaTransicion } from '../domain/estado-acta';
@@ -435,7 +436,7 @@ export function useGenerarDocumentoEvaluacion(id: string) {
 export const clavesConfig = {
   configuracion: (id: string) => ['evaluacion', id, 'configuracion'] as const,
   asignaturas: (id: string) => ['evaluacion', id, 'asignaturas-elegibles'] as const,
-  docentes: () => ['docentes'] as const,
+  docentes: (planEvaluacionId: string) => ['docentes', planEvaluacionId] as const,
 };
 
 /**
@@ -481,10 +482,11 @@ export function useAsignaturasElegibles(id: string, opciones: { habilitado?: boo
   });
 }
 
-export function useDocentes() {
+export function useDocentes(planEvaluacionId: string) {
   return useQuery({
-    queryKey: clavesConfig.docentes(),
-    queryFn: () => configuracionApi.docentes(),
+    queryKey: clavesConfig.docentes(planEvaluacionId),
+    queryFn: () => configuracionApi.docentes(planEvaluacionId),
+    enabled: !!planEvaluacionId,
   });
 }
 
@@ -569,7 +571,6 @@ export const clavesMejora = {
     [
       'mejora',
       'lista',
-      f.carreraId,
       f.texto ?? '',
       f.aspecto ?? 'todos',
       f.estadoImplementacion ?? 'todos',
@@ -586,11 +587,14 @@ export const clavesMejora = {
   documentos: (id: string) => ['mejora', id, 'documentos'] as const,
 };
 
-export function usePlanesMejora(filtro: mejoraApi.FiltroMejora) {
+export function usePlanesMejora(
+  filtro: mejoraApi.FiltroMejora,
+  opciones: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: clavesMejora.lista(filtro),
     queryFn: () => mejoraApi.listarPlanesMejora(filtro),
-    enabled: !!filtro.carreraId,
+    enabled: opciones.enabled ?? true,
   });
 }
 
@@ -631,6 +635,24 @@ export function useCrearPlanMejora() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['mejora', 'lista'] });
     },
+  });
+}
+
+/** RF-CH-042. Sin id fijo: el listado elimina cualquiera de sus filas; el 404 posterior dice «no encontrado». */
+export function useEliminarPlanMejora() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => mejoraApi.eliminarPlanMejora(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mejora', 'lista'] }),
+  });
+}
+
+/** RF-CH-045: los docentes activos de la carrera del plan. */
+export function useDocentesDelPlanMejora(id: string) {
+  return useQuery({
+    queryKey: ['mejora', id, 'docentes'] as const,
+    queryFn: () => mejoraApi.docentesDelPlanMejora(id),
+    enabled: !!id,
   });
 }
 

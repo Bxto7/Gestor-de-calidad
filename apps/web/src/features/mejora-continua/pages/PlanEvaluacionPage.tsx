@@ -122,7 +122,7 @@ export function PlanEvaluacionPage() {
   const { data: asignaturas } = useAsignaturasElegibles(id, {
     habilitado: vista?.base.tipo === 'DIRECTA',
   });
-  const { data: docentes } = useDocentes();
+  const { data: docentes } = useDocentes(id);
   const guardarCompetencia = useGuardarCompetencia(id);
   const guardarAsignaturas = useGuardarAsignaturas(id);
   const guardarPorcentaje = useGuardarPorcentaje(id);

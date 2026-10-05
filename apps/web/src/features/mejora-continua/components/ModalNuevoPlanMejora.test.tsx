@@ -13,24 +13,22 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/features/acreditacion/api/queries', () => ({
-  useCriterios: () => ({
-    data: [
-      {
-        id: 'cri-1',
-        carreraId: 'carrera-1',
-        codigo: 'C-01',
-        nombre: 'Estudiantes',
-        activo: true,
-        creadoEn: '',
-      },
-    ],
-  }),
-}));
+const CRITERIO_POR_DEFECTO = {
+  id: 'cri-1',
+  carreraId: 'carrera-1',
+  codigo: 'C-01',
+  nombre: 'Estudiantes',
+  activo: true,
+  creadoEn: '',
+};
+
+const { useCriterios } = vi.hoisted(() => ({ useCriterios: vi.fn() }));
+
+vi.mock('@/features/acreditacion/api/queries', () => ({ useCriterios }));
 vi.mock('@/features/plan-estudios/api/queries', () => ({
   useObjetivos: () => ({
     data: [
@@ -46,6 +44,11 @@ vi.mock('@/features/plan-estudios/api/queries', () => ({
 }));
 
 import { ModalNuevoPlanMejora } from './ModalNuevoPlanMejora';
+
+beforeEach(() => {
+  useCriterios.mockReset();
+  useCriterios.mockReturnValue({ data: [CRITERIO_POR_DEFECTO] });
+});
 
 function renderizar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -94,5 +97,49 @@ describe('ModalNuevoPlanMejora', () => {
 
     expect(screen.queryByLabelText('Elemento')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Plan de evaluación base')).toBeInTheDocument();
+  });
+});
+
+describe('RF-CH-047 — los criterios son los de la carrera', () => {
+  it('pide los criterios de la carrera recibida y solo ofrece los activos', async () => {
+    useCriterios.mockReturnValue({
+      data: [
+        CRITERIO_POR_DEFECTO,
+        { ...CRITERIO_POR_DEFECTO, id: 'cri-2', codigo: 'C-02', nombre: 'Inactivo', activo: false },
+      ],
+    });
+    renderizar();
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Aspecto' }),
+      'CRITERIO_ACREDITACION',
+    );
+
+    expect(useCriterios).toHaveBeenCalledWith('carrera-1');
+    const opciones = within(screen.getByRole('combobox', { name: 'Elemento' }))
+      .getAllByRole('option')
+      .map((o) => o.textContent);
+    expect(opciones).toEqual(['Selecciona un criterio…', 'C-01 — Estudiantes']);
+  });
+
+  it('sin criterios: sugiere crearlos en Criterios de Acreditación y no deja crear', async () => {
+    useCriterios.mockReturnValue({ data: [] });
+    renderizar();
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Aspecto' }),
+      'CRITERIO_ACREDITACION',
+    );
+
+    expect(screen.getByText(/no hay criterios de acreditación en tu carrera/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled();
+  });
+
+  it('con criterios activos no aparece el aviso', async () => {
+    renderizar();
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Aspecto' }),
+      'CRITERIO_ACREDITACION',
+    );
+
+    expect(screen.queryByText(/no hay criterios de acreditación/i)).not.toBeInTheDocument();
   });
 });

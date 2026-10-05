@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { montarPagina } from '@/features/plan-estudios/pruebas/montar-pagina';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 
-import type { EstadoMedicion } from '../domain/tipos';
+import type { EstadoMedicion, EstadoMejora } from '../domain/tipos';
 import { EliminarPlan } from './EliminarPlan';
 
 function montar(
@@ -94,5 +94,43 @@ describe('EliminarPlan — la confirmación', () => {
 
     expect(await within(dialogo).findByRole('alert')).toHaveTextContent(motivo);
     expect(screen.getByRole('dialog', { name: 'Eliminar plan de medición' })).toBeInTheDocument();
+  });
+});
+
+describe('EliminarPlan — planes de mejora (RF-CH-042)', () => {
+  function montarMejora(estado: EstadoMejora, permisos = ['mejora.eliminar']) {
+    montarPagina(
+      <EliminarPlan
+        permiso="mejora.eliminar"
+        plan={{ id: 'pj-1', codigo: 'PJ-1', estado, carreraId: 'c1' }}
+        titulo="Eliminar plan de mejora"
+        detalle="con su seguimiento y sus evidencias"
+        eliminar={vi.fn(() => Promise.resolve())}
+      />,
+      { permisos, carreraACargo: 'c1' },
+    );
+  }
+
+  it('se ofrece en En revisión con `mejora.eliminar`, y no en Aprobado', () => {
+    montarMejora('En revisión');
+    expect(screen.getByRole('button', { name: 'Eliminar PJ-1' })).toBeInTheDocument();
+  });
+
+  it('en Aprobado no se ofrece', () => {
+    montarMejora('Aprobado');
+    expect(screen.queryByRole('button', { name: 'Eliminar PJ-1' })).not.toBeInTheDocument();
+  });
+
+  it('sin `mejora.eliminar` no se ofrece', () => {
+    montarMejora('Borrador', ['mejora.leer']);
+    expect(screen.queryByRole('button', { name: 'Eliminar PJ-1' })).not.toBeInTheDocument();
+  });
+
+  it('el diálogo dice qué se pierde con el plan de mejora', async () => {
+    montarMejora('Borrador');
+    await userEvent.click(screen.getByRole('button', { name: 'Eliminar PJ-1' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      'con su seguimiento y sus evidencias',
+    );
   });
 });

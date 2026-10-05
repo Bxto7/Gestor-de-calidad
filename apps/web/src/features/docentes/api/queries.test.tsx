@@ -20,7 +20,9 @@ describe('useDocentes', () => {
     const qc = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
     });
-    qc.setQueryData(clavesConfig.docentes(), [{ id: 'del-catalogo', nombre: 'Del catálogo' }]);
+    qc.setQueryData(clavesConfig.docentes('plan-1'), [
+      { id: 'del-catalogo', nombre: 'Del catálogo' },
+    ]);
     const listar = vi.spyOn(api, 'listarDocentes').mockResolvedValue([]);
 
     const wrapper = ({ children }: { children: ReactNode }) => (

@@ -24,9 +24,9 @@ export async function asignaturasElegibles(planId: string): Promise<AsignaturaEl
   return cliente.get<AsignaturaElegible[]>(`/planes-evaluacion/${planId}/asignaturas-elegibles`);
 }
 
-/** RF-PE-018: cuentas activas con rol Docente, para elegir responsable. */
-export async function docentes(): Promise<Docente[]> {
-  return cliente.get<Docente[]>('/docentes');
+/** RF-PE-018: los docentes activos de la carrera del plan, para elegir responsable. */
+export async function docentes(planEvaluacionId: string): Promise<Docente[]> {
+  return cliente.get<Docente[]>('/docentes', { planEvaluacionId });
 }
 
 /**

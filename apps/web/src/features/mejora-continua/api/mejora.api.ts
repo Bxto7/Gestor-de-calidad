@@ -10,7 +10,9 @@ import { cliente, type ArchivoDescargado } from '@/shared/api/cliente';
 import type {
   AspectoPlanMejora,
   EstadoImplementacion,
-  EstadoMedicion,
+  Docente,
+  AccionMejora,
+  EstadoMejora,
   EventoBitacora,
   EvidenciaPlanMejora,
   PlanMejora,
@@ -19,16 +21,14 @@ import type {
 } from '../domain/tipos';
 
 export interface FiltroMejora {
-  carreraId: string;
   texto?: string;
   aspecto?: AspectoPlanMejora;
   estadoImplementacion?: EstadoImplementacion;
-  estado?: EstadoMedicion;
+  estado?: EstadoMejora;
 }
 
 export async function listarPlanesMejora(filtro: FiltroMejora): Promise<PlanMejora[]> {
   return cliente.get<PlanMejora[]>('/planes-mejora', {
-    carreraId: filtro.carreraId,
     texto: filtro.texto,
     aspecto: filtro.aspecto,
     estadoImplementacion: filtro.estadoImplementacion,
@@ -59,7 +59,8 @@ export interface DefinicionPlanMejora {
   plazo: string;
   recursos: string;
   metas: string;
-  responsable: string;
+  /** RF-CH-045: un docente activo de la carrera del plan. */
+  responsableId?: string;
 }
 
 export async function editarDefinicionMejora(
@@ -69,15 +70,20 @@ export async function editarDefinicionMejora(
   return cliente.patch<PlanMejora>(`/planes-mejora/${id}/definicion`, datos);
 }
 
-export type AccionMejora =
-  'enviar-a-revision' | 'aprobar' | 'observar' | 'marcar-vigente' | 'archivar';
-
 export async function transicionarMejora(
   id: string,
   accion: AccionMejora,
   comentario?: string,
 ): Promise<PlanMejora> {
   return cliente.post<PlanMejora>(`/planes-mejora/${id}/transicion`, { accion, comentario });
+}
+
+export async function eliminarPlanMejora(id: string): Promise<void> {
+  return cliente.delete(`/planes-mejora/${id}`);
+}
+
+export async function docentesDelPlanMejora(id: string): Promise<Docente[]> {
+  return cliente.get<Docente[]>(`/planes-mejora/${id}/docentes`);
 }
 
 export async function actualizarImplementacionMejora(

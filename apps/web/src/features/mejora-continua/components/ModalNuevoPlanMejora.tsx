@@ -42,6 +42,8 @@ export function ModalNuevoPlanMejora({ carreraId, onCerrar, onCreado }: ModalNue
   const [error, setError] = useState<string | null>(null);
 
   const { data: criterios } = useCriterios(carreraId);
+  // RF-CH-047: solo los criterios activos de la carrera recibida.
+  const activos = (criterios ?? []).filter((c) => c.activo);
   const { data: objetivos } = useObjetivos();
   const { data: basesDirecta } = useQuery({
     queryKey: ['mejora', 'bases-directa'],
@@ -156,16 +158,21 @@ export function ModalNuevoPlanMejora({ carreraId, onCerrar, onCreado }: ModalNue
                 onChange={(e) => setElementoId(e.target.value)}
               >
                 <option value="">Selecciona un criterio…</option>
-                {(criterios ?? [])
-                  .filter((c) => c.activo)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.codigo} — {c.nombre}
-                    </option>
-                  ))}
+                {activos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.codigo} — {c.nombre}
+                  </option>
+                ))}
               </Selector>
             )}
           </Campo>
+        )}
+
+        {aspecto === 'CRITERIO_ACREDITACION' && activos.length === 0 && (
+          <p className="text-sm text-tinta-suave">
+            No hay criterios de acreditación en tu carrera: créalos primero en Criterios de
+            Acreditación.
+          </p>
         )}
 
         {aspecto === 'OBJETIVO_EDUCACIONAL' && (
