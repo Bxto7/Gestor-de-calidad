@@ -109,7 +109,7 @@ export async function transicionarActa(
   return cliente.post<Acta>(`/actas/${id}/transiciones`, { accion, comentario });
 }
 
-/** RF-AC-017 RN2: solo un acta en Borrador puede eliminarse. */
+/** RF-CH-050: se elimina en Borrador o En revisión. */
 export async function eliminarActa(id: string): Promise<void> {
   return cliente.delete(`/actas/${id}`);
 }
@@ -117,16 +117,13 @@ export async function eliminarActa(id: string): Promise<void> {
 /**
  * RF-AC-022: qué se hizo sobre el acta, con quién y cuándo.
  *
- * Sale de `/auditoria` y no de un endpoint de actas: el registro ya lo escribe el
- * listener de la bitácora a partir de los eventos del acta, y §3.2 prohíbe que un
- * módulo consulte las tablas de otro. Devuelve lo más reciente primero.
+ * Sale del endpoint propio del acta (Bloque 6c) y no de `/auditoria`: ese endpoint
+ * da el historial de cualquier entidad a quien conozca su identificador, y este
+ * aplica el mismo alcance que el acta —otra carrera responde 404—. Devuelve lo más
+ * reciente primero, hasta 50 movimientos.
  */
 export async function historialDeActa(id: string): Promise<EventoBitacora[]> {
-  return cliente.get<EventoBitacora[]>('/auditoria', {
-    entidad: 'ActaAprobacion',
-    entidadId: id,
-    limite: 50,
-  });
+  return cliente.get<EventoBitacora[]>(`/actas/${id}/historial`);
 }
 
 /* ── Documentos (RF-AC-018/019) ─────────────────────────────────────────── */

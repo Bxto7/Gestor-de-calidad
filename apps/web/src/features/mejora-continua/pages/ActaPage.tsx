@@ -6,8 +6,9 @@
  * Secciones apiladas verticalmente, no en pestañas (mismo criterio que
  * `PlanMedicionPage`): cabecera, asistentes, acciones del periodo, textos
  * institucionales, el estado del acta con sus transiciones y su historial de
- * modificaciones (RF-AC-022). Editable solo en Borrador (RF-AC-017); una acta
- * Aprobada, Emitida o Histórica se consulta en solo lectura (RF-AC-021).
+ * modificaciones (RF-AC-022). Editable solo en Borrador (RF-AC-017); se elimina en
+ * Borrador o En revisión (RF-CH-050); una acta Aprobada, Emitida o Histórica se
+ * consulta en solo lectura (RF-AC-021).
  */
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,6 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useEncabezado } from '@/app/encabezado';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { ErrorDeNegocio, guardarArchivo } from '@/shared/api/cliente';
+import { ConfirmarEliminacion } from '@/shared/components/ConfirmarEliminacion';
 import {
   AreaTexto,
   Badge,
@@ -31,6 +33,7 @@ import {
 
 import { descargarDocumentoActa } from '../api/actas.api';
 import { DocumentosDelActa } from '../components/DocumentosDelActa';
+import { FalloAlCargarPlan } from '../components/FalloAlCargarPlan';
 import { HistorialDelActa } from '../components/HistorialDelActa';
 import {
   clavesActas,
@@ -50,6 +53,7 @@ import {
 import {
   describirTransicion,
   permiteEdicion,
+  permiteEliminacion,
   TONO_ESTADO_ACTA,
   transicionesDisponibles,
   type AccionActaTransicion,
@@ -68,7 +72,7 @@ export function ActaPage() {
   const { publicar } = useEncabezado();
   const { puede } = useSesion();
 
-  const { data: acta, isLoading } = useActa(id);
+  const { data: acta, isLoading, isError, error: falloAlCargar, refetch } = useActa(id);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +86,18 @@ export function ActaPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acta?.codigo]);
+
+  // RF-CH-049 RN1: un acta de otra carrera responde 404, igual que una que no existe.
+  if (isError) {
+    return (
+      <FalloAlCargarPlan
+        error={falloAlCargar}
+        tituloNoEncontrado="Acta de aprobación no encontrada"
+        objeto="el acta"
+        onReintentar={() => void refetch()}
+      />
+    );
+  }
 
   if (isLoading || !acta) return <Cargando etiqueta="Cargando el acta de aprobación…" />;
 
@@ -169,8 +185,8 @@ export function ActaPage() {
       {puede('actas.leer') && ESTADOS_EXPORTABLES.includes(acta.estado) && (
         <ExportacionActaSeccion acta={acta} ejecutar={ejecutar} />
       )}
-      {editable && puede('actas.eliminar') && (
-        <EliminarActaSeccion acta={acta} ejecutar={ejecutar} />
+      {permiteEliminacion(acta.estado) && puede('actas.eliminar') && (
+        <EliminarActaSeccion acta={acta} />
       )}
       {(puede('auditoria.leer') || puede('auditoria.leer_entidad')) && (
         <HistorialActaSeccion acta={acta} />
@@ -181,9 +197,10 @@ export function ActaPage() {
 
 /**
  * RF-AC-022: el historial de modificaciones del acta. Se pinta solo con
- * `auditoria.leer` o `auditoria.leer_entidad`, los mismos permisos que exige
- * `/auditoria`: sin ellos el servidor respondería 403, y una sección vacía por un
- * permiso que falta se leería como «no se ha tocado nunca».
+ * `auditoria.leer` o `auditoria.leer_entidad`: el endpoint propio del acta exige,
+ * además del alcance, el permiso de auditoría que ya gobierna esta sección. Sin él el
+ * servidor respondería 403, y una sección vacía por un permiso que falta se leería
+ * como «no se ha tocado nunca».
  */
 function HistorialActaSeccion({ acta }: { acta: Acta }) {
   const { data: historial } = useHistorialActa(acta.id, true);
@@ -717,25 +734,11 @@ function ModalObservacion({
   );
 }
 
-/** RF-AC-017 RN2: solo un acta en Borrador puede eliminarse. */
-function EliminarActaSeccion({
-  acta,
-  ejecutar,
-}: {
-  acta: Acta;
-  ejecutar: (fn: () => Promise<unknown>) => Promise<void>;
-}) {
+/** RF-CH-050: Borrador o En revisión. El motivo de un 409 lo muestra `ConfirmarEliminacion` sin cerrar. */
+function EliminarActaSeccion({ acta }: { acta: Acta }) {
   const navegar = useNavigate();
   const eliminar = useEliminarActa(acta.id);
-  const [confirmando, setConfirmando] = useState(false);
-
-  async function confirmarEliminacion() {
-    setConfirmando(false);
-    await ejecutar(async () => {
-      await eliminar.mutateAsync(undefined);
-      void navegar('/mejora-continua/actas');
-    });
-  }
+  const [abierto, setAbierto] = useState(false);
 
   return (
     <Tarjeta>
@@ -743,40 +746,29 @@ function EliminarActaSeccion({
         <div>
           <h2 className="text-sm font-semibold text-tinta">Eliminar acta</h2>
           <p className="text-sm text-tinta-suave">
-            Solo posible mientras el acta está en Borrador.
+            Solo posible mientras el acta está en Borrador o En revisión.
           </p>
         </div>
-        <Boton
-          variante="peligro"
-          disabled={eliminar.isPending}
-          onClick={() => setConfirmando(true)}
-        >
-          {eliminar.isPending ? 'Eliminando…' : 'Eliminar acta'}
+        <Boton variante="peligro" onClick={() => setAbierto(true)}>
+          Eliminar acta
         </Boton>
       </div>
 
-      {confirmando && (
-        <Modal
-          abierto
-          ancho="sm"
+      {abierto && (
+        <ConfirmarEliminacion
           titulo="Eliminar acta"
-          descripcion="Esta acción no se puede deshacer."
-          onCerrar={() => setConfirmando(false)}
-          pie={
+          descripcion={
             <>
-              <Boton variante="secundario" onClick={() => setConfirmando(false)}>
-                Cancelar
-              </Boton>
-              <Boton variante="peligro" onClick={() => void confirmarEliminacion()}>
-                Eliminar
-              </Boton>
+              Se eliminará <strong>{acta.codigo}</strong> con sus asistentes y las acciones
+              cargadas, y no se podrá recuperar.
             </>
           }
-        >
-          <p className="text-sm text-tinta-suave">
-            ¿Eliminar el acta {acta.codigo}? Esta acción no se puede deshacer.
-          </p>
-        </Modal>
+          onConfirmar={async () => {
+            await eliminar.mutateAsync(undefined);
+            void navegar('/mejora-continua/actas');
+          }}
+          onCerrar={() => setAbierto(false)}
+        />
       )}
     </Tarjeta>
   );

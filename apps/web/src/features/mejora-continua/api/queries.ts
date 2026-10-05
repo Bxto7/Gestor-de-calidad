@@ -769,10 +769,11 @@ export const clavesActas = {
 
 const LISTA_ACTAS = ['actas', 'lista'] as const;
 
-export function useActas(filtro?: actasApi.FiltroActas) {
+export function useActas(filtro?: actasApi.FiltroActas, opciones: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: clavesActas.lista(filtro),
     queryFn: () => actasApi.listarActas(filtro),
+    enabled: opciones.enabled ?? true,
   });
 }
 
@@ -868,8 +869,17 @@ export function useTransicionarActa(id: string) {
   );
 }
 
+/**
+ * Eliminar no pasa por `useMutacionDeActa`: esa invalida el detalle del acta, y
+ * volver a pedir un acta recién borrada respondería 404 y la pantalla mostraría «no
+ * encontrada» un instante antes de volver al listado. Solo se invalida el listado.
+ */
 export function useEliminarActa(id: string) {
-  return useMutacionDeActa(id, () => actasApi.eliminarActa(id));
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => actasApi.eliminarActa(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: LISTA_ACTAS }),
+  });
 }
 
 /**

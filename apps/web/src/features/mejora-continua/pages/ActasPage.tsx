@@ -8,9 +8,9 @@
  * acciones) queda fuera de este ciclo — decisión tomada con el usuario, ver
  * §2 del spec de esta pantalla.
  *
- * Sin selector de carrera: a diferencia de `PlanesMejoraPage`, el backend
- * (`FiltroActas`) no filtra por carrera — mismo criterio que
- * `PlanesMedicionPage`/`PlanesEvaluacionPage`.
+ * Sin selector de carrera: la que impone el servidor es la de la sesión (RF-CH-048,
+ * RF-CH-049). Quien lee solo su carrera y no tiene ninguna ve un aviso en lugar del
+ * listado (como `PlanesMejoraPage`); el Consultor lee todas.
  */
 
 import { useEffect, useState } from 'react';
@@ -18,6 +18,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { useEncabezado } from '@/app/encabezado';
 import { SiPuede } from '@/features/auth/components/SiPuede';
+import { useSesion } from '@/features/auth/hooks/contexto-sesion';
 import { ErrorDeNegocio } from '@/shared/api/cliente';
 import {
   Badge,
@@ -34,19 +35,28 @@ import {
 import { useActas, useCrearActa } from '../api/queries';
 import { TONO_ESTADO_ACTA, type EstadoActa } from '../domain/estado-acta';
 
-const ESTADOS: readonly EstadoActa[] = ['Borrador', 'En revisión', 'Aprobada', 'Emitida', 'Histórica'];
+const ESTADOS: readonly EstadoActa[] = [
+  'Borrador',
+  'En revisión',
+  'Aprobada',
+  'Emitida',
+  'Histórica',
+];
 
 export function ActasPage() {
   const { publicar } = useEncabezado();
+  const { identidad, puede } = useSesion();
+  // RF-CH-049: quien lee solo su carrera y no tiene ninguna no ve nada, y se le dice por qué.
+  const sinCarrera = puede('lectura.solo_su_carrera') && !identidad?.carreraACargo;
 
   const [estado, setEstado] = useState<EstadoActa | ''>('');
   const [texto, setTexto] = useState('');
   const [abierto, setAbierto] = useState(false);
 
-  const { data: actas, isLoading } = useActas({
-    estado: estado || undefined,
-    texto: texto || undefined,
-  });
+  const { data: actas, isLoading } = useActas(
+    { estado: estado || undefined, texto: texto || undefined },
+    { enabled: !sinCarrera },
+  );
 
   useEffect(() => {
     publicar({ migas: [{ etiqueta: 'Actas de aprobación' }], acciones: null });
@@ -59,11 +69,13 @@ export function ActasPage() {
         titulo="Actas de aprobación"
         descripcion="Acta de aprobación de las acciones de mejora de cada periodo académico."
         acciones={
-          <SiPuede permiso="actas.crear">
-            <Boton variante="primario" onClick={() => setAbierto(true)}>
-              Nueva acta
-            </Boton>
-          </SiPuede>
+          sinCarrera ? null : (
+            <SiPuede permiso="actas.crear">
+              <Boton variante="primario" onClick={() => setAbierto(true)}>
+                Nueva acta
+              </Boton>
+            </SiPuede>
+          )
         }
       />
 
@@ -90,7 +102,12 @@ export function ActasPage() {
         </Selector>
       </div>
 
-      {isLoading ? (
+      {sinCarrera ? (
+        <EstadoVacio
+          titulo="No tienes una carrera asignada"
+          detalle="Las actas de aprobación se ven y se crean por carrera. Pide al administrador que te asigne la tuya."
+        />
+      ) : isLoading ? (
         <Cargando etiqueta="Cargando actas de aprobación…" />
       ) : (actas ?? []).length === 0 ? (
         <EstadoVacio

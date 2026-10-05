@@ -15,7 +15,7 @@ import * as actasApi from '../api/actas.api';
 import { ActasPage } from './ActasPage';
 
 const sesionDePrueba: ValorSesion = {
-  identidad: null,
+  identidad: { id: 'u-1', nombre: 'Coordinadora', permisos: [], roles: [], carreraACargo: 'car-1' },
   cargando: false,
   puede: () => true,
   dirigeCarrera: () => true,
@@ -101,5 +101,52 @@ describe('RF-AC-001 — alta de acta', () => {
     await waitFor(() => {
       expect(crear).toHaveBeenCalledWith({ periodoAcademico: '2026-1' });
     });
+  });
+});
+
+describe('RF-CH-049 — el listado es de la carrera del usuario', () => {
+  it('sin carrera asignada: aviso en lugar del listado y de «Nueva acta», y no consulta nada', () => {
+    const espia = vi.spyOn(actasApi, 'listarActas').mockResolvedValue([]);
+    // Los espías de las pruebas anteriores siguen vigentes: no hay `restoreMocks` global.
+    espia.mockClear();
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <ContextoSesion.Provider
+            value={{
+              ...sesionDePrueba,
+              identidad: {
+                id: 'u-1',
+                nombre: 'Coordinadora',
+                permisos: [],
+                roles: [],
+                carreraACargo: null,
+              },
+            }}
+          >
+            <CtxEncabezado.Provider
+              value={{ migas: [], acciones: null, publicar: () => undefined }}
+            >
+              <ActasPage />
+            </CtxEncabezado.Provider>
+          </ContextoSesion.Provider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText('No tienes una carrera asignada')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /nueva acta/i })).not.toBeInTheDocument();
+    expect(espia).not.toHaveBeenCalled();
+  });
+
+  it('con carrera y sin actas: lista vacía con su mensaje, sin selector de carrera', async () => {
+    vi.spyOn(actasApi, 'listarActas').mockResolvedValue([]);
+    montar();
+
+    expect(await screen.findByText('Todavía no hay actas de aprobación')).toBeInTheDocument();
+    expect(screen.queryByText('No tienes una carrera asignada')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /carrera/i })).not.toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CtxEncabezado } from '@/app/encabezado';
 import { ContextoSesion, type ValorSesion } from '@/features/auth/hooks/contexto-sesion';
+import { ErrorDeNegocio } from '@/shared/api/cliente';
 
 import type { Acta, ContenidoActa } from '../domain/tipos';
 
@@ -94,6 +95,7 @@ function montar(sesion: ValorSesion = sesionDePrueba) {
           <CtxEncabezado.Provider value={{ migas: [], acciones: null, publicar: () => undefined }}>
             <Routes>
               <Route path="/mejora-continua/actas/:id" element={<ActaPage />} />
+              <Route path="/mejora-continua/actas" element={<p>Listado de actas</p>} />
             </Routes>
           </CtxEncabezado.Provider>
         </ContextoSesion.Provider>
@@ -571,5 +573,75 @@ describe('RF-AC-022 — historial de modificaciones', () => {
       screen.queryByRole('heading', { name: 'Historial de modificaciones' }),
     ).not.toBeInTheDocument();
     expect(actasApi.historialDeActa).not.toHaveBeenCalled();
+  });
+});
+
+describe('RF-CH-049 — un acta que no es de tu carrera', () => {
+  it('un 404 dice «no encontrada» y no deja «Cargando…» para siempre', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockRejectedValue(
+      new ErrorDeNegocio('No existe el acta de aprobación con identificador acta-1.', 404),
+    );
+    montar();
+
+    expect(await screen.findByText('Acta de aprobación no encontrada')).toBeInTheDocument();
+    expect(screen.queryByText(/cargando/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reintentar/i })).not.toBeInTheDocument();
+  });
+
+  it('un fallo que no es 404 ofrece reintentar y no dice que el acta no existe', async () => {
+    vi.spyOn(actasApi, 'obtenerActa').mockRejectedValue(new Error('red caída'));
+    montar();
+
+    expect(await screen.findByText('No se pudo cargar el acta.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument();
+    expect(screen.queryByText('Acta de aprobación no encontrada')).not.toBeInTheDocument();
+  });
+});
+
+describe('RF-CH-050 — eliminar en Borrador o En revisión', () => {
+  it.each(['Borrador', 'En revisión'] as const)('en %s ofrece eliminar', async (estado) => {
+    vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado });
+    montar();
+    await screen.findByText(actaDePrueba.codigo);
+
+    expect(screen.getByRole('button', { name: /eliminar acta/i })).toBeInTheDocument();
+  });
+
+  it.each(['Aprobada', 'Emitida', 'Histórica'] as const)(
+    'en %s no ofrece eliminar aunque tenga actas.eliminar',
+    async (estado) => {
+      vi.spyOn(actasApi, 'obtenerActa').mockResolvedValue({ ...actaDePrueba, estado });
+      montar();
+      await screen.findByText(actaDePrueba.codigo);
+
+      expect(screen.queryByRole('button', { name: /eliminar acta/i })).not.toBeInTheDocument();
+    },
+  );
+
+  it('el motivo del 409 se muestra en el diálogo sin cerrarlo', async () => {
+    const motivo =
+      'No se puede eliminar el acta ACTA N° 001 – EAP-ISI: está Aprobada. Solo se eliminan actas en Borrador o En revisión.';
+    vi.spyOn(actasApi, 'eliminarActa').mockRejectedValue(new ErrorDeNegocio(motivo, 409));
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+
+    await userEvent.click(screen.getByRole('button', { name: /eliminar acta/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^eliminar$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(motivo);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('al eliminar vuelve al listado y no vuelve a pedir el acta borrada', async () => {
+    vi.spyOn(actasApi, 'eliminarActa').mockResolvedValue(undefined);
+    montar();
+    await screen.findByDisplayValue(actaDePrueba.titulo);
+    vi.mocked(actasApi.obtenerActa).mockClear();
+
+    await userEvent.click(screen.getByRole('button', { name: /eliminar acta/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^eliminar$/i }));
+
+    expect(await screen.findByText('Listado de actas')).toBeInTheDocument();
+    expect(actasApi.obtenerActa).not.toHaveBeenCalled();
   });
 });

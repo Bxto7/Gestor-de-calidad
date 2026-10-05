@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   describirTransicion,
   permiteEdicion,
+  permiteEliminacion,
   transicionesDisponibles,
 } from './estado-acta';
 
@@ -47,5 +48,17 @@ describe('RF-AC-017 RN1 — la edición libre solo existe en Borrador', () => {
     for (const e of ['En revisión', 'Aprobada', 'Emitida', 'Histórica'] as const) {
       expect(permiteEdicion(e)).toBe(false);
     }
+  });
+});
+
+describe('RF-CH-050 — eliminar solo en Borrador o En revisión', () => {
+  it.each([
+    ['Borrador', true],
+    ['En revisión', true],
+    ['Aprobada', false],
+    ['Emitida', false],
+    ['Histórica', false],
+  ] as const)('%s: %s', (estado, esperado) => {
+    expect(permiteEliminacion(estado)).toBe(esperado);
   });
 });

@@ -66,6 +66,11 @@ export function permiteEdicion(estado: EstadoActa): boolean {
   return estado === 'Borrador';
 }
 
+/** RF-CH-050: se elimina en Borrador o En revisión; Aprobada, Emitida e Histórica no. */
+export function permiteEliminacion(estado: EstadoActa): boolean {
+  return estado === 'Borrador' || estado === 'En revisión';
+}
+
 /** El tono del badge de cada estado — lo usan la lista y el detalle. */
 export const TONO_ESTADO_ACTA: Record<EstadoActa, TonoBadge> = {
   Borrador: 'neutro',
