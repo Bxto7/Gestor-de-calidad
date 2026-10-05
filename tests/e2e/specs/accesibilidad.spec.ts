@@ -12,7 +12,11 @@ import type { Page } from '@playwright/test';
 import { tokenDe } from '../fixtures/api';
 import { analizar } from '../fixtures/axe';
 import { borradorNuevo, borrarPlan, cabeceras } from '../fixtures/plan-borrador';
-import { completarDefinicion } from '../fixtures/plan-mejora';
+import {
+  completarDefinicion,
+  crearPlanDeMejoraPorApi,
+  eliminarPlanDeMejoraPorApi,
+} from '../fixtures/plan-mejora';
 import { expect, paginaComo, test } from '../fixtures/sesion';
 import { API } from '../global-setup';
 
@@ -252,6 +256,19 @@ test('el modal de eliminar un plan de evaluación (RF-CH-039)', async ({ page, r
     await analizar(page, 'el modal de eliminar un plan de evaluación');
   } finally {
     await request.delete(`${API}/planes-evaluacion/${plan.id}`, { headers: h });
+  }
+});
+
+test('el modal de eliminar un plan de mejora (RF-CH-042)', async ({ page, request }) => {
+  const plan = await crearPlanDeMejoraPorApi(request); // un Borrador propio
+  try {
+    await page.goto('/mejora-continua/mejora');
+    await page.getByRole('button', { name: `Eliminar ${plan.codigo}` }).click();
+    await expect(page.getByRole('dialog', { name: 'Eliminar plan de mejora' })).toBeVisible();
+
+    await analizar(page, 'el modal de eliminar un plan de mejora');
+  } finally {
+    await eliminarPlanDeMejoraPorApi(request, plan.id);
   }
 });
 

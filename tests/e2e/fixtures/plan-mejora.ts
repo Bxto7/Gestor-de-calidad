@@ -19,7 +19,11 @@
  * al PATCH y al GET que lo sigue, no solo al PATCH.
  */
 
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
+
+import { API } from '../global-setup';
+import { tokenDe } from './api';
+import { cabeceras } from './plan-borrador';
 
 const CAMPOS_DE_TEXTO: readonly (readonly [etiqueta: string, valor: string])[] = [
   ['Nombre de la acción', 'Reforzar el syllabus del curso'],
@@ -28,7 +32,6 @@ const CAMPOS_DE_TEXTO: readonly (readonly [etiqueta: string, valor: string])[] =
   ['Input', 'Resultados de la medición del periodo anterior'],
   ['Recursos', 'Horas docentes y material de laboratorio'],
   ['Metas', 'Llegar al 80 % de logro en el siguiente periodo'],
-  ['Responsable', 'Coordinación académica'],
 ];
 
 /** El valor con el que nace un plan: `new Date(0)`, ver `plan-mejora.repository.ts`. */
@@ -62,6 +65,19 @@ export async function completarDefinicion(page: Page): Promise<void> {
   const plazo = page.getByLabel('Plazo', { exact: true });
   if ((await plazo.inputValue()) === PLAZO_SIN_COMPLETAR) await guardarCampo(page, 'Plazo', PLAZO);
 
+  // RF-CH-045: el responsable es un docente de la carrera, no texto libre. Se elige
+  // después de los textos y esperando al PATCH, por lo que explica la cabecera:
+  // cada guardado reenvía la definición entera.
+  const responsable = page.getByLabel('Responsable', { exact: true });
+  if ((await responsable.inputValue()) === '') {
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.request().method() === 'PATCH' && r.url().includes('/definicion'),
+      ),
+      responsable.selectOption({ label: 'E2E Docente' }),
+    ]);
+  }
+
   // Si un PATCH pisó a otro, el envío a revisión fallaría más adelante con un
   // mensaje que no dice cuál. Se recarga para leer lo que guardó el servidor —los
   // campos no son controlados: sin recargar, solo se vería lo que se escribió— y se
@@ -71,5 +87,61 @@ export async function completarDefinicion(page: Page): Promise<void> {
   for (const [etiqueta] of CAMPOS_DE_TEXTO) {
     await expect(page.getByLabel(etiqueta, { exact: true }), etiqueta).not.toHaveValue('');
   }
+  await expect(page.getByLabel('Responsable', { exact: true })).not.toHaveValue('');
   await expect(page.getByLabel('Plazo', { exact: true })).not.toHaveValue(PLAZO_SIN_COMPLETAR);
+}
+
+export interface PlanMejoraApi {
+  id: string;
+  codigo: string;
+  estado: string;
+  carreraId: string;
+}
+
+/**
+ * Un plan de mejora propio en Borrador (carrera E2E, aspecto Criterio), creado por
+ * API con el Coordinador. Quien lo crea lo elimina con `eliminarPlanDeMejoraPorApi`.
+ */
+export async function crearPlanDeMejoraPorApi(request: APIRequestContext): Promise<PlanMejoraApi> {
+  const h = cabeceras(await tokenDe('editor'));
+  const carreras = (await (await request.get(`${API}/carreras`, { headers: h })).json()) as {
+    id: string;
+    codigo: string;
+  }[];
+  const carrera = carreras.find((c) => c.codigo === 'E2E');
+  expect(carrera, 'Falta la carrera E2E: `npm run e2e:preparar`.').toBeDefined();
+  const criterios = (await (
+    await request.get(`${API}/carreras/${carrera!.id}/criterios`, { headers: h })
+  ).json()) as { id: string; codigo: string }[];
+  const criterio = criterios.find((c) => c.codigo === 'C-E2E-01');
+  expect(criterio, 'Falta el criterio C-E2E-01: `npm run e2e:preparar`.').toBeDefined();
+
+  const alta = await request.post(`${API}/planes-mejora`, {
+    headers: h,
+    data: { aspecto: 'CRITERIO_ACREDITACION', elementoId: criterio!.id },
+  });
+  expect(alta.ok(), `No se creó el plan de mejora (${alta.status()}).`).toBe(true);
+  return (await alta.json()) as PlanMejoraApi;
+}
+
+/** Elimina un plan propio; no falla si ya no existe (la prueba pudo borrarlo por pantalla). */
+export async function eliminarPlanDeMejoraPorApi(
+  request: APIRequestContext,
+  id: string | undefined,
+): Promise<void> {
+  if (!id) return;
+  await request.delete(`${API}/planes-mejora/${id}`, {
+    headers: cabeceras(await tokenDe('editor')),
+  });
+}
+
+/** El plan de la carrera ajena que siembra `npm run e2e:preparar` (lo lee el Consultor). */
+export async function planDeMejoraAjeno(request: APIRequestContext): Promise<PlanMejoraApi> {
+  const r = await request.get(`${API}/planes-mejora`, {
+    headers: cabeceras(await tokenDe('lector')),
+  });
+  expect(r.ok()).toBe(true);
+  const ajeno = ((await r.json()) as PlanMejoraApi[]).find((p) => p.codigo === 'PJ-E2E-AJENA');
+  expect(ajeno, 'Falta el plan PJ-E2E-AJENA: `npm run e2e:preparar`.').toBeDefined();
+  return ajeno!;
 }
