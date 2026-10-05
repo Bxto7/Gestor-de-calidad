@@ -100,8 +100,8 @@ export const PERMISOS = [
   ['mejora.leer', 'Consultar planes de mejora', 'mejora-continua'],
   ['mejora.crear', 'Crear un plan de mejora', 'mejora-continua'],
   ['mejora.editar', 'Editar un plan de mejora en Borrador', 'mejora-continua'],
-  ['mejora.eliminar', 'Eliminar un plan de mejora en Borrador', 'mejora-continua'],
-  ['mejora.aprobar', 'Aprobar, observar y dar vigencia a un plan de mejora', 'mejora-continua'],
+  ['mejora.eliminar', 'Eliminar un plan de mejora en Borrador o En revisión', 'mejora-continua'],
+  ['mejora.aprobar', 'Aprobar y observar un plan de mejora', 'mejora-continua'],
 
   // Mejora continua — Actas de Aprobación
   ['actas.leer', 'Consultar actas de aprobación', 'mejora-continua'],
