@@ -7,6 +7,7 @@
  * del rol en el código volvería a meter esa configuración dentro del despliegue.
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { leerSesion, limpiarSesion, suscribirseASesion } from '../../../shared/api/sesion';
@@ -21,6 +22,7 @@ import { vistaPrincipalDe, type RolVista } from '../domain/vista-principal';
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [identidad, setIdentidad] = useState<Identidad | null>(null);
   const [cargando, setCargando] = useState(true);
+  const cacheDeConsultas = useQueryClient();
 
   // Al arrancar (y al recargar la página) hay token guardado pero no identidad:
   // se pide al servidor en vez de deducirla del token, que además podría llevar
@@ -55,9 +57,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   useEffect(
     () =>
       suscribirseASesion(() => {
-        if (!leerSesion()) setIdentidad(null);
+        if (!leerSesion()) {
+          // La caché de consultas es del navegador, no de la persona: sin vaciarla,
+          // quien inicie sesión después vería listados de la anterior (`staleTime`).
+          cacheDeConsultas.clear();
+          setIdentidad(null);
+        }
       }),
-    [],
+    [cacheDeConsultas],
   );
 
   const permisos = useMemo(() => new Set(identidad?.permisos ?? []), [identidad]);
@@ -109,9 +116,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const entrar = useCallback((nueva: Identidad) => setIdentidad(nueva), []);
 
   const salir = useCallback(async () => {
-    await cerrarEnServidor();
+    try {
+      await cerrarEnServidor();
+    } finally {
+      // Ver la suscripción de arriba: la caché no debe sobrevivir a la sesión.
+      cacheDeConsultas.clear();
+    }
     setIdentidad(null);
-  }, []);
+  }, [cacheDeConsultas]);
 
   const valor = useMemo<ValorSesion>(
     () => ({
