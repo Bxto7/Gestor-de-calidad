@@ -53,7 +53,7 @@ export class DocumentosDelActaController {
       'GET /documentos-acta/:id hasta que pasa a «Listo».',
   })
   @ApiResponse({ status: 202, description: 'Trabajo encolado.' })
-  @ApiResponse({ status: 404, description: 'El acta no existe.' })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
   async pedir(
     @Param('actaId', ParseUUIDPipe) actaId: string,
     @ActorActual() actor: Actor,
@@ -67,6 +67,7 @@ export class DocumentosDelActaController {
     summary: 'Documentos generados de un acta',
     description: 'Del más reciente al más antiguo, para poder volver a descargar uno de ayer.',
   })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
   async listar(
     @Param('actaId', ParseUUIDPipe) actaId: string,
     @ActorActual() actor: Actor,
@@ -94,7 +95,7 @@ export class DocumentosActaController {
       'En cola → Generando → Listo, o Fallido con el motivo. La pantalla ' +
       'consulta hasta que deja de estar en curso.',
   })
-  @ApiResponse({ status: 404, description: 'El trabajo no existe.' })
+  @ApiResponse({ status: 404, description: 'El trabajo no existe, o su acta no es de tu carrera.' })
   async estado(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.consultar.estado(actor, id);
   }

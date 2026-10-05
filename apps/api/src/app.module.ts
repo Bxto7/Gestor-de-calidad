@@ -1034,6 +1034,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         RENDERIZADOR_EXCEL_ACTA,
         AUTHORIZATION_PORT,
         PUBLICADOR_EVENTOS,
+        ALCANCE_DE_LECTURA,
       ],
       useFactory: (
         documentos: RepositorioDocumentosActaPort,
@@ -1045,6 +1046,7 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         excel: RenderizadorExcelActaPort,
         autorizacion: AuthorizationPort,
         eventos: PublicadorDeEventos,
+        alcance: AlcanceDeLecturaPort,
       ) =>
         new GenerarDocumentoActa(
           documentos,
@@ -1056,16 +1058,25 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
           excel,
           autorizacion,
           eventos,
+          alcance,
         ),
     },
     {
       provide: ConsultarDocumentoActa,
-      inject: [REPOSITORIO_DOCUMENTOS_ACTA, ALMACEN_ARCHIVOS, AUTHORIZATION_PORT],
+      inject: [
+        REPOSITORIO_DOCUMENTOS_ACTA,
+        ALMACEN_ARCHIVOS,
+        AUTHORIZATION_PORT,
+        REPOSITORIO_ACTA_APROBACION,
+        ALCANCE_DE_LECTURA,
+      ],
       useFactory: (
         documentos: RepositorioDocumentosActaPort,
         almacen: AlmacenDeArchivosPort,
         autorizacion: AuthorizationPort,
-      ) => new ConsultarDocumentoActa(documentos, almacen, autorizacion),
+        actas: RepositorioActaAprobacionPort,
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarDocumentoActa(documentos, almacen, autorizacion, actas, alcance),
     },
     {
       provide: VersionarPlanesMedicion,

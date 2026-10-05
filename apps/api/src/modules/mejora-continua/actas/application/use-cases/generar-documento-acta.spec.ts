@@ -16,9 +16,11 @@ import {
   NoEncontrado,
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
 import type { DatosPlanMejora, RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
 import type {
+  AccionActaDato,
   DatosActa,
   RepositorioActaAprobacionPort,
 } from '../ports/acta-aprobacion.port.js';
@@ -32,6 +34,16 @@ import {
   ConsultarDocumentoActa,
   GenerarDocumentoActa,
 } from './generar-documento-acta.use-case.js';
+
+const alcanceTotal: AlcanceDeLecturaPort = {
+  alcanceDeLectura: async () => ({ tipo: 'TODAS' }),
+  puedeLeerCarrera: async () => true,
+};
+/** Lee solo `carrera-1`, la del acta de prueba; con otra carrera, el acta es ajena. */
+const alcanceDeCarrera = (carreraId: string | null): AlcanceDeLecturaPort => ({
+  alcanceDeLectura: async () => ({ tipo: 'CARRERA', carreraId }),
+  puedeLeerCarrera: async (_u, carrera) => carreraId !== null && carrera === carreraId,
+});
 
 const ACTOR: Actor = { id: 'u-1', nombre: 'Coordinadora académica' };
 
@@ -88,6 +100,7 @@ interface Dobles {
   pdf?: RenderizadorPdfActaPort['render'];
   excel?: RenderizadorExcelActaPort['render'];
   autorizacion?: AuthorizationPort;
+  alcance?: AlcanceDeLecturaPort;
 }
 
 function montar(dobles: Dobles = {}) {
@@ -151,10 +164,43 @@ function montar(dobles: Dobles = {}) {
     { render: dobles.excel ?? (async () => Buffer.from('excel')) },
     dobles.autorizacion ?? permitirTodo(),
     eventos,
+    dobles.alcance ?? alcanceTotal,
     { ahora: () => new Date('2026-09-20T12:00:00Z') },
   );
 
   return { caso, publicados, estadoCambiadoA: () => estadoCambiadoA };
+}
+
+function montarConsulta(
+  dobles: {
+    repo?: Partial<RepositorioDocumentosActaPort>;
+    almacen?: Partial<AlmacenDeArchivosPort>;
+    autorizacion?: AuthorizationPort;
+    actas?: Partial<RepositorioActaAprobacionPort>;
+    alcance?: AlcanceDeLecturaPort;
+  } = {},
+) {
+  const repo: RepositorioDocumentosActaPort = {
+    crear: async () => trabajo(), porId: async () => trabajo(), listarDeActa: async () => [],
+    marcarGenerando: async () => {}, marcarListo: async () => {}, marcarFallido: async () => {},
+    ubicacionDe: async () => '/documentos/t-1.pdf',
+    ...dobles.repo,
+  };
+  const actas = {
+    crear: async () => acta(), porId: async () => acta(), listar: async () => [],
+    editarCabecera: async () => acta(), reemplazarAsistentes: async () => acta(),
+    accionesDe: async () => [], agregarAcciones: async () => {}, actualizarSeleccion: async () => {},
+    editarTextos: async () => acta(), planesYaEmitidos: async () => new Set<string>(),
+    cambiarEstado: async () => acta(), eliminar: async () => {},
+    correlativosDe: async () => [], ...dobles.actas,
+  } satisfies RepositorioActaAprobacionPort;
+  return new ConsultarDocumentoActa(
+    repo,
+    { guardar: async () => '/x', leer: async () => Buffer.from('contenido'), ...dobles.almacen },
+    dobles.autorizacion ?? permitirTodo(),
+    actas,
+    dobles.alcance ?? alcanceTotal,
+  );
 }
 
 describe('RF-AC-018/019 — encolar', () => {
@@ -274,20 +320,6 @@ describe('RF-AC-018/019 — generar', () => {
 });
 
 describe('RF-AC-018/019 — consultar y descargar', () => {
-  function montarConsulta(dobles: { repo?: Partial<RepositorioDocumentosActaPort>; almacen?: Partial<AlmacenDeArchivosPort>; autorizacion?: AuthorizationPort } = {}) {
-    const repo: RepositorioDocumentosActaPort = {
-      crear: async () => trabajo(), porId: async () => trabajo(), listarDeActa: async () => [],
-      marcarGenerando: async () => {}, marcarListo: async () => {}, marcarFallido: async () => {},
-      ubicacionDe: async () => '/documentos/t-1.pdf',
-      ...dobles.repo,
-    };
-    return new ConsultarDocumentoActa(
-      repo,
-      { guardar: async () => '/x', leer: async () => Buffer.from('contenido'), ...dobles.almacen },
-      dobles.autorizacion ?? permitirTodo(),
-    );
-  }
-
   it('descarga un trabajo Listo con su nombre y su tipo', async () => {
     const caso = montarConsulta({ repo: { porId: async () => trabajo({ estado: 'Listo', nombreArchivo: 'a.pdf', tipoMime: 'application/pdf' }) } });
 
@@ -315,5 +347,117 @@ describe('RF-AC-018/019 — consultar y descargar', () => {
     await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
     await expect(caso.listarDeActa(ACTOR, 'acta-1')).rejects.toThrow(AccesoDenegado);
     await expect(caso.descargar(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
+  });
+});
+
+describe('RF-CH-049 — encolar acotado a la carrera', () => {
+  it('un acta de otra carrera es 404 y no crea trabajo ni encola', async () => {
+    let creado = false;
+    const encolados: string[] = [];
+    const { caso } = montar({
+      alcance: alcanceDeCarrera('carrera-9'),
+      repo: { crear: async () => ((creado = true), trabajo()) },
+      cola: { encolar: async (id) => void encolados.push(id) },
+    });
+
+    const fallo = await caso.encolar(ACTOR, 'acta-1', 'ACTA_PDF').catch((e: unknown) => e);
+
+    expect(fallo).toBeInstanceOf(NoEncontrado);
+    expect(creado).toBe(false);
+    expect(encolados).toEqual([]);
+  });
+
+  it('sin actas.leer es 403 aunque el acta no exista (primero el permiso, después la existencia)', async () => {
+    const { caso } = montar({ autorizacion: denegar(), actas: { porId: async () => null } });
+
+    await expect(caso.encolar(ACTOR, 'acta-x', 'ACTA_PDF')).rejects.toThrow(AccesoDenegado);
+  });
+});
+
+describe('RF-CH-049 — el worker no lee planes de otra carrera', () => {
+  const vinculo = (planMejoraId: string, orden: number): AccionActaDato => ({
+    id: `aa-${orden}`, planMejoraId, aspecto: 'CRITERIO_ACREDITACION', incluida: true,
+    porcentajeMedicionCompetencia: null, orden, codigoSnapshot: null, nombreSnapshot: null,
+    plazoSnapshot: null, recursosSnapshot: null, metasSnapshot: null, responsableSnapshot: null,
+    metaCompetenciaSnapshot: null,
+  });
+
+  it('un acta en vivo exporta el plan propio y deja fuera el ajeno', async () => {
+    let recibido: unknown;
+    const { caso } = montar({
+      actas: {
+        porId: async () => acta({ estado: 'Borrador' }),
+        accionesDe: async () => [vinculo('plan-propio', 0), vinculo('plan-ajeno', 1)],
+      },
+      planes: {
+        planesPorIds: async () => [
+          plan({ id: 'plan-propio', nombre: 'Reforzar bibliografía' }),
+          plan({ id: 'plan-ajeno', carreraId: 'carrera-9', nombre: 'Plan de otra carrera' }),
+        ],
+      },
+      pdf: async (documento) => ((recibido = documento), Buffer.from('pdf')),
+    });
+
+    await caso.ejecutar('t-1');
+
+    const texto = JSON.stringify(recibido);
+    expect(texto).toContain('Reforzar bibliografía');
+    expect(texto).not.toContain('Plan de otra carrera');
+  });
+});
+
+describe('RF-CH-049 — consultar y descargar acotado a la carrera', () => {
+  const ajena = { alcance: alcanceDeCarrera('carrera-9') };
+  const listo = trabajo({ estado: 'Listo', nombreArchivo: 'a.pdf', tipoMime: 'application/pdf' });
+
+  it('el estado de un trabajo de un acta ajena es 404', async () => {
+    const caso = montarConsulta({ ...ajena, repo: { porId: async () => listo } });
+
+    const fallo = await caso.estado(ACTOR, 't-1').catch((e: unknown) => e);
+
+    expect(fallo).toBeInstanceOf(NoEncontrado);
+    expect(fallo).not.toBeInstanceOf(AccesoDenegado);
+  });
+
+  it('descargar un trabajo Listo de un acta ajena es 404 y no lee el archivo', async () => {
+    let leyo = false;
+    const caso = montarConsulta({
+      ...ajena,
+      repo: { porId: async () => listo },
+      almacen: { leer: async () => ((leyo = true), Buffer.from('x')) },
+    });
+
+    await expect(caso.descargar(ACTOR, 't-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(leyo).toBe(false);
+  });
+
+  it('un trabajo cuya acta ya no existe es 404', async () => {
+    const caso = montarConsulta({ actas: { porId: async () => null }, repo: { porId: async () => listo } });
+
+    await expect(caso.estado(ACTOR, 't-1')).rejects.toBeInstanceOf(NoEncontrado);
+  });
+
+  it('listarDeActa de un acta ajena es 404 y no consulta los trabajos', async () => {
+    let consulto = false;
+    const caso = montarConsulta({
+      ...ajena,
+      repo: { listarDeActa: async () => ((consulto = true), []) },
+    });
+
+    await expect(caso.listarDeActa(ACTOR, 'acta-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(consulto).toBe(false);
+  });
+
+  it('el 403 va antes que el 404: sin actas.leer ni se mira el acta', async () => {
+    const caso = montarConsulta({ autorizacion: denegar(), actas: { porId: async () => null } });
+
+    await expect(caso.estado(ACTOR, 't-1')).rejects.toThrow(AccesoDenegado);
+    await expect(caso.listarDeActa(ACTOR, 'acta-x')).rejects.toThrow(AccesoDenegado);
+  });
+
+  it('quien lee todas (Consultor) descarga el de cualquier carrera', async () => {
+    const caso = montarConsulta({ repo: { porId: async () => listo } });
+
+    expect((await caso.descargar(ACTOR, 't-1')).nombreArchivo).toBe('a.pdf');
   });
 });

@@ -29,6 +29,8 @@ import {
   ReglaDeNegocioViolada,
 } from '../../../../../shared-kernel/errors/errores.js';
 import type { AuthorizationPort } from '../../../../auth/application/ports/authorization.port.js';
+import type { AlcanceDeLecturaPort } from '../../../../auth/application/ports/alcance-de-lectura.port.js';
+import { exigirPlanLegible } from '../../../application/alcance-de-planes.js';
 import type { RepositorioPlanMejoraPort } from '../../../mejora/application/ports/plan-mejora.port.js';
 import {
   armarActaParaDocumento,
@@ -49,7 +51,9 @@ import type {
   TrabajoDocumentoActa,
 } from '../ports/documentos-acta.port.js';
 
-const FORMATO: Readonly<Record<TipoDocActa, { extension: string; tipoMime: string; nombre: string }>> = {
+const FORMATO: Readonly<
+  Record<TipoDocActa, { extension: string; tipoMime: string; nombre: string }>
+> = {
   ACTA_PDF: { extension: 'pdf', tipoMime: 'application/pdf', nombre: 'el acta en PDF' },
   ACTA_EXCEL: {
     extension: 'xlsx',
@@ -73,12 +77,21 @@ export class GenerarDocumentoActa {
     private readonly excel: RenderizadorExcelActaPort,
     private readonly autorizacion: AuthorizationPort,
     private readonly eventos: PublicadorDeEventos,
+    private readonly alcance: AlcanceDeLecturaPort,
     private readonly reloj: Reloj = { ahora: () => new Date() },
   ) {}
 
   async encolar(actor: Actor, actaId: string, tipo: TipoDocActa): Promise<TrabajoDocumentoActa> {
-    const acta = await this.exigirActa(actaId);
+    // (1) y (2): primero el permiso, después la existencia y el alcance; un acta
+    // de otra carrera es 404, no 403 (RF-CH-049).
     await this.exigir(actor, 'actas.leer', null);
+    const acta = await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.actas.porId(actaId),
+      'el acta de aprobación',
+      actaId,
+    );
 
     const trabajo = await this.documentos.crear({ actaId, tipo, solicitadoPor: actor.id });
     await this.cola.encolar(trabajo.id, 'mejora-continua-actas');
@@ -124,7 +137,9 @@ export class GenerarDocumentoActa {
       });
 
       const bytes =
-        trabajo.tipo === 'ACTA_PDF' ? await this.pdf.render(documento) : await this.excel.render(documento);
+        trabajo.tipo === 'ACTA_PDF'
+          ? await this.pdf.render(documento)
+          : await this.excel.render(documento);
       const ubicacion = await this.almacen.guardar(`${trabajoId}.${extension}`, bytes);
 
       await this.documentos.marcarListo(trabajoId, {
@@ -157,7 +172,8 @@ export class GenerarDocumentoActa {
       const planesPorId = new Map(planes.map((p) => [p.id, p]));
       return vinculos.flatMap((v): AccionParaDocumento[] => {
         const plan = planesPorId.get(v.planMejoraId);
-        if (!plan) return [];
+        // Ausente, o de otra carrera (dato forzado o legado: `planMejoraId` no tiene FK).
+        if (!plan || plan.carreraId !== acta.carreraId) return [];
         return [
           {
             incluida: v.incluida,
@@ -209,12 +225,6 @@ export class GenerarDocumentoActa {
     ];
   }
 
-  private async exigirActa(id: string): Promise<DatosActa> {
-    const acta = await this.actas.porId(id);
-    if (acta === null) throw new NoEncontrado('el acta de aprobación', id);
-    return acta;
-  }
-
   private async exigir(actor: Actor, permiso: string, carreraId: string | null): Promise<void> {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
@@ -238,17 +248,36 @@ export class ConsultarDocumentoActa {
     private readonly documentos: RepositorioDocumentosActaPort,
     private readonly almacen: AlmacenDeArchivosPort,
     private readonly autorizacion: AuthorizationPort,
+    private readonly actas: RepositorioActaAprobacionPort,
+    private readonly alcance: AlcanceDeLecturaPort,
   ) {}
 
+  /**
+   * El trabajo es del acta que lo pidió, y esa acta decide si se ve: un trabajo de
+   * un acta de otra carrera responde 404 igual que uno que no existe (RF-CH-049),
+   * esté o no Listo.
+   */
   async estado(actor: Actor, trabajoId: string): Promise<TrabajoDocumentoActa> {
     await this.exigirLectura(actor);
     const trabajo = await this.documentos.porId(trabajoId);
     if (trabajo === null) throw new NoEncontrado('el documento', trabajoId);
+
+    const acta = await this.actas.porId(trabajo.actaId);
+    if (acta === null || !(await this.alcance.puedeLeerCarrera(actor.id, acta.carreraId))) {
+      throw new NoEncontrado('el documento', trabajoId);
+    }
     return trabajo;
   }
 
   async listarDeActa(actor: Actor, actaId: string, limite = 20): Promise<TrabajoDocumentoActa[]> {
     await this.exigirLectura(actor);
+    await exigirPlanLegible(
+      this.alcance,
+      actor,
+      await this.actas.porId(actaId),
+      'el acta de aprobación',
+      actaId,
+    );
     return this.documentos.listarDeActa(actaId, limite);
   }
 
