@@ -1,6 +1,7 @@
 /**
- * El alcance por carrera de los planes de Medición y de Evaluación (Bloque 6a,
- * RF-CH-033, RF-CH-034, RF-CH-037, RF-CH-038).
+ * El alcance por carrera de los planes de Medición, de Evaluación (Bloque 6a,
+ * RF-CH-033, RF-CH-034, RF-CH-037, RF-CH-038) y de Mejora (Bloque 6b, RF-CH-040,
+ * RF-CH-041).
  *
  * Tres preguntas que siete casos de uso se hacen igual, en un solo sitio: qué
  * carrera impone el alcance a un listado, si un plan concreto es legible y con qué

@@ -127,7 +127,7 @@ export class GestionarActas {
 
     return vinculos.flatMap((v) => {
       const plan = planesPorId.get(v.planMejoraId);
-      if (!plan) return []; // el plan de mejora se eliminó después de cargarse; se omite en vez de fallar
+      if (!plan) return []; // defensivo: un plan en un acta no se elimina (RF-CH-042), así que no debería faltar
       return [
         {
           id: v.id,
