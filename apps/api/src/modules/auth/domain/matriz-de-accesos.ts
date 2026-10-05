@@ -107,7 +107,7 @@ export const PERMISOS = [
   ['actas.leer', 'Consultar actas de aprobación', 'mejora-continua'],
   ['actas.crear', 'Crear un acta de aprobación', 'mejora-continua'],
   ['actas.editar', 'Editar un acta de aprobación en Borrador', 'mejora-continua'],
-  ['actas.eliminar', 'Eliminar un acta de aprobación en Borrador', 'mejora-continua'],
+  ['actas.eliminar', 'Eliminar un acta de aprobación en Borrador o En revisión', 'mejora-continua'],
   ['actas.aprobar', 'Aprobar, rechazar u observar un acta de aprobación', 'mejora-continua'],
 
   // Transversales

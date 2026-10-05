@@ -151,6 +151,12 @@ export interface PlanResumenParaActa {
   readonly responsable: string;
 }
 
+/** RF-CH-050: el resultado de un borrado, decidido con la fila bloqueada. */
+export type ResultadoEliminacionActa =
+  | { readonly tipo: 'eliminado' }
+  | { readonly tipo: 'no-existe' }
+  | { readonly tipo: 'estado-no-permite'; readonly estado: EstadoActa };
+
 export interface RepositorioActaAprobacionPort {
   crear(datos: NuevaActa): Promise<DatosActa>;
   porId(id: string): Promise<DatosActa | null>;
@@ -191,7 +197,7 @@ export interface RepositorioActaAprobacionPort {
       readonly snapshots?: readonly SnapshotAccionActa[];
     },
   ): Promise<DatosActa>;
-  eliminar(id: string): Promise<void>;
+  eliminar(id: string): Promise<ResultadoEliminacionActa>;
   /** RF-AC-002 RN2: los correlativos ya usados dentro de esa carrera. */
   correlativosDe(carreraId: string): Promise<readonly number[]>;
 }

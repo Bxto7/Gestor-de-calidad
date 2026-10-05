@@ -28,6 +28,12 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
     );
   });
 
+  it('actas.eliminar describe el alcance real: Borrador o En revisión (RF-CH-050)', () => {
+    const eliminar = PERMISOS.find(([codigo]) => codigo === 'actas.eliminar');
+
+    expect(eliminar?.[1]).toBe('Eliminar un acta de aprobación en Borrador o En revisión');
+  });
+
   it('DIRECTOR_CARRERA: pierde Sistema, Acreditación, Medición y Evaluación y Mejora; conserva Plan de Estudios y Actas', () => {
     expect(permisosOrdenados('DIRECTOR_CARRERA')).toEqual(
       [

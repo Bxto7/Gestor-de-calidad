@@ -137,8 +137,9 @@ export class ActasController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar un acta en Borrador' })
-  @ApiResponse({ status: 409, description: 'El acta no está en Borrador.' })
+  @ApiOperation({ summary: 'Eliminar un acta en Borrador o En revisión (RF-CH-050)' })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
+  @ApiResponse({ status: 409, description: 'El acta no está en Borrador ni En revisión.' })
   async eliminar(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     await this.casos.eliminar(actor, id);
   }

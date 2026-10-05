@@ -125,7 +125,7 @@ function montar(dobles: Dobles = {}) {
       estadoCambiadoA = estado;
       return acta({ estado });
     },
-    eliminar: async () => {},
+    eliminar: async () => ({ tipo: 'eliminado' as const }),
     correlativosDe: async () => [],
     ...dobles.actas,
   };
@@ -191,7 +191,7 @@ function montarConsulta(
     editarCabecera: async () => acta(), reemplazarAsistentes: async () => acta(),
     accionesDe: async () => [], agregarAcciones: async () => {}, actualizarSeleccion: async () => {},
     editarTextos: async () => acta(), planesYaEmitidos: async () => new Set<string>(),
-    cambiarEstado: async () => acta(), eliminar: async () => {},
+    cambiarEstado: async () => acta(), eliminar: async () => ({ tipo: 'eliminado' }) as const,
     correlativosDe: async () => [], ...dobles.actas,
   } satisfies RepositorioActaAprobacionPort;
   return new ConsultarDocumentoActa(

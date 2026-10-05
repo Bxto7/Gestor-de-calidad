@@ -103,7 +103,7 @@ describe('el repositorio', () => {
     const a = await repo.crear(nuevaActa());
     await repo.reemplazarAsistentes(a.id, ['Ana Pérez']);
 
-    await repo.eliminar(a.id);
+    expect(await repo.eliminar(a.id)).toEqual({ tipo: 'eliminado' });
 
     expect(await repo.porId(a.id)).toBeNull();
   });

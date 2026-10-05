@@ -8,7 +8,10 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../platform/database/prisma.service.js';
-import type { EstadoActa } from '../../domain/value-objects/estado-acta.js';
+import {
+  permiteEliminacionActa,
+  type EstadoActa,
+} from '../../domain/value-objects/estado-acta.js';
 import type { AspectoPlanMejora } from '../../../mejora/application/ports/plan-mejora.port.js';
 import type {
   AccionActaDato,
@@ -20,6 +23,7 @@ import type {
   NuevaAccionActa,
   NuevaActa,
   RepositorioActaAprobacionPort,
+  ResultadoEliminacionActa,
   SnapshotAccionActa,
 } from '../../application/ports/acta-aprobacion.port.js';
 
@@ -342,8 +346,25 @@ export class ActaAprobacionRepositoryPrisma implements RepositorioActaAprobacion
     return this.exigir(id);
   }
 
-  async eliminar(id: string): Promise<void> {
-    await this.prisma.actaAprobacion.delete({ where: { id } });
+  /**
+   * RF-CH-050: borra solo si el estado lo permite, **en la misma transacción** y con
+   * la fila bloqueada (`FOR UPDATE`): el estado que vio el caso de uso pudo cambiar
+   * en medio —una aprobación o un rechazo concurrentes—, y borrar un acta Aprobada no
+   * se puede deshacer. Asistentes, acciones y documentos caen por cascada del esquema.
+   */
+  async eliminar(id: string): Promise<ResultadoEliminacionActa> {
+    return this.prisma.$transaction(async (tx) => {
+      const bloqueada = await tx.$queryRaw<{ id: string; estado: string }[]>`
+        SELECT "id", "estado"::text AS "estado" FROM "mejora_continua"."actas_aprobacion" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      const fila = bloqueada[0];
+      if (!fila) return { tipo: 'no-existe' } as const;
+
+      const estado = A_DOMINIO[fila.estado as EstadoActaBd] ?? 'Borrador';
+      if (!permiteEliminacionActa(estado)) return { tipo: 'estado-no-permite', estado } as const;
+
+      await tx.actaAprobacion.delete({ where: { id } });
+      return { tipo: 'eliminado' } as const;
+    });
   }
 
   async correlativosDe(carreraId: string): Promise<readonly number[]> {

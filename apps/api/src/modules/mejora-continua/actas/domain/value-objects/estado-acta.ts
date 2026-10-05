@@ -9,3 +9,11 @@
  * mezcladas en el mismo archivo.
  */
 export type EstadoActa = 'Borrador' | 'En revisión' | 'Aprobada' | 'Emitida' | 'Histórica';
+
+/**
+ * RF-CH-050: un acta se elimina en Borrador o En revisión. Aprobada y Emitida ya
+ * son un documento formal (RF-AC-017) y no se borran; Histórica tampoco.
+ */
+export function permiteEliminacionActa(estado: EstadoActa): boolean {
+  return estado === 'Borrador' || estado === 'En revisión';
+}

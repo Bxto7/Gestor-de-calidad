@@ -149,7 +149,7 @@ function repoActas(
     listar: async () => [actaResumen()],
     editarCabecera: async () => acta(),
     reemplazarAsistentes: async () => acta(),
-    eliminar: async () => {},
+    eliminar: async () => ({ tipo: 'eliminado' }) as const,
     correlativosDe: async () => [],
     accionesDe: async () => [],
     agregarAcciones: async () => {},
@@ -505,12 +505,13 @@ describe('reemplazarAsistentes', () => {
 });
 
 describe('eliminar', () => {
-  it('elimina un acta en Borrador', async () => {
+  it.each(['Borrador', 'En revisión'] as const)('elimina un acta en %s', async (estado) => {
     let eliminado = false;
     const actas = repoActas({
-      porId: async () => acta({ estado: 'Borrador' }),
+      porId: async () => acta({ estado }),
       eliminar: async () => {
         eliminado = true;
+        return { tipo: 'eliminado' };
       },
     });
     const casos = montar({ actas });
@@ -520,11 +521,54 @@ describe('eliminar', () => {
     expect(eliminado).toBe(true);
   });
 
-  it('rechaza eliminar un acta que no está en Borrador (RF-AC-017)', async () => {
-    const actas = repoActas({ porId: async () => acta({ estado: 'Emitida' }) });
-    const casos = montar({ actas });
+  it.each(['Aprobada', 'Emitida', 'Histórica'] as const)(
+    'rechaza eliminar un acta %s con el estado actual en el motivo y sin tocar nada',
+    async (estado) => {
+      let intentoBorrar = false;
+      const { eventos, publicador } = capturarEventos();
+      const actas = repoActas({
+        porId: async () => acta({ estado }),
+        eliminar: async () => {
+          intentoBorrar = true;
+          return { tipo: 'eliminado' };
+        },
+      });
+      const casos = montar({ actas, eventos: publicador });
 
-    await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(ReglaDeNegocioViolada);
+      await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(
+        new ReglaDeNegocioViolada(
+          `No se puede eliminar el acta ACTA N° 001 – EAP-ISI: está ${estado}. Solo se eliminan actas en Borrador o En revisión.`,
+        ),
+      );
+      expect(intentoBorrar).toBe(false);
+      expect(eventos).toEqual([]);
+    },
+  );
+
+  it('si el acta cambió de estado entre la lectura y el bloqueo de la fila: 409 y sin evento', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'En revisión' }),
+      eliminar: async () => ({ tipo: 'estado-no-permite', estado: 'Aprobada' }),
+    });
+    const casos = montar({ actas, eventos: publicador });
+
+    await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(
+      'No se puede eliminar el acta ACTA N° 001 – EAP-ISI: está Aprobada.',
+    );
+    expect(eventos).toEqual([]);
+  });
+
+  it('si otro la borró en medio: 404 y sin evento', async () => {
+    const { eventos, publicador } = capturarEventos();
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      eliminar: async () => ({ tipo: 'no-existe' }),
+    });
+    const casos = montar({ actas, eventos: publicador });
+
+    await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toBeInstanceOf(NoEncontrado);
+    expect(eventos).toEqual([]);
   });
 
   it('exige actas.eliminar acotado a la carrera del acta', async () => {
@@ -532,19 +576,26 @@ describe('eliminar', () => {
     const casos = montar({ autorizacion: denegarSolo(pedidos, ['actas.eliminar']) });
 
     await expect(casos.eliminar(ACTOR, 'acta-1')).rejects.toThrow(AccesoDenegado);
-    expect(pedidos).toContain('actas.eliminar');
+    expect(pedidos).toEqual(['actas.leer', 'actas.eliminar']);
   });
 
-  it('publica ActaEliminada', async () => {
-    const { eventos, publicador } = capturarEventos();
+  it('publica ActaEliminada solo después de borrar', async () => {
+    const orden: string[] = [];
+    const actas = repoActas({
+      porId: async () => acta({ estado: 'Borrador' }),
+      eliminar: async () => {
+        orden.push('borrar');
+        return { tipo: 'eliminado' };
+      },
+    });
     const casos = montar({
-      eventos: publicador,
-      actas: repoActas({ porId: async () => acta({ estado: 'Borrador' }) }),
+      actas,
+      eventos: { publicar: async (e) => void orden.push(...e.map((x) => x.nombre)) },
     });
 
     await casos.eliminar(ACTOR, 'acta-1');
 
-    expect(eventos.map((e) => e.nombre)).toEqual(['actas.eliminada']);
+    expect(orden).toEqual(['borrar', 'actas.eliminada']);
   });
 });
 

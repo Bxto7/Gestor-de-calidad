@@ -38,6 +38,7 @@ import {
   formatearCodigoActa,
   siguienteCorrelativoActa,
 } from '../../domain/value-objects/correlativo-acta.js';
+import { permiteEliminacionActa, type EstadoActa } from '../../domain/value-objects/estado-acta.js';
 import {
   describirTransicion,
   intentarTransicion,
@@ -503,15 +504,16 @@ export class GestionarActas {
     return Math.round(porcentajeDeMeta(planMedicion.meta));
   }
 
+  /** RF-CH-050: Borrador o En revisión. El evento va después de borrar: la bitácora es append-only. */
   async eliminar(actor: Actor, id: string): Promise<void> {
     const acta = await this.actaGestionable(actor, id, 'actas.eliminar');
-    if (acta.estado !== 'Borrador') {
-      throw new ReglaDeNegocioViolada(
-        'RF-AC-017: un acta que no está en Borrador no puede eliminarse.',
-      );
-    }
+    if (!permiteEliminacionActa(acta.estado)) throw estadoNoEliminable(acta.codigo, acta.estado);
 
-    await this.actas.eliminar(id);
+    const r = await this.actas.eliminar(id);
+    if (r.tipo === 'no-existe') throw new NoEncontrado('el acta de aprobación', id);
+    // El estado cambió entre la lectura y el bloqueo de la fila: no se borró nada.
+    if (r.tipo === 'estado-no-permite') throw estadoNoEliminable(acta.codigo, r.estado);
+
     await this.eventos.publicar([new ActaEliminada(actor, id, acta.codigo)]);
   }
 
@@ -538,4 +540,10 @@ export class GestionarActas {
     const decision = await this.autorizacion.puede(actor.id, permiso, carreraId);
     if (!decision.permitido) throw new AccesoDenegado(decision.motivo);
   }
+}
+
+function estadoNoEliminable(codigo: string, estado: EstadoActa): ReglaDeNegocioViolada {
+  return new ReglaDeNegocioViolada(
+    `No se puede eliminar el acta ${codigo}: está ${estado}. Solo se eliminan actas en Borrador o En revisión.`,
+  );
 }
