@@ -264,8 +264,9 @@ async function main(): Promise<void> {
 
 /**
  * Una carrera AJENA a la del Coordinador y el Docente de prueba, con un plan de
- * mejora Aprobado (Bloque 6b, RF-CH-041): las pruebas de 404 por URL directa
- * necesitan un plan que exista y que esas cuentas no puedan leer. Idempotente.
+ * mejora Aprobado (Bloque 6b, RF-CH-041) y un acta de aprobación (Bloque 6c,
+ * RF-CH-049): las pruebas de 404 por URL directa necesitan un plan y un acta que
+ * existan y que esas cuentas no puedan leer. Idempotente.
  */
 async function planDeMejoraDeCarreraAjena(facultadId: string): Promise<void> {
   const ajena = await prisma.carrera.upsert({
@@ -281,21 +282,39 @@ async function planDeMejoraDeCarreraAjena(facultadId: string): Promise<void> {
   const existente = await prisma.planMejora.findFirst({
     where: { carreraId: ajena.id, codigo: 'PJ-E2E-AJENA' },
   });
-  if (existente) return;
-  await prisma.planMejora.create({
-    data: {
-      codigo: 'PJ-E2E-AJENA',
-      aspecto: 'CRITERIO_ACREDITACION',
+  if (!existente) {
+    await prisma.planMejora.create({
+      data: {
+        codigo: 'PJ-E2E-AJENA',
+        aspecto: 'CRITERIO_ACREDITACION',
+        carreraId: ajena.id,
+        criterioAcreditacionId: '00000000-0000-4000-8000-0000000000aa',
+        nombre: 'Plan de otra carrera',
+        causaRaiz: 'x',
+        justificacion: 'x',
+        plazo: new Date('2026-12-31'),
+        recursos: 'x',
+        metas: 'x',
+        responsable: 'Nadie',
+        estado: 'APROBADO',
+      },
+    });
+  }
+  await prisma.actaAprobacion.upsert({
+    where: { carreraId_correlativo: { carreraId: ajena.id, correlativo: 1 } },
+    update: {},
+    create: {
       carreraId: ajena.id,
-      criterioAcreditacionId: '00000000-0000-4000-8000-0000000000aa',
-      nombre: 'Plan de otra carrera',
-      causaRaiz: 'x',
-      justificacion: 'x',
-      plazo: new Date('2026-12-31'),
-      recursos: 'x',
-      metas: 'x',
-      responsable: 'Nadie',
-      estado: 'APROBADO',
+      correlativo: 1,
+      codigo: 'ACTA-E2E-AJENA',
+      periodoAcademico: 'E2E-AJENA',
+      titulo: 'Acta de otra carrera',
+      objetivo: 'x',
+      convocadaPor: 'x',
+      fechaReunion: new Date('2026-05-01'),
+      lugarReunion: 'x',
+      textoIntroduccion: 'x',
+      textoAcuerdoCierre: 'x',
     },
   });
 }

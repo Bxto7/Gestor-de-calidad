@@ -21,8 +21,12 @@ cuál carrera*. Son una conjunción: no basta con tener el permiso.
   marca (Administrador, Consultor) se lee cualquier carrera. Hoy la marca hace que
   lo de otra carrera responda 404, como si no existiera, en Acreditación
   (atributos del graduado y criterios), en los planes de Medición, de Evaluación
-  **y de Mejora** y en sus documentos (exportación, estado y descarga).
-  **Todavía no** en las Actas de Aprobación: el Bloque 6c las acota.
+  **y de Mejora** y en sus documentos (exportación, estado y descarga), y **en las
+  Actas de Aprobación** (listado, detalle, contenido, historial y exportación;
+  Bloque 6c, RF-CH-049).
+- El historial de un acta exige, además de `actas.leer` y del alcance, el permiso de
+  auditoría que ya existía (`auditoria.leer` o `auditoria.leer_entidad`): el
+  Consultor lee el acta pero no su historial.
 - La marca llega a una base de datos **solo** al ejecutar el seed
   (`npx tsx prisma/seed.ts`, después de `prisma migrate deploy`): el seed
   reemplaza el conjunto de permisos de cada rol, así que una base migrada pero sin
@@ -93,7 +97,7 @@ arma y aprueba el Coordinador (§4): el Director no tiene ningún permiso `medic
 | Planes de estudio | leer, ver histórico, crear, editar, eliminar, enviar a revisión, **aprobar** (único rol), observar/devolver, nueva versión, justificar observaciones |
 | Contenido curricular | leer + gestionar: objetivos, competencias, atributos del graduado, criterios de acreditación, asignaturas, malla |
 | Plan de medición, de evaluación y de mejora | — (sin permisos `medicion.*`, `evaluacion.*` ni `mejora.*`) |
-| Actas de Aprobación | leer, crear, editar, eliminar, **aprobar** |
+| Actas de Aprobación | leer, crear, editar, eliminar (en Borrador o En revisión), **aprobar** |
 | Reportes | generar PDF y Excel |
 | Auditoría | leer historial de cambios |
 
@@ -110,7 +114,7 @@ carrera**. Lleva `lectura.solo_su_carrera`: en los módulos que ya la aplican
 **Alcance de lectura:** solo su carrera (`lectura.solo_su_carrera`, Bloque 6a).
 Los planes de Medición y de Evaluación (con sus documentos) y Acreditación de
 otra carrera le responden 404; el panel general de Reportes, 403. Los planes de
-Mejora (con sus documentos) también; las Actas todavía no (§1).
+Mejora y las Actas de Aprobación (con sus documentos, su contenido y su historial) también.
 **Filosofía:** apoyo operativo: arma los planes de Mejora Continua y **también los
 aprueba** (decisión de la universidad al revisar el Bloque 1, 2026-09-29), pero
 **no aprueba el plan de estudios** ni las Actas de Aprobación, que siguen siendo del
@@ -124,7 +128,7 @@ Director.
 | Plan de medición | leer, crear, editar, eliminar, **aprobar** | — |
 | Plan de evaluación | leer, crear, editar, eliminar, **aprobar** | — |
 | Plan de mejora | leer, crear, editar, eliminar (en Borrador o En revisión), **aprobar** | — |
-| Actas de Aprobación | leer, crear, editar, eliminar | **aprobar** |
+| Actas de Aprobación | leer, crear, editar, eliminar (en Borrador o En revisión) | **aprobar** |
 | Reportes | generar PDF y Excel | — |
 | Auditoría | solo historial de su entidad (`auditoria.leer_entidad`), no la bitácora entera | ver bitácora completa de accesos |
 

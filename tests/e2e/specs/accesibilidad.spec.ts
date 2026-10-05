@@ -9,6 +9,12 @@
 
 import type { Page } from '@playwright/test';
 
+import {
+  crearActa,
+  crearActaAprobada,
+  crearActaEnRevision,
+  crearPlanMejora,
+} from '../fixtures/acta';
 import { tokenDe } from '../fixtures/api';
 import { analizar } from '../fixtures/axe';
 import { borradorNuevo, borrarPlan, cabeceras } from '../fixtures/plan-borrador';
@@ -17,7 +23,7 @@ import {
   crearPlanDeMejoraPorApi,
   eliminarPlanDeMejoraPorApi,
 } from '../fixtures/plan-mejora';
-import { expect, paginaComo, test } from '../fixtures/sesion';
+import { expect, test } from '../fixtures/sesion';
 import { API } from '../global-setup';
 
 /**
@@ -316,21 +322,6 @@ test('el detalle de un plan de mejora', async ({ page }) => {
   await analizar(page, 'el detalle del plan de mejora');
 });
 
-/**
- * Crea un plan de mejora fresco (Criterio de Acreditación) y abre su detalle.
- * Sirve de punto de partida a las dos pruebas de Documentos y Versiones de
- * más abajo — mismo papel que `crearPlanEvaluacion` para su gemelo.
- */
-async function crearPlanMejora(page: Page): Promise<void> {
-  await page.goto('/mejora-continua/mejora');
-  await page.getByRole('button', { name: 'Nuevo plan de mejora' }).click();
-  const modal = page.getByRole('dialog');
-  await modal.getByLabel('Aspecto').selectOption('CRITERIO_ACREDITACION');
-  await modal.getByLabel('Elemento').selectOption({ index: 1 });
-  await modal.getByRole('button', { name: 'Crear' }).click();
-  await expect(page.getByRole('heading', { name: 'Estado del plan' })).toBeVisible();
-}
-
 test('la pestaña de documentos del plan de mejora, con un PDF ya generado', async ({ page }) => {
   // Con contenido real: analizar la lista vacía no distingue «sin
   // problemas» de «axe nunca llegó a ver la fila de un documento» — mismo
@@ -343,20 +334,6 @@ test('la pestaña de documentos del plan de mejora, con un PDF ya generado', asy
 
   await analizar(page, 'la pestaña de documentos del plan de mejora');
 });
-
-/**
- * Crea un acta de aprobación fresca en Borrador y abre su detalle. El periodo
- * lleva la hora para que dos corridas seguidas sin reiniciar la base no choquen
- * ni se confundan entre sí.
- */
-async function crearActa(page: Page): Promise<void> {
-  await page.goto('/mejora-continua/actas');
-  await page.getByRole('button', { name: 'Nueva acta' }).click();
-  const modal = page.getByRole('dialog');
-  await modal.getByLabel('Periodo académico*').fill(`E2E-AXE-${Date.now()}`);
-  await modal.getByRole('button', { name: 'Crear' }).click();
-  await expect(page.getByRole('heading', { name: 'Cabecera del acta' })).toBeVisible();
-}
 
 test('el listado de actas de aprobación, con una acta ya creada', async ({ page }) => {
   // Con contenido real: analizar el estado vacío no distingue «sin problemas» de
@@ -384,79 +361,6 @@ test('el detalle de un acta en Borrador, con sus campos editables', async ({ pag
 
   await analizar(page, 'el detalle del acta de aprobación en Borrador');
 });
-
-/**
- * Pulsa un botón del acta y espera a que el servidor confirme el cambio (una
- * escritura a `/actas/...` con respuesta correcta). El acta se arma paso a paso y
- * cada paso valida contra lo ya guardado: pulsar «Enviar a revisión» antes de que
- * el servidor tenga la cabecera fallaría con «Hay inconsistencias bloqueantes» sin
- * decir cuál.
- */
-async function pulsarYEsperarGuardado(page: Page, nombre: string): Promise<void> {
-  const [respuesta] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.request().method() !== 'GET' && new URL(r.url()).pathname.includes('/actas/'),
-    ),
-    page.getByRole('button', { name: nombre, exact: true }).click(),
-  ]);
-  expect(respuesta.ok(), `«${nombre}» no se guardó (${respuesta.status()}).`).toBe(true);
-}
-
-/**
- * Deja un acta En revisión, recorriendo la interfaz como lo haría quien la arma.
- *
- * Enviar a revisión exige la validación integral de RF-AC-016: cabecera, un asistente,
- * al menos una acción incluida y los datos de emisión. Las acciones salen de los planes
- * de mejora Aprobados o Vigentes de la carrera que no estén ya en un acta emitida,
- * así que cada llamada aprueba antes su propio plan de mejora: no depende de lo que
- * hayan dejado otros ficheros ni de que una corrida anterior no lo haya gastado.
- * Los permisos se reparten: `page` va con la cuenta `director` (`actas.*`) y el plan
- * de mejora lo aprueba el Coordinador (`mejora.aprobar`) en una pestaña aparte.
- */
-async function crearActaEnRevision(page: Page): Promise<void> {
-  const coordinador = await paginaComo(page, 'editor');
-  try {
-    await crearPlanMejora(coordinador);
-    await completarDefinicion(coordinador);
-    await coordinador.getByRole('button', { name: 'Enviar a revisión' }).click();
-    await coordinador.getByRole('button', { name: 'Aprobar', exact: true }).click();
-    // Sin cerrar antes: la pestaña abandonaría la página antes de que el servidor
-    // termine de aprobar el plan, y el acta no encontraría ninguna acción que cargar.
-    await expect(coordinador.getByRole('button', { name: 'Aprobar', exact: true })).toBeHidden();
-  } finally {
-    await coordinador.close();
-  }
-
-  await crearActa(page);
-  await page.getByLabel('Convocada por').fill('Dirección de la carrera');
-  await page.getByLabel('Fecha de reunión').fill('2026-09-01');
-  await page.getByLabel('Lugar de reunión').fill('Sala de reuniones');
-  await page.getByLabel('Lugar de emisión').fill('Huancayo');
-  await page.getByLabel('Fecha de emisión').fill('2026-09-02');
-  await pulsarYEsperarGuardado(page, 'Guardar cabecera');
-
-  await page.getByRole('button', { name: 'Agregar asistente' }).click();
-  await page.getByLabel('Asistente 1').fill('E2E Director');
-  await pulsarYEsperarGuardado(page, 'Guardar asistentes');
-
-  await pulsarYEsperarGuardado(page, 'Cargar acciones del periodo');
-  const acciones = page.getByRole('table', { name: 'Acciones de mejora incluidas en el acta' });
-  await expect(acciones.getByRole('checkbox').first()).toBeChecked();
-
-  await pulsarYEsperarGuardado(page, 'Enviar a revisión');
-  // Aprobar solo aparece con el acta ya En revisión: esperarlo confirma que el
-  // servidor y la pantalla coinciden antes de que la prueba haga nada más.
-  await expect(page.getByRole('button', { name: 'Aprobar', exact: true })).toBeVisible();
-}
-
-/** Lo mismo que `crearActaEnRevision`, y además la aprueba (RF-AC-014). */
-async function crearActaAprobada(page: Page): Promise<void> {
-  await crearActaEnRevision(page);
-  await pulsarYEsperarGuardado(page, 'Aprobar');
-  await expect(page.getByRole('note')).toContainText(
-    'Esta acta está Aprobada y no admite cambios.',
-  );
-}
 
 test.describe('con la cuenta que aprueba', () => {
   // Generar una versión exige `evaluacion.crear`/`mejora.crear` y aprobar
@@ -584,6 +488,22 @@ test.describe('con las cuentas que aprueban planes y actas', () => {
     await expect(modal.getByRole('button', { name: 'Confirmar' })).toBeEnabled();
 
     await analizar(page, 'el modal de rechazo del acta de aprobación');
+  });
+
+  test('el modal de eliminar un acta de aprobación', async ({ page }) => {
+    // El diálogo de confirmación (RF-CH-050) lo comparte con Acreditación y con los
+    // planes `ConfirmarEliminacion`; aquí se analiza abierto sobre un acta en Borrador,
+    // que es donde el Director lo usa. Al terminar se elimina el acta que se creó.
+    await crearActa(page);
+    await page.getByRole('button', { name: 'Eliminar acta' }).click();
+
+    const modal = page.getByRole('dialog', { name: 'Eliminar acta' });
+    await expect(modal).toBeVisible();
+
+    await analizar(page, 'el modal de eliminar un acta de aprobación');
+
+    await modal.getByRole('button', { name: 'Eliminar', exact: true }).click();
+    await expect(page).toHaveURL(/\/mejora-continua\/actas$/);
   });
 });
 

@@ -71,8 +71,10 @@ reales, leer los códigos del mensaje y decidir con quien los creó.
 
 **Bloque 6b.** El Docente de prueba ahora lee solo su carrera: sin `npx tsx prisma/seed.ts`
 después de `migrate deploy` la prueba de 404 del Docente falla. `npm run e2e:preparar` crea la
-carrera ajena `E2E-AJENA` con un plan de mejora `PJ-E2E-AJENA` para esas pruebas. Son 31
-pruebas de `axe`.
+carrera ajena `E2E-AJENA` con un plan de mejora `PJ-E2E-AJENA` para esas pruebas.
+
+**Bloque 6c.** `npm run e2e:preparar` crea también el acta `ACTA-E2E-AJENA` en la carrera
+ajena; sin ella `actas-por-carrera.spec.ts` falla. Son 32 pruebas de `axe`.
 
 El worker no es opcional: los PDF y Excel se generan en una cola de BullMQ y solo él la
 consume. Sin él, la API responde bien pero los documentos se quedan en «Pendiente» y fallan
@@ -151,8 +153,8 @@ está registrada como **D-10** en la sección 8 de
 2026**: cumplir el estándar pesa más que la lista literal de colores del documento.
 
 **Cobertura actual (4 de octubre de 2026).** Además de las cuatro pantallas de
-aquella primera medición, el spec tiene hoy 31 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
-sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, Criterios de Acreditación y los modales de eliminar de Atributos, Criterios, Planes de Medición, Planes de Evaluación y Planes de Mejora, el
+aquella primera medición, el spec tiene hoy 32 pruebas de `axe`: listados y detalles de medición, evaluación y mejora (con
+sus pestañas de Documentos y Versiones ya con datos reales), Atributos del Graduado, Criterios de Acreditación y los modales de eliminar de Atributos, Criterios, Planes de Medición, Planes de Evaluación, Planes de Mejora y Actas, el
 resumen, las vistas de inicio de Administrador, Director y Docente, la página Mis evidencias,
 desde RF127 el selector de competencias con una competencia sin atributo —la casilla
 deshabilitada y su motivo enlazado por `aria-describedby`— y las Actas de Aprobación: el
