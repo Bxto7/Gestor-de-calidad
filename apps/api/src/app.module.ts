@@ -75,6 +75,12 @@ import {
   type RepositorioBitacoraPort,
 } from './modules/auditoria/application/ports/bitacora.port.js';
 import { ConsultarBitacora } from './modules/auditoria/application/use-cases/consultar-bitacora.use-case.js';
+import {
+  HISTORIAL_DEL_ACTA,
+  type HistorialDelActaPort,
+} from './modules/mejora-continua/actas/application/ports/historial-del-acta.port.js';
+import { ConsultarHistorialDelActa } from './modules/mejora-continua/actas/application/use-cases/consultar-historial-del-acta.use-case.js';
+import { HistorialDelActaAdapter } from './modules/mejora-continua/actas/infrastructure/historial-del-acta.adapter.js';
 import { BitacoraController } from './modules/auditoria/infrastructure/http/bitacora.controller.js';
 import { BitacoraRepositoryPrisma } from './modules/auditoria/infrastructure/persistence/bitacora.repository.js';
 import { BitacoraListener } from './modules/auditoria/infrastructure/listeners/bitacora.listener.js';
@@ -1077,6 +1083,27 @@ const PUBLICADOR_EVENTOS = Symbol('PublicadorDeEventos');
         actas: RepositorioActaAprobacionPort,
         alcance: AlcanceDeLecturaPort,
       ) => new ConsultarDocumentoActa(documentos, almacen, autorizacion, actas, alcance),
+    },
+    {
+      // El adaptador recibe el caso de uso de auditoría y Actas no sabe de qué módulo es.
+      provide: HISTORIAL_DEL_ACTA,
+      inject: [ConsultarBitacora],
+      useFactory: (bitacora: ConsultarBitacora) => new HistorialDelActaAdapter(bitacora),
+    },
+    {
+      provide: ConsultarHistorialDelActa,
+      inject: [
+        REPOSITORIO_ACTA_APROBACION,
+        HISTORIAL_DEL_ACTA,
+        AUTHORIZATION_PORT,
+        ALCANCE_DE_LECTURA,
+      ],
+      useFactory: (
+        actas: RepositorioActaAprobacionPort,
+        historial: HistorialDelActaPort,
+        autorizacion: AuthorizationPort,
+        alcance: AlcanceDeLecturaPort,
+      ) => new ConsultarHistorialDelActa(actas, historial, autorizacion, alcance),
     },
     {
       provide: VersionarPlanesMedicion,

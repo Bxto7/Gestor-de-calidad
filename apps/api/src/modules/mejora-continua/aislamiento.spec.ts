@@ -173,6 +173,9 @@ describe('aislamiento de mejora-continua', () => {
       join(RAIZ, 'domain'),
       join(RAIZ, 'medicion', 'domain'),
       join(RAIZ, 'evaluacion', 'domain'),
+      join(RAIZ, 'mejora', 'domain'),
+      join(RAIZ, 'actas', 'domain'),
+      join(RAIZ, 'resumen', 'domain'),
     ]) {
       for (const { archivo, importado } of importsDe(raiz)) {
         if (/^@nestjs\/|^@prisma\/|database\/generated/.test(importado)) infractores.push(archivo);
@@ -191,6 +194,9 @@ describe('aislamiento de mejora-continua', () => {
       join(RAIZ, 'application'),
       join(RAIZ, 'medicion', 'application'),
       join(RAIZ, 'evaluacion', 'application'),
+      join(RAIZ, 'mejora', 'application'),
+      join(RAIZ, 'actas', 'application'),
+      join(RAIZ, 'resumen', 'application'),
     ]) {
       for (const { archivo, importado } of importsDe(raiz)) {
         if (/^@prisma\/|database\/generated|prisma\.service/.test(importado)) {
@@ -200,6 +206,20 @@ describe('aislamiento de mejora-continua', () => {
     }
 
     expect(infractores).toEqual([]);
+  });
+
+  it('el historial del acta pasa por su puerto: ni el puerto ni el adaptador importan auditoría', () => {
+    // Actas lee la bitácora por `HistorialDelActaPort`. El adaptador recibe el caso de
+    // uso de auditoría por tipo estructural y lo cablea `app.module.ts`; si alguien
+    // escribe un `import` de `auditoria/` aquí, la regla de arriba lo caza, y esta
+    // fija además que el puerto y el adaptador existen donde se espera.
+    const archivos = importsDe(join(RAIZ, 'actas')).map(({ archivo }) => archivo);
+
+    expect(archivos).toContain('actas/application/ports/historial-del-acta.port.ts');
+    expect(archivos).toContain('actas/infrastructure/historial-del-acta.adapter.ts');
+    expect(
+      importsDe(join(RAIZ, 'actas')).filter(({ importado }) => DE_AUDITORIA.test(importado)),
+    ).toEqual([]);
   });
 });
 

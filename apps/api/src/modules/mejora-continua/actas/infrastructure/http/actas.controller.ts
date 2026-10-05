@@ -23,6 +23,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import type { Actor } from '../../../../../shared-kernel/domain-events/domain-event.js';
 import { ActorActual } from '../../../../auth/infrastructure/http/jwt.guard.js';
+import { ConsultarHistorialDelActa } from '../../application/use-cases/consultar-historial-del-acta.use-case.js';
 import { GestionarActas } from '../../application/use-cases/gestionar-actas.use-case.js';
 import {
   ActualizarSeleccionAccionesDto,
@@ -38,7 +39,10 @@ import {
 @ApiBearerAuth()
 @Controller('actas')
 export class ActasController {
-  constructor(private readonly casos: GestionarActas) {}
+  constructor(
+    private readonly casos: GestionarActas,
+    private readonly historial: ConsultarHistorialDelActa,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear un acta de aprobación (RF-AC-001 a RF-AC-003)' })
@@ -67,6 +71,19 @@ export class ActasController {
   @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
   async contenido(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
     return this.casos.obtenerContenido(actor, id);
+  }
+
+  @Get(':id/historial')
+  @ApiOperation({
+    summary: 'Historial de modificaciones del acta (RF-AC-022)',
+    description:
+      'Del más reciente al más antiguo, hasta 50 movimientos. Exige `actas.leer` y el ' +
+      'permiso de auditoría (`auditoria.leer` o `auditoria.leer_entidad`); un acta de otra ' +
+      'carrera responde 404.',
+  })
+  @ApiResponse({ status: 404, description: 'El acta no existe o no es de tu carrera.' })
+  async historialDelActa(@Param('id', ParseUUIDPipe) id: string, @ActorActual() actor: Actor) {
+    return this.historial.ejecutar(actor, id);
   }
 
   @Patch(':id')
