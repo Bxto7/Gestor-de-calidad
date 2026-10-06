@@ -87,6 +87,26 @@ describe('PlanesMedicionPage — el alta en la carrera de la sesión (RF-CH-033)
     expect(within(dialogo).queryByLabelText(/Carrera/)).not.toBeInTheDocument();
   });
 
+  it('ofrece un plan Histórico pero no uno en Borrador (RF-PM-001 RN2, D-17)', async () => {
+    vi.spyOn(apiPlanes, 'listarPlanes').mockResolvedValue([
+      planEstudios({ id: 'pe-1', carreraId: 'c1', codigo: 'PE-ISI-2018-v1', estado: 'Histórico' }),
+      planEstudios({ id: 'pe-2', carreraId: 'c1', codigo: 'PE-ISI-2026-v2', estado: 'Borrador' }),
+    ]);
+    montarPagina(<PlanesMedicionPage />, { permisos: GESTIONA, carreraACargo: 'c1' });
+    vi.spyOn(api, 'listarPlanes').mockResolvedValue([plan()]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo plan de medición' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nuevo plan de medición' });
+    const selector = within(dialogo).getByLabelText(/^Plan de estudios/);
+
+    expect(
+      await within(selector).findByRole('option', { name: 'PE-ISI-2018-v1 — Histórico' }),
+    ).toBeInTheDocument();
+    expect(
+      within(selector).queryByRole('option', { name: /PE-ISI-2026-v2/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it('sin carrera asignada, el alta muestra un aviso en lugar del formulario', async () => {
     montar({ carreraACargo: null });
 

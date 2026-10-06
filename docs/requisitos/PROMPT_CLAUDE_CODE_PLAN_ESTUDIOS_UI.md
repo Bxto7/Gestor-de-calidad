@@ -1281,6 +1281,8 @@ El estado «Aprobada» se añadió el 4 de septiembre de 2026, con D-10. Hasta e
 | D-13 | RF-PE-006 RN2 (Mejora Continua) | La excepción del registro progresivo remite a RF-PE-022 y RF-PE-028 (medición Indirecta, ninguno registra un porcentaje); los que sí lo describen son RF-PE-019 y RF-PE-026 | **PENDIENTE** |
 | D-14 | RF-PE-032 RN2 · RF-PE-033 RN2 (Mejora Continua) | El Excel y el PDF calcan la plantilla del plan de medición, no «el formato institucional»: esa plantilla no está en el repositorio | **PENDIENTE** |
 | D-15 | RF-CH-029 RN1 · RF-CH-032 RN1 (Cambios y Observaciones MVP1) | Eliminar un atributo o un criterio se bloquea ante **cualquier** uso (competencia mapeada, plan de estudios que lo adopta, plan de mejora de cualquier estado); el documento solo bloquea ante uso en Mejora Continua activa | **PENDIENTE** |
+| D-16 | RF049 RN1 (→ RF094) | Una asignatura sin competencia vinculada ya no bloquea aprobar el plan: es advertencia justificable, no requisito | Aprobada (2026-10-06) |
+| D-17 | RF-PM-001 RN2 (Mejora Continua) | Un plan de medición ya puede construirse también sobre un plan de estudios Histórico, no solo Aprobado o Vigente | Aprobada (2026-10-06) |
 
 ### D-1 · RF092 — desde qué estado se genera la evidencia de aprobación
 
@@ -1558,6 +1560,32 @@ tabla completo y descargable.
 **Por qué:** el documento permitiría borrar un atributo con competencias mapeadas pero sin uso en Mejora Continua, lo que dejaría esas competencias sin atributo y violaría RF127 sin aviso; y un criterio referenciado por un plan de mejora histórico quedaría colgando, porque no hay clave foránea que lo impida.
 
 **Qué hay que decidir:** si la universidad acepta el criterio estricto, corregir RN1 de los dos requisitos. Si prefiere la lectura literal, el cambio es acotado: un caso de uso con dos condiciones menos y sus pruebas.
+
+### D-16 · RF049 RN1 (→ RF094) — una asignatura sin competencia ya no bloquea aprobar
+
+**Pide:** RF049 RN1: «Una asignatura debe tener al menos una competencia asociada antes de aprobarse el plan (ver RF094)». `RF094` lo implementaba como hallazgo **bloqueante** del motor de validaciones: sin al menos una competencia por asignatura, el plan no podía pasar de `En revisión` a `Aprobado`.
+
+**Hace:** `ASIGNATURA_SIN_COMPETENCIA` pasa a **advertencia**: se sigue reportando y se puede justificar (RF099), pero ya no impide enviar a revisión ni aprobar.
+
+**Por qué:** lo destapó el plan `PE-ISI-2018`: de sus 74 asignaturas, 69 no tienen ninguna competencia vinculada en el dato de origen, y no es un hueco de carga — el currículo real tiene asignaturas de formación general (p. ej. Historia Social Contemporánea, Realidad Nacional y Regional, Deporte Sociedad y Género) que legítimamente no miden ninguna competencia de perfil profesional. `RF048` ya clasifica el tipo de asignatura (General/Transversal/Especialidad) pero la regla de RF049 RN1 no distingue por tipo, y en los datos reales ni siquiera correlaciona limpiamente con ese campo (la mayoría de las 69 son `Especialidad`, no `General`). Exigirlo como bloqueante habría dejado sin forma de aprobarse a un plan real, vigente en la universidad.
+
+**Dónde:** `motor-de-validaciones.ts` (backend, autoridad) y su espejo `motor-validaciones.ts` (frontend), hallazgo `ASIGNATURA_SIN_COMPETENCIA`.
+
+**Decidido el 6 de octubre de 2026:** aprobado. El criterio es que vincular competencias a cada asignatura queda como sugerencia de calidad del plan, no como condición de aprobación — la decisión real de qué asignaturas miden competencias de perfil profesional le corresponde a quien arma el currículo, no al sistema.
+
+### D-17 · RF-PM-001 RN2 (Mejora Continua) — plan de medición también sobre un plan Histórico
+
+*Este punto es del documento de Mejora Continua, no del de Plan de Estudios.*
+
+**Pide:** RF-PM-001 RN2: «Solo se listan planes de estudios en estado Aprobado o Vigente» como base de un nuevo plan de medición.
+
+**Hace:** también lista los que están en **Histórico** (`ContenidoCurricularAdapter`, constante `ELEGIBLES`, ahora `APROBADO`, `VIGENTE` y `HISTORICO`).
+
+**Por qué:** lo destapó el intento de medir el plan `PE-ISI-2018`, hoy Histórico tras la llegada de `PE-ISI-2026-v2` a Vigente. Un currículo que deja de ser Vigente no deja de tener estudiantes cursándolo: las cohortes que entraron bajo el plan 2018 siguen egresando bajo ese plan durante años, y seguir midiendo sus competencias es la razón de ser de Mejora Continua. Nada en `generar una nueva versión` (RF075) impedía ya trabajar sobre un plan Histórico —`permiteNuevaVersion` ya lo aceptaba antes de esta decisión—, así que excluirlo solo de medición era una inconsistencia entre dos partes del mismo sistema.
+
+**Dónde:** `contenido-curricular.adapter.ts` (autoridad), `contenido-curricular.port.ts` (contrato), `gestionar-planes-medicion.use-case.ts` (mensaje de la RN2) y `PlanesMedicionPage.tsx` (filtro del selector en el alta).
+
+**Decidido el 6 de octubre de 2026:** aprobado.
 
 ---
 

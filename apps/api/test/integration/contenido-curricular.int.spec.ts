@@ -41,21 +41,33 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-async function plan(codigo: string, version: number, estado: 'BORRADOR' | 'APROBADO' | 'VIGENTE') {
+async function plan(
+  codigo: string,
+  version: number,
+  estado: 'BORRADOR' | 'APROBADO' | 'VIGENTE' | 'HISTORICO',
+) {
   return prisma.planEstudios.create({
     data: { carreraId, codigo, version, estado, duracionAnios: 5 },
   });
 }
 
-describe('RF-PM-001 RN2 — solo Aprobado o Vigente son elegibles', () => {
-  it('los Borradores no se listan', async () => {
+describe('RF-PM-001 RN2 — solo Aprobado, Vigente o Histórico son elegibles', () => {
+  it('los Borradores no se listan; un Histórico sí (D-17)', async () => {
+    // D-17 (docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md §8): medir un
+    // currículo ya archivado tiene sentido para cohortes que aún no egresan bajo
+    // ese plan, así que Histórico se suma a Aprobado/Vigente.
     await plan('PE-ISI-2026-v1', 1, 'BORRADOR');
     await plan('PE-ISI-2027-v2', 2, 'APROBADO');
     await plan('PE-ISI-2028-v3', 3, 'VIGENTE');
+    await plan('PE-ISI-2018-v1', 4, 'HISTORICO');
 
     const elegibles = await contenido.planesElegibles();
 
-    expect(elegibles.map((p) => p.codigo).sort()).toEqual(['PE-ISI-2027-v2', 'PE-ISI-2028-v3']);
+    expect(elegibles.map((p) => p.codigo).sort()).toEqual([
+      'PE-ISI-2018-v1',
+      'PE-ISI-2027-v2',
+      'PE-ISI-2028-v3',
+    ]);
   });
 
   it('`planPorId` devuelve el Borrador, pero marcado como no elegible', async () => {

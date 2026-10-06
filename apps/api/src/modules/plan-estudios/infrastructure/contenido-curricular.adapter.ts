@@ -22,8 +22,15 @@ import type {
   PlanBase,
 } from '../application/ports/contenido-curricular.port.js';
 
-/** RF-PM-001 RN2: los únicos estados sobre los que se puede medir. */
-const ELEGIBLES = ['APROBADO', 'VIGENTE'] as const;
+/**
+ * RF-PM-001 RN2: los estados sobre los que se puede medir.
+ *
+ * Divergencia D-17 (docs/requisitos/PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md §8,
+ * aprobada 2026-10-06): el requisito solo listaba Aprobado y Vigente. Se suma
+ * Histórico porque medir un currículo archivado tiene sentido mientras existan
+ * cohortes que todavía egresan bajo ese plan.
+ */
+const ELEGIBLES = ['APROBADO', 'VIGENTE', 'HISTORICO'] as const;
 
 const SELECCION_PLAN = {
   id: true,

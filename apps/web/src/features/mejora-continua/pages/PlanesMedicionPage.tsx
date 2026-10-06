@@ -181,13 +181,16 @@ function ModalNuevoPlan({ onCerrar }: { onCerrar: () => void }) {
   const { identidad } = useSesion();
   const carreraId = identidad?.carreraACargo ?? null;
 
-  // RF-PM-001 RN2: solo Aprobado o Vigente, y solo de su carrera. El backend lo
-  // vuelve a comprobar; filtrar aquí evita ofrecer lo que va a rechazar.
+  // RF-PM-001 RN2 (D-17): Aprobado, Vigente o Histórico, y solo de su carrera.
+  // El backend lo vuelve a comprobar; filtrar aquí evita ofrecer lo que va a
+  // rechazar.
   const { data: planesEstudio } = usePlanes(carreraId ? { carreraId } : undefined, {
     enabled: carreraId !== null,
   });
   const elegibles = (planesEstudio ?? []).filter(
-    (p) => p.carreraId === carreraId && (p.estado === 'Aprobado' || p.estado === 'Vigente'),
+    (p) =>
+      p.carreraId === carreraId &&
+      (p.estado === 'Aprobado' || p.estado === 'Vigente' || p.estado === 'Histórico'),
   );
 
   const [planEstudiosId, setPlanEstudiosId] = useState('');

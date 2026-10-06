@@ -184,17 +184,21 @@ export function validarPlan(entrada: EntradaValidacion): ResultadoValidacion {
   const ciclos = ciclosDeCarrera(carrera);
   const hallazgos: Hallazgo[] = [];
 
-  // RF094 - cada asignatura con al menos una competencia. Bloqueante.
+  // RF094 - cada asignatura con al menos una competencia. Advertencia, no
+  // bloqueante: divergencia D-15 (CLAUDE.md §1) respecto a RF049 RN1— no toda
+  // asignatura mide una competencia de perfil profesional (formación
+  // general, por ejemplo), así que el plan puede aprobarse igual y la
+  // persona que aprueba puede justificarlo (RF099).
   const sinCompetencia = activas.filter((a) => a.competenciaIds.length === 0);
   if (sinCompetencia.length > 0) {
     hallazgos.push({
       codigo: 'ASIGNATURA_SIN_COMPETENCIA',
       rf: 'RF094',
-      severidad: 'bloqueante',
+      severidad: 'advertencia',
       titulo: 'Asignaturas sin competencia asociada',
       detalle:
         sinCompetencia.length +
-        ' asignatura(s) no tienen ninguna competencia vinculada. Cada asignatura necesita al menos una para poder aprobar el plan.',
+        ' asignatura(s) no tienen ninguna competencia vinculada. Revisa si corresponde vincular una.',
       afectados: sinCompetencia.map((a) => a.codigo + ' · ' + a.nombre),
     });
   }

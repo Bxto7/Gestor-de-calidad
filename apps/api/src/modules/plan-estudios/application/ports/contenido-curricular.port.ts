@@ -19,7 +19,7 @@ export interface PlanBase {
   readonly carreraId: string;
   readonly carreraNombre: string;
   readonly version: number;
-  /** RF-PM-001 RN2: solo Aprobado o Vigente son elegibles. */
+  /** RF-PM-001 RN2: Aprobado, Vigente o Histórico son elegibles (D-17). */
   readonly elegible: boolean;
   /** RF-PM-016: cuántos años dura, para proponer los periodos. */
   readonly duracionAnios: number;
@@ -60,7 +60,7 @@ export interface CarreraBase {
 }
 
 export interface ContenidoCurricularPort {
-  /** RF-PM-001 RN2: los planes en estado Aprobado o Vigente. */
+  /** RF-PM-001 RN2: los planes en estado Aprobado, Vigente o Histórico (D-17). */
   planesElegibles(): Promise<PlanBase[]>;
   /** Devuelve null si no existe. `elegible` dice si además se puede usar. */
   planPorId(planEstudiosId: string): Promise<PlanBase | null>;

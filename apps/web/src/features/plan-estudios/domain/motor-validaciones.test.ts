@@ -148,13 +148,17 @@ describe('RF097 / RF098 — un plan correcto no genera hallazgos', () => {
 });
 
 describe('RF094 — cada asignatura necesita una competencia', () => {
-  it('detecta las que no tienen ninguna y bloquea', () => {
+  it('detecta las que no tienen ninguna, como advertencia que no bloquea', () => {
+    // Divergencia D-15 (CLAUDE.md §1): no toda asignatura mide una competencia
+    // de perfil profesional (formación general, por ejemplo), así que RF049
+    // RN1 deja de ser bloqueante y pasa a sugerencia justificable (RF099).
     const e = entradaValida();
     e.asignaturas[0]!.competenciaIds = [];
     const r = validarPlan(e);
 
-    expect(codigos(r)).toContain('ASIGNATURA_SIN_COMPETENCIA');
-    expect(r.tieneBloqueos).toBe(true);
+    const h = r.hallazgos.find((x) => x.codigo === 'ASIGNATURA_SIN_COMPETENCIA');
+    expect(h?.severidad).toBe('advertencia');
+    expect(r.tieneBloqueos).toBe(false);
   });
 
   it('nombra la asignatura afectada para poder corregirla', () => {

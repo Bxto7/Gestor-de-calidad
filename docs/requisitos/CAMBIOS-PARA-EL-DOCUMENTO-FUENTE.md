@@ -2,11 +2,11 @@
 
 Dirigido a quien mantiene *«Módulo de Plan de Estudios — Especificación de Requerimientos»* (Huancayo, 15 de agosto de 2026) y *«Módulo de Mejora Continua — Requerimientos»*.
 
-Al construir los módulos aparecieron catorce puntos en los que el sistema y el documento no coinciden. **Doce necesitan que alguien de la universidad decida**; dos son solo constancia de que se hizo más de lo pedido.
+Al construir los módulos aparecieron diecisiete puntos en los que el sistema y el documento no coinciden. **Doce necesitan que alguien de la universidad decida**; cinco son solo constancia (dos de que se hizo más de lo pedido, tres de decisiones ya aprobadas).
 
-Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-15** que se usan aquí. Falta **D-10** en este resumen a propósito: es una decisión de paleta de colores ya aprobada, sin nada que la universidad tenga que resolver.
+Este archivo está escrito para leerse sin abrir el código. El detalle técnico de cada punto está en la sección 8 de `PROMPT_CLAUDE_CODE_PLAN_ESTUDIOS_UI.md`, con los mismos identificadores **D-1** a **D-17** que se usan aquí. Faltan **D-10**, **D-16** y **D-17** en este resumen a propósito: son decisiones ya aprobadas, sin nada que la universidad tenga que resolver.
 
-Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto); D-11 se actualizó el 25 de septiembre de 2026; D-15 se añadió el 3 de octubre de 2026.
+Fecha de este informe: **11 de septiembre de 2026** (la primera versión es del 25 de agosto); D-11 se actualizó el 25 de septiembre de 2026; D-15 se añadió el 3 de octubre de 2026; D-16 y D-17 se añadieron el 6 de octubre de 2026.
 
 ---
 

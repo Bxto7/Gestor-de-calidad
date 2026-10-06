@@ -130,7 +130,11 @@ Se están construyendo **en paralelo**:
 >   ISI 2018 con sumillas «pendiente»; la parte de horas teóricas en 0 la retiró RF-CH-020), D-11 (`RF127`, se muestran deshabilitadas en vez de excluirse), D-12
 >   (`RF-PE-020`, evidencia solo como enlace), D-13 (`RF-PE-006` RN2, remite a
 >   números equivocados), D-14 (`RF-PE-032`/`033`, sin la plantilla institucional) y D-15 (`RF-CH-029`/`032`, eliminar atributos y criterios bloquea ante cualquier uso y no solo ante el de Mejora Continua activa).
->   D-7 y D-8 están ratificadas y D-10 aprobada.
+>   D-7 y D-8 están ratificadas; D-10, D-16 (`RF049` RN1 → `RF094`, asignatura sin
+>   competencia deja de bloquear aprobar el plan y pasa a advertencia
+>   justificable, 2026-10-06) y D-17 (`RF-PM-001` RN2, Mejora Continua, un plan de
+>   medición ya puede construirse también sobre un plan de estudios Histórico,
+>   2026-10-06) están aprobadas.
 > - **`RF127` cumple el resultado pero no la forma que pide.** Desde el 25 de
 >   septiembre de 2026 ningún plan de medición puede incluir una competencia sin
 >   atributo del graduado: `declararCompetencias` la rechaza (regla estricta sobre todo

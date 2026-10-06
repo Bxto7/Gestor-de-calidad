@@ -110,10 +110,10 @@ export class GestionarPlanesMedicion {
       );
     }
 
-    // RF-PM-001 RN2.
+    // RF-PM-001 RN2 (D-17): Aprobado, Vigente o Histórico.
     if (!base.elegible) {
       throw new ReglaDeNegocioViolada(
-        `El plan de estudios ${base.codigo} debe estar Aprobado o Vigente para poder medirse.`,
+        `El plan de estudios ${base.codigo} debe estar Aprobado, Vigente o Histórico para poder medirse.`,
       );
     }
 
