@@ -190,15 +190,13 @@ describe('VistaDocenteInicio', () => {
     expect(await screen.findByText('Aún no tienes evaluaciones asignadas.')).toBeInTheDocument();
   });
 
-  it('sin carrera a cargo no llama al endpoint y enlaza a Usuarios', () => {
+  it('sin carrera a cargo no llama al endpoint y pide a un administrador que la asigne', () => {
     const espia = vi.spyOn(api, 'listarMisEvaluaciones');
     montar(null);
 
     expect(screen.getByText('Esta vista necesita una carrera asignada.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ir a Usuarios' })).toHaveAttribute(
-      'href',
-      '/usuarios',
-    );
+    expect(screen.getByText(/Pide a un administrador/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ir a Usuarios' })).not.toBeInTheDocument();
     expect(espia).not.toHaveBeenCalled();
   });
 

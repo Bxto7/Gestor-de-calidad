@@ -7,7 +7,6 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 
 import { SiPuede } from '@/features/auth/components/SiPuede';
 import { useSesion } from '@/features/auth/hooks/contexto-sesion';
@@ -52,11 +51,11 @@ function Esqueleto() {
 
 function SinCarrera() {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-superficie-tenue p-6">
+    <div className="rounded-2xl bg-superficie-tenue p-6">
       <p className="text-sm text-tinta">Esta vista necesita una carrera asignada.</p>
-      <Link to="/usuarios" className="text-sm font-semibold text-uc-primary">
-        Ir a Usuarios
-      </Link>
+      <p className="mt-1 text-sm text-tinta-suave">
+        Pide a un administrador que te asigne una carrera para ver tus evaluaciones.
+      </p>
     </div>
   );
 }
