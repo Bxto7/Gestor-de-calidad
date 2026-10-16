@@ -180,6 +180,26 @@ describe('RF-CH-043 y RF-CH-044 — el detalle con el ciclo propio', () => {
     expect(selector).toHaveProperty('disabled', !editable);
   });
 
+  it('un Docente (mejora.solo_su_responsabilidad) edita el plan donde es responsable', async () => {
+    planDevuelto({ estado: 'Aprobado', responsableId: 'u1' });
+    renderizar(['mejora.leer', 'mejora.editar', 'mejora.solo_su_responsabilidad']);
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Seguimiento' }));
+    const selector = screen.getByRole('combobox', { name: /Estado de implementación/ });
+
+    expect(selector).toBeEnabled();
+  });
+
+  it('un Docente (mejora.solo_su_responsabilidad) no edita el plan de otro', async () => {
+    planDevuelto({ estado: 'Aprobado', responsableId: 'otro-docente' });
+    renderizar(['mejora.leer', 'mejora.editar', 'mejora.solo_su_responsabilidad']);
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Seguimiento' }));
+    const selector = screen.getByRole('combobox', { name: /Estado de implementación/ });
+
+    expect(selector).toBeDisabled();
+  });
+
   it('«nueva versión» solo desde Aprobado', async () => {
     planDevuelto({ estado: 'Aprobado' });
     renderizar(['mejora.leer', 'mejora.crear']);

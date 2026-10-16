@@ -272,6 +272,10 @@ export class GestionarPlanesMejora {
       competenciaId: datos.aspecto === 'COMPETENCIA' ? datos.elementoId : null,
       periodoId: datos.aspecto === 'COMPETENCIA' ? ambitoId : null,
       planEvaluacionId,
+      // Quien crea el plan nace como su responsable; un Coordinador puede
+      // reasignarlo luego con `editarDefinicion`, igual que hoy.
+      responsableId: actor.id,
+      responsableNombre: actor.nombre,
     });
 
     await this.eventos.publicar([new PlanMejoraCreado(actor, creado.id, creado.codigo)]);
@@ -419,6 +423,7 @@ export class GestionarPlanesMejora {
 
     const plan = await this.planLegible(actor, planId);
     await this.exigir(actor, 'mejora.editar', plan.carreraId);
+    await this.exigirResponsabilidadSiAplica(actor, plan);
     this.exigirSeguimientoEditable(plan);
 
     await this.planes.eliminarEvidencia(evidenciaId);
@@ -615,7 +620,7 @@ export class GestionarPlanesMejora {
     );
   }
 
-  /** (1) a (3): lectura, existencia y alcance, y el permiso sobre la carrera **del plan**. */
+  /** (1) a (4): lectura, existencia y alcance, el permiso sobre la carrera **del plan**, y la responsabilidad si aplica. */
   private async planGestionable(
     actor: Actor,
     id: string,
@@ -624,7 +629,27 @@ export class GestionarPlanesMejora {
     await this.exigir(actor, 'mejora.leer', null);
     const plan = await this.planLegible(actor, id);
     await this.exigir(actor, permiso, plan.carreraId);
+    await this.exigirResponsabilidadSiAplica(actor, plan);
     return plan;
+  }
+
+  /**
+   * Un Docente (marca `mejora.solo_su_responsabilidad`) solo gestiona los
+   * planes donde figura como responsable; un Coordinador, sin la marca, no
+   * tiene esta restricción. Ya pasó `mejora.leer`, así que el plan es visible
+   * — negar con un motivo es más claro aquí que simular que no existe.
+   */
+  private async exigirResponsabilidadSiAplica(actor: Actor, plan: DatosPlanMejora): Promise<void> {
+    const decision = await this.autorizacion.puede(
+      actor.id,
+      'mejora.solo_su_responsabilidad',
+      null,
+    );
+    if (decision.permitido && plan.responsableId !== actor.id) {
+      throw new AccesoDenegado(
+        `Solo quien es responsable del plan de mejora ${plan.codigo} puede gestionarlo.`,
+      );
+    }
   }
 
   /** RF-PJ-006/007: la definición solo se edita en Borrador. */

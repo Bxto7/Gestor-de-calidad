@@ -94,7 +94,7 @@ function datosDefinicionActual(plan: PlanMejora): DefinicionPlanMejora {
 export function PlanMejoraPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { publicar } = useEncabezado();
-  const { puede } = useSesion();
+  const { puede, identidad } = useSesion();
   const navegar = useNavigate();
 
   const { data: plan, isLoading, isError, error: falloAlCargar, refetch } = usePlanMejora(id);
@@ -165,8 +165,14 @@ export function PlanMejoraPage() {
 
   if (isLoading || !plan) return <Cargando etiqueta="Cargando plan de mejora…" />;
 
-  const editableDefinicion = permiteEdicionDefinicionMejora(plan.estado, puede('mejora.editar'));
-  const editableSeguimiento = permiteEdicionSeguimientoMejora(plan.estado, puede('mejora.editar'));
+  // Un Docente (marca `mejora.solo_su_responsabilidad`) solo edita el plan donde
+  // es responsable; el backend es la autoridad, esto solo evita ofrecer un botón
+  // que el servidor va a rechazar.
+  const puedeEditar =
+    puede('mejora.editar') &&
+    (!puede('mejora.solo_su_responsabilidad') || plan.responsableId === identidad?.id);
+  const editableDefinicion = permiteEdicionDefinicionMejora(plan.estado, puedeEditar);
+  const editableSeguimiento = permiteEdicionSeguimientoMejora(plan.estado, puedeEditar);
 
   const nombreElemento =
     plan.aspecto === 'CRITERIO_ACREDITACION'

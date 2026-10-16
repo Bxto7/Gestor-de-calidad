@@ -130,7 +130,10 @@ describe('Matriz de accesos vigente tras el MVP1 (RF-CH-002 a 005)', () => {
         'evaluacion.leer',
         'evidencia.registrar',
         'lectura.solo_su_carrera',
+        'mejora.crear',
+        'mejora.editar',
         'mejora.leer',
+        'mejora.solo_su_responsabilidad',
         'objetivo.leer',
       ].sort(),
     );

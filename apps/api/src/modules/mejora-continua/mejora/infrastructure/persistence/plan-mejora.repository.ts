@@ -222,7 +222,8 @@ export class PlanMejoraRepositoryPrisma
         plazo: new Date(0),
         recursos: '',
         metas: '',
-        responsable: '',
+        responsable: datos.responsableNombre,
+        responsableId: datos.responsableId,
       },
       select: SELECCION,
     });

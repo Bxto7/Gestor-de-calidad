@@ -132,6 +132,8 @@ describe('RF132 — inactivar', () => {
       competenciaId: null,
       periodoId: null,
       planEvaluacionId: null,
+      responsableId: '00000000-0000-0000-0000-000000000000',
+      responsableNombre: 'Fixture',
     });
     await impactoPlanMejora.crear({
       codigo: 'PJ-2',
@@ -142,6 +144,8 @@ describe('RF132 — inactivar', () => {
       competenciaId: null,
       periodoId: null,
       planEvaluacionId: null,
+      responsableId: '00000000-0000-0000-0000-000000000000',
+      responsableNombre: 'Fixture',
     });
     // Un plan de mejora de otro criterio no debe contarse.
     const otro = await criterios.crear(carreraA, 'C-02', 'Otro criterio');
@@ -154,6 +158,8 @@ describe('RF132 — inactivar', () => {
       competenciaId: null,
       periodoId: null,
       planEvaluacionId: null,
+      responsableId: '00000000-0000-0000-0000-000000000000',
+      responsableNombre: 'Fixture',
     });
 
     expect(await enUso.contarPlanesDeMejora(creado.id)).toBe(2);

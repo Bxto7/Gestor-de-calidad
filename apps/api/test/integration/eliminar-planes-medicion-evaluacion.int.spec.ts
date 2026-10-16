@@ -280,6 +280,8 @@ describe('RF-CH-039 — eliminar un plan de evaluación', () => {
       competenciaId: randomUUID(),
       periodoId: randomUUID(),
       planEvaluacionId,
+      responsableId: '00000000-0000-0000-0000-000000000000',
+      responsableNombre: 'Fixture',
     });
   }
 

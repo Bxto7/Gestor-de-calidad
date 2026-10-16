@@ -117,6 +117,8 @@ async function planDeMejoraSobre(criterioId: string, carreraId: string, codigo: 
     competenciaId: null,
     periodoId: null,
     planEvaluacionId: null,
+    responsableId: '00000000-0000-0000-0000-000000000000',
+    responsableNombre: 'Fixture',
   });
 }
 

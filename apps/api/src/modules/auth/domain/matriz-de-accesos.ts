@@ -102,6 +102,11 @@ export const PERMISOS = [
   ['mejora.editar', 'Editar un plan de mejora en Borrador', 'mejora-continua'],
   ['mejora.eliminar', 'Eliminar un plan de mejora en Borrador o En revisión', 'mejora-continua'],
   ['mejora.aprobar', 'Aprobar y observar un plan de mejora', 'mejora-continua'],
+  [
+    'mejora.solo_su_responsabilidad',
+    'Crear y editar solo los planes de mejora donde es responsable',
+    'mejora-continua',
+  ],
 
   // Mejora continua — Actas de Aprobación
   ['actas.leer', 'Consultar actas de aprobación', 'mejora-continua'],
@@ -269,6 +274,12 @@ export const ROLES: {
       'evaluacion.leer',
       'evidencia.registrar',
       'mejora.leer',
+      // Crea y edita planes de mejora, pero solo los suyos: la marca de abajo
+      // acota `mejora.editar` (y lo que comparte su misma puerta de control:
+      // seguimiento, evidencias, impacto) al plan donde es responsable.
+      'mejora.crear',
+      'mejora.editar',
+      'mejora.solo_su_responsabilidad',
       // Bloque 6b (RF-CH-041): ve todos los planes de mejora de SU carrera, no los
       // de otra. La marca acota TODAS sus lecturas: carreras, catálogo, evaluación.
       // De paso se corrige que hoy lea los planes de Evaluación de cualquier carrera.

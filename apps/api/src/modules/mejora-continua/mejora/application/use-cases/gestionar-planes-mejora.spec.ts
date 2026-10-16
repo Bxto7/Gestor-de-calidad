@@ -120,7 +120,12 @@ function directorioDouble(
 
 function permitirTodo(): AuthorizationPort {
   return {
-    puede: async () => ({ permitido: true }),
+    // Sin restricciones: la marca de responsabilidad es justo eso, una
+    // restricción, así que un actor "permite todo" no la lleva.
+    puede: async (_id, permiso) =>
+      permiso === 'mejora.solo_su_responsabilidad'
+        ? { permitido: false, motivo: 'No aplica.' }
+        : { permitido: true },
     permisosDe: async () => new Set(),
     carreraACargoDe: async () => CARRERA,
     rolesDe: async () => [],
@@ -209,6 +214,8 @@ function repoMejora(sobre: Partial<RepositorioPlanMejoraPort> = {}): Repositorio
         competenciaId: d.competenciaId,
         periodoId: d.periodoId,
         planEvaluacionId: d.planEvaluacionId,
+        responsable: d.responsableNombre,
+        responsableId: d.responsableId,
       }),
     porId: async () => plan(),
     editarDefinicion: async (_id, datos) => plan({ ...datos }),
@@ -495,6 +502,17 @@ describe('RF-PJ-001 a RF-PJ-003 y §2a del diseño de 2c-J-B — el alta', () =>
     expect(creado.estado).toBe('Borrador');
     expect(creado.estadoImplementacion).toBe('Pendiente');
     expect(creado.carreraId).toBe(CARRERA);
+  });
+
+  it('quien lo crea nace como su responsable', async () => {
+    const { caso } = montar();
+
+    const creado = await caso.crear(ACTOR, {
+      aspecto: 'CRITERIO_ACREDITACION',
+      elementoId: 'cri-1',
+    });
+
+    expect(creado.responsableId).toBe(ACTOR.id);
   });
 
   it('sin carrera a cargo, se deniega antes de tocar cualquier otra cosa (fail-closed)', async () => {
@@ -1167,7 +1185,9 @@ describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
       autorizacion: {
         puede: async (_id, permiso) => {
           pedidos.push(permiso);
-          return { permitido: true };
+          return permiso === 'mejora.solo_su_responsabilidad'
+            ? { permitido: false, motivo: 'No aplica.' }
+            : { permitido: true };
         },
         permisosDe: async () => new Set(),
         carreraACargoDe: async () => CARRERA,
@@ -1177,7 +1197,7 @@ describe('RF-PJ-004 y RF-PJ-005 — las transiciones', () => {
 
     await caso.transicionar(ACTOR, 'pj-1', 'aprobar', {});
 
-    expect(pedidos).toEqual(['mejora.leer', 'mejora.aprobar']);
+    expect(pedidos).toEqual(['mejora.leer', 'mejora.aprobar', 'mejora.solo_su_responsabilidad']);
   });
 
   it('deja constancia del antes y el después', async () => {
@@ -1503,6 +1523,28 @@ describe('RF-CH-040 y RF-CH-041 — el alcance por carrera', () => {
       );
     });
 
+    it('un Docente (mejora.solo_su_responsabilidad) edita el plan donde es responsable', async () => {
+      const { caso } = montar({
+        plan: plan({ responsableId: ACTOR.id }),
+        autorizacion: permitirSolo(['mejora.leer', 'mejora.editar', 'mejora.solo_su_responsabilidad']),
+      });
+
+      await expect(
+        caso.editarDefinicion(ACTOR, 'pj-1', definicion()),
+      ).resolves.toBeDefined();
+    });
+
+    it('un Docente (mejora.solo_su_responsabilidad) no edita el plan de otro', async () => {
+      const { caso } = montar({
+        plan: plan({ responsableId: 'otro-docente' }),
+        autorizacion: permitirSolo(['mejora.leer', 'mejora.editar', 'mejora.solo_su_responsabilidad']),
+      });
+
+      await expect(caso.editarDefinicion(ACTOR, 'pj-1', definicion())).rejects.toThrow(
+        AccesoDenegado,
+      );
+    });
+
     it('el permiso de escritura se pide sobre la carrera del plan', async () => {
       const pedidos: [string, string | null][] = [];
       const { caso } = montar({
@@ -1510,7 +1552,9 @@ describe('RF-CH-040 y RF-CH-041 — el alcance por carrera', () => {
         autorizacion: {
           puede: async (_id, permiso, carreraId) => {
             pedidos.push([permiso, carreraId ?? null]);
-            return { permitido: true };
+            return permiso === 'mejora.solo_su_responsabilidad'
+              ? { permitido: false, motivo: 'No aplica.' }
+              : { permitido: true };
           },
           permisosDe: async () => new Set(),
           carreraACargoDe: async () => CARRERA,
@@ -1523,6 +1567,7 @@ describe('RF-CH-040 y RF-CH-041 — el alcance por carrera', () => {
       expect(pedidos).toEqual([
         ['mejora.leer', null],
         ['mejora.eliminar', CARRERA],
+        ['mejora.solo_su_responsabilidad', null],
       ]);
     });
 

@@ -102,6 +102,9 @@ export interface NuevoPlanMejora {
   readonly competenciaId: string | null;
   readonly periodoId: string | null;
   readonly planEvaluacionId: string | null;
+  /** Quien crea el plan nace como su responsable (RF-CH-006 RN4 ampliada). */
+  readonly responsableId: string;
+  readonly responsableNombre: string;
 }
 
 /** RF-PJ-022/025 (decisión 7 del diseño): la fila única de umbrales configurables. */
