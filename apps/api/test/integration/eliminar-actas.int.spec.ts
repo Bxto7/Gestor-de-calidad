@@ -151,7 +151,7 @@ describe('RF-CH-050 — eliminar un acta', () => {
     ]);
 
     expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
-    const rechazado = r.find((x) => x.status === 'rejected') as PromiseRejectedResult;
+    const rechazado = r.find((x) => x.status === 'rejected')!;
     expect(rechazado.reason).toBeInstanceOf(NoEncontrado);
     expect(bitacora).toEqual(['Acta de aprobación ACTA-A eliminada.']);
   });

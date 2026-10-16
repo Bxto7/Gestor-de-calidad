@@ -1,0 +1,25 @@
+project:
+  name: "SGC-Sistema de Gestion de la Calidad para la UC" # ← cámbialo si lo requieres
+  version: 1.0.0
+  description: "Proyecto de software para la gestion de la calidad en la UC"
+
+stack:
+  detect: true                          # detecta tu lenguaje solo
+
+academic:
+  course: "Taller de Investigación 2"
+  evaluation_name: "Evaluación del Parcial"
+  partial_weight_percentage: 80         # vale el 80 % del Examen Parcial
+
+evaluator:                              # docente que recibe el informe
+  name: "Maglioni Arana Caparachin"
+  email: "marana@continental.edu.pe"
+  role: "Docente"
+
+members:                                # ← cada integrante recibe su nota
+  - name: "Carlos Alberto Tovar Sanchez"
+    code: "60982244"
+    email: "60982244@continental.edu.pe"
+  - name: "William Mikeiel Rojas Peña"
+    code: "72733304"
+    email: "72733304@continental.edu.pe"

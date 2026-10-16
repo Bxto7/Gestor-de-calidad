@@ -150,7 +150,7 @@ export class GestionarActas {
 
     return vinculos.flatMap((v) => {
       const plan = planesPorId.get(v.planMejoraId);
-      if (!plan || plan.carreraId !== carreraId) return []; // defensivo: ausente (RF-CH-042) o de otra carrera
+      if (plan?.carreraId !== carreraId) return []; // defensivo: ausente (RF-CH-042) o de otra carrera
       return [
         {
           id: v.id,
@@ -473,7 +473,7 @@ export class GestionarActas {
       const plan = planesPorId.get(v.planMejoraId);
       // El plan desapareció entre "cargar acciones" y "aprobar", o no es de la
       // carrera del acta (dato forzado o legado): no hay nada que congelar.
-      if (!plan || plan.carreraId !== carreraId) continue;
+      if (plan?.carreraId !== carreraId) continue;
 
       const metaCompetenciaSnapshot =
         plan.aspecto === 'COMPETENCIA' && v.porcentajeMedicionCompetencia !== null

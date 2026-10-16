@@ -303,7 +303,7 @@ describe('RF-CH-042 — eliminar un plan de mejora', () => {
     ]);
 
     expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
-    const rechazado = r.find((x) => x.status === 'rejected') as PromiseRejectedResult;
+    const rechazado = r.find((x) => x.status === 'rejected')!;
     expect(rechazado.reason).toBeInstanceOf(NoEncontrado);
     expect(bitacora).toEqual(['Plan de mejora PJ-1 eliminado en Borrador.']);
   });

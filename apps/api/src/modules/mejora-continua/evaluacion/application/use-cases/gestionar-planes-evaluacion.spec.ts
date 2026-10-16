@@ -851,6 +851,8 @@ describe('RF-CH-037 — el alta en la carrera de la sesión', () => {
   it('sin carrera asignada: AccesoDenegado con el motivo, antes de mirar la base', async () => {
     let consultada = false;
     const { caso } = montar({ autorizacion: autorizarEn(null) });
+    // eslint-disable-next-line @typescript-eslint/dot-notation -- acceso deliberado a la
+    // dependencia privada para espiar el orden de las llamadas; la notación de punto no compila.
     const mediciones = caso['mediciones'];
     const porIdOriginal = mediciones.porId.bind(mediciones);
     mediciones.porId = async (id) => {

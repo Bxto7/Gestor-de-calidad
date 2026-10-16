@@ -173,7 +173,7 @@ export class GenerarDocumentoActa {
       return vinculos.flatMap((v): AccionParaDocumento[] => {
         const plan = planesPorId.get(v.planMejoraId);
         // Ausente, o de otra carrera (dato forzado o legado: `planMejoraId` no tiene FK).
-        if (!plan || plan.carreraId !== acta.carreraId) return [];
+        if (plan?.carreraId !== acta.carreraId) return [];
         return [
           {
             incluida: v.incluida,

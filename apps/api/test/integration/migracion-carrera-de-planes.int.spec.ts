@@ -68,7 +68,7 @@ async function sobreEstadoDeAntes(
   } catch (e) {
     if (!(e instanceof Revertir)) throw e;
   }
-  if (fallo) throw fallo;
+  if (fallo) throw fallo as Error;
 }
 
 /** Un plan de medición como lo dejaba el código anterior: sin carrera. */

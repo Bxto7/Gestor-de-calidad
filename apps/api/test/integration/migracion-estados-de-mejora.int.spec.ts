@@ -53,7 +53,7 @@ async function revertida(prueba: (tx: Prisma.TransactionClient) => Promise<void>
   } catch (e) {
     if (!(e instanceof Revertir)) throw e;
   }
-  if (fallo) throw fallo;
+  if (fallo) throw fallo as Error;
 }
 
 type Estado = 'BORRADOR' | 'EN_REVISION' | 'APROBADO' | 'VIGENTE' | 'HISTORICO';

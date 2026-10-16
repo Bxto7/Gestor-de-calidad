@@ -308,7 +308,7 @@ describe('RF-PE-034 — nueva versión del plan de evaluación', () => {
 
   it('la versión nueva hereda la carrera del plan de origen (RF-CH-037)', async () => {
     let recibida = '';
-    const copiarOriginal = planes.copiar;
+    const copiarOriginal = planes.copiar.bind(planes);
     planes.copiar = async (d) => {
       recibida = d.carreraId;
       return copiarOriginal(d);
